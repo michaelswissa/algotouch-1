@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import MonthCalendar from '@/components/MonthCalendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,11 @@ interface TradeDay {
 }
 
 const Calendar = () => {
+  // Current date for default month/year
+  const currentDate = new Date();
+  const [currentMonth] = useState(currentDate.toLocaleString('he-IL', { month: 'long' }));
+  const [currentYear] = useState(currentDate.getFullYear());
+
   // Mock trade days data for the calendar
   const tradeDays: TradeDay[] = [
     { date: "2023-03-01", trades: 5, profit: 243.50, status: "Open" },
@@ -38,7 +43,11 @@ const Calendar = () => {
                 <CardTitle>לוח שנה מסחר</CardTitle>
               </CardHeader>
               <CardContent>
-                <MonthCalendar />
+                <MonthCalendar 
+                  month={currentMonth} 
+                  year={currentYear} 
+                  status="Open" 
+                />
               </CardContent>
             </Card>
           </div>

@@ -31,7 +31,7 @@ const CalendarDay = ({ day, isToday = false, status = 'neutral', month = 'curren
 interface MonthCalendarProps {
   month: string;
   year: number;
-  status?: 'פתוח' | 'פעיל' | 'Open' | 'Active';
+  status?: 'Open' | 'Active';
 }
 
 const MonthCalendar = ({ month, year, status = 'Open' }: MonthCalendarProps) => {
@@ -65,7 +65,7 @@ const MonthCalendar = ({ month, year, status = 'Open' }: MonthCalendarProps) => 
         <h3 className="text-sm font-medium">{month}, {year}</h3>
         <span className={cn(
           "text-xs px-2 py-0.5 rounded",
-          status === 'פעיל' || status === 'Active' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+          status === 'Active' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
         )}>
           {status}
         </span>
