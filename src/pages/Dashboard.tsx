@@ -27,7 +27,7 @@ const Dashboard = () => {
       <div className="tradervue-container py-8 animate-fade-in">
         <h1 className="text-3xl font-bold mb-6">לוח בקרה</h1>
         
-        {/* News Section */}
+        {/* News Section - First */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">חדשות שוק ההון</h2>
           <Card>
@@ -47,7 +47,7 @@ const Dashboard = () => {
           </Card>
         </div>
         
-        {/* Stock Indices Section */}
+        {/* Stock Indices Section - Second */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">מדדים בזמן אמת</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -69,7 +69,7 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Courses Section */}
+        {/* Courses Section - Third */}
         <Courses />
       </div>
     </Layout>

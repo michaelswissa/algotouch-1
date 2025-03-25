@@ -3,7 +3,7 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import CourseCard from '@/components/CourseCard';
 
-const CoursesPage = () => {
+const Courses = () => {
   const coursesData = [
     {
       title: "קורס אלגוטאצ' למתחילים",
@@ -73,4 +73,4 @@ const CoursesPage = () => {
   );
 };
 
-export default CoursesPage;
+export default Courses;

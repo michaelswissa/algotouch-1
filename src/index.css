@@ -100,12 +100,21 @@
     @apply bg-white rounded-lg shadow-sm border border-gray-100;
   }
 
+  /* RTL specific navigation link styling */
   [dir="rtl"] .tradervue-nav-link {
-    @apply flex flex-row-reverse items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
+  }
+
+  [dir="rtl"] .tradervue-nav-link svg {
+    @apply ml-2;
   }
 
   [dir="ltr"] .tradervue-nav-link {
     @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
+  }
+
+  [dir="ltr"] .tradervue-nav-link svg {
+    @apply mr-2;
   }
 
   .tradervue-nav-link.active {
@@ -124,12 +133,12 @@
     @apply w-full border-collapse;
   }
 
-  .tradervue-table th {
+  [dir="rtl"] .tradervue-table th {
     @apply px-4 py-2 text-right text-sm font-medium text-gray-500 border-b border-gray-200;
   }
 
   [dir="ltr"] .tradervue-table th {
-    @apply text-left;
+    @apply px-4 py-2 text-left text-sm font-medium text-gray-500 border-b border-gray-200;
   }
 
   .tradervue-table td {
@@ -180,7 +189,24 @@
     @apply flex-shrink-0 w-6 h-6 rounded-full bg-[#0299FF] text-white flex items-center justify-center text-xs font-medium;
   }
   
-  /* RTL specific utilities */
+  /* Enhanced RTL menu specific styling */
+  [dir="rtl"] .menu-icon {
+    @apply ml-2 -mr-1;
+  }
+  
+  [dir="rtl"] .dropdown-content {
+    @apply right-0 text-right;
+  }
+  
+  [dir="rtl"] .dropdown-item {
+    @apply flex flex-row-reverse text-right;
+  }
+  
+  [dir="rtl"] .dropdown-item-icon {
+    @apply ml-2 mr-0;
+  }
+  
+  /* General RTL utilities */
   [dir="rtl"] .rtl-flip {
     transform: scaleX(-1);
   }
@@ -234,52 +260,40 @@
     margin-right: 0;
     margin-left: 1rem;
   }
-  
-  /* Additional RTL overrides for typical UI elements */
-  [dir="rtl"] .flex-row {
-    flex-direction: row-reverse;
+
+  /* Icon spacing in RTL */
+  [dir="rtl"] .icon-ml {
+    @apply ml-0 mr-2;
   }
   
-  [dir="rtl"] .justify-end {
-    justify-content: flex-start;
+  [dir="rtl"] .icon-mr {
+    @apply mr-0 ml-2;
+  }
+
+  /* Dropdown and menu positioning for RTL */
+  [dir="rtl"] .dropdown-menu,
+  [dir="rtl"] .popover-content {
+    @apply right-0 left-auto;
   }
   
-  [dir="rtl"] .justify-start {
-    justify-content: flex-end;
+  /* Fix for button icons in RTL */
+  [dir="rtl"] button svg:first-child:not(:last-child),
+  [dir="rtl"] .button svg:first-child:not(:last-child) {
+    @apply ml-2 -mr-1;
   }
   
-  [dir="rtl"] .text-right {
-    text-align: left;
+  [dir="rtl"] button svg:last-child:not(:first-child),
+  [dir="rtl"] .button svg:last-child:not(:first-child) {
+    @apply mr-2 -ml-1;
   }
   
-  [dir="rtl"] .text-left {
-    text-align: right;
+  /* RTL search input adjustments */
+  [dir="rtl"] .search-input {
+    @apply pr-10 pl-4;
   }
   
-  /* Fix for dropdown menus in RTL */
-  [dir="rtl"] .radix-dropdown-content,
-  [dir="rtl"] .radix-popover-content {
-    text-align: right;
-  }
-  
-  [dir="rtl"] .right-3 {
-    right: auto;
-    left: 0.75rem;
-  }
-  
-  [dir="rtl"] .left-3 {
-    left: auto;
-    right: 0.75rem;
-  }
-  
-  /* RTL adjustments for common Lucide icons */
-  [dir="rtl"] [data-lucide="chevron-right"],
-  [dir="rtl"] [data-lucide="arrow-right"] {
-    transform: scaleX(-1);
-  }
-  
-  [dir="rtl"] [data-lucide="chevron-left"],
-  [dir="rtl"] [data-lucide="arrow-left"] {
-    transform: scaleX(-1);
+  [dir="rtl"] .search-icon {
+    @apply right-3 left-auto;
   }
 }
+

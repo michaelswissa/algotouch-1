@@ -7,7 +7,6 @@ import {
   BarChart2, 
   LineChart, 
   Notebook, 
-  PlusCircle, 
   Users,
   GraduationCap,
   Search,
@@ -31,7 +30,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="w-60 bg-white border-r border-gray-200 min-h-screen flex flex-col" dir="rtl">
+    <div className="w-60 bg-white border-l border-gray-200 min-h-screen flex flex-col" dir="rtl">
       <div className="p-4 border-b border-gray-200">
         <TraderVueLogo className="mb-4" />
         <div className="relative">
@@ -44,11 +43,11 @@ const Sidebar = () => {
           <Link
             key={item.path}
             to={item.path}
-            className={`tradervue-nav-link ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700 ${
               location.pathname === item.path ? 'active bg-gray-100 text-gray-900 font-medium' : ''
             }`}
           >
-            {item.icon}
+            <span className="flex-shrink-0">{item.icon}</span>
             <span>{item.name}</span>
           </Link>
         ))}

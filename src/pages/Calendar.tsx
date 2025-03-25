@@ -1,66 +1,74 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import Layout from '@/components/Layout';
-import TradeFilters from '@/components/TradeFilters';
-import ReportTabs from '@/components/ReportTabs';
-import PerformanceMetrics from '@/components/PerformanceMetrics';
 import MonthCalendar from '@/components/MonthCalendar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const CalendarPage = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [calendarView, setCalendarView] = useState('calendar');
+interface TradeDay {
+  date: string;
+  trades: number;
+  profit: number;
+  status: "Open" | "Active"; // Using allowed types
+}
+
+const Calendar = () => {
+  // Mock trade days data for the calendar
+  const tradeDays: TradeDay[] = [
+    { date: "2023-03-01", trades: 5, profit: 243.50, status: "Open" },
+    { date: "2023-03-02", trades: 3, profit: -120.75, status: "Active" },
+    { date: "2023-03-05", trades: 7, profit: 385.20, status: "Open" },
+    { date: "2023-03-08", trades: 2, profit: -85.30, status: "Open" },
+    { date: "2023-03-10", trades: 4, profit: 195.60, status: "Active" },
+    { date: "2023-03-15", trades: 6, profit: 310.90, status: "Open" },
+    { date: "2023-03-17", trades: 3, profit: -150.45, status: "Active" },
+    { date: "2023-03-22", trades: 5, profit: 270.80, status: "Open" },
+    { date: "2023-03-25", trades: 4, profit: -110.25, status: "Active" },
+    { date: "2023-03-28", trades: 8, profit: 420.70, status: "Open" },
+  ];
 
   return (
     <Layout>
       <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
         <h1 className="text-3xl font-bold mb-6">לוח שנה</h1>
         
-        <TradeFilters />
-        
-        <ReportTabs activeTab={activeTab} onTabChange={setActiveTab} />
-        
-        <PerformanceMetrics />
-        
-        <div className="mb-6">
-          <div className="flex border border-gray-200 rounded-md overflow-hidden w-fit">
-            <button 
-              className={`px-4 py-2 text-sm font-medium ${calendarView === 'recent' ? 'bg-white' : 'bg-gray-100'}`}
-              onClick={() => setCalendarView('recent')}
-            >
-              אחרונים
-            </button>
-            <button 
-              className={`px-4 py-2 text-sm font-medium ${calendarView === 'year-month-day' ? 'bg-white' : 'bg-gray-100'}`}
-              onClick={() => setCalendarView('year-month-day')}
-            >
-              שנה/חודש/יום
-            </button>
-            <button 
-              className={`px-4 py-2 text-sm font-medium ${calendarView === 'calendar' ? 'bg-white' : 'bg-gray-100'}`}
-              onClick={() => setCalendarView('calendar')}
-            >
-              לוח שנה
-            </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>לוח שנה מסחר</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MonthCalendar />
+              </CardContent>
+            </Card>
           </div>
-        </div>
-        
-        <div className="mb-6 flex justify-end">
-          <div className="flex border border-gray-200 rounded-md overflow-hidden">
-            <button className="px-4 py-1 text-sm">2021</button>
-            <button className="px-4 py-1 text-sm">2022</button>
-            <button className="px-4 py-1 text-sm">2023</button>
-            <button className="px-4 py-1 text-sm font-medium bg-gray-100">2024</button>
+          
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle>פעילות אחרונה</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {tradeDays.slice(0, 5).map((day, index) => (
+                    <div key={index} className="flex items-center justify-between pb-2 border-b border-gray-100 last:border-b-0">
+                      <div>
+                        <div className="font-medium">{day.date}</div>
+                        <div className="text-sm text-gray-500">{day.trades} עסקאות</div>
+                      </div>
+                      <div className={`text-lg font-semibold ${day.profit >= 0 ? 'text-[#0299FF]' : 'text-red-500'}`}>
+                        {day.profit >= 0 ? '+' : ''}{day.profit.toFixed(2)}$
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <MonthCalendar month="ינואר" year={2024} status="פתוח" />
-          <MonthCalendar month="פברואר" year={2024} status="פעיל" />
-          <MonthCalendar month="מרץ" year={2024} status="פתוח" />
         </div>
       </div>
     </Layout>
   );
 };
 
-export default CalendarPage;
+export default Calendar;
