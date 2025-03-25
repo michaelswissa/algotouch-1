@@ -13,6 +13,7 @@ import Journal from "./pages/Journal";
 import Notebook from "./pages/Notebook";
 import NewTrade from "./pages/NewTrade";
 import Community from "./pages/Community";
+import Courses from "./pages/Courses";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/notebook" element={<Notebook />} />
           <Route path="/new-trade" element={<NewTrade />} />
           <Route path="/community" element={<Community />} />
+          <Route path="/courses" element={<Courses />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
