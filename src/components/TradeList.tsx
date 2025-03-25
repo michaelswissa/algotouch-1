@@ -28,50 +28,50 @@ const mockTrades: Trade[] = [
   {
     id: '1',
     symbol: 'MGOGL',
-    date: '20 Jun 2024',
+    date: '20 יוני 2024',
     pnl: 781.52,
     volume: 123,
     executions: 12,
     exitEfficiency: 60,
     side: 'Long',
-    tags: ['Options', 'Smith', '+2'],
-    notes: 'The set-up: What I did...',
+    tags: ['אופציות', 'סמית\'', '+2'],
+    notes: 'הסט-אפ: מה שעשיתי...',
   },
   {
     id: '2',
     symbol: 'VERO',
-    date: '07 Jun 2024',
+    date: '07 יוני 2024',
     pnl: -246.90,
     volume: 41,
     executions: 1423,
     exitEfficiency: 10,
     side: 'Long',
-    tags: ['LogoPro', 'Healthcare'],
-    notes: 'The set-up: What I did...',
+    tags: ['לוגופרו', 'בריאות'],
+    notes: 'הסט-אפ: מה שעשיתי...',
   },
   {
     id: '3',
     symbol: 'HOLO',
-    date: '05 Jun 2024',
+    date: '05 יוני 2024',
     pnl: 808.01,
     volume: 1420,
     executions: 235,
     exitEfficiency: 43,
     side: 'Long',
-    tags: ['Options', 'Healthcare'],
-    notes: 'The set-up: What I did...',
+    tags: ['אופציות', 'בריאות'],
+    notes: 'הסט-אפ: מה שעשיתי...',
   },
   {
     id: '4',
     symbol: 'LSDI',
-    date: '31 May 2024',
+    date: '31 מאי 2024',
     pnl: 18.50,
     volume: 1,
     executions: 8,
     exitEfficiency: 98,
     side: 'Long',
-    tags: ['Options', 'Healthcare', '+2'],
-    notes: 'The set-up: What I did...',
+    tags: ['אופציות', 'בריאות', '+2'],
+    notes: 'הסט-אפ: מה שעשיתי...',
   },
 ];
 
@@ -79,12 +79,12 @@ const TradeList = () => {
   return (
     <div>
       <div className="flex gap-4 mb-4 overflow-x-auto">
-        <button className="tradervue-tab active">Table</button>
-        <button className="tradervue-tab">Charts (large)</button>
-        <button className="tradervue-tab">Charts (short)</button>
+        <button className="tradervue-tab active">טבלה</button>
+        <button className="tradervue-tab">גרפים (גדולים)</button>
+        <button className="tradervue-tab">גרפים (קטנים)</button>
         <div className="flex-1"></div>
-        <button className="tradervue-tab active">Gross</button>
-        <button className="tradervue-tab">Net</button>
+        <button className="tradervue-tab active">ברוטו</button>
+        <button className="tradervue-tab">נטו</button>
       </div>
 
       <Table className="tradervue-table">
@@ -93,15 +93,15 @@ const TradeList = () => {
             <TableCell className="w-10">
               <input type="checkbox" className="rounded border-gray-300" />
             </TableCell>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Date</TableCell>
-            <TableCell>P&L</TableCell>
-            <TableCell>Volume</TableCell>
-            <TableCell>Execs</TableCell>
-            <TableCell>Exit eff.</TableCell>
-            <TableCell>Side</TableCell>
-            <TableCell>Tags</TableCell>
-            <TableCell>Notes</TableCell>
+            <TableCell>סמל</TableCell>
+            <TableCell>תאריך</TableCell>
+            <TableCell>רווח/הפסד</TableCell>
+            <TableCell>נפח</TableCell>
+            <TableCell>פעולות</TableCell>
+            <TableCell>יעילות יציאה</TableCell>
+            <TableCell>כיוון</TableCell>
+            <TableCell>תגיות</TableCell>
+            <TableCell>הערות</TableCell>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -116,7 +116,7 @@ const TradeList = () => {
                 trade.pnl >= 0 ? 'text-tradervue-green' : 'text-tradervue-red',
                 'font-medium'
               )}>
-                {trade.pnl >= 0 ? `$${trade.pnl}` : `-$${Math.abs(trade.pnl)}`}
+                {trade.pnl >= 0 ? `₪${trade.pnl}` : `-₪${Math.abs(trade.pnl)}`}
               </TableCell>
               <TableCell>{trade.volume}</TableCell>
               <TableCell>{trade.executions}</TableCell>

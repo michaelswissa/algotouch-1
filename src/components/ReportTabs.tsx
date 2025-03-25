@@ -8,13 +8,13 @@ interface ReportTabsProps {
 
 const ReportTabs = ({ activeTab, onTabChange }: ReportTabsProps) => {
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'detailed', label: 'Detailed' },
-    { id: 'win-vs-loss', label: 'Win vs Loss' },
-    { id: 'drawdown', label: 'Drawdown' },
-    { id: 'compare', label: 'Compare' },
-    { id: 'tag-breakdown', label: 'Tag Breakdown' },
-    { id: 'advanced', label: 'Advanced' },
+    { id: 'overview', label: 'סקירה כללית' },
+    { id: 'detailed', label: 'מפורט' },
+    { id: 'win-vs-loss', label: 'רווח לעומת הפסד' },
+    { id: 'drawdown', label: 'ירידה' },
+    { id: 'compare', label: 'השוואה' },
+    { id: 'tag-breakdown', label: 'פילוח תגיות' },
+    { id: 'advanced', label: 'מתקדם' },
   ];
 
   return (

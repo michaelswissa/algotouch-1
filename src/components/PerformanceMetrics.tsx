@@ -15,39 +15,39 @@ const PerformanceMetrics = () => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <div className="space-y-1">
-            <span className="text-xs text-gray-500">P&L Type</span>
+            <span className="text-xs text-gray-500">סוג רווח/הפסד</span>
             <Select defaultValue="gross">
               <SelectTrigger className="w-28 py-1 h-auto text-sm">
-                <SelectValue placeholder="P&L Type" />
+                <SelectValue placeholder="סוג רווח/הפסד" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="gross">Gross</SelectItem>
-                <SelectItem value="net">Net</SelectItem>
+                <SelectItem value="gross">ברוטו</SelectItem>
+                <SelectItem value="net">נטו</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-gray-500">View mode</span>
+            <span className="text-xs text-gray-500">מצב תצוגה</span>
             <Select defaultValue="dollar">
               <SelectTrigger className="w-28 py-1 h-auto text-sm">
-                <SelectValue placeholder="View mode" />
+                <SelectValue placeholder="מצב תצוגה" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="dollar">$ Value</SelectItem>
-                <SelectItem value="percent">% Value</SelectItem>
+                <SelectItem value="dollar">ערך ₪</SelectItem>
+                <SelectItem value="percent">ערך %</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-gray-500">Report type</span>
+            <span className="text-xs text-gray-500">סוג דוח</span>
             <Select defaultValue="aggregate">
               <SelectTrigger className="w-36 py-1 h-auto text-sm">
-                <SelectValue placeholder="Report type" />
+                <SelectValue placeholder="סוג דוח" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="aggregate">Aggregate P&L</SelectItem>
-                <SelectItem value="daily">Daily P&L</SelectItem>
-                <SelectItem value="cumulative">Cumulative P&L</SelectItem>
+                <SelectItem value="aggregate">רווח/הפסד מצטבר</SelectItem>
+                <SelectItem value="daily">רווח/הפסד יומי</SelectItem>
+                <SelectItem value="cumulative">רווח/הפסד מצטבר</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -82,7 +82,7 @@ const PerformanceMetrics = () => {
             </div>
             <div>
               <h4 className="text-xl font-bold">1.24</h4>
-              <p className="text-sm text-gray-500">Profit factor</p>
+              <p className="text-sm text-gray-500">מכפיל רווח</p>
             </div>
           </div>
         </Card>
@@ -114,7 +114,7 @@ const PerformanceMetrics = () => {
             </div>
             <div>
               <h4 className="text-xl font-bold">1.24</h4>
-              <p className="text-sm text-gray-500">Winning VS Losing Trades</p>
+              <p className="text-sm text-gray-500">עסקאות רווחיות לעומת הפסדיות</p>
             </div>
           </div>
         </Card>
@@ -125,27 +125,27 @@ const PerformanceMetrics = () => {
               <h4 className="text-xl font-bold">1.24</h4>
               <div className="flex items-center gap-4 mt-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-green-500">$34.82</span>
+                  <span className="text-xs text-green-500">₪34.82</span>
                   <div className="w-20 h-1 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-green-500 w-[70%]"></div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-red-500">$51.32</span>
+                  <span className="text-xs text-red-500">₪51.32</span>
                   <div className="w-20 h-1 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-red-500 w-[30%]"></div>
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-gray-500 mt-1">Avg. Winning vs Losing Trade</p>
+              <p className="text-sm text-gray-500 mt-1">עסקה רווחית לעומת מפסידה בממוצע</p>
             </div>
           </div>
         </Card>
 
         <Card className="md:col-span-3 p-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-700">P&L</h4>
-            <h3 className="text-xl font-bold text-gray-900">$344,456.78</h3>
+            <h4 className="text-sm font-medium text-gray-700">רווח/הפסד</h4>
+            <h3 className="text-xl font-bold text-gray-900">₪344,456.78</h3>
           </div>
           <div className="mt-2 h-14 w-full">
             <svg viewBox="0 0 300 60" className="w-full h-full">

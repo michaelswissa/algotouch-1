@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { GraduationCap, BookOpen, PlayCircle } from 'lucide-react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { GraduationCap, BookOpen, Play, ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
-export interface CourseModule {
+export interface ModuleProps {
   title: string;
   duration?: string;
   isNew?: boolean;
@@ -13,59 +14,66 @@ export interface CourseModule {
 export interface CourseProps {
   title: string;
   description: string;
-  modules: CourseModule[];
-  icon?: 'graduation' | 'book' | 'play';
+  icon: "graduation" | "book" | "play";
+  id?: string;
+  modules: ModuleProps[];
+  isSelected?: boolean;
+  onClick?: () => void;
 }
 
-const CourseCard = ({ title, description, modules, icon = 'graduation' }: CourseProps) => {
+const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: CourseProps) => {
+  // Render the appropriate icon based on the icon prop
   const renderIcon = () => {
     switch (icon) {
-      case 'graduation':
-        return <GraduationCap className="w-8 h-8 text-[#0299FF]" />;
-      case 'book':
-        return <BookOpen className="w-8 h-8 text-[#0299FF]" />;
-      case 'play':
-        return <PlayCircle className="w-8 h-8 text-[#0299FF]" />;
+      case "graduation":
+        return <GraduationCap className="h-5 w-5 text-blue-500" />;
+      case "book":
+        return <BookOpen className="h-5 w-5 text-green-500" />;
+      case "play":
+        return <Play className="h-5 w-5 text-purple-500" />;
       default:
-        return <GraduationCap className="w-8 h-8 text-[#0299FF]" />;
+        return <GraduationCap className="h-5 w-5 text-blue-500" />;
     }
   };
 
   return (
-    <div className="course-card p-6">
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0">
-          {renderIcon()}
-        </div>
-        <div className="flex-1">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
-          <p className="text-gray-600 mb-4">{description}</p>
-          
-          <div className="mb-4">
-            <span className="text-sm font-medium text-gray-700 block mb-2">מודולים נבחרים:</span>
-            <ul className="space-y-2 text-sm text-gray-600">
-              {modules.slice(0, 3).map((module, index) => (
-                <li key={index} className="flex items-center gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#0299FF] text-white flex items-center justify-center text-xs font-medium">
-                    {index + 1}
-                  </span>
-                  <span className="flex-1">{module.title}</span>
-                  {module.duration && <span className="text-xs text-gray-500">{module.duration}</span>}
-                  {module.isNew && <Badge className="bg-green-100 text-green-800 hover:bg-green-200">חדש</Badge>}
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <Button variant="outline" className="text-[#0299FF] border-[#0299FF] hover:bg-[#0299FF] hover:text-white">
-              פרטים נוספים
-            </Button>
-            <span className="text-sm text-gray-500">{modules.length} מודולים</span>
+    <Card className={`hover:shadow-md transition-all ${isSelected ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-start gap-2">
+          <div className="p-2 rounded-full bg-blue-100">{renderIcon()}</div>
+          <div>
+            <CardTitle className="text-lg">{title}</CardTitle>
           </div>
         </div>
-      </div>
-    </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-600 mb-4 text-sm">{description}</p>
+        <div className="space-y-2">
+          {modules.slice(0, 4).map((module, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <ArrowLeft className="h-3 w-3 text-gray-400" />
+              <span className="text-gray-700">{module.title}</span>
+              {module.duration && <span className="text-gray-500 text-xs">{module.duration}</span>}
+              {module.isNew && <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200 mr-auto">חדש</Badge>}
+            </div>
+          ))}
+          {modules.length > 4 && (
+            <div className="text-sm text-gray-500 pt-1">
+              ועוד {modules.length - 4} מודולים...
+            </div>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button 
+          variant="outline" 
+          className="w-full" 
+          onClick={onClick}
+        >
+          {isSelected ? 'כעת נצפה' : 'צפה בקורס'}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

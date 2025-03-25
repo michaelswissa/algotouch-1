@@ -14,7 +14,9 @@ import Notebook from "./pages/Notebook";
 import MonthlyReport from "./pages/MonthlyReport";
 import Community from "./pages/Community";
 import Courses from "./pages/Courses";
+import CourseDetail from "./pages/CourseDetail";
 import NotFound from "./pages/NotFound";
+import NewTrade from "./pages/NewTrade";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,8 @@ const App = () => {
             <Route path="/monthly-report" element={<MonthlyReport />} />
             <Route path="/community" element={<Community />} />
             <Route path="/courses" element={<Courses />} />
+            <Route path="/courses/:courseId" element={<CourseDetail />} />
+            <Route path="/new-trade" element={<NewTrade />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

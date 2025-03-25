@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Calendar, 
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 
 const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   
   const navItems = [
     { path: '/dashboard', name: 'לוח בקרה', icon: <Home size={18} /> },
@@ -28,6 +29,13 @@ const Sidebar = () => {
     { path: '/community', name: 'קהילה', icon: <Users size={18} /> },
     { path: '/courses', name: 'קורסים', icon: <GraduationCap size={18} /> },
   ];
+
+  const isActive = (path: string) => {
+    // Check if the current location starts with the path
+    // This handles nested routes like /courses/:courseId
+    return location.pathname === path || 
+           (path !== '/' && location.pathname.startsWith(path));
+  };
 
   return (
     <div className="w-60 bg-white border-l border-gray-200 min-h-screen flex flex-col" dir="rtl">
@@ -44,7 +52,7 @@ const Sidebar = () => {
             key={item.path}
             to={item.path}
             className={`flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700 ${
-              location.pathname === item.path ? 'active bg-gray-100 text-gray-900 font-medium' : ''
+              isActive(item.path) ? 'active bg-gray-100 text-gray-900 font-medium' : ''
             }`}
           >
             <span className="ml-2">{item.icon}</span>

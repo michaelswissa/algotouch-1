@@ -20,7 +20,7 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
   return (
     <div className="flex flex-wrap gap-4 mb-4">
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Symbol</label>
+        <label className="text-xs text-gray-500">סמל</label>
         <input 
           type="text" 
           value={symbol}
@@ -30,74 +30,74 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
       </div>
       
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Tags</label>
+        <label className="text-xs text-gray-500">תגיות</label>
         <Select defaultValue="3-selected">
           <SelectTrigger className="w-36 py-1.5 h-auto">
-            <SelectValue placeholder="Select Tags" />
+            <SelectValue placeholder="בחר תגיות" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="3-selected">3 selected</SelectItem>
-            <SelectItem value="momentum">Momentum</SelectItem>
-            <SelectItem value="swing">Swing</SelectItem>
-            <SelectItem value="day-trade">Day Trade</SelectItem>
+            <SelectItem value="3-selected">3 נבחרו</SelectItem>
+            <SelectItem value="momentum">מומנטום</SelectItem>
+            <SelectItem value="swing">סווינג</SelectItem>
+            <SelectItem value="day-trade">דיי טרייד</SelectItem>
           </SelectContent>
         </Select>
       </div>
       
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Side</label>
+        <label className="text-xs text-gray-500">כיוון</label>
         <Select defaultValue="long">
           <SelectTrigger className="w-28 py-1.5 h-auto">
-            <SelectValue placeholder="Side" />
+            <SelectValue placeholder="כיוון" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="long">Long</SelectItem>
             <SelectItem value="short">Short</SelectItem>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">הכל</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {!minimal && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Duration</label>
+          <label className="text-xs text-gray-500">משך</label>
           <Select defaultValue="all">
             <SelectTrigger className="w-28 py-1.5 h-auto">
-              <SelectValue placeholder="Duration" />
+              <SelectValue placeholder="משך" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="day">Day</SelectItem>
-              <SelectItem value="swing">Swing</SelectItem>
-              <SelectItem value="position">Position</SelectItem>
+              <SelectItem value="all">הכל</SelectItem>
+              <SelectItem value="day">יום</SelectItem>
+              <SelectItem value="swing">סווינג</SelectItem>
+              <SelectItem value="position">פוזיציה</SelectItem>
             </SelectContent>
           </Select>
         </div>
       )}
 
       <div className="space-y-1">
-        <label className="text-xs text-gray-500 invisible">Date</label>
+        <label className="text-xs text-gray-500 invisible">תאריך</label>
         <Button variant="outline" size="sm" className="h-[34px] gap-2">
           <Calendar size={14} />
-          <span>Jan 6 - Feb 6</span>
+          <span>6 ינו' - 6 פבר'</span>
         </Button>
       </div>
 
       {!minimal && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500 invisible">Advanced</label>
+          <label className="text-xs text-gray-500 invisible">מתקדם</label>
           <Button variant="outline" size="sm" className="h-[34px]">
-            <Filter size={14} className="mr-2" />
-            Advanced
+            <Filter size={14} className="ml-2" />
+            מתקדם
           </Button>
         </div>
       )}
 
       {!minimal && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500 invisible">Clear</label>
+          <label className="text-xs text-gray-500 invisible">נקה</label>
           <Button variant="outline" size="sm" className="h-[34px]">
-            Clear
+            נקה
           </Button>
         </div>
       )}

@@ -9,13 +9,13 @@ import { Button } from '@/components/ui/button';
 
 const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
-  const [currentMonth, setCurrentMonth] = useState('January');
+  const [currentMonth, setCurrentMonth] = useState('ינואר');
   const [currentYear, setCurrentYear] = useState(2024);
 
   return (
     <Layout>
       <div className="tradervue-container py-8 animate-fade-in">
-        <h1 className="text-3xl font-bold mb-6">Reports</h1>
+        <h1 className="text-3xl font-bold mb-6">דוחות</h1>
         
         <TradeFilters />
         
@@ -29,7 +29,7 @@ const ReportsPage = () => {
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ChevronLeft size={16} />
             </Button>
-            <span className="text-sm font-medium">Today</span>
+            <span className="text-sm font-medium">היום</span>
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ChevronRight size={16} />
             </Button>
@@ -43,7 +43,7 @@ const ReportsPage = () => {
                 <div className="flex items-center gap-1">
                   <span className="font-medium">{day}</span>
                   <span className="text-xs text-gray-500">
-                    {i === 0 ? 'Mon' : i === 1 ? 'Tue' : i === 2 ? 'Wed' : i === 3 ? 'Thu' : i === 4 ? 'Fri' : i === 5 ? 'Sat' : 'Sun'}
+                    {i === 0 ? 'שני' : i === 1 ? 'שלישי' : i === 2 ? 'רביעי' : i === 3 ? 'חמישי' : i === 4 ? 'שישי' : i === 5 ? 'שבת' : 'ראשון'}
                   </span>
                 </div>
                 {i === 0 || i === 2 || i === 4 ? (
@@ -55,10 +55,10 @@ const ReportsPage = () => {
               
               <div className="text-center">
                 <p className={`font-bold ${i === 0 || i === 2 || i === 4 ? 'text-tradervue-green' : i === 1 || i === 3 ? 'text-tradervue-red' : 'text-gray-400'}`}>
-                  {i === 0 || i === 2 || i === 4 ? '+$1.5k' : i === 1 || i === 3 ? '-$1.5k' : '$0'}
+                  {i === 0 || i === 2 || i === 4 ? '+₪1.5k' : i === 1 || i === 3 ? '-₪1.5k' : '₪0'}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {i === 0 || i === 1 || i === 2 || i === 3 || i === 4 ? '15 trades' : '0 trades'}
+                  {i === 0 || i === 1 || i === 2 || i === 3 || i === 4 ? '15 עסקאות' : '0 עסקאות'}
                 </p>
               </div>
             </div>
@@ -66,11 +66,11 @@ const ReportsPage = () => {
         </div>
         
         <div className="mb-8">
-          <h3 className="text-lg font-medium mb-4">Your recent shared trades</h3>
+          <h3 className="text-lg font-medium mb-4">העסקאות המשותפות האחרונות שלך</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="tradervue-card p-4">
-                <div className="mb-2 text-sm text-gray-500">May 6, 2021 09:30</div>
+                <div className="mb-2 text-sm text-gray-500">6 במאי, 2021 09:30</div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold">ETSY</span>
                   <div className="h-6 w-24">
@@ -93,8 +93,8 @@ const ReportsPage = () => {
         
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-medium">Open trades</h3>
-            <span className="text-sm text-gray-500">30 days</span>
+            <h3 className="text-lg font-medium">עסקאות פתוחות</h3>
+            <span className="text-sm text-gray-500">30 ימים</span>
           </div>
           <span className="text-sm font-medium">1</span>
         </div>

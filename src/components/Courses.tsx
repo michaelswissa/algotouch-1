@@ -2,11 +2,17 @@
 import React from 'react';
 import CourseCard, { CourseProps } from './CourseCard';
 
+interface CoursesComponentProps {
+  onCourseClick?: (courseId: string) => void;
+  selectedCourseId?: string | null;
+}
+
 const coursesData: CourseProps[] = [
   {
     title: "קורס אלגוטאצ' למתחילים",
     description: "לימוד שיטתי של מערכת אלגוטאצ' הכולל פתיחת חשבון, הגדרת המערכת, תפעול ומסחר, ועד ניהול כספים ומיסוי.",
     icon: "graduation",
+    id: "algotouch-basics",
     modules: [
       { title: "פתיחת חשבון ב-TradeStation" },
       { title: "הגדרת מערכת אלגוטאצ'" },
@@ -21,6 +27,7 @@ const coursesData: CourseProps[] = [
     title: "הדרכה מקיפה למערכת TradeStation",
     description: "קורס עומק המכסה את כל היבטי מערכת TradeStation מסביבת העבודה ועד סורקי מניות, גרפים, ושליחת פקודות.",
     icon: "book",
+    id: "algotouch-advanced",
     modules: [
       { title: "הדרכת מתחילים למערכת מסחר TradeStation", duration: "1:25:56" },
       { title: "תחילת העבודה עם חשבון החוזים העתידיים", duration: "9:35" },
@@ -38,6 +45,7 @@ const coursesData: CourseProps[] = [
     title: "מסחר בחוזים עתידיים",
     description: "קורס מקיף העוסק במסחר בחוזים עתידיים בבורסה האמריקאית, כולל סשנים, סימולים, פקיעות ובטחונות.",
     icon: "play",
+    id: "market-analysis",
     modules: [
       { title: "פתיח", duration: "1:49" },
       { title: "פעילות החוזים העתידיים הפופולרים", duration: "2:43" },
@@ -49,13 +57,18 @@ const coursesData: CourseProps[] = [
   }
 ];
 
-const Courses = () => {
+const Courses = ({ onCourseClick, selectedCourseId }: CoursesComponentProps) => {
   return (
     <div className="mt-8" dir="rtl">
       <h2 className="text-2xl font-bold mb-6">קורסים דיגיטליים</h2>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {coursesData.map((course, index) => (
-          <CourseCard key={index} {...course} />
+          <CourseCard 
+            key={index} 
+            {...course} 
+            onClick={() => onCourseClick && course.id && onCourseClick(course.id)}
+            isSelected={course.id === selectedCourseId}
+          />
         ))}
       </div>
     </div>
