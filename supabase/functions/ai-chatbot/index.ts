@@ -24,21 +24,49 @@ serve(async (req) => {
     // Initialize with a system message if needed
     const systemMessage = {
       role: "system",
-      content: "אתה עוזר מומחה למערכת AlgoTouch ולמסחר אלגוריתמי. התשובות שלך הן בעברית, מדויקות וקצרות. אתה עוזר למשתמשים להבין ניתוח טכני, רמות תמיכה והתנגדות, והגדרת פרמטרים במערכת AlgoTouch."
-    }
-
-    // Create or retrieve thread
-    let thread
-    if (threadId) {
-      thread = { id: threadId }
-    } else {
-      thread = await openai.beta.threads.create()
-      console.log("Created new thread:", thread.id)
+      content: "אתה מומחה למסחר אלגוריתמי המיועד לשילוב בין מערכת AlgoTouch לפלטפורמת TradeStation. תפקידך לספק הסברים טכניים בכל הנוגע להגדרות המערכת, ניהול סיכונים, אופטימיזציה של פרמטרים ואסטרטגיות מסחר מתקדמות. אתה עונה בעברית בצורה טכנית, מפורטת וברורה."
     }
 
     // Action switch
     switch (action) {
       case 'chat':
+        // If using the standard chat completions API
+        if (!threadId) {
+          const chatMessages = messages || []
+          // Add system message if not present
+          if (!chatMessages.some(msg => msg.role === 'system')) {
+            chatMessages.unshift(systemMessage)
+          }
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: chatMessages,
+            temperature: 0.7,
+          })
+
+          return new Response(
+            JSON.stringify({
+              messages: [...chatMessages, {
+                role: 'assistant',
+                content: completion.choices[0].message.content,
+                created_at: new Date().toISOString()
+              }]
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        // Create or retrieve thread for Assistants API
+        let thread
+        if (threadId) {
+          thread = { id: threadId }
+        } else {
+          thread = await openai.beta.threads.create()
+          console.log("Created new thread:", thread.id)
+        }
+
         // Add user message to thread
         if (messages && messages.length > 0) {
           await openai.beta.threads.messages.create(thread.id, {
@@ -49,8 +77,8 @@ serve(async (req) => {
 
         // Create a run with the assistant
         const run = await openai.beta.threads.runs.create(thread.id, {
-          assistant_id: "asst_KqyUxYuP1v5eHlILJEsH6Czz", // Using the assistant ID from the PHP code
-          instructions: "אתה מומחה במערכת AlgoTouch ובמסחר אלגוריתמי. ענה בעברית בצורה ברורה וקצרה."
+          assistant_id: "asst_KqyUxYuP1v5eHlILJEsH6Czz", // Using the provided assistant ID
+          instructions: "אתה מומחה למסחר אלגוריתמי. ענה בעברית בצורה טכנית, מפורטת וברורה."
         })
 
         // Poll for run completion
@@ -63,6 +91,7 @@ serve(async (req) => {
         while (runStatus.status !== 'completed' && runStatus.status !== 'failed' && attempts < maxAttempts) {
           await new Promise(resolve => setTimeout(resolve, 2000))
           runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id)
+          console.log(`Run status: ${runStatus.status}, attempt: ${attempts}`)
           attempts++
         }
 
@@ -94,7 +123,7 @@ serve(async (req) => {
 
       case 'tts':
         const text = messages[0].content
-        // Using OpenAI TTS for simplicity
+        // Using OpenAI TTS
         const mp3 = await openai.audio.speech.create({
           model: "tts-1",
           voice: "nova",

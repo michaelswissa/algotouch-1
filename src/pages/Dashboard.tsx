@@ -2,7 +2,6 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
-import ChatBot from '@/components/ChatBot';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Dashboard = () => {
@@ -72,12 +71,6 @@ const Dashboard = () => {
         
         {/* Courses Section - Third */}
         <Courses />
-        
-        {/* AI Chatbot Section - Fourth */}
-        <div className="mt-12 mb-8">
-          <h2 className="text-xl font-semibold mb-4">בינה מלאכותית - העוזר החכם</h2>
-          <ChatBot />
-        </div>
       </div>
     </Layout>
   );

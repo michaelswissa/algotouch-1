@@ -16,11 +16,11 @@ export function useChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'system',
-      content: 'אתה עוזר מומחה למערכת AlgoTouch ולמסחר אלגוריתמי. התשובות שלך הן בעברית, מדויקות וקצרות.'
+      content: 'אתה מומחה למסחר אלגוריתמי המיועד לשילוב בין מערכת AlgoTouch לפלטפורמת TradeStation. תפקידך לספק הסברים טכניים בכל הנוגע להגדרות המערכת, ניהול סיכונים, אופטימיזציה של פרמטרים ואסטרטגיות מסחר מתקדמות.'
     },
     {
       role: 'assistant',
-      content: 'שלום, אני העוזר החכם של AlgoTouch. איך אוכל לעזור לך היום?'
+      content: 'שלום, אני העוזר החכם של AlgoTouch. כיצד אוכל לעזור לך היום בנושאי מסחר אלגוריתמי, הגדרות המערכת, או אסטרטגיות מסחר?'
     }
   ]);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -111,11 +111,11 @@ export function useChatbot() {
     setMessages([
       {
         role: 'system',
-        content: 'אתה עוזר מומחה למערכת AlgoTouch ולמסחר אלגוריתמי. התשובות שלך הן בעברית, מדויקות וקצרות.'
+        content: 'אתה מומחה למסחר אלגוריתמי המיועד לשילוב בין מערכת AlgoTouch לפלטפורמת TradeStation. תפקידך לספק הסברים טכניים בכל הנוגע להגדרות המערכת, ניהול סיכונים, אופטימיזציה של פרמטרים ואסטרטגיות מסחר מתקדמות.'
       },
       {
         role: 'assistant',
-        content: 'שלום, אני העוזר החכם של AlgoTouch. איך אוכל לעזור לך היום?'
+        content: 'שלום, אני העוזר החכם של AlgoTouch. כיצד אוכל לעזור לך היום בנושאי מסחר אלגוריתמי, הגדרות המערכת, או אסטרטגיות מסחר?'
       }
     ]);
     setThreadId(null);

@@ -111,17 +111,18 @@ const ChatBot = () => {
   return (
     <div className="container mx-auto py-8 max-w-5xl" dir="rtl">
       <div>
-        <Card>
+        <Card className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border border-blue-100 dark:border-blue-900">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ml-2 rtl:mr-2 rtl:ml-0">
-                  <Bot className="h-5 w-5" />
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ml-2 rtl:mr-2 rtl:ml-0">
+                  <Bot className="h-6 w-6" />
                 </div>
                 <div>
                   <CardTitle className="text-2xl">העוזר החכם של AlgoTouch</CardTitle>
                   <CardDescription>
-                    העוזר מתמחה במערכת AlgoTouch, אסטרטגיות מסחר וניתוח נתונים. שאל כל שאלה הקשורה למערכת ולמסחר אלגוריתמי.
+                    העוזר מתמחה במערכת AlgoTouch ובמסחר אלגוריתמי. שאל כל שאלה הקשורה לרמות תמיכה והתנגדות, 
+                    Position Sizing, Stop Loss, BE Stop, Trailing Stop, DCA, ו-Martingale.
                   </CardDescription>
                 </div>
               </div>
@@ -136,7 +137,7 @@ const ChatBot = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4 h-[500px] overflow-y-auto p-4 rounded-lg bg-gray-50 dark:bg-gray-900/30">
+            <div className="space-y-4 h-[500px] overflow-y-auto p-4 rounded-lg bg-white/80 dark:bg-gray-900/50 shadow-inner">
               {initialLoadComplete && messages.filter(msg => msg.role !== 'system').map((message, index) => (
                 <div 
                   key={index} 
@@ -182,8 +183,17 @@ const ChatBot = () => {
                   }
                 }}
                 disabled={isLoading}
-                className="flex-1"
+                className="flex-1 bg-white/90 dark:bg-gray-800/90"
               />
+              <Button 
+                onClick={handleSpeakLatestMessage}
+                variant="outline"
+                disabled={isLoading || messages.length <= 1}
+                className="min-w-[44px]"
+                title={isSpeaking ? "הפסק הקראה" : "הקרא הודעה אחרונה"}
+              >
+                {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </Button>
               <Button 
                 onClick={handleSendMessage} 
                 disabled={isLoading || !input.trim()}
@@ -215,53 +225,58 @@ const ChatBot = () => {
             <Button 
               variant="outline" 
               className="w-full justify-start text-right hover:bg-blue-50 dark:hover:bg-blue-900/20" 
-              onClick={() => handleQuickQuestion('מהם יעדי הרווח (Profit Targets) ואיך מגדירים אותם?')}
+              onClick={() => handleQuickQuestion('הסבר על שלושת רמות הרווח (Profit Targets) ואיך להגדיר אותן')}
               disabled={isLoading}
             >
               <ArrowUpRight className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-              מהם יעדי הרווח (Profit Targets)?
+              הסבר על 3 רמות רווח (Profit Targets)
             </Button>
             <Button 
               variant="outline" 
               className="w-full justify-start text-right hover:bg-blue-50 dark:hover:bg-blue-900/20" 
-              onClick={() => handleQuickQuestion('איך בוחרים את הפרמטרים האופטימליים למסחר?')}
+              onClick={() => handleQuickQuestion('מהו Dollar Cost Averaging (DCA) ואיך משתמשים בו?')}
               disabled={isLoading}
             >
               <ArrowUpRight className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-              בחירת פרמטרים אופטימליים למסחר
+              Dollar Cost Averaging (DCA)
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-right hover:bg-blue-50 dark:hover:bg-blue-900/20" 
+              onClick={() => handleQuickQuestion('הסבר על שיטת Martingale ומתי להשתמש בה')}
+              disabled={isLoading}
+            >
+              <ArrowUpRight className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
+              שיטת Martingale
             </Button>
           </CardContent>
         </Card>
         
         <Card className="md:col-span-2 bg-gradient-to-br from-blue-50/90 to-indigo-50/90 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200/50 dark:border-blue-900/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-blue-700 dark:text-blue-400 flex justify-between items-center">
-              <span>טיפ מקצועי</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" 
-                onClick={handleSpeakLatestMessage}
-                disabled={isLoading || messages.length <= 1}
-              >
-                {isSpeaking ? (
-                  <>
-                    <VolumeX className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-                    הפסק הקראה
-                  </>
-                ) : (
-                  <>
-                    <Volume2 className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-                    הקרא הודעה אחרונה
-                  </>
-                )}
-              </Button>
-            </CardTitle>
+            <CardTitle className="text-base font-medium text-blue-700 dark:text-blue-400">טיפים מקצועיים למערכת AlgoTouch</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-700 dark:text-blue-400">
-              <strong>הגדרת 3 רמות רווח</strong> מאפשרת לנעול רווחים מוקדם ובטוח (Target 1) ועדיין לאפשר לחלק מהפוזיציה להמשיך לרוץ לרווחים גבוהים יותר בעסקאות מוצלחות במיוחד (Target 3).
-            </p>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-blue-700 dark:text-blue-400">1. הגדרת 3 רמות רווח</h3>
+              <p className="text-sm text-blue-700 dark:text-blue-400">
+                הגדרת 3 רמות רווח מאפשרת לנעול רווחים מוקדם ובטוח (Target 1) ועדיין לאפשר לחלק מהפוזיציה להמשיך לרוץ לרווחים גבוהים יותר בעסקאות מוצלחות במיוחד (Target 3).
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="font-semibold text-blue-700 dark:text-blue-400">2. בחירת טיים-פריים</h3>
+              <p className="text-sm text-blue-700 dark:text-blue-400">
+                בחר את טיים-פריים בהתאם לגודל החשבון: חשבונות קטנים עד $5,000 - עבוד עם נרות של 30 שניות עד 5 דקות; חשבונות גדולים יותר יכולים להשתמש בנרות של עד 60 דקות.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="font-semibold text-blue-700 dark:text-blue-400">3. ניהול סיכונים</h3>
+              <p className="text-sm text-blue-700 dark:text-blue-400">
+                הגבל את הסיכון לעסקה בודדת ל-0.25%-1% מסך התיק. השתמש בפקודות Stop Loss, BE Stop, ו-Trailing Stop לניהול סיכונים אופטימלי.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

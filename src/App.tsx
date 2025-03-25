@@ -14,6 +14,7 @@ import MonthlyReport from "./pages/MonthlyReport";
 import Community from "./pages/Community";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
+import AIAssistant from "./pages/AIAssistant";
 import NotFound from "./pages/NotFound";
 import NewTrade from "./pages/NewTrade";
 
@@ -42,6 +43,7 @@ const App = () => {
             <Route path="/community" element={<Community />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:courseId" element={<CourseDetail />} />
+            <Route path="/ai-assistant" element={<AIAssistant />} />
             <Route path="/new-trade" element={<NewTrade />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

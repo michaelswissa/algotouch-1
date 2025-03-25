@@ -9,7 +9,8 @@ import {
   Users,
   GraduationCap,
   Search,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Bot
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ const Sidebar = () => {
     { path: '/monthly-report', name: 'דוח חודשי', icon: <FileSpreadsheet size={18} /> },
     { path: '/community', name: 'קהילה', icon: <Users size={18} /> },
     { path: '/courses', name: 'קורסים', icon: <GraduationCap size={18} /> },
+    { path: '/ai-assistant', name: 'עוזר AI', icon: <Bot size={18} /> },
   ];
 
   const isActive = (path: string) => {
