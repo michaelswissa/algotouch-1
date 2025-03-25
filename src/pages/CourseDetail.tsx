@@ -195,7 +195,7 @@ const CourseDetailPage = () => {
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="lessons" value={activeTab} onValueChange={setActiveTab}>
+            <Tabs defaultValue="lessons" value={activeTab} onValueChange={setActiveTab} dir="rtl">
               <TabsList className="w-full">
                 <TabsTrigger value="lessons" className="flex-1">שיעורים</TabsTrigger>
                 <TabsTrigger value="modules" className="flex-1">מודולים</TabsTrigger>
@@ -204,7 +204,7 @@ const CourseDetailPage = () => {
                 <TabsTrigger value="notes" className="flex-1">הערות</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="lessons" className="space-y-4 mt-4">
+              <TabsContent value="lessons" className="space-y-4 mt-4" dir="rtl">
                 {course.lessons.map((lesson) => (
                   <Card key={lesson.id} className="cursor-pointer hover:shadow-md transition-all">
                     <CardContent className="p-4 flex items-center justify-between">
@@ -234,7 +234,7 @@ const CourseDetailPage = () => {
                 ))}
               </TabsContent>
 
-              <TabsContent value="modules" className="space-y-4 mt-4">
+              <TabsContent value="modules" className="space-y-4 mt-4" dir="rtl">
                 {course.modules.map((module, idx) => (
                   <Card key={idx} className="cursor-pointer hover:shadow-md transition-all">
                     <CardContent className="p-4">
@@ -265,7 +265,7 @@ const CourseDetailPage = () => {
                 ))}
               </TabsContent>
 
-              <TabsContent value="quizzes" className="space-y-4 mt-4">
+              <TabsContent value="quizzes" className="space-y-4 mt-4" dir="rtl">
                 {course.quizzes ? course.quizzes.map((quiz) => (
                   <Card key={quiz.id} className="cursor-pointer hover:shadow-md transition-all">
                     <CardContent className="p-4 flex items-center justify-between">
@@ -296,7 +296,7 @@ const CourseDetailPage = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="resources" className="space-y-4 mt-4">
+              <TabsContent value="resources" className="space-y-4 mt-4" dir="rtl">
                 {course.resources.map((resource) => (
                   <Card key={resource.id} className="cursor-pointer hover:shadow-md transition-all">
                     <CardContent className="p-4 flex items-center justify-between">
@@ -319,7 +319,7 @@ const CourseDetailPage = () => {
                 ))}
               </TabsContent>
 
-              <TabsContent value="notes" className="mt-4">
+              <TabsContent value="notes" className="mt-4" dir="rtl">
                 <Card>
                   <CardContent className="p-4">
                     <textarea 
