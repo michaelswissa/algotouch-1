@@ -101,7 +101,7 @@
   }
 
   [dir="rtl"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
+    @apply flex flex-row-reverse items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
   }
 
   [dir="ltr"] .tradervue-nav-link {
@@ -193,5 +193,65 @@
   [dir="rtl"] .mr-auto {
     margin-right: 0;
     margin-left: auto;
+  }
+  
+  [dir="rtl"] .ml-1 {
+    margin-left: 0;
+    margin-right: 0.25rem;
+  }
+  
+  [dir="rtl"] .ml-2 {
+    margin-left: 0;
+    margin-right: 0.5rem;
+  }
+  
+  [dir="rtl"] .ml-3 {
+    margin-left: 0;
+    margin-right: 0.75rem;
+  }
+  
+  [dir="rtl"] .ml-4 {
+    margin-left: 0;
+    margin-right: 1rem;
+  }
+  
+  [dir="rtl"] .mr-1 {
+    margin-right: 0;
+    margin-left: 0.25rem;
+  }
+  
+  [dir="rtl"] .mr-2 {
+    margin-right: 0;
+    margin-left: 0.5rem;
+  }
+  
+  [dir="rtl"] .mr-3 {
+    margin-right: 0;
+    margin-left: 0.75rem;
+  }
+  
+  [dir="rtl"] .mr-4 {
+    margin-right: 0;
+    margin-left: 1rem;
+  }
+  
+  [dir="rtl"] .flex-row {
+    flex-direction: row-reverse;
+  }
+  
+  [dir="rtl"] .justify-end {
+    justify-content: flex-start;
+  }
+  
+  [dir="rtl"] .justify-start {
+    justify-content: flex-end;
+  }
+  
+  [dir="rtl"] .text-right {
+    text-align: left;
+  }
+  
+  [dir="rtl"] .text-left {
+    text-align: right;
   }
 }

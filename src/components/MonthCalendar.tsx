@@ -31,7 +31,7 @@ const CalendarDay = ({ day, isToday = false, status = 'neutral', month = 'curren
 interface MonthCalendarProps {
   month: string;
   year: number;
-  status?: 'Open' | 'Active';
+  status?: 'פתוח' | 'פעיל' | 'Open' | 'Active';
 }
 
 const MonthCalendar = ({ month, year, status = 'Open' }: MonthCalendarProps) => {
@@ -65,20 +65,20 @@ const MonthCalendar = ({ month, year, status = 'Open' }: MonthCalendarProps) => 
         <h3 className="text-sm font-medium">{month}, {year}</h3>
         <span className={cn(
           "text-xs px-2 py-0.5 rounded",
-          status === 'Active' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+          status === 'פעיל' || status === 'Active' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
         )}>
           {status}
         </span>
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center">
-        <div className="text-xs text-gray-500">Mo</div>
-        <div className="text-xs text-gray-500">Tu</div>
-        <div className="text-xs text-gray-500">We</div>
-        <div className="text-xs text-gray-500">Th</div>
-        <div className="text-xs text-gray-500">Fr</div>
-        <div className="text-xs text-gray-500">Sa</div>
-        <div className="text-xs text-gray-500">Su</div>
+        <div className="text-xs text-gray-500">יום ב'</div>
+        <div className="text-xs text-gray-500">יום ג'</div>
+        <div className="text-xs text-gray-500">יום ד'</div>
+        <div className="text-xs text-gray-500">יום ה'</div>
+        <div className="text-xs text-gray-500">יום ו'</div>
+        <div className="text-xs text-gray-500">שבת</div>
+        <div className="text-xs text-gray-500">יום א'</div>
 
         {/* This would be dynamically generated based on the month */}
         <CalendarDay day={1} status={daysWithStatus[1] || 'neutral'} month="current" isToday={isCurrentMonth && today === 1} />

@@ -32,7 +32,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="w-60 bg-white border-l border-gray-200 min-h-screen flex flex-col" dir="rtl">
+    <div className="w-60 bg-white border-r border-gray-200 min-h-screen flex flex-col" dir="rtl">
       <div className="p-4 border-b border-gray-200">
         <TraderVueLogo className="mb-4" />
         <div className="relative">
