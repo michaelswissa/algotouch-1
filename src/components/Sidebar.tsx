@@ -6,12 +6,12 @@ import {
   Calendar, 
   BarChart2, 
   LineChart, 
-  BookOpen, 
   Notebook, 
   PlusCircle, 
   Users,
   GraduationCap,
-  Search
+  Search,
+  FileSpreadsheet
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
@@ -24,9 +24,8 @@ const Sidebar = () => {
     { path: '/calendar', name: 'לוח שנה', icon: <Calendar size={18} /> },
     { path: '/reports', name: 'דוחות', icon: <BarChart2 size={18} /> },
     { path: '/trades', name: 'עסקאות', icon: <LineChart size={18} /> },
-    { path: '/journal', name: 'יומן', icon: <BookOpen size={18} /> },
     { path: '/notebook', name: 'מחברת', icon: <Notebook size={18} /> },
-    { path: '/new-trade', name: 'עסקה חדשה', icon: <PlusCircle size={18} /> },
+    { path: '/monthly-report', name: 'דוח חודשי', icon: <FileSpreadsheet size={18} /> },
     { path: '/community', name: 'קהילה', icon: <Users size={18} /> },
     { path: '/courses', name: 'קורסים', icon: <GraduationCap size={18} /> },
   ];
@@ -45,7 +44,7 @@ const Sidebar = () => {
           <Link
             key={item.path}
             to={item.path}
-            className={`tradervue-nav-link flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700 ${
+            className={`tradervue-nav-link ${
               location.pathname === item.path ? 'active bg-gray-100 text-gray-900 font-medium' : ''
             }`}
           >

@@ -62,7 +62,7 @@
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 240 5% 64.9%;
 
     --accent: 160 84% 39%;
     --accent-foreground: 210 40% 98%;
@@ -235,6 +235,7 @@
     margin-left: 1rem;
   }
   
+  /* Additional RTL overrides for typical UI elements */
   [dir="rtl"] .flex-row {
     flex-direction: row-reverse;
   }
@@ -253,5 +254,32 @@
   
   [dir="rtl"] .text-left {
     text-align: right;
+  }
+  
+  /* Fix for dropdown menus in RTL */
+  [dir="rtl"] .radix-dropdown-content,
+  [dir="rtl"] .radix-popover-content {
+    text-align: right;
+  }
+  
+  [dir="rtl"] .right-3 {
+    right: auto;
+    left: 0.75rem;
+  }
+  
+  [dir="rtl"] .left-3 {
+    left: auto;
+    right: 0.75rem;
+  }
+  
+  /* RTL adjustments for common Lucide icons */
+  [dir="rtl"] [data-lucide="chevron-right"],
+  [dir="rtl"] [data-lucide="arrow-right"] {
+    transform: scaleX(-1);
+  }
+  
+  [dir="rtl"] [data-lucide="chevron-left"],
+  [dir="rtl"] [data-lucide="arrow-left"] {
+    transform: scaleX(-1);
   }
 }

@@ -10,9 +10,8 @@ import Dashboard from "./pages/Dashboard";
 import Reports from "./pages/Reports";
 import Calendar from "./pages/Calendar";
 import Trades from "./pages/Trades";
-import Journal from "./pages/Journal";
 import Notebook from "./pages/Notebook";
-import NewTrade from "./pages/NewTrade";
+import MonthlyReport from "./pages/MonthlyReport";
 import Community from "./pages/Community";
 import Courses from "./pages/Courses";
 import NotFound from "./pages/NotFound";
@@ -38,9 +37,8 @@ const App = () => {
             <Route path="/reports" element={<Reports />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/trades" element={<Trades />} />
-            <Route path="/journal" element={<Journal />} />
             <Route path="/notebook" element={<Notebook />} />
-            <Route path="/new-trade" element={<NewTrade />} />
+            <Route path="/monthly-report" element={<MonthlyReport />} />
             <Route path="/community" element={<Community />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="*" element={<NotFound />} />
