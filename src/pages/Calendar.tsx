@@ -12,8 +12,8 @@ const CalendarPage = () => {
 
   return (
     <Layout>
-      <div className="tradervue-container py-8 animate-fade-in">
-        <h1 className="text-3xl font-bold mb-6">Calendar</h1>
+      <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
+        <h1 className="text-3xl font-bold mb-6">לוח שנה</h1>
         
         <TradeFilters />
         
@@ -27,19 +27,19 @@ const CalendarPage = () => {
               className={`px-4 py-2 text-sm font-medium ${calendarView === 'recent' ? 'bg-white' : 'bg-gray-100'}`}
               onClick={() => setCalendarView('recent')}
             >
-              Recent
+              אחרונים
             </button>
             <button 
               className={`px-4 py-2 text-sm font-medium ${calendarView === 'year-month-day' ? 'bg-white' : 'bg-gray-100'}`}
               onClick={() => setCalendarView('year-month-day')}
             >
-              Year/Month/Day
+              שנה/חודש/יום
             </button>
             <button 
               className={`px-4 py-2 text-sm font-medium ${calendarView === 'calendar' ? 'bg-white' : 'bg-gray-100'}`}
               onClick={() => setCalendarView('calendar')}
             >
-              Calendar
+              לוח שנה
             </button>
           </div>
         </div>
@@ -54,9 +54,9 @@ const CalendarPage = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <MonthCalendar month="January" year={2024} status="Open" />
-          <MonthCalendar month="February" year={2024} status="Active" />
-          <MonthCalendar month="March" year={2024} status="Open" />
+          <MonthCalendar month="ינואר" year={2024} status="פתוח" />
+          <MonthCalendar month="פברואר" year={2024} status="פעיל" />
+          <MonthCalendar month="מרץ" year={2024} status="פתוח" />
         </div>
       </div>
     </Layout>

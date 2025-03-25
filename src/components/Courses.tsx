@@ -51,7 +51,7 @@ const coursesData: CourseProps[] = [
 
 const Courses = () => {
   return (
-    <div className="mt-8">
+    <div className="mt-8" dir="rtl">
       <h2 className="text-2xl font-bold mb-6">קורסים דיגיטליים</h2>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {coursesData.map((course, index) => (
