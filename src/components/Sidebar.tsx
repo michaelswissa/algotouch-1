@@ -47,7 +47,7 @@ const Sidebar = () => {
               location.pathname === item.path ? 'active bg-gray-100 text-gray-900 font-medium' : ''
             }`}
           >
-            <span className="flex-shrink-0">{item.icon}</span>
+            <span className="ml-2">{item.icon}</span>
             <span>{item.name}</span>
           </Link>
         ))}

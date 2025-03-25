@@ -12,10 +12,10 @@ const TradesPage = () => {
     <Layout>
       <div className="tradervue-container py-8 animate-fade-in">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Trades</h1>
+          <h1 className="text-3xl font-bold">עסקאות</h1>
           <Button variant="outline" size="sm" className="gap-2">
             <Filter size={14} />
-            <span>Filters</span>
+            <span>סינון</span>
           </Button>
         </div>
         

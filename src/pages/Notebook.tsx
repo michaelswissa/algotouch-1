@@ -8,27 +8,27 @@ import { Plus, FileText, Folder } from 'lucide-react';
 const NotebookPage = () => {
   const categories = [
     {
-      name: 'Trading Strategies',
+      name: 'אסטרטגיות מסחר',
       notes: [
-        { title: 'Gap and Go Strategy', date: 'May 15, 2024' },
-        { title: 'VWAP Bounce Play', date: 'April 28, 2024' },
-        { title: 'Breakout Strategy', date: 'March 20, 2024' },
+        { title: 'אסטרטגיית Gap and Go', date: '15 מאי, 2024' },
+        { title: 'משחק באונס VWAP', date: '28 אפריל, 2024' },
+        { title: 'אסטרטגיית פריצה', date: '20 מרץ, 2024' },
       ]
     },
     {
-      name: 'Market Analysis',
+      name: 'ניתוח שוק',
       notes: [
-        { title: 'SPY Weekly Analysis', date: 'June 10, 2024' },
-        { title: 'Sector Rotation Notes', date: 'May 30, 2024' },
+        { title: 'ניתוח שבועי של SPY', date: '10 יוני, 2024' },
+        { title: 'הערות על רוטציית מגזרים', date: '30 מאי, 2024' },
       ]
     },
     {
-      name: 'Trade Reviews',
+      name: 'סקירות עסקאות',
       notes: [
-        { title: 'AAPL Trade - June 2024', date: 'June 5, 2024' },
-        { title: 'TSLA Failed Setup', date: 'May 22, 2024' },
-        { title: 'MSFT Earnings Play', date: 'April 26, 2024' },
-        { title: 'AMD Momentum Trade', date: 'April 15, 2024' },
+        { title: 'עסקת AAPL - יוני 2024', date: '5 יוני, 2024' },
+        { title: 'התקנה שנכשלה ב-TSLA', date: '22 מאי, 2024' },
+        { title: 'משחק הרווחים של MSFT', date: '26 אפריל, 2024' },
+        { title: 'עסקת מומנטום ב-AMD', date: '15 אפריל, 2024' },
       ]
     }
   ];
@@ -37,15 +37,15 @@ const NotebookPage = () => {
     <Layout>
       <div className="tradervue-container py-8 animate-fade-in">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Notebook</h1>
+          <h1 className="text-3xl font-bold">מחברת</h1>
           <div className="flex gap-2">
             <Button variant="outline" className="gap-2">
               <Folder size={16} />
-              New Folder
+              תיקייה חדשה
             </Button>
             <Button className="gap-2">
               <Plus size={16} />
-              New Note
+              פתק חדש
             </Button>
           </div>
         </div>
@@ -71,8 +71,8 @@ const NotebookPage = () => {
                     </CardHeader>
                     <CardContent className="p-4 pt-2">
                       <p className="text-sm text-gray-600 line-clamp-2">
-                        Notes on {note.title.toLowerCase()} including key levels, entry and exit criteria, 
-                        and important observations from previous trades.
+                        הערות על {note.title.toLowerCase()} כולל רמות מפתח, קריטריונים לכניסה ויציאה,
+                        ותובנות חשובות מעסקאות קודמות.
                       </p>
                     </CardContent>
                   </Card>
