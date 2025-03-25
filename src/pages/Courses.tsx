@@ -14,7 +14,7 @@ const CoursesPage = () => {
 
   return (
     <Layout>
-      <div className="tradervue-container py-8 animate-fade-in">
+      <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
         <h1 className="text-3xl font-bold mb-6">קורסים</h1>
         
         <Courses onCourseClick={handleCourseClick} selectedCourseId={selectedCourseId} />

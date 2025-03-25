@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import CourseCard, { CourseProps } from './CourseCard';
 
 interface CoursesComponentProps {
@@ -14,13 +15,13 @@ const coursesData: CourseProps[] = [
     icon: "graduation",
     id: "algotouch-basics",
     modules: [
-      { title: "פתיחת חשבון ב-TradeStation" },
-      { title: "הגדרת מערכת אלגוטאצ'" },
-      { title: "תפעול ומסחר במערכת", isNew: true },
-      { title: "ניהול ומעקב שוטף" },
-      { title: "משיכת כספים" },
-      { title: "מיסוי" },
-      { title: "קבלת תמיכה" }
+      { title: "פתיחת חשבון ב-TradeStation", details: "הרשמה ל-Tradestation, העברת כספים לחשבון המסחר, מילוי טפסים + התקנת הפלטפורמה של Tradestation" },
+      { title: "הגדרת מערכת אלגוטאצ'", details: "בקשת גישה למערכת + התקנה, חיבור אלגוטאצ' לחשבון המסחר שלך ב-Tradestation" },
+      { title: "תפעול ומסחר במערכת", isNew: true, details: "בחירת נכס למסחר, הגדרת פרקי זמן למסחר, הגדרת רמות תמיכה והתנגדות, כפתורי הפעלה והגדרות בסיסיות, ניהול יעדי רווח, ניהול סיכונים והגנה על עסקאות, שימוש חוזר ברמות תמיכה והתנגדות, שליחת פקודות מדויקות, אסטרטגיות מתקדמות לניהול עסקאות" },
+      { title: "ניהול ומעקב שוטף", details: "חוקים להצלחה במסחר - הדרך למסחר יציב ורווחי, איך להוציא דו\"ח עסקאות במערכת, שינויים ואופטימיזציה לפרמטרים - שיפור ביצועים בעזרת בינה מלאכותית" },
+      { title: "משיכת כספים", details: "תהליך משיכת כספים מ-Tradestation לחשבון הבנק שלך" },
+      { title: "מיסוי", details: "נקודות חשובות בהקשר למיסוי רווחים מהמסחר, חישוב מס ורווחים נטו" },
+      { title: "קבלת תמיכה", details: "איך ליצור קשר עם התמיכה של אלגוטאצ'" }
     ]
   },
   {
@@ -29,16 +30,18 @@ const coursesData: CourseProps[] = [
     icon: "book",
     id: "algotouch-advanced",
     modules: [
-      { title: "הדרכת מתחילים למערכת מסחר TradeStation", duration: "1:25:56" },
+      { title: "הדרכת מתחילים למערכת מסחר טריידסטיישן", duration: "1:25:56" },
       { title: "תחילת העבודה עם חשבון החוזים העתידיים", duration: "9:35" },
       { title: "סביבת עבודה", duration: "6:50" },
       { title: "ניהול חשבון", duration: "11:56" },
+      { title: "ניתוחים וחדשות על מניות חמות", duration: "11:54" },
       { title: "היכרות עם הגרפים", duration: "10:04" },
       { title: "סורק המניות עטור הפרסים Radar Screen", duration: "6:54" },
       { title: "סורקי מניות ורשימות חמות", duration: "7:40" },
       { title: "אפשרויות שליחת פקודות", duration: "17:48" },
       { title: "סטופ לוס וטייק פרופיט", duration: "17:32" },
-      { title: "הכרת המטריקס: ניתוח עומק השוק בזמן אמת", duration: "11:49" }
+      { title: "הכרת המטריקס: ניתוח עומק השוק בזמן אמת", duration: "11:49" },
+      { title: "הדרכת מערכת TS למתקדמים", duration: "52:00" }
     ]
   },
   {
@@ -58,6 +61,16 @@ const coursesData: CourseProps[] = [
 ];
 
 const Courses = ({ onCourseClick, selectedCourseId }: CoursesComponentProps) => {
+  const navigate = useNavigate();
+
+  const handleCourseClick = (courseId: string) => {
+    console.log("קורס נבחר:", courseId);
+    if (onCourseClick) {
+      onCourseClick(courseId);
+    }
+    navigate(`/courses/${courseId}`);
+  };
+
   return (
     <div className="mt-8" dir="rtl">
       <h2 className="text-2xl font-bold mb-6">קורסים דיגיטליים</h2>
@@ -66,7 +79,7 @@ const Courses = ({ onCourseClick, selectedCourseId }: CoursesComponentProps) => 
           <CourseCard 
             key={index} 
             {...course} 
-            onClick={() => onCourseClick && course.id && onCourseClick(course.id)}
+            onClick={() => course.id && handleCourseClick(course.id)}
             isSelected={course.id === selectedCourseId}
           />
         ))}

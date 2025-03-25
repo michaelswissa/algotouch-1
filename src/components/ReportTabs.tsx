@@ -19,7 +19,7 @@ const ReportTabs = ({ activeTab, onTabChange }: ReportTabsProps) => {
 
   return (
     <div className="border-b border-gray-200 mb-6">
-      <div className="flex overflow-x-auto hide-scrollbar">
+      <div className="flex overflow-x-auto hide-scrollbar" dir="rtl">
         {tabs.map((tab) => (
           <button
             key={tab.id}

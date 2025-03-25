@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 const TradesPage = () => {
   return (
     <Layout>
-      <div className="tradervue-container py-8 animate-fade-in">
+      <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">עסקאות</h1>
           <Button variant="outline" size="sm" className="gap-2">

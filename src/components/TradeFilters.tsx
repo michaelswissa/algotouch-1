@@ -18,7 +18,7 @@ interface TradeFiltersProps {
 
 const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: TradeFiltersProps) => {
   return (
-    <div className="flex flex-wrap gap-4 mb-4">
+    <div className="flex flex-wrap gap-4 mb-4" dir="rtl">
       <div className="space-y-1">
         <label className="text-xs text-gray-500">סמל</label>
         <input 
@@ -51,8 +51,8 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
             <SelectValue placeholder="כיוון" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="long">Long</SelectItem>
-            <SelectItem value="short">Short</SelectItem>
+            <SelectItem value="long">לונג</SelectItem>
+            <SelectItem value="short">שורט</SelectItem>
             <SelectItem value="all">הכל</SelectItem>
           </SelectContent>
         </Select>

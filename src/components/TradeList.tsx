@@ -77,7 +77,7 @@ const mockTrades: Trade[] = [
 
 const TradeList = () => {
   return (
-    <div>
+    <div dir="rtl">
       <div className="flex gap-4 mb-4 overflow-x-auto">
         <button className="tradervue-tab active">טבלה</button>
         <button className="tradervue-tab">גרפים (גדולים)</button>
@@ -139,7 +139,7 @@ const TradeList = () => {
                   "bg-blue-50 text-blue-600 hover:bg-blue-50",
                   "border-blue-200"
                 )}>
-                  {trade.side}
+                  {trade.side === 'Long' ? 'לונג' : 'שורט'}
                 </Badge>
               </TableCell>
               <TableCell>
