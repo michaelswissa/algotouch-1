@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 160 84% 39%;
+    --primary: 202 100% 50%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -23,7 +23,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 160 84% 39%;
+    --accent: 202 100% 50%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -37,7 +37,7 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary: 202 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
@@ -104,7 +104,7 @@
   }
 
   .tradervue-positive {
-    @apply text-tradervue-green;
+    @apply text-[#0299FF];
   }
 
   .tradervue-negative {
@@ -132,7 +132,7 @@
   }
 
   .calendar-day.positive {
-    @apply bg-tradervue-light-green text-tradervue-green;
+    @apply bg-blue-100 text-[#0299FF];
   }
 
   .calendar-day.negative {
@@ -144,6 +144,26 @@
   }
 
   .tradervue-tab.active {
-    @apply border-tradervue-green text-tradervue-green;
+    @apply border-[#0299FF] text-[#0299FF];
+  }
+
+  .course-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow;
+  }
+
+  .course-list {
+    @apply space-y-4;
+  }
+
+  .module-list {
+    @apply mt-4 space-y-2 text-sm;
+  }
+
+  .module-item {
+    @apply flex items-start gap-2;
+  }
+
+  .module-number {
+    @apply flex-shrink-0 w-6 h-6 rounded-full bg-[#0299FF] text-white flex items-center justify-center text-xs font-medium;
   }
 }

@@ -64,11 +64,11 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				tradervue: {
-					green: '#22c55e',
+					green: '#0299FF',
 					red: '#ef4444',
-					blue: '#0ea5e9',
+					blue: '#0299FF',
 					navy: '#0f172a',
-					'light-green': '#bbf7d0',
+					'light-green': '#bae6fd',
 					'light-red': '#fecaca',
 					'light-blue': '#bae6fd',
 				}

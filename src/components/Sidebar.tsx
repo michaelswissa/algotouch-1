@@ -9,7 +9,8 @@ import {
   BookOpen, 
   Notebook, 
   PlusCircle, 
-  Users 
+  Users,
+  GraduationCap
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ const Sidebar = () => {
     { path: '/notebook', name: 'Notebook', icon: <Notebook size={18} /> },
     { path: '/new-trade', name: 'New trade', icon: <PlusCircle size={18} /> },
     { path: '/community', name: 'Community', icon: <Users size={18} /> },
+    { path: '/courses', name: 'Courses', icon: <GraduationCap size={18} /> },
   ];
 
   return (

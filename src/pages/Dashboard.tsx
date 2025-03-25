@@ -1,6 +1,7 @@
 
 import React from 'react';
 import Layout from '@/components/Layout';
+import Courses from '@/components/Courses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Dashboard = () => {
@@ -15,7 +16,7 @@ const Dashboard = () => {
               <CardTitle className="text-lg font-medium">Today's Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-tradervue-green">+$1,245.67</p>
+              <p className="text-3xl font-bold text-[#0299FF]">+$1,245.67</p>
               <p className="text-sm text-gray-500 mt-1">5 trades</p>
             </CardContent>
           </Card>
@@ -25,7 +26,7 @@ const Dashboard = () => {
               <CardTitle className="text-lg font-medium">Weekly Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-tradervue-green">+$5,678.90</p>
+              <p className="text-3xl font-bold text-[#0299FF]">+$5,678.90</p>
               <p className="text-sm text-gray-500 mt-1">23 trades</p>
             </CardContent>
           </Card>
@@ -41,7 +42,10 @@ const Dashboard = () => {
           </Card>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Courses Section */}
+        <Courses />
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg font-medium">Recent Activity</CardTitle>
@@ -54,7 +58,7 @@ const Dashboard = () => {
                       <p className="font-medium">AAPL {i % 2 === 0 ? 'Long' : 'Short'}</p>
                       <p className="text-sm text-gray-500">June {i + 10}, 2024</p>
                     </div>
-                    <div className={i % 2 === 0 ? 'text-tradervue-green' : 'text-tradervue-red'}>
+                    <div className={i % 2 === 0 ? 'text-[#0299FF]' : 'text-tradervue-red'}>
                       {i % 2 === 0 ? '+' : '-'}${(Math.random() * 1000).toFixed(2)}
                     </div>
                   </div>
@@ -75,7 +79,7 @@ const Dashboard = () => {
                       <p className="font-medium">{symbol}</p>
                       <p className="text-sm text-gray-500">{Math.floor(Math.random() * 20) + 5} trades</p>
                     </div>
-                    <div className={i % 3 === 0 ? 'text-tradervue-red' : 'text-tradervue-green'}>
+                    <div className={i % 3 === 0 ? 'text-tradervue-red' : 'text-[#0299FF]'}>
                       {i % 3 === 0 ? '-' : '+'}${(Math.random() * 5000).toFixed(2)}
                     </div>
                   </div>
