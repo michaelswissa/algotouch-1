@@ -7,10 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
-import Reports from "./pages/Reports";
 import Calendar from "./pages/Calendar";
 import Trades from "./pages/Trades";
-import Notebook from "./pages/Notebook";
+import Journal from "./pages/Journal";
 import MonthlyReport from "./pages/MonthlyReport";
 import Community from "./pages/Community";
 import Courses from "./pages/Courses";
@@ -36,10 +35,9 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/reports" element={<Reports />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/trades" element={<Trades />} />
-            <Route path="/notebook" element={<Notebook />} />
+            <Route path="/journal" element={<Journal />} />
             <Route path="/monthly-report" element={<MonthlyReport />} />
             <Route path="/community" element={<Community />} />
             <Route path="/courses" element={<Courses />} />

@@ -9,6 +9,7 @@ export interface ModuleProps {
   title: string;
   duration?: string;
   isNew?: boolean;
+  details?: string;
 }
 
 export interface CourseProps {
@@ -37,7 +38,7 @@ const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: 
   };
 
   return (
-    <Card className={`hover:shadow-md transition-all ${isSelected ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}>
+    <Card className={`hover:shadow-md transition-all ${isSelected ? 'ring-2 ring-blue-500 shadow-lg' : ''}`} dir="rtl">
       <CardHeader className="pb-2">
         <div className="flex items-start gap-2">
           <div className="p-2 rounded-full bg-blue-100">{renderIcon()}</div>
