@@ -112,8 +112,27 @@ export default {
 					'50%': { transform: 'translateY(-5px)' }
 				},
 				'glow': {
-					'0%, 100%': { boxShadow: '0 0 10px rgba(2, 153, 255, 0.3)' }, // Changed to brand color
-					'50%': { boxShadow: '0 0 20px rgba(2, 153, 255, 0.6)' }  // Changed to brand color
+					'0%, 100%': { boxShadow: '0 0 10px rgba(2, 153, 255, 0.3)' }, 
+					'50%': { boxShadow: '0 0 20px rgba(2, 153, 255, 0.6)' }  
+				},
+				'neon-flicker': {
+					'0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%': {
+						opacity: '1'
+					},
+					'20%, 24%, 55%': {
+						opacity: '0.5'
+					}
+				},
+				'sine-wave': {
+					'0%': { transform: 'translateY(0)' },
+					'25%': { transform: 'translateY(-5px)' },
+					'50%': { transform: 'translateY(0)' },
+					'75%': { transform: 'translateY(5px)' },
+					'100%': { transform: 'translateY(0)' }
+				},
+				'rotate-slow': {
+					'0%': { transform: 'rotate(0deg)' },
+					'100%': { transform: 'rotate(360deg)' }
 				}
 			},
 			animation: {
@@ -123,7 +142,10 @@ export default {
 				'slide-in': 'slide-in 0.6s ease-out',
 				'pulse-subtle': 'pulse-subtle 3s infinite ease-in-out',
 				'float': 'float 6s infinite ease-in-out',
-				'glow': 'glow 3s infinite ease-in-out'
+				'glow': 'glow 3s infinite ease-in-out',
+				'neon-flicker': 'neon-flicker 2s infinite',
+				'sine-move': 'sine-wave 6s infinite ease-in-out',
+				'rotate-slow': 'rotate-slow 15s linear infinite'
 			},
       textDirection: {
         rtl: 'rtl',

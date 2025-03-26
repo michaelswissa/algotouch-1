@@ -1,0 +1,170 @@
+
+@layer utilities {
+  /* 2025 Design Keyframes */
+  @keyframes neon-pulse {
+    0%, 100% { 
+      text-shadow: 0 0 4px rgba(2, 153, 255, 0.7), 0 0 11px rgba(2, 153, 255, 0.7), 0 0 19px rgba(2, 153, 255, 0.5);
+    }
+    50% { 
+      text-shadow: 0 0 4px rgba(2, 153, 255, 0.9), 0 0 14px rgba(2, 153, 255, 0.9), 0 0 24px rgba(2, 153, 255, 0.7);
+    }
+  }
+
+  @keyframes border-flow {
+    0%, 100% { 
+      border-color: rgba(2, 153, 255, 0.3);
+      box-shadow: 0 0 5px rgba(2, 153, 255, 0.3);
+    }
+    50% { 
+      border-color: rgba(2, 153, 255, 0.7);
+      box-shadow: 0 0 15px rgba(2, 153, 255, 0.5);
+    }
+  }
+
+  @keyframes sine-wave {
+    0% { transform: translateY(0px); }
+    25% { transform: translateY(-5px); }
+    50% { transform: translateY(0px); }
+    75% { transform: translateY(5px); }
+    100% { transform: translateY(0px); }
+  }
+
+  @keyframes gentle-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+  }
+
+  @keyframes soft-rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* 2025 Design Classes */
+  .hover-scale {
+    @apply transition-transform duration-300 hover:scale-105;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-300 hover:shadow-lg hover:shadow-primary/30;
+  }
+  
+  .pulsate {
+    @apply animate-pulse-subtle;
+  }
+  
+  .float {
+    @apply animate-float;
+  }
+  
+  .glow {
+    @apply animate-glow;
+  }
+
+  .neon-text {
+    @apply text-primary font-semibold;
+    animation: neon-pulse 2s infinite;
+  }
+
+  .neon-border {
+    @apply border border-primary/50 rounded-lg;
+    animation: border-flow 4s infinite;
+  }
+
+  .sine-move {
+    animation: sine-wave 6s infinite ease-in-out;
+  }
+
+  .floating-element {
+    animation: gentle-float 6s infinite ease-in-out;
+  }
+
+  .soft-spin {
+    animation: soft-rotate 30s infinite linear;
+  }
+
+  /* Background effects */
+  .bg-mesh {
+    background-image: radial-gradient(rgba(2, 153, 255, 0.1) 1px, transparent 1px),
+                      radial-gradient(rgba(2, 153, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+  }
+
+  .bg-dots {
+    background-image: radial-gradient(rgba(2, 153, 255, 0.2) 2px, transparent 2px);
+    background-size: 30px 30px;
+  }
+
+  .bg-grid {
+    background-image: linear-gradient(rgba(2, 153, 255, 0.1) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(2, 153, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Modern glassmorphism */
+  .glass-modern {
+    @apply backdrop-blur-lg bg-white/5 dark:bg-background/30 border border-white/20 dark:border-white/5 shadow-xl;
+  }
+
+  .glass-card-2025 {
+    @apply backdrop-blur-xl bg-white/10 dark:bg-white/5 border border-white/20 
+    dark:border-primary/10 shadow-lg hover:shadow-primary/10 transition-all duration-300;
+  }
+
+  .glass-button {
+    @apply backdrop-blur-md bg-white/10 dark:bg-white/5 border border-white/20 
+    shadow-sm hover:shadow-primary/20 transition-all duration-300 hover:bg-white/20;
+  }
+
+  /* Card enhancements */
+  .card-highlight {
+    @apply border-l-4 border-primary;
+  }
+
+  .card-gradient {
+    @apply bg-gradient-to-br from-background to-secondary/80 backdrop-blur-sm;
+  }
+
+  /* Sidebar link with modern effects */
+  .sidebar-link {
+    @apply relative overflow-hidden transition-all duration-300;
+  }
+  
+  .sidebar-link::after {
+    @apply content-[''] absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300 ease-in-out;
+  }
+  
+  .sidebar-link:hover::after {
+    @apply w-full;
+  }
+  
+  .sidebar-link.active::after {
+    @apply w-full;
+  }
+
+  /* 2025 Button styles */
+  .btn-2025 {
+    @apply relative overflow-hidden px-4 py-2 rounded-lg font-medium 
+    bg-gradient-to-r from-primary/90 to-primary/70
+    text-white transition-all duration-300 shadow-md hover:shadow-lg;
+  }
+
+  .btn-2025::before {
+    @apply content-[''] absolute top-0 left-0 w-full h-full bg-white opacity-0 
+    transition-opacity duration-300 rounded-lg;
+    mix-blend-mode: overlay;
+  }
+
+  .btn-2025:hover::before {
+    @apply opacity-20;
+  }
+
+  /* Text gradient effects */
+  .text-gradient-blue {
+    @apply bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-purple {
+    @apply bg-gradient-to-r from-purple-600 via-purple-500 to-primary bg-clip-text text-transparent;
+  }
+}

@@ -11,7 +11,8 @@ import {
   Search,
   FileSpreadsheet,
   Bot,
-  PlusCircle
+  PlusCircle,
+  Sparkles
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
@@ -44,12 +45,15 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-xl shadow-black/5 transition-all duration-300" dir="rtl">
-      <div className="p-6 border-b border-sidebar-border flex justify-center">
-        <TraderVueLogo className="mb-2" />
+    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-xl shadow-black/5 transition-all duration-300 relative overflow-hidden" dir="rtl">
+      {/* Add subtle animation background */}
+      <div className="absolute inset-0 bg-mesh opacity-30 pointer-events-none"></div>
+      
+      <div className="p-6 border-b border-sidebar-border flex justify-center relative z-10">
+        <TraderVueLogo className="mb-2 hover-scale" />
       </div>
       
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="p-4 border-b border-sidebar-border relative z-10">
         <div className="relative mb-4">
           <Input 
             type="text" 
@@ -61,14 +65,15 @@ const Sidebar = () => {
         
         <Button 
           onClick={handleNewTrade} 
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 group"
         >
-          <PlusCircle size={16} />
+          <PlusCircle size={16} className="group-hover:rotate-90 transition-transform duration-300" />
           <span>עסקה חדשה</span>
+          <Sparkles size={14} className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute right-4" />
         </Button>
       </div>
       
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin relative z-10">
         {navItems.map((item) => (
           <Link
             key={item.path}
@@ -77,13 +82,20 @@ const Sidebar = () => {
               isActive(item.path) ? 'active bg-sidebar-accent/30 text-primary font-medium' : ''
             }`}
           >
-            <span className="ml-2 text-primary">{item.icon}</span>
+            <span className={`ml-2 ${isActive(item.path) ? 'text-primary' : 'text-primary/70'} transition-colors duration-300`}>
+              {item.icon}
+            </span>
             <span>{item.name}</span>
+            
+            {/* Add subtle indicator for active item */}
+            {isActive(item.path) && (
+              <span className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary rounded-l-md"></span>
+            )}
           </Link>
         ))}
       </nav>
       
-      <div className="p-4 border-t border-sidebar-border text-xs text-center text-sidebar-foreground/70">
+      <div className="p-4 border-t border-sidebar-border text-xs text-center text-sidebar-foreground/70 relative z-10">
         <p>AlgoTouch &copy; 2025</p>
         <p className="mt-1">כל הזכויות שמורות</p>
       </div>
