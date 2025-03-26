@@ -19,7 +19,7 @@ serve(async (req) => {
       apiKey: Deno.env.get('OPENAI_API_KEY')
     })
 
-    const { messages, action, threadId, runId, ttsConfig } = await req.json()
+    const { messages, action, threadId, runId, ttsConfig, toolOutputs } = await req.json()
 
     // Initialize with a detailed system message for AlgoTouch trading
     const systemMessage = {
@@ -30,6 +30,76 @@ serve(async (req) => {
 התמקד בנושאים כמו הגדרת רמות תמיכה והתנגדות, Position Sizing, Stop Loss, BE Stop, Trailing Stop, Dollar Cost Averaging (DCA), Martingale, ושלושת רמות הרווח (Profit Targets).
 הסבר בפירוט כיצד להגדיר את הפרמטרים השונים ואת השימוש בכלי המסחר, הגדרות המסך, וכיצד להפעיל את הפונקציות השונות של מערכת AlgoTouch.`
     }
+
+    // Define tools for the assistant
+    const algoTouchTools = [
+      {
+        type: "function",
+        function: {
+          name: "get_position_sizing",
+          description: "חישוב גודל פוזיציה מתאים על פי הון וניהול סיכונים",
+          parameters: {
+            type: "object",
+            properties: {
+              account_size: {
+                type: "number",
+                description: "גודל החשבון בדולרים"
+              },
+              risk_percentage: {
+                type: "number",
+                description: "אחוז הסיכון לעסקה (בדרך כלל בין 0.5% ל-2%)"
+              },
+              entry_price: {
+                type: "number",
+                description: "מחיר הכניסה לפוזיציה"
+              },
+              stop_loss_price: {
+                type: "number",
+                description: "מחיר ה-Stop Loss המתוכנן"
+              }
+            },
+            required: ["account_size", "risk_percentage", "entry_price", "stop_loss_price"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "calculate_profit_targets",
+          description: "חישוב יעדי רווח על בסיס יחס סיכוי סיכון",
+          parameters: {
+            type: "object",
+            properties: {
+              entry_price: {
+                type: "number",
+                description: "מחיר הכניסה לפוזיציה"
+              },
+              stop_loss_price: {
+                type: "number",
+                description: "מחיר ה-Stop Loss המתוכנן"
+              },
+              risk_reward_ratio_1: {
+                type: "number",
+                description: "יחס סיכוי/סיכון ליעד הראשון (בד״כ 1 או 1.5)"
+              },
+              risk_reward_ratio_2: {
+                type: "number",
+                description: "יחס סיכוי/סיכון ליעד השני (בד״כ 2 או 2.5)"
+              },
+              risk_reward_ratio_3: {
+                type: "number",
+                description: "יחס סיכוי/סיכון ליעד השלישי (בד״כ 3 או יותר)"
+              },
+              is_long: {
+                type: "boolean",
+                description: "האם הפוזיציה היא לונג (true) או שורט (false)"
+              }
+            },
+            required: ["entry_price", "stop_loss_price", "is_long"]
+          }
+        }
+      }
+    ];
 
     // Action switch
     switch (action) {
@@ -67,6 +137,7 @@ serve(async (req) => {
         let thread
         if (threadId) {
           thread = { id: threadId }
+          console.log("Using existing thread:", thread.id)
         } else {
           thread = await openai.beta.threads.create()
           console.log("Created new thread:", thread.id)
@@ -81,7 +152,7 @@ serve(async (req) => {
         }
 
         // Create a run with the specific assistant ID
-        const run = await openai.beta.threads.runs.create(thread.id, {
+        const runOptions = {
           assistant_id: "asst_KqyUxYuP1v5eHlILJEsH6Czz", // Using the provided assistant ID
           instructions: `אתה מומחה למסחר אלגוריתמי, מומחה למערכת AlgoTouch, ובקיא בכל הקשור לפלטפורמת TradeStation.
 ענה בעברית בצורה טכנית, מפורטת ומדויקת.
@@ -90,13 +161,44 @@ Trailing Stop, שלושת רמות הרווח (Profit Targets), Dollar Cost Aver
 הסבר את הפרמטרים הטכניים בצורה מפורטת וברורה, הדגם עם מספרים ודוגמאות מוחשיות.
 נתח נושאים טכניים צעד אחר צעד, והתייחס למאפיינים ספציפיים של המערכת.`,
           model: "gpt-4o", // Using the most capable model for the assistant
-          tools: [{"type": "file_search"}],
+          tools: [
+            {"type": "file_search"},
+            ...algoTouchTools
+          ],
           tool_resources: {
             "file_search": {
               "vector_store_ids": ["vs_67b64215c8548191b5984ab5316ee63a"] // Vector store ID
             }
           }
-        })
+        }
+
+        // If we have tool outputs to submit for a run in progress
+        if (toolOutputs && runId) {
+          console.log("Submitting tool outputs for run:", runId)
+          const submissionResponse = await openai.beta.threads.runs.submitToolOutputs(
+            thread.id,
+            runId,
+            { tool_outputs: toolOutputs }
+          )
+          console.log("Tool outputs submitted, run continuing")
+          
+          // We'll return the updated run status
+          return new Response(
+            JSON.stringify({
+              threadId: thread.id,
+              runId: submissionResponse.id,
+              status: submissionResponse.status,
+              requiresAction: submissionResponse.required_action
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        // Create new run
+        const run = await openai.beta.threads.runs.create(thread.id, runOptions)
+        console.log(`Created new run: ${run.id} with status: ${run.status}`)
 
         // Poll for run completion with better error handling and timeouts
         let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id)
@@ -106,7 +208,7 @@ Trailing Stop, שלושת רמות הרווח (Profit Targets), Dollar Cost Aver
         const maxAttempts = 60 // About 120 seconds max
         const pollingInterval = 2000 // 2 seconds
         
-        while (!['completed', 'failed', 'expired', 'cancelled'].includes(runStatus.status) && attempts < maxAttempts) {
+        while (!['completed', 'failed', 'expired', 'cancelled', 'requires_action'].includes(runStatus.status) && attempts < maxAttempts) {
           // Wait before checking status again
           await new Promise(resolve => setTimeout(resolve, pollingInterval))
           
@@ -131,6 +233,25 @@ Trailing Stop, שלושת רמות הרווח (Profit Targets), Dollar Cost Aver
 
         if (runStatus.status === 'expired' || runStatus.status === 'cancelled') {
           throw new Error(`Run ${runStatus.status}`)
+        }
+
+        if (runStatus.status === 'requires_action') {
+          // The run needs the client to execute functions and return the outputs
+          console.log("Run requires action:", JSON.stringify(runStatus.required_action))
+          
+          // Return the required actions to the client
+          return new Response(
+            JSON.stringify({
+              threadId: thread.id,
+              runId: run.id,
+              status: runStatus.status,
+              requiresAction: runStatus.required_action,
+              toolCalls: runStatus.required_action?.submit_tool_outputs?.tool_calls || []
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
         }
 
         if (attempts >= maxAttempts) {
