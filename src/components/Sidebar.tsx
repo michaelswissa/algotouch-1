@@ -34,8 +34,6 @@ const Sidebar = () => {
   ];
 
   const isActive = (path: string) => {
-    // Check if the current location starts with the path
-    // This handles nested routes like /courses/:courseId
     return location.pathname === path || 
            (path !== '/' && location.pathname.startsWith(path));
   };
@@ -45,9 +43,9 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-xl shadow-black/5 transition-all duration-300 relative overflow-hidden" dir="rtl">
+    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/5 transition-all duration-300 relative overflow-hidden" dir="rtl">
       {/* Add subtle animation background */}
-      <div className="absolute inset-0 bg-mesh opacity-30 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-mesh opacity-20 pointer-events-none"></div>
       
       <div className="p-6 border-b border-sidebar-border flex justify-center relative z-10">
         <TraderVueLogo className="mb-2 hover-scale" />
@@ -58,14 +56,14 @@ const Sidebar = () => {
           <Input 
             type="text" 
             placeholder="חיפוש" 
-            className="w-full pr-8 bg-sidebar-accent/40 border-sidebar-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300" 
+            className="w-full pr-8 bg-sidebar-accent/20 border-sidebar-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300" 
           />
           <Search className="h-4 w-4 absolute top-3 right-3 text-muted-foreground" />
         </div>
         
         <Button 
           onClick={handleNewTrade} 
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 group"
+          className="w-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 group"
         >
           <PlusCircle size={16} className="group-hover:rotate-90 transition-transform duration-300" />
           <span>עסקה חדשה</span>
@@ -78,8 +76,8 @@ const Sidebar = () => {
           <Link
             key={item.path}
             to={item.path}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/50 text-sidebar-foreground transition-all duration-200 sidebar-link ${
-              isActive(item.path) ? 'active bg-sidebar-accent/30 text-primary font-medium' : ''
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/20 text-sidebar-foreground transition-all duration-200 sidebar-link ${
+              isActive(item.path) ? 'active bg-sidebar-accent/10 text-primary font-medium' : ''
             }`}
           >
             <span className={`ml-2 ${isActive(item.path) ? 'text-primary' : 'text-primary/70'} transition-colors duration-300`}>

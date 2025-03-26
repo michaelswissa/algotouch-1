@@ -1,11 +1,10 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 40% 96%;
+    --background: 210 40% 98%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -14,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 202 100% 50%; /* Brand color #0299FF */
+    --primary: 202 100% 60%; /* Brighter brand color #33ADFF */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -23,7 +22,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 202 100% 50%; /* Brand color #0299FF */
+    --accent: 202 100% 60%; /* Brighter brand color #33ADFF */
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -37,7 +36,7 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 202 100% 50%; /* Brand color #0299FF */
+    --sidebar-primary: 202 100% 60%; /* Brighter brand color #33ADFF */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
@@ -46,43 +45,43 @@
   }
 
   .dark {
-    /* Updated modern dark theme with #0D0D2B-like tones, but lighter and more friendly */
-    --background: 240 60% 12%;  /* Softer dark background, closer to #0D0D2B but lighter */
+    /* Much lighter dark theme based on #0D0D2B but friendlier */
+    --background: 240 60% 16%;  /* Lighter background - more vibrant blue */
     --foreground: 210 40% 98%;
 
-    --card: 240 55% 16%;  /* Lighter than background for better depth perception */
+    --card: 240 55% 20%;  /* Lighter card background */
     --card-foreground: 210 40% 98%;
 
-    --popover: 240 55% 16%;
+    --popover: 240 55% 20%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 202 100% 55%; /* Brighter brand color for better visibility */
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 202 100% 65%; /* Much brighter brand color for visibility */
+    --primary-foreground: 240 5% 94.9%;
 
-    --secondary: 240 30% 24%;  /* Lighter secondary for better contrast */
+    --secondary: 240 30% 28%;  /* Lighter secondary for better contrast */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 240 30% 24%;
-    --muted-foreground: 217 10% 80%;  /* Brighter muted text for better readability */
+    --muted: 240 30% 28%;
+    --muted-foreground: 217 10% 85%;  /* Brighter muted text */
 
-    --accent: 202 100% 55%; /* Brighter brand color for better visibility */
+    --accent: 202 100% 65%; /* Brighter brand color */
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 60.6%;
+    --destructive: 0 62.8% 65%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 240 30% 28%;  /* More visible borders for better UI definition */
-    --input: 240 30% 28%;
+    --border: 240 30% 32%;  /* Lighter borders */
+    --input: 240 30% 32%;
     --ring: 212.7 26.8% 83.9%;
 
-    /* Sidebar updated for better contrast while maintaining the dark theme */
-    --sidebar-background: 240 60% 10%;  /* Slightly darker sidebar for contrast */
+    /* Sidebar updated to be lighter */
+    --sidebar-background: 240 60% 18%;  /* Lighter sidebar */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 202 100% 55%; /* Brighter brand color */
+    --sidebar-primary: 202 100% 65%; /* Brighter brand color */
     --sidebar-primary-foreground: 240 5% 94.9%;
-    --sidebar-accent: 240 30% 28%;
+    --sidebar-accent: 240 30% 32%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 240 30% 22%;
+    --sidebar-border: 240 30% 26%;
     --sidebar-ring: 212.7 26.8% 83.9%;
   }
 }
