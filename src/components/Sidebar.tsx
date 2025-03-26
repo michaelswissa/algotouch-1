@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -13,7 +14,6 @@ import {
   PlusCircle,
   Sparkles,
   ChevronRight,
-  Menu,
   X
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
@@ -49,12 +49,12 @@ const Sidebar = () => {
   return (
     <div 
       className={cn(
-        "dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/5 transition-all duration-300 relative overflow-hidden",
+        "dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/10 transition-all duration-300 relative overflow-hidden",
         collapsed ? "w-16" : "w-64"
       )} 
       dir="rtl"
     >
-      {/* Sidebar toggle button */}
+      {/* Modern toggle button */}
       <Button
         variant="ghost"
         size="icon"
@@ -64,8 +64,8 @@ const Sidebar = () => {
         {collapsed ? <ChevronRight size={14} /> : <X size={14} />}
       </Button>
       
-      {/* Add subtle animation background */}
-      <div className="absolute inset-0 bg-mesh opacity-10 pointer-events-none"></div>
+      {/* Modern subtle background pattern */}
+      <div className="absolute inset-0 bg-mesh opacity-5 pointer-events-none"></div>
       
       <div className={cn(
         "p-6 border-b border-sidebar-border flex justify-center relative z-10",
@@ -89,10 +89,11 @@ const Sidebar = () => {
           </div>
         )}
         
+        {/* Modern action button */}
         <Button 
           onClick={handleNewTrade} 
           className={cn(
-            "bg-primary/80 hover:bg-primary/90 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105 group",
+            "bg-gradient-to-r from-primary/90 to-primary/70 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.03] group",
             collapsed ? "w-10 h-10 p-0 rounded-full mx-auto" : "w-full"
           )}
         >
@@ -108,8 +109,8 @@ const Sidebar = () => {
             key={item.path}
             to={item.path}
             className={cn(
-              "flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/10 text-sidebar-foreground transition-all duration-200 sidebar-link",
-              isActive(item.path) && "active bg-sidebar-accent/5 text-primary font-medium",
+              "flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/15 text-sidebar-foreground transition-all duration-200 sidebar-link",
+              isActive(item.path) && "active bg-sidebar-accent/10 text-primary font-medium",
               collapsed && "justify-center px-2"
             )}
           >
@@ -121,7 +122,7 @@ const Sidebar = () => {
             </span>
             {!collapsed && <span>{item.name}</span>}
             
-            {/* Add subtle indicator for active item */}
+            {/* Modern active indicator */}
             {isActive(item.path) && (
               <span className={cn(
                 "absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary/80 rounded-l-md",

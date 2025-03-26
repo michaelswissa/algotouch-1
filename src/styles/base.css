@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    --background: 220 30% 98%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 204 100% 50%; /* Vibrant blue #0099ff */
+    --primary: 210 100% 50%; /* Modern vibrant blue #0066ff */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -23,7 +23,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 204 100% 50%; /* Vibrant blue #0099ff */
+    --accent: 210 100% 50%; /* Vibrant blue */
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -37,7 +37,7 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 204 100% 50%; /* Vibrant blue #0099ff */
+    --sidebar-primary: 210 100% 50%; /* Vibrant blue */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
@@ -46,43 +46,43 @@
   }
 
   .dark {
-    /* Modernized dark theme with a brighter, more appealing color scheme */
-    --background: 224 20% 18%; /* Slightly brighter background */
+    /* Modern dark theme with a sleeker, refined color scheme */
+    --background: 224 25% 12%; /* Slightly darker background for contrast */
     --foreground: 210 40% 98%;
 
-    --card: 224 20% 22%; /* Lighter card background */
+    --card: 224 25% 16%; /* Refined card background */
     --card-foreground: 210 40% 98%;
 
-    --popover: 224 20% 22%;
+    --popover: 224 25% 16%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 204 100% 65%; /* Bright blue for better visibility */
+    --primary: 210 100% 60%; /* Brighter, modern blue */
     --primary-foreground: 240 5% 94.9%;
 
-    --secondary: 224 15% 30%; /* Lighter secondary for better contrast */
+    --secondary: 224 20% 26%; /* Refined secondary for better contrast */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 224 15% 35%;
-    --muted-foreground: 217 10% 90%; /* Brighter muted text */
+    --muted: 224 20% 30%;
+    --muted-foreground: 217 10% 90%; /* Brighter text for readability */
 
-    --accent: 204 100% 65%; /* Brighter accent color */
+    --accent: 210 100% 60%; /* Brighter accent color */
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 70% 65%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 224 20% 32%; /* Lighter borders */
-    --input: 224 20% 32%;
+    --border: 224 25% 26%; /* Refined borders */
+    --input: 224 25% 26%;
     --ring: 212.7 26.8% 83.9%;
 
-    /* Sidebar updated to be more vibrant and modern */
-    --sidebar-background: 224 20% 22%; /* Slightly lighter sidebar */
+    /* Modern sidebar with refined colors */
+    --sidebar-background: 223 25% 16%; /* Sleeker sidebar */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 204 100% 65%; /* Bright blue for better visibility */
+    --sidebar-primary: 210 100% 60%; /* Modern bright blue */
     --sidebar-primary-foreground: 240 5% 94.9%;
-    --sidebar-accent: 224 15% 34%;
+    --sidebar-accent: 224 20% 30%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 224 15% 30%;
+    --sidebar-border: 224 20% 26%;
     --sidebar-ring: 212.7 26.8% 83.9%;
   }
 }
@@ -106,17 +106,17 @@
     @apply font-bold text-foreground tracking-tight;
   }
 
-  /* Modern, more subtle scrollbars */
+  /* Modern, sleek scrollbars */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-secondary/40 rounded-full;
+    @apply bg-secondary/30 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-primary/50 hover:bg-primary/70 rounded-full transition-colors;
+    @apply bg-primary/40 hover:bg-primary/60 rounded-full transition-colors;
   }
 }

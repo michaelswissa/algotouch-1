@@ -5,22 +5,22 @@
   }
 
   .tradervue-card {
-    @apply bg-card rounded-lg shadow-sm border border-border/60 transition-all duration-300 hover:shadow-md dark:shadow-primary/5;
+    @apply bg-card/95 rounded-lg shadow-md border border-border/60 transition-all duration-300 hover:shadow-lg dark:shadow-primary/10;
   }
 
   .elevated-card {
     @apply bg-card/90 rounded-lg border border-border/60 shadow-lg dark:shadow-primary/20 backdrop-blur-md 
-    hover:shadow-xl transition-all duration-300 hover:border-primary/30;
+    hover:shadow-xl transition-all duration-300 hover:border-primary/40;
   }
 
-  /* Glass card effect - more refined */
+  /* Modern glass card effect */
   .glass-card {
-    @apply bg-background/50 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg shadow-primary/10;
+    @apply bg-background/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-lg shadow-primary/15;
   }
 
-  /* Navigation Links */
+  /* Navigation Links - modernized */
   [dir="rtl"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary text-foreground transition-all duration-200;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/70 text-foreground transition-all duration-200;
   }
 
   [dir="rtl"] .tradervue-nav-link svg {
@@ -28,7 +28,7 @@
   }
 
   [dir="ltr"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary text-foreground transition-all duration-200;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/70 text-foreground transition-all duration-200;
   }
 
   [dir="ltr"] .tradervue-nav-link svg {
@@ -43,52 +43,52 @@
     @apply text-primary transform scale-110;
   }
 
-  /* Trading indicators */
+  /* Trading indicators - enhanced */
   .tradervue-positive {
-    @apply text-tradervue-green;
+    @apply text-tradervue-green font-medium;
   }
 
   .tradervue-negative {
-    @apply text-tradervue-red;
+    @apply text-tradervue-red font-medium;
   }
 
-  /* Table styles - more refined */
+  /* Table styles - modernized */
   .tradervue-table {
     @apply w-full border-collapse;
   }
 
   [dir="rtl"] .tradervue-table th {
-    @apply px-4 py-2 text-right text-sm font-medium text-muted-foreground border-b border-border/60;
+    @apply px-4 py-3 text-right text-sm font-medium text-muted-foreground border-b border-border/60;
   }
 
   [dir="ltr"] .tradervue-table th {
-    @apply px-4 py-2 text-left text-sm font-medium text-muted-foreground border-b border-border/60;
+    @apply px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b border-border/60;
   }
 
   .tradervue-table td {
-    @apply px-4 py-3 text-sm border-b border-border/40;
+    @apply px-4 py-3 text-sm border-b border-border/30;
   }
 
   .tradervue-table tr:hover {
-    @apply bg-muted/30 transition-colors;
+    @apply bg-muted/40 transition-colors;
   }
 
-  /* Other UI components - modernized */
+  /* UI components - enhanced for modern design */
   .tradervue-filter-pill {
-    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground 
-    transition-all duration-200 hover:bg-primary/30 cursor-pointer;
+    @apply inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-secondary/80 text-secondary-foreground 
+    transition-all duration-200 hover:bg-primary/40 cursor-pointer;
   }
 
   .calendar-day {
-    @apply w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all duration-200 hover:bg-secondary/60 cursor-pointer;
+    @apply w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all duration-200 hover:bg-secondary/70 cursor-pointer;
   }
 
   .calendar-day.positive {
-    @apply bg-tradervue-light-green text-tradervue-green;
+    @apply bg-tradervue-light-green/80 text-tradervue-green font-medium;
   }
 
   .calendar-day.negative {
-    @apply bg-tradervue-light-red text-tradervue-red;
+    @apply bg-tradervue-light-red/80 text-tradervue-red font-medium;
   }
 
   .tradervue-tab {
@@ -100,13 +100,13 @@
     @apply border-primary text-primary;
   }
 
-  /* Course and module styles - enhanced */
+  /* Course components - modernized */
   .course-card {
-    @apply bg-card/90 rounded-lg shadow-sm border border-border hover:shadow-md hover:border-primary/30 transition-all duration-300 backdrop-blur-sm;
+    @apply bg-card/95 rounded-lg shadow-md border border-border hover:shadow-lg hover:border-primary/40 transition-all duration-300 backdrop-blur-sm;
   }
 
   .course-list {
-    @apply space-y-5;
+    @apply space-y-6;
   }
 
   .module-list {
@@ -114,10 +114,10 @@
   }
 
   .module-item {
-    @apply flex items-start gap-2 p-2 rounded-md hover:bg-secondary/50 transition-colors;
+    @apply flex items-start gap-2 p-2.5 rounded-md hover:bg-secondary/70 transition-colors;
   }
 
   .module-number {
-    @apply flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium shadow-sm shadow-primary/30;
+    @apply flex-shrink-0 w-6 h-6 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center text-xs font-medium shadow-md shadow-primary/30;
   }
 }

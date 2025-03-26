@@ -66,7 +66,7 @@ export default {
 				tradervue: {
 					green: '#22c55e', // Keep profits in green
 					red: '#ef4444',
-					blue: '#0299FF', // Change to brand color
+					blue: '#0066FF', // Modern brand color
 					navy: '#0f172a',
 					'light-green': '#dcfce7', // Keep light green for profits
 					'light-red': '#fecaca',
@@ -78,8 +78,12 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
+			borderWidth: {
+				'3': '3px',
+			},
 			scale: {
 				'102': '1.02',
+				'103': '1.03',
 			},
 			keyframes: {
 				'accordion-down': {
@@ -115,8 +119,8 @@ export default {
 					'50%': { transform: 'translateY(-5px)' }
 				},
 				'glow': {
-					'0%, 100%': { boxShadow: '0 0 10px rgba(2, 153, 255, 0.15)' }, 
-					'50%': { boxShadow: '0 0 20px rgba(2, 153, 255, 0.25)' }  
+					'0%, 100%': { boxShadow: '0 0 10px rgba(0, 102, 255, 0.15)' }, 
+					'50%': { boxShadow: '0 0 20px rgba(0, 102, 255, 0.25)' }  
 				},
 				'neon-flicker': {
 					'0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%': {
