@@ -47,7 +47,6 @@ serve(async (req) => {
             model: "gpt-4o", // Using gpt-4o for better reasoning and response quality
             messages: chatMessages,
             temperature: 0.5, // Slightly lower temperature for more technical/factual responses
-            // Removed the reasoning_effort parameter which was causing the error
           })
 
           return new Response(
@@ -99,22 +98,39 @@ Trailing Stop, שלושת רמות הרווח (Profit Targets), Dollar Cost Aver
           }
         })
 
-        // Poll for run completion
+        // Poll for run completion with better error handling and timeouts
         let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id)
         
-        // Simple polling mechanism with timeout
+        // Enhanced polling mechanism with better timeout handling
         let attempts = 0
-        const maxAttempts = 60 // About 120 seconds max (increased from 30 attempts)
+        const maxAttempts = 60 // About 120 seconds max
+        const pollingInterval = 2000 // 2 seconds
         
-        while (runStatus.status !== 'completed' && runStatus.status !== 'failed' && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id)
-          console.log(`Run status: ${runStatus.status}, attempt: ${attempts}`)
+        while (!['completed', 'failed', 'expired', 'cancelled'].includes(runStatus.status) && attempts < maxAttempts) {
+          // Wait before checking status again
+          await new Promise(resolve => setTimeout(resolve, pollingInterval))
+          
+          try {
+            runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id)
+            console.log(`Run status: ${runStatus.status}, attempt: ${attempts + 1}/${maxAttempts}`)
+          } catch (retrieveError) {
+            console.error(`Error retrieving run status: ${retrieveError.message}`)
+            
+            // If we've had multiple retrieval errors, we should fail the overall request
+            if (attempts > 5) {
+              throw new Error(`Multiple failures retrieving run status: ${retrieveError.message}`)
+            }
+          }
+          
           attempts++
         }
 
         if (runStatus.status === 'failed') {
           throw new Error(`Run failed with error: ${runStatus.last_error?.message || 'Unknown error'}`)
+        }
+
+        if (runStatus.status === 'expired' || runStatus.status === 'cancelled') {
+          throw new Error(`Run ${runStatus.status}`)
         }
 
         if (attempts >= maxAttempts) {
