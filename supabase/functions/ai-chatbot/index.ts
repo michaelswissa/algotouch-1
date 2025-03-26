@@ -42,12 +42,12 @@ serve(async (req) => {
             chatMessages.unshift(systemMessage)
           }
 
-          // Use the OpenAI o3-mini model for better reasoning capabilities
+          // Use the OpenAI GPT-4o model
           const completion = await openai.chat.completions.create({
             model: "gpt-4o", // Using gpt-4o for better reasoning and response quality
             messages: chatMessages,
             temperature: 0.5, // Slightly lower temperature for more technical/factual responses
-            reasoning_effort: "high", // Higher reasoning effort for detailed explanations
+            // Removed the reasoning_effort parameter which was causing the error
           })
 
           return new Response(
@@ -94,7 +94,7 @@ Trailing Stop, שלושת רמות הרווח (Profit Targets), Dollar Cost Aver
           tools: [{"type": "file_search"}],
           tool_resources: {
             "file_search": {
-              "vector_store_ids": ["vs_67b64215c8548191b5984ab5316ee63a"] // Provided vector store ID
+              "vector_store_ids": ["vs_67b64215c8548191b5984ab5316ee63a"] // Vector store ID
             }
           }
         })
