@@ -111,7 +111,7 @@
   }
 
   .glass-card-2025 {
-    @apply backdrop-blur-md bg-white/95 dark:bg-white/8 border border-white/50 
+    @apply backdrop-blur-md bg-white/95 dark:bg-white/10 border border-white/50 
     dark:border-primary/15 shadow-md hover:shadow-lg transition-all duration-300;
   }
 
