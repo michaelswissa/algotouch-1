@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import MonthCalendar from '@/components/MonthCalendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
+import { CalendarDays, TrendingUp, TrendingDown, LineChart } from 'lucide-react';
 
 interface TradeDay {
   date: string;
@@ -97,6 +97,35 @@ const Calendar = () => {
               </CardContent>
             </Card>
           </div>
+        </div>
+        
+        {/* Economic Calendar Section */}
+        <div className="mt-8">
+          <Card className="elevated-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <LineChart size={18} className="text-primary" />
+                אירועים כלכליים השבוע
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-hidden rounded-md">
+                <iframe 
+                  src="https://sslecal2.investing.com?ecoDayBackground=%23039aff&defaultFont=%23039aff&innerBorderColor=%238e989e&borderColor=%23039aff&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=2,3&features=datepicker,timezone,timeselector,filters&countries=23,5&calType=week&timeZone=8&lang=1" 
+                  width="100%" 
+                  height="467" 
+                  frameBorder="0" 
+                  allowTransparency={true}
+                  className="mx-auto"
+                ></iframe>
+                <div className="poweredBy text-center mt-2" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                  <span style={{ fontSize: '11px', color: '#333333' }}>
+                    Real Time Economic Calendar provided by <a href="https://www.investing.com/" rel="nofollow" target="_blank" style={{ fontSize: '11px', color: '#06529D', fontWeight: 'bold' }} className="underline_link">Investing.com</a>.
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </Layout>
