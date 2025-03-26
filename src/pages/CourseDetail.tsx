@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ChevronRight, Play, CheckCircle2, Clock, FileText } from 'lucide-react';
+import { ChevronRight, Play, CheckCircle2, Clock, FileText, Video, Volume2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface Lesson {
@@ -14,6 +13,7 @@ interface Lesson {
   duration?: string;
   completed?: boolean;
   content?: string;
+  videoUrl?: string;
 }
 
 interface Module {
@@ -43,6 +43,11 @@ interface Course {
     questions: number;
     completed: boolean;
   }[];
+  activeVideo?: {
+    title: string;
+    url: string;
+    duration: string;
+  };
 }
 
 const mockCourseData: Record<string, Course> = {
@@ -60,11 +65,11 @@ const mockCourseData: Record<string, Course> = {
       { title: "קבלת תמיכה", details: "איך ליצור קשר עם התמיכה של אלגוטאצ'" }
     ],
     lessons: [
-      { id: 1, title: "מבוא למסחר אלגוריתמי", duration: "45 דקות", completed: true },
-      { id: 2, title: "התקנת וחיבור המערכת", duration: "35 דקות", completed: true },
-      { id: 3, title: "ממשק המשתמש", duration: "50 דקות", completed: false },
-      { id: 4, title: "הגדרת רמות מחיר", duration: "55 דקות", completed: false },
-      { id: 5, title: "הגדרות בסיסיות", duration: "40 דקות", completed: false }
+      { id: 1, title: "מבוא למסחר אלגוריתמי", duration: "45 דקות", completed: true, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 2, title: "התקנת וחיבור המערכת", duration: "35 דקות", completed: true, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 3, title: "ממשק המשתמש", duration: "50 דקות", completed: false, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 4, title: "הגדרת רמות מחיר", duration: "55 דקות", completed: false, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 5, title: "הגדרות בסיסיות", duration: "40 דקות", completed: false, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" }
     ],
     resources: [
       { id: 1, title: "מדריך למשתמש - PDF", type: "pdf", size: "2.4 MB" },
@@ -75,7 +80,12 @@ const mockCourseData: Record<string, Course> = {
     quizzes: [
       { id: 1, title: "מבחן בסיסי - מושגי יסוד", questions: 10, completed: true },
       { id: 2, title: "מבחן מתקדם - אסטרטגיות מסחר", questions: 15, completed: false }
-    ]
+    ],
+    activeVideo: {
+      title: "מבוא למסחר אלגוריתמי",
+      url: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      duration: "45 דקות"
+    }
   },
   "algotouch-advanced": {
     title: "הדרכה מקיפה למערכת TradeStation",
@@ -129,7 +139,7 @@ const mockCourseData: Record<string, Course> = {
       { id: 1, title: "מושגי יסוד בחוזים עתידיים", duration: "40 דקות", completed: false },
       { id: 2, title: "מינוף וניהול סיכונים", duration: "45 דקות", completed: false },
       { id: 3, title: "עונתיות בחוזים על סחורות", duration: "50 דקות", completed: false },
-      { id: 4, title: "אסטרטגיות ספרדים", duration: "65 דקות", completed: false }
+      { id: 4, title: "אסטרטגיות ��פרדים", duration: "65 דקות", completed: false }
     ],
     resources: [
       { id: 1, title: "לוח מועדי פקיעה - PDF", type: "pdf", size: "1.8 MB" },
@@ -142,9 +152,17 @@ const mockCourseData: Record<string, Course> = {
 const CourseDetail = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [activeTab, setActiveTab] = useState('content');
+  const [activeVideoId, setActiveVideoId] = useState<number | null>(1);
   
-  // Fallback to first course if courseId is not valid
   const courseData = courseId && mockCourseData[courseId] ? mockCourseData[courseId] : Object.values(mockCourseData)[0];
+
+  const activeLesson = courseData.lessons.find(lesson => lesson.id === activeVideoId);
+  const videoUrl = activeLesson?.videoUrl || courseData.activeVideo?.url;
+  const videoTitle = activeLesson?.title || courseData.activeVideo?.title || '';
+
+  const handleLessonClick = (lessonId: number) => {
+    setActiveVideoId(lessonId);
+  };
 
   return (
     <Layout className="p-4 md:p-6">
@@ -179,7 +197,41 @@ const CourseDetail = () => {
         </div>
       </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <div className="mb-6 bg-background/40 rounded-xl overflow-hidden shadow-lg border border-primary/10">
+        <div className="relative pt-[56.25%] w-full overflow-hidden">
+          <iframe 
+            className="absolute top-0 left-0 w-full h-full"
+            src={videoUrl}
+            title={videoTitle}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        </div>
+        <div className="p-4 flex justify-between items-center bg-card/80 backdrop-blur-sm border-t">
+          <div className="flex-1">
+            <h3 className="font-medium text-lg">{videoTitle}</h3>
+            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+              <Clock className="size-3.5" />
+              <span>{activeLesson?.duration || courseData.activeVideo?.duration}</span>
+              <div className="flex items-center gap-1 mr-4">
+                <Volume2 className="size-3.5" />
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="text-xs">
+              הורד
+            </Button>
+            <Button size="sm" className="text-xs">
+              שתף
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" dir="ltr">
         <TabsList className="w-full justify-start mb-6 bg-background border-b rounded-none pb-0 h-auto">
           <TabsTrigger value="content" className="rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary pb-3">
             תוכן הקורס
@@ -194,7 +246,7 @@ const CourseDetail = () => {
           )}
         </TabsList>
         
-        <TabsContent value="content" className="mt-0">
+        <TabsContent value="content" className="mt-0" dir="rtl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
               <Card className="bg-card/80 backdrop-blur-sm border">
@@ -204,8 +256,13 @@ const CourseDetail = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {courseData.lessons.map(lesson => (
-                      <div key={lesson.id} className="p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors">
-                        <Button size="icon" variant="secondary" className="size-10 rounded-full flex-shrink-0">
+                      <div 
+                        key={lesson.id} 
+                        className={`p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer
+                                ${activeVideoId === lesson.id ? 'border-primary bg-primary/5' : ''}`}
+                        onClick={() => handleLessonClick(lesson.id)}
+                      >
+                        <Button size="icon" variant={activeVideoId === lesson.id ? "default" : "secondary"} className="size-10 rounded-full flex-shrink-0">
                           <Play className="size-5" />
                         </Button>
                         <div className="flex-grow">
@@ -271,7 +328,7 @@ const CourseDetail = () => {
           </div>
         </TabsContent>
         
-        <TabsContent value="resources" className="mt-0">
+        <TabsContent value="resources" className="mt-0" dir="rtl">
           <Card className="bg-card/80 backdrop-blur-sm border">
             <CardHeader>
               <CardTitle className="text-xl">חומרים להורדה</CardTitle>
@@ -300,7 +357,7 @@ const CourseDetail = () => {
         </TabsContent>
         
         {courseData.quizzes && (
-          <TabsContent value="quizzes" className="mt-0">
+          <TabsContent value="quizzes" className="mt-0" dir="rtl">
             <Card className="bg-card/80 backdrop-blur-sm border">
               <CardHeader>
                 <CardTitle className="text-xl">מבחנים</CardTitle>
