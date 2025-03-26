@@ -64,11 +64,11 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				tradervue: {
-					green: '#0299FF',
+					green: '#22c55e',
 					red: '#ef4444',
 					blue: '#0299FF',
 					navy: '#0f172a',
-					'light-green': '#bae6fd',
+					'light-green': '#dcfce7',
 					'light-red': '#fecaca',
 					'light-blue': '#bae6fd',
 				}
@@ -114,6 +114,9 @@ export default {
         rtl: 'rtl',
         ltr: 'ltr',
       },
+			backgroundImage: {
+				'main-background': "url('https://algotouch.co.il/wp-content/uploads/2025/03/Frame-1171274870.png')",
+			},
 		}
 	},
 	plugins: [require("tailwindcss-animate")],

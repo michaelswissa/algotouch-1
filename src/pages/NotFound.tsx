@@ -9,11 +9,11 @@ const NotFound = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4" dir="rtl">
+    <div className="min-h-screen flex flex-col items-center justify-center dark:bg-background bg-opacity-90 px-4" dir="rtl">
       <TraderVueLogo className="mb-8" />
       
       <h1 className="text-5xl font-bold mb-2 text-primary">404</h1>
-      <p className="text-xl text-gray-600 mb-8">העמוד לא נמצא</p>
+      <p className="text-xl text-gray-400 mb-8">העמוד לא נמצא</p>
       
       <div className="max-w-md text-center mb-8">
         <p className="text-gray-500">
@@ -24,7 +24,7 @@ const NotFound = () => {
       <div className="flex flex-col sm:flex-row gap-4">
         <Button 
           onClick={() => navigate('/')} 
-          className="min-w-[150px] flex items-center gap-2"
+          className="min-w-[150px] flex items-center gap-2 bg-primary text-primary-foreground"
         >
           <HomeIcon size={16} />
           דף הבית
@@ -33,7 +33,7 @@ const NotFound = () => {
         <Button 
           onClick={() => window.location.reload()} 
           variant="outline" 
-          className="min-w-[150px] flex items-center gap-2"
+          className="min-w-[150px] flex items-center gap-2 border-gray-700 hover:bg-gray-800"
         >
           <RefreshCcw size={16} />
           רענן עמוד

@@ -123,7 +123,7 @@ const TradeList = () => {
               <TableCell>
                 <div className="flex items-center gap-2">
                   {trade.exitEfficiency}%
-                  <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="w-12 h-2 bg-gray-600 rounded-full overflow-hidden">
                     <div 
                       className={cn(
                         "h-full", 
@@ -136,8 +136,8 @@ const TradeList = () => {
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={cn(
-                  "bg-blue-50 text-blue-600 hover:bg-blue-50",
-                  "border-blue-200"
+                  "bg-blue-950 text-blue-300 hover:bg-blue-950",
+                  "border-blue-800"
                 )}>
                   {trade.side === 'Long' ? 'לונג' : 'שורט'}
                 </Badge>
@@ -145,13 +145,13 @@ const TradeList = () => {
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {trade.tags.map((tag, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs bg-gray-50">
+                    <Badge key={idx} variant="outline" className="text-xs bg-gray-800 border-gray-700 text-gray-300">
                       {tag}
                     </Badge>
                   ))}
                 </div>
               </TableCell>
-              <TableCell className="text-gray-500 truncate max-w-[160px]">
+              <TableCell className="text-gray-400 truncate max-w-[160px]">
                 {trade.notes}
               </TableCell>
             </TableRow>

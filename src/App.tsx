@@ -21,10 +21,11 @@ import NewTrade from "./pages/NewTrade";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Set RTL direction at the document level
+  // Set RTL direction and dark mode at the document level
   useEffect(() => {
     document.documentElement.dir = "rtl";
     document.documentElement.lang = "he";
+    document.documentElement.classList.add('dark');
   }, []);
 
   return (
