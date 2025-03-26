@@ -27,7 +27,7 @@ const Layout = ({ children, className }: LayoutProps) => {
         <div className="absolute w-24 h-24 rounded-full bg-blue-300/5 blur-2xl top-1/2 right-1/4 floating-element pointer-events-none" style={{ animationDelay: "2s" }}></div>
         
         {/* Main content with enhanced glass effect - even lighter */}
-        <div className="rounded-xl glass-card-2025 min-h-full p-6 backdrop-blur-sm bg-white/90 dark:bg-white/8 shadow-sm z-10 relative border border-white/50 dark:border-white/5">
+        <div className="rounded-xl glass-card-2025 min-h-full p-6 backdrop-blur-sm bg-white/90 dark:bg-white/10 shadow-sm z-10 relative border border-white/50 dark:border-white/5">
           {/* Subtle neon border effect */}
           <div className="absolute inset-0 rounded-xl neon-border opacity-20 pointer-events-none"></div>
           
