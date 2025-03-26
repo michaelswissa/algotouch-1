@@ -64,13 +64,13 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				tradervue: {
-					green: '#0299FF', // Changed from #22c55e to brand color
+					green: '#22c55e', // Keep profits in green
 					red: '#ef4444',
-					blue: '#3b82f6',
+					blue: '#0299FF', // Change to brand color
 					navy: '#0f172a',
-					'light-green': '#e0f2ff', // Adjusted to match brand color
+					'light-green': '#dcfce7', // Keep light green for profits
 					'light-red': '#fecaca',
-					'light-blue': '#bae6fd',
+					'light-blue': '#e0f2ff', // Adjusted to match brand color
 				}
 			},
 			borderRadius: {
@@ -112,8 +112,8 @@ export default {
 					'50%': { transform: 'translateY(-5px)' }
 				},
 				'glow': {
-					'0%, 100%': { boxShadow: '0 0 10px rgba(34, 197, 94, 0.3)' },
-					'50%': { boxShadow: '0 0 20px rgba(34, 197, 94, 0.6)' }
+					'0%, 100%': { boxShadow: '0 0 10px rgba(2, 153, 255, 0.3)' }, // Changed to brand color
+					'50%': { boxShadow: '0 0 20px rgba(2, 153, 255, 0.6)' }  // Changed to brand color
 				}
 			},
 			animation: {
@@ -130,7 +130,7 @@ export default {
         ltr: 'ltr',
       },
 			backgroundImage: {
-				'main-background': "url('https://algotouch.co.il/wp-content/uploads/2025/03/Frame-1171274870.png')",
+				'main-background': "url('/lovable-uploads/c8aeaafa-4701-4427-aee2-5b86b8612e94.png')",
 			},
 		}
 	},

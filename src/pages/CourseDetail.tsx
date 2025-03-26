@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -116,4 +117,227 @@ const mockCourseData: Record<string, Course> = {
     description: "קורס מקיף העוסק במסחר בחוזים עתידיים בבורסה האמריקאית, כולל סשנים, סימולים, פקיעות ובטחונות.",
     instructor: "רונית לוי",
     modules: [
-      { title: "
+      { title: "מבוא למסחר בחוזים עתידיים", duration: "45:22" },
+      { title: "חוזים עתידיים על מדדים", duration: "38:15" },
+      { title: "חוזים עתידיים על סחורות", duration: "42:30" },
+      { title: "גמישות בטחונות", duration: "27:45" },
+      { title: "סשנים בשוק החוזים העתידיים", duration: "33:10" },
+      { title: "פקיעות ורולים", duration: "29:55" },
+      { title: "יתרונות וחסרונות במסחר בחוזים", duration: "35:20" }
+    ],
+    lessons: [
+      { id: 1, title: "מושגי יסוד בחוזים עתידיים", duration: "40 דקות", completed: false },
+      { id: 2, title: "מינוף וניהול סיכונים", duration: "45 דקות", completed: false },
+      { id: 3, title: "עונתיות בחוזים על סחורות", duration: "50 דקות", completed: false },
+      { id: 4, title: "אסטרטגיות ספרדים", duration: "65 דקות", completed: false }
+    ],
+    resources: [
+      { id: 1, title: "לוח מועדי פקיעה - PDF", type: "pdf", size: "1.8 MB" },
+      { id: 2, title: "מחשבון מרווחים - Excel", type: "excel", size: "350 KB" }
+    ],
+    progress: 10
+  }
+};
+
+const CourseDetail = () => {
+  const { courseId } = useParams<{ courseId: string }>();
+  const [activeTab, setActiveTab] = useState('content');
+  
+  // Fallback to first course if courseId is not valid
+  const courseData = courseId && mockCourseData[courseId] ? mockCourseData[courseId] : Object.values(mockCourseData)[0];
+
+  return (
+    <Layout className="p-4 md:p-6">
+      <div className="mb-4">
+        <Link to="/courses" className="text-primary hover:text-primary/90 flex items-center text-sm font-medium mb-2">
+          <ChevronRight className="size-4 rotate-180 mr-1" />
+          חזרה לכל הקורסים
+        </Link>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">{courseData.title}</h1>
+        <p className="text-muted-foreground">{courseData.description}</p>
+        
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">מדריך:</span>
+            <span className="text-sm text-muted-foreground">{courseData.instructor}</span>
+          </div>
+          
+          <div className="sm:mr-6 flex items-center gap-2">
+            <span className="text-sm font-medium">התקדמות:</span>
+            <div className="w-full max-w-48 flex items-center gap-2">
+              <Progress value={courseData.progress} className="h-2" />
+              <span className="text-sm text-tradervue-green">{courseData.progress}%</span>
+            </div>
+          </div>
+          
+          <div className="sm:mr-auto">
+            <Button className="gap-2">
+              <Play className="size-4" />
+              המשך ללמוד
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full justify-start mb-6 bg-background border-b rounded-none pb-0 h-auto">
+          <TabsTrigger value="content" className="rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary pb-3">
+            תוכן הקורס
+          </TabsTrigger>
+          <TabsTrigger value="resources" className="rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary pb-3">
+            חומרי עזר
+          </TabsTrigger>
+          {courseData.quizzes && (
+            <TabsTrigger value="quizzes" className="rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary pb-3">
+              מבחנים
+            </TabsTrigger>
+          )}
+        </TabsList>
+        
+        <TabsContent value="content" className="mt-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <Card className="bg-card/80 backdrop-blur-sm border">
+                <CardHeader>
+                  <CardTitle className="text-xl">שיעורים אחרונים</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {courseData.lessons.map(lesson => (
+                      <div key={lesson.id} className="p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors">
+                        <Button size="icon" variant="secondary" className="size-10 rounded-full flex-shrink-0">
+                          <Play className="size-5" />
+                        </Button>
+                        <div className="flex-grow">
+                          <h3 className="font-medium">{lesson.title}</h3>
+                          {lesson.duration && (
+                            <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                              <Clock className="size-3.5" />
+                              {lesson.duration}
+                            </div>
+                          )}
+                        </div>
+                        {lesson.completed ? (
+                          <CheckCircle2 className="size-5 text-tradervue-green flex-shrink-0" />
+                        ) : (
+                          <Button size="sm" variant="ghost" className="flex-shrink-0">
+                            המשך
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div>
+              <Card className="bg-card/80 backdrop-blur-sm border">
+                <CardHeader>
+                  <CardTitle className="text-xl">מודולים</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {courseData.modules.map((module, index) => (
+                      <div key={index} className="group">
+                        <div className="flex gap-3 items-start p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                          <div className="mt-0.5 size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium flex-shrink-0">
+                            {index + 1}
+                          </div>
+                          <div>
+                            <h3 className="font-medium group-hover:text-primary transition-colors">
+                              {module.title}
+                              {module.isNew && (
+                                <span className="mr-2 bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-semibold">
+                                  חדש
+                                </span>
+                              )}
+                            </h3>
+                            {module.duration && (
+                              <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                <Clock className="size-3.5" />
+                                {module.duration}
+                              </div>
+                            )}
+                            {module.details && <p className="text-sm text-muted-foreground mt-1">{module.details}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="resources" className="mt-0">
+          <Card className="bg-card/80 backdrop-blur-sm border">
+            <CardHeader>
+              <CardTitle className="text-xl">חומרים להורדה</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {courseData.resources.map(resource => (
+                  <div key={resource.id} className="p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors">
+                    <div className="size-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <FileText className="size-5 text-primary" />
+                    </div>
+                    <div className="flex-grow">
+                      <h3 className="font-medium">{resource.title}</h3>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {resource.size}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" className="flex-shrink-0">
+                      הורדה
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {courseData.quizzes && (
+          <TabsContent value="quizzes" className="mt-0">
+            <Card className="bg-card/80 backdrop-blur-sm border">
+              <CardHeader>
+                <CardTitle className="text-xl">מבחנים</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {courseData.quizzes.map(quiz => (
+                    <div key={quiz.id} className="p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors">
+                      <div className="size-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <FileText className="size-5 text-primary" />
+                      </div>
+                      <div className="flex-grow">
+                        <h3 className="font-medium">{quiz.title}</h3>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {quiz.questions} שאלות
+                        </div>
+                      </div>
+                      {quiz.completed ? (
+                        <div className="flex items-center gap-1 text-tradervue-green text-sm mr-2">
+                          <CheckCircle2 className="size-4" />
+                          הושלם
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" className="flex-shrink-0">
+                          התחל מבחן
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
+    </Layout>
+  );
+};
+
+export default CourseDetail;
