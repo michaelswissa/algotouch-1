@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -45,43 +46,43 @@
   }
 
   .dark {
-    /* Much lighter dark theme based on #0D0D2B but friendlier */
-    --background: 240 60% 16%;  /* Lighter background - more vibrant blue */
+    /* Much lighter dark theme - even more friendly blues */
+    --background: 228 30% 20%;  /* Lighter, less saturated blue background */
     --foreground: 210 40% 98%;
 
-    --card: 240 55% 20%;  /* Lighter card background */
+    --card: 228 28% 24%;  /* Lighter card background */
     --card-foreground: 210 40% 98%;
 
-    --popover: 240 55% 20%;
+    --popover: 228 28% 24%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 202 100% 65%; /* Much brighter brand color for visibility */
+    --primary: 202 100% 70%; /* Even brighter brand color for visibility */
     --primary-foreground: 240 5% 94.9%;
 
-    --secondary: 240 30% 28%;  /* Lighter secondary for better contrast */
+    --secondary: 228 20% 28%;  /* Lighter secondary for better contrast */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 240 30% 28%;
-    --muted-foreground: 217 10% 85%;  /* Brighter muted text */
+    --muted: 228 20% 32%;
+    --muted-foreground: 217 10% 90%;  /* Brighter muted text */
 
-    --accent: 202 100% 65%; /* Brighter brand color */
+    --accent: 202 100% 70%; /* Brighter brand color */
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 65%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 240 30% 32%;  /* Lighter borders */
-    --input: 240 30% 32%;
+    --border: 228 20% 38%;  /* Lighter borders */
+    --input: 228 20% 38%;
     --ring: 212.7 26.8% 83.9%;
 
     /* Sidebar updated to be lighter */
-    --sidebar-background: 240 60% 18%;  /* Lighter sidebar */
+    --sidebar-background: 228 30% 22%;  /* Lighter sidebar */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 202 100% 65%; /* Brighter brand color */
+    --sidebar-primary: 202 100% 70%; /* Brighter brand color */
     --sidebar-primary-foreground: 240 5% 94.9%;
-    --sidebar-accent: 240 30% 32%;
+    --sidebar-accent: 228 20% 32%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 240 30% 26%;
+    --sidebar-border: 228 20% 30%;
     --sidebar-ring: 212.7 26.8% 83.9%;
   }
 }
@@ -105,17 +106,17 @@
     @apply font-bold text-foreground tracking-tight;
   }
 
-  /* Custom scrollbars */
+  /* Custom scrollbars - lighter */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-secondary/50 rounded-full;
+    @apply bg-secondary/40 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-primary/60 hover:bg-primary/80 rounded-full transition-colors;
+    @apply bg-primary/50 hover:bg-primary/70 rounded-full transition-colors;
   }
 }

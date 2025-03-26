@@ -78,6 +78,9 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
+			scale: {
+				'102': '1.02',
+			},
 			keyframes: {
 				'accordion-down': {
 					from: {
@@ -112,8 +115,8 @@ export default {
 					'50%': { transform: 'translateY(-5px)' }
 				},
 				'glow': {
-					'0%, 100%': { boxShadow: '0 0 10px rgba(2, 153, 255, 0.3)' }, 
-					'50%': { boxShadow: '0 0 20px rgba(2, 153, 255, 0.6)' }  
+					'0%, 100%': { boxShadow: '0 0 10px rgba(2, 153, 255, 0.15)' }, 
+					'50%': { boxShadow: '0 0 20px rgba(2, 153, 255, 0.25)' }  
 				},
 				'neon-flicker': {
 					'0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%': {
