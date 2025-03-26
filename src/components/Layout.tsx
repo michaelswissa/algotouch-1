@@ -15,10 +15,10 @@ const Layout = ({ children, className }: LayoutProps) => {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden dark:bg-background dark:text-foreground bg-opacity-90 transition-all duration-300" dir="rtl">
+    <div className="flex h-screen overflow-hidden dark:bg-background dark:text-foreground transition-all duration-300" dir="rtl">
       <Sidebar />
-      <main className={cn("flex-1 overflow-y-auto p-2 animate-fade-in", className)}>
-        <div className="rounded-lg glass-card min-h-full p-4">
+      <main className={cn("flex-1 overflow-y-auto p-2 animate-fade-in bg-main-background bg-cover bg-center bg-no-repeat", className)}>
+        <div className="rounded-lg glass-card min-h-full p-4 backdrop-blur-md bg-background/60">
           {children}
         </div>
       </main>

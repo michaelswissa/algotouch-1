@@ -130,7 +130,7 @@ export default {
         ltr: 'ltr',
       },
 			backgroundImage: {
-				'main-background': "url('/lovable-uploads/c8aeaafa-4701-4427-aee2-5b86b8612e94.png')",
+				'main-background': "url('/lovable-uploads/ae529ab2-fe6c-449c-a597-26b0cb1c1d61.png')",
 			},
 		}
 	},
