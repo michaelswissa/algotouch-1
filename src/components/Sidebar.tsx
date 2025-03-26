@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
@@ -12,15 +12,20 @@ import {
   FileSpreadsheet,
   Bot,
   PlusCircle,
-  Sparkles
+  Sparkles,
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
   
   const navItems = [
     { path: '/dashboard', name: 'לוח בקרה', icon: <Home size={18} /> },
@@ -43,59 +48,105 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/5 transition-all duration-300 relative overflow-hidden" dir="rtl">
-      {/* Add subtle animation background */}
-      <div className="absolute inset-0 bg-mesh opacity-20 pointer-events-none"></div>
+    <div 
+      className={cn(
+        "dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/5 transition-all duration-300 relative overflow-hidden",
+        collapsed ? "w-16" : "w-64"
+      )} 
+      dir="rtl"
+    >
+      {/* Sidebar toggle button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-3 left-3 z-20 h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-muted-foreground"
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <X size={14} />}
+      </Button>
       
-      <div className="p-6 border-b border-sidebar-border flex justify-center relative z-10">
-        <TraderVueLogo className="mb-2 hover-scale" />
+      {/* Add subtle animation background */}
+      <div className="absolute inset-0 bg-mesh opacity-10 pointer-events-none"></div>
+      
+      <div className={cn(
+        "p-6 border-b border-sidebar-border flex justify-center relative z-10",
+        collapsed && "p-3"
+      )}>
+        <TraderVueLogo className="mb-2 hover-scale" small={collapsed} />
       </div>
       
-      <div className="p-4 border-b border-sidebar-border relative z-10">
-        <div className="relative mb-4">
-          <Input 
-            type="text" 
-            placeholder="חיפוש" 
-            className="w-full pr-8 bg-sidebar-accent/20 border-sidebar-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300" 
-          />
-          <Search className="h-4 w-4 absolute top-3 right-3 text-muted-foreground" />
-        </div>
+      <div className={cn(
+        "p-4 border-b border-sidebar-border relative z-10",
+        collapsed && "p-2"
+      )}>
+        {!collapsed && (
+          <div className="relative mb-4">
+            <Input 
+              type="text" 
+              placeholder="חיפוש" 
+              className="w-full pr-8 bg-sidebar-accent/10 border-sidebar-border/50 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300" 
+            />
+            <Search className="h-4 w-4 absolute top-3 right-3 text-muted-foreground" />
+          </div>
+        )}
         
         <Button 
           onClick={handleNewTrade} 
-          className="w-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 group"
+          className={cn(
+            "bg-primary/80 hover:bg-primary/90 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105 group",
+            collapsed ? "w-10 h-10 p-0 rounded-full mx-auto" : "w-full"
+          )}
         >
           <PlusCircle size={16} className="group-hover:rotate-90 transition-transform duration-300" />
-          <span>עסקה חדשה</span>
-          <Sparkles size={14} className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute right-4" />
+          {!collapsed && <span>עסקה חדשה</span>}
+          {!collapsed && <Sparkles size={14} className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute right-4" />}
         </Button>
       </div>
       
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin relative z-10">
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto scrollbar-thin relative z-10">
         {navItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/20 text-sidebar-foreground transition-all duration-200 sidebar-link ${
-              isActive(item.path) ? 'active bg-sidebar-accent/10 text-primary font-medium' : ''
-            }`}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/10 text-sidebar-foreground transition-all duration-200 sidebar-link",
+              isActive(item.path) && "active bg-sidebar-accent/5 text-primary font-medium",
+              collapsed && "justify-center px-2"
+            )}
           >
-            <span className={`ml-2 ${isActive(item.path) ? 'text-primary' : 'text-primary/70'} transition-colors duration-300`}>
+            <span className={cn(
+              "transition-colors duration-300",
+              isActive(item.path) ? "text-primary" : "text-primary/60"
+            )}>
               {item.icon}
             </span>
-            <span>{item.name}</span>
+            {!collapsed && <span>{item.name}</span>}
             
             {/* Add subtle indicator for active item */}
             {isActive(item.path) && (
-              <span className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary rounded-l-md"></span>
+              <span className={cn(
+                "absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary/80 rounded-l-md",
+                collapsed && "w-1 right-0"
+              )}></span>
             )}
           </Link>
         ))}
       </nav>
       
-      <div className="p-4 border-t border-sidebar-border text-xs text-center text-sidebar-foreground/70 relative z-10">
-        <p>AlgoTouch &copy; 2025</p>
-        <p className="mt-1">כל הזכויות שמורות</p>
+      <div className={cn(
+        "p-4 border-t border-sidebar-border text-xs text-center text-sidebar-foreground/60 relative z-10",
+        collapsed && "p-2"
+      )}>
+        {!collapsed ? (
+          <>
+            <p>AlgoTouch &copy; 2025</p>
+            <p className="mt-1">כל הזכויות שמורות</p>
+          </>
+        ) : (
+          <div className="text-center">
+            <span>&copy;</span>
+          </div>
+        )}
       </div>
     </div>
   );
