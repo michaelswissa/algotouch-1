@@ -44,21 +44,37 @@ const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: 
       dir="rtl"
     >
       {/* Course thumbnail - visually appealing video preview */}
-      <div className="relative w-full h-40 bg-secondary/40 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 z-10"></div>
-        <div className="h-full w-full bg-gradient-to-r from-primary/5 to-secondary/20 flex items-center justify-center">
-          <div className="bg-primary/90 rounded-full p-3 shadow-lg pulse-subtle z-20">
+      <div className="relative w-full h-48 overflow-hidden">
+        {/* Video thumbnail background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-primary/5 z-0">
+          <div className="absolute inset-0 bg-mesh opacity-30"></div>
+        </div>
+        
+        {/* Video overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/60 z-10"></div>
+        
+        {/* Video play button */}
+        <div className="absolute inset-0 flex items-center justify-center z-20">
+          <div className="bg-primary/90 rounded-full p-3 shadow-lg animate-pulse-subtle transform hover:scale-110 transition-transform duration-300 cursor-pointer">
             <Play className="h-6 w-6 text-white" />
           </div>
         </div>
-        <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-1 rounded-md z-20 backdrop-blur-sm">
-          5 שיעורים
+        
+        {/* Video info badge */}
+        <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2.5 py-1 rounded-md z-20 backdrop-blur-sm flex items-center gap-1.5">
+          <Video className="h-3.5 w-3.5" />
+          <span>{modules.length} שיעורים</span>
+        </div>
+        
+        {/* Module count badge */}
+        <div className="absolute bottom-3 left-3 bg-primary/80 text-white text-xs px-2.5 py-1 rounded-md z-20 backdrop-blur-sm">
+          {Math.floor(Math.random() * 60) + 30} דקות
         </div>
       </div>
       
       <CardHeader className="pb-2">
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-full bg-primary/10 text-primary">{renderIcon()}</div>
+          <div className="p-2 rounded-full bg-primary/10 text-primary flex-shrink-0">{renderIcon()}</div>
           <div>
             <CardTitle className="text-lg">{title}</CardTitle>
             <p className="text-muted-foreground text-sm mt-1">{description}</p>
@@ -69,8 +85,8 @@ const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: 
       <CardContent>
         <div className="space-y-2.5">
           {modules.slice(0, 3).map((module, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm bg-secondary/40 p-2 rounded-md hover:bg-secondary/60 transition-colors">
-              <Video className="h-3.5 w-3.5 text-primary/80 flex-shrink-0" />
+            <div key={i} className="flex items-center gap-2 text-sm bg-secondary/40 p-2 rounded-md hover:bg-secondary/60 transition-colors cursor-pointer group">
+              <Video className="h-3.5 w-3.5 text-primary group-hover:text-primary flex-shrink-0" />
               <span className="font-medium">{module.title}</span>
               {module.duration && <span className="text-xs text-muted-foreground mr-auto">{module.duration}</span>}
               {module.isNew && <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200 ml-auto">חדש</Badge>}

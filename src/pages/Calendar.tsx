@@ -117,11 +117,11 @@ const Calendar = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex justify-center">
-                  <div className="overflow-hidden rounded-md max-w-4xl w-full">
+                  <div className="overflow-hidden rounded-md w-full">
                     <iframe 
                       src="https://sslecal2.investing.com?ecoDayBackground=%23039aff&defaultFont=%23039aff&innerBorderColor=%238e989e&borderColor=%23039aff&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=2,3&features=datepicker,timezone,timeselector,filters&countries=23,5&calType=week&timeZone=8&lang=1" 
                       width="100%" 
-                      height="467" 
+                      height="500" 
                       frameBorder="0" 
                       allowTransparency={true}
                       className="mx-auto"

@@ -3,21 +3,21 @@
   /* 2025 Design Keyframes */
   @keyframes neon-pulse {
     0%, 100% { 
-      text-shadow: 0 0 4px rgba(51, 173, 255, 0.2), 0 0 8px rgba(51, 173, 255, 0.15), 0 0 12px rgba(51, 173, 255, 0.1);
+      text-shadow: 0 0 4px rgba(0, 153, 255, 0.3), 0 0 8px rgba(0, 153, 255, 0.2), 0 0 12px rgba(0, 153, 255, 0.1);
     }
     50% { 
-      text-shadow: 0 0 4px rgba(51, 173, 255, 0.3), 0 0 10px rgba(51, 173, 255, 0.2), 0 0 16px rgba(51, 173, 255, 0.1);
+      text-shadow: 0 0 4px rgba(0, 153, 255, 0.4), 0 0 10px rgba(0, 153, 255, 0.3), 0 0 16px rgba(0, 153, 255, 0.2);
     }
   }
 
   @keyframes border-flow {
     0%, 100% { 
-      border-color: rgba(51, 173, 255, 0.05);
-      box-shadow: 0 0 5px rgba(51, 173, 255, 0.05);
+      border-color: rgba(0, 153, 255, 0.1);
+      box-shadow: 0 0 5px rgba(0, 153, 255, 0.05);
     }
     50% { 
-      border-color: rgba(51, 173, 255, 0.15);
-      box-shadow: 0 0 10px rgba(51, 173, 255, 0.1);
+      border-color: rgba(0, 153, 255, 0.25);
+      box-shadow: 0 0 10px rgba(0, 153, 255, 0.1);
     }
   }
 
@@ -45,7 +45,7 @@
   }
   
   .hover-glow {
-    @apply transition-all duration-300 hover:shadow-md hover:shadow-primary/10;
+    @apply transition-all duration-300 hover:shadow-md hover:shadow-primary/20;
   }
   
   .pulsate {
@@ -66,7 +66,7 @@
   }
 
   .neon-border {
-    @apply border border-primary/20 rounded-lg;
+    @apply border border-primary/30 rounded-lg;
     animation: border-flow 5s infinite;
   }
 
@@ -82,51 +82,51 @@
     animation: soft-rotate 40s infinite linear;
   }
 
-  /* Background effects - even more subtle */
+  /* Background effects - more visible but still elegant */
   .bg-mesh {
-    background-image: radial-gradient(rgba(51, 173, 255, 0.02) 1px, transparent 1px),
-                      radial-gradient(rgba(51, 173, 255, 0.02) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(0, 153, 255, 0.04) 1px, transparent 1px),
+                      radial-gradient(rgba(0, 153, 255, 0.04) 1px, transparent 1px);
     background-size: 30px 30px;
     background-position: 0 0, 15px 15px;
   }
 
   .bg-dots {
-    background-image: radial-gradient(rgba(51, 173, 255, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
+    background-image: radial-gradient(rgba(0, 153, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 
   .bg-grid {
-    background-image: linear-gradient(rgba(51, 173, 255, 0.02) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(51, 173, 255, 0.02) 1px, transparent 1px);
+    background-image: linear-gradient(rgba(0, 153, 255, 0.03) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0, 153, 255, 0.03) 1px, transparent 1px);
     background-size: 30px 30px;
   }
 
   .light-pattern {
-    background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2333adff' fill-opacity='0.02'%3E%3Cpath d='M48 40v-8h-4v8h-8v4h8v8h4v-8h8v-4h-8zm0-32V0h-4v8h-8v4h8v8h4v-8h8V8h-8zM8 40v-8H4v8H0v4h4v8h4v-8h8v-4H8zM8 8V0H4v8H0v4h4v8h4v-8h8V8H8z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230099ff' fill-opacity='0.03'%3E%3Cpath d='M48 40v-8h-4v8h-8v4h8v8h4v-8h8v-4h-8zm0-32V0h-4v8h-8v4h8v8h4v-8h8V8h-8zM8 40v-8H4v8H0v4h4v8h4v-8h8v-4H8zM8 8V0H4v8H0v4h4v8h4v-8h8V8H8z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 
-  /* Modern glassmorphism - ultra light */
+  /* Modern glassmorphism - refined and polished */
   .glass-modern {
-    @apply backdrop-blur-md bg-white/80 dark:bg-white/10 border border-white/20 dark:border-white/5 shadow-sm;
+    @apply backdrop-blur-md bg-white/90 dark:bg-white/10 border border-white/20 dark:border-white/5 shadow-sm;
   }
 
   .glass-card-2025 {
-    @apply backdrop-blur-md bg-white/90 dark:bg-white/10 border border-white/20 
-    dark:border-primary/5 shadow-sm hover:shadow-md transition-all duration-300;
+    @apply backdrop-blur-md bg-white/95 dark:bg-white/10 border border-white/40 
+    dark:border-primary/10 shadow-sm hover:shadow-md transition-all duration-300;
   }
 
   .glass-button {
-    @apply backdrop-blur-md bg-white/60 dark:bg-white/10 border border-white/30 
-    shadow-sm hover:shadow-md transition-all duration-300 hover:bg-white/70;
+    @apply backdrop-blur-md bg-white/70 dark:bg-white/10 border border-white/40 
+    shadow-sm hover:shadow-md transition-all duration-300 hover:bg-white/80;
   }
 
   /* Card enhancements */
   .card-highlight {
-    @apply border-l-2 border-primary/30;
+    @apply border-l-2 border-primary;
   }
 
   .card-gradient {
-    @apply bg-gradient-to-br from-background/95 to-secondary/20 backdrop-blur-sm;
+    @apply bg-gradient-to-br from-background/95 to-primary/5 backdrop-blur-sm;
   }
 
   /* Sidebar link with modern effects */
@@ -135,7 +135,7 @@
   }
   
   .sidebar-link::after {
-    @apply content-[''] absolute bottom-0 left-0 w-0 h-0.5 bg-primary/50 transition-all duration-300 ease-in-out;
+    @apply content-[''] absolute bottom-0 left-0 w-0 h-0.5 bg-primary/70 transition-all duration-300 ease-in-out;
   }
   
   .sidebar-link:hover::after {
@@ -146,10 +146,10 @@
     @apply w-full;
   }
 
-  /* 2025 Button styles - ultra light and elegant */
+  /* 2025 Button styles - refined and sleek */
   .btn-2025 {
     @apply relative overflow-hidden px-4 py-2 rounded-lg font-medium 
-    bg-gradient-to-r from-primary/50 to-primary/30
+    bg-gradient-to-r from-primary/80 to-primary/60
     text-white transition-all duration-300 shadow-sm hover:shadow-md;
   }
 
@@ -165,10 +165,10 @@
 
   /* Text gradient effects */
   .text-gradient-blue {
-    @apply bg-gradient-to-r from-primary via-primary/70 to-primary/40 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent;
   }
 
   .text-gradient-purple {
-    @apply bg-gradient-to-r from-purple-500/80 via-purple-400/70 to-primary/80 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-purple-500 via-purple-400 to-primary bg-clip-text text-transparent;
   }
 }

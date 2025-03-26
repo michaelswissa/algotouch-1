@@ -5,22 +5,22 @@
   }
 
   .tradervue-card {
-    @apply bg-card rounded-lg shadow-sm border border-border transition-all duration-300 hover:shadow-md dark:shadow-black/10;
+    @apply bg-card rounded-lg shadow-sm border border-border/60 transition-all duration-300 hover:shadow-md dark:shadow-primary/5;
   }
 
   .elevated-card {
-    @apply bg-card/90 rounded-lg border border-border/60 shadow-lg dark:shadow-primary/10 backdrop-blur-md 
-    hover:shadow-xl transition-all duration-300 hover:border-primary/20;
+    @apply bg-card/90 rounded-lg border border-border/60 shadow-lg dark:shadow-primary/20 backdrop-blur-md 
+    hover:shadow-xl transition-all duration-300 hover:border-primary/30;
   }
 
-  /* Glass card effect */
+  /* Glass card effect - more refined */
   .glass-card {
-    @apply bg-background/50 backdrop-blur-md border border-white/10 dark:border-white/5 shadow-lg shadow-primary/5;
+    @apply bg-background/50 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg shadow-primary/10;
   }
 
   /* Navigation Links */
   [dir="rtl"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/80 text-foreground transition-all duration-200;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary text-foreground transition-all duration-200;
   }
 
   [dir="rtl"] .tradervue-nav-link svg {
@@ -28,7 +28,7 @@
   }
 
   [dir="ltr"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/80 text-foreground transition-all duration-200;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary text-foreground transition-all duration-200;
   }
 
   [dir="ltr"] .tradervue-nav-link svg {
@@ -52,35 +52,35 @@
     @apply text-tradervue-red;
   }
 
-  /* Table styles */
+  /* Table styles - more refined */
   .tradervue-table {
     @apply w-full border-collapse;
   }
 
   [dir="rtl"] .tradervue-table th {
-    @apply px-4 py-2 text-right text-sm font-medium text-muted-foreground border-b border-border;
+    @apply px-4 py-2 text-right text-sm font-medium text-muted-foreground border-b border-border/60;
   }
 
   [dir="ltr"] .tradervue-table th {
-    @apply px-4 py-2 text-left text-sm font-medium text-muted-foreground border-b border-border;
+    @apply px-4 py-2 text-left text-sm font-medium text-muted-foreground border-b border-border/60;
   }
 
   .tradervue-table td {
-    @apply px-4 py-3 text-sm border-b border-border;
+    @apply px-4 py-3 text-sm border-b border-border/40;
   }
 
   .tradervue-table tr:hover {
-    @apply bg-muted/50 transition-colors;
+    @apply bg-muted/30 transition-colors;
   }
 
-  /* Other UI components */
+  /* Other UI components - modernized */
   .tradervue-filter-pill {
     @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground 
-    transition-all duration-200 hover:bg-primary/20 cursor-pointer;
+    transition-all duration-200 hover:bg-primary/30 cursor-pointer;
   }
 
   .calendar-day {
-    @apply w-8 h-8 flex items-center justify-center rounded-full text-sm transition-all duration-200;
+    @apply w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all duration-200 hover:bg-secondary/60 cursor-pointer;
   }
 
   .calendar-day.positive {
@@ -100,13 +100,13 @@
     @apply border-primary text-primary;
   }
 
-  /* Course and module styles */
+  /* Course and module styles - enhanced */
   .course-card {
-    @apply bg-card/80 rounded-lg shadow-sm border border-border hover:shadow-md hover:border-primary/20 transition-all duration-300 backdrop-blur-sm;
+    @apply bg-card/90 rounded-lg shadow-sm border border-border hover:shadow-md hover:border-primary/30 transition-all duration-300 backdrop-blur-sm;
   }
 
   .course-list {
-    @apply space-y-4;
+    @apply space-y-5;
   }
 
   .module-list {
@@ -114,10 +114,10 @@
   }
 
   .module-item {
-    @apply flex items-start gap-2;
+    @apply flex items-start gap-2 p-2 rounded-md hover:bg-secondary/50 transition-colors;
   }
 
   .module-number {
-    @apply flex-shrink-0 w-6 h-6 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center text-xs font-medium shadow-sm shadow-primary/20;
+    @apply flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium shadow-sm shadow-primary/30;
   }
 }

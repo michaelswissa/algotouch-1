@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 202 100% 60%; /* Brighter brand color #33ADFF */
+    --primary: 204 100% 50%; /* Vibrant blue #0099ff */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -23,7 +23,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 202 100% 60%; /* Brighter brand color #33ADFF */
+    --accent: 204 100% 50%; /* Vibrant blue #0099ff */
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -37,7 +37,7 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 202 100% 60%; /* Brighter brand color #33ADFF */
+    --sidebar-primary: 204 100% 50%; /* Vibrant blue #0099ff */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
@@ -46,43 +46,43 @@
   }
 
   .dark {
-    /* Much lighter dark theme - even more friendly blues with less saturation */
-    --background: 228 15% 25%;  /* Much lighter, less saturated blue background */
+    /* Modernized dark theme with a brighter, more appealing color scheme */
+    --background: 224 20% 18%; /* Slightly brighter background */
     --foreground: 210 40% 98%;
 
-    --card: 228 15% 30%;  /* Lighter card background */
+    --card: 224 20% 22%; /* Lighter card background */
     --card-foreground: 210 40% 98%;
 
-    --popover: 228 15% 30%;
+    --popover: 224 20% 22%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 202 100% 75%; /* Even brighter brand color for visibility */
+    --primary: 204 100% 65%; /* Bright blue for better visibility */
     --primary-foreground: 240 5% 94.9%;
 
-    --secondary: 228 10% 35%;  /* Lighter secondary for better contrast */
+    --secondary: 224 15% 30%; /* Lighter secondary for better contrast */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 228 10% 40%;
-    --muted-foreground: 217 10% 90%;  /* Brighter muted text */
+    --muted: 224 15% 35%;
+    --muted-foreground: 217 10% 90%; /* Brighter muted text */
 
-    --accent: 202 100% 75%; /* Brighter brand color */
+    --accent: 204 100% 65%; /* Brighter accent color */
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 65%;
+    --destructive: 0 70% 65%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 228 15% 40%;  /* Lighter borders */
-    --input: 228 15% 40%;
+    --border: 224 20% 32%; /* Lighter borders */
+    --input: 224 20% 32%;
     --ring: 212.7 26.8% 83.9%;
 
-    /* Sidebar updated to be lighter */
-    --sidebar-background: 228 15% 28%;  /* Lighter sidebar */
+    /* Sidebar updated to be more vibrant and modern */
+    --sidebar-background: 224 20% 22%; /* Slightly lighter sidebar */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 202 100% 75%; /* Brighter brand color */
+    --sidebar-primary: 204 100% 65%; /* Bright blue for better visibility */
     --sidebar-primary-foreground: 240 5% 94.9%;
-    --sidebar-accent: 228 10% 38%;
+    --sidebar-accent: 224 15% 34%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 228 10% 35%;
+    --sidebar-border: 224 15% 30%;
     --sidebar-ring: 212.7 26.8% 83.9%;
   }
 }
@@ -106,7 +106,7 @@
     @apply font-bold text-foreground tracking-tight;
   }
 
-  /* Custom scrollbars - lighter */
+  /* Modern, more subtle scrollbars */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -117,6 +117,6 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-primary/40 hover:bg-primary/60 rounded-full transition-colors;
+    @apply bg-primary/50 hover:bg-primary/70 rounded-full transition-colors;
   }
 }
