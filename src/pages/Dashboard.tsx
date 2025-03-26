@@ -3,6 +3,7 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, Info } from 'lucide-react';
 
 const Dashboard = () => {
   // Mock news data
@@ -24,19 +25,24 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="tradervue-container py-8 animate-fade-in">
-        <h1 className="text-3xl font-bold mb-6">לוח בקרה</h1>
+      <div className="tradervue-container py-6">
+        <h1 className="text-3xl font-bold mb-8 flex items-center">
+          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">לוח בקרה</span>
+        </h1>
         
         {/* News Section - First */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">חדשות שוק ההון</h2>
-          <Card>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Info size={18} className="text-primary" />
+            <span>חדשות שוק ההון</span>
+          </h2>
+          <Card className="elevated-card overflow-hidden">
             <CardContent className="p-0">
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-border">
                 {newsItems.map(news => (
-                  <div key={news.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <h3 className="font-medium text-gray-900">{news.title}</h3>
-                    <div className="flex items-center justify-between mt-2 text-sm text-gray-500">
+                  <div key={news.id} className="p-4 hover:bg-secondary/50 transition-all duration-200 cursor-pointer">
+                    <h3 className="font-medium text-foreground">{news.title}</h3>
+                    <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
                       <span>{news.source}</span>
                       <span>{news.time}</span>
                     </div>
@@ -49,17 +55,24 @@ const Dashboard = () => {
         
         {/* Stock Indices Section - Second */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">מדדים בזמן אמת</h2>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp size={18} className="text-primary" />
+            <span>מדדים בזמן אמת</span>
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {stockIndices.map(index => (
-              <Card key={index.id}>
+              <Card key={index.id} className="hover-scale">
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h3 className="font-bold text-gray-800">{index.id}</h3>
-                      <p className="text-2xl font-medium">{index.value}</p>
+                      <h3 className="font-bold text-foreground">{index.id}</h3>
+                      <p className="text-2xl font-medium mt-1">{index.value}</p>
                     </div>
-                    <div className={`text-lg ${index.isPositive ? 'text-[#0299FF]' : 'text-tradervue-red'}`}>
+                    <div className={`flex items-center text-lg ${index.isPositive ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
+                      {index.isPositive ? 
+                        <ArrowUpRight className="mr-1" size={20} /> : 
+                        <ArrowDownRight className="mr-1" size={20} />
+                      }
                       {index.change}
                     </div>
                   </div>

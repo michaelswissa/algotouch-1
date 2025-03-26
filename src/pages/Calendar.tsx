@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import MonthCalendar from '@/components/MonthCalendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface TradeDay {
   date: string;
@@ -33,14 +34,23 @@ const Calendar = () => {
 
   return (
     <Layout>
-      <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
-        <h1 className="text-3xl font-bold mb-6">לוח שנה</h1>
+      <div className="tradervue-container py-6">
+        <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
+          <CalendarDays size={28} className="text-primary" />
+          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">לוח שנה</span>
+        </h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>לוח שנה מסחר</CardTitle>
+            <Card className="elevated-card">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <CalendarDays size={18} className="text-primary" />
+                  לוח שנה מסחר
+                </CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  {currentMonth} {currentYear}
+                </div>
               </CardHeader>
               <CardContent>
                 <MonthCalendar 
@@ -53,20 +63,33 @@ const Calendar = () => {
           </div>
           
           <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>פעילות אחרונה</CardTitle>
+            <Card className="elevated-card h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <TrendingUp size={18} className="text-primary" />
+                  פעילות אחרונה
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {tradeDays.slice(0, 5).map((day, index) => (
-                    <div key={index} className="flex items-center justify-between pb-2 border-b border-gray-100 last:border-b-0">
+                    <div key={index} className="flex items-center justify-between pb-3 border-b border-border last:border-b-0 hover:bg-secondary/30 transition-colors duration-200 p-2 rounded-md">
                       <div>
                         <div className="font-medium">{day.date}</div>
-                        <div className="text-sm text-gray-500">{day.trades} עסקאות</div>
+                        <div className="text-sm text-muted-foreground">{day.trades} עסקאות</div>
                       </div>
-                      <div className={`text-lg font-semibold ${day.profit >= 0 ? 'text-[#0299FF]' : 'text-red-500'}`}>
-                        {day.profit >= 0 ? '+' : ''}{day.profit.toFixed(2)}$
+                      <div className={`text-lg font-semibold flex items-center ${day.profit >= 0 ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
+                        {day.profit >= 0 ? (
+                          <>
+                            <TrendingUp size={16} className="mr-1" />
+                            +{day.profit.toFixed(2)}$
+                          </>
+                        ) : (
+                          <>
+                            <TrendingDown size={16} className="mr-1" />
+                            {day.profit.toFixed(2)}$
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}

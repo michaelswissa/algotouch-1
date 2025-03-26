@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    --background: 210 40% 96%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -33,7 +33,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 47.4% 11.2%;
@@ -46,41 +46,41 @@
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 225 10% 8%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 224 10% 10%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 224 10% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 142 76% 36%;
+    --primary: 142 76% 50%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted-foreground: 213 20% 70%;
 
-    --accent: 142 76% 36%;
+    --accent: 142 76% 50%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 50.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 217.2 32.6% 22.5%;
+    --input: 217.2 32.6% 22.5%;
     --ring: 212.7 26.8% 83.9%;
 
-    --sidebar-background: 240 10% 3.9%;
+    --sidebar-background: 222 14% 10%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 142 76% 36%;
+    --sidebar-primary: 142 76% 50%;
     --sidebar-primary-foreground: 240 5% 94.9%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent: 217.2 32.6% 25.5%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-border: 217.2 32.6% 22.5%;
     --sidebar-ring: 212.7 26.8% 83.9%;
   }
 }
@@ -98,45 +98,77 @@
     background-position: center;
     background-repeat: no-repeat;
     background-attachment: fixed;
+    letter-spacing: 0.01em;
   }
   
   html[dir="rtl"] body {
     text-align: right;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold text-foreground tracking-tight;
+  }
+
+  /* Custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary/50 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/50 hover:bg-primary/70 rounded-full transition-colors;
+  }
+
+  /* Glass card effect */
+  .glass-card {
+    @apply bg-background/50 backdrop-blur-md border border-white/10 dark:border-white/5;
+  }
 }
 
 @layer components {
   .tradervue-container {
-    @apply max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8;
+    @apply max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in;
   }
 
   .tradervue-card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-100;
+    @apply bg-card rounded-lg shadow-sm border border-border transition-all duration-300 hover:shadow-md dark:shadow-black/10;
+  }
+
+  .elevated-card {
+    @apply bg-card rounded-lg border border-border shadow-lg dark:shadow-black/20 hover:shadow-xl transition-all duration-300;
   }
 
   /* RTL specific navigation link styling */
   [dir="rtl"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/80 text-foreground transition-all duration-200;
   }
 
   [dir="rtl"] .tradervue-nav-link svg {
-    @apply ml-2;
+    @apply ml-2 transition-transform duration-200;
   }
 
   [dir="ltr"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700;
+    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/80 text-foreground transition-all duration-200;
   }
 
   [dir="ltr"] .tradervue-nav-link svg {
-    @apply mr-2;
+    @apply mr-2 transition-transform duration-200;
   }
 
   .tradervue-nav-link.active {
-    @apply bg-gray-100 text-gray-900 font-medium;
+    @apply bg-secondary/90 text-foreground font-medium;
+  }
+
+  .tradervue-nav-link:hover svg {
+    @apply text-primary transform scale-110;
   }
 
   .tradervue-positive {
-    @apply text-[#0299FF];
+    @apply text-tradervue-green;
   }
 
   .tradervue-negative {
@@ -148,27 +180,31 @@
   }
 
   [dir="rtl"] .tradervue-table th {
-    @apply px-4 py-2 text-right text-sm font-medium text-gray-500 border-b border-gray-200;
+    @apply px-4 py-2 text-right text-sm font-medium text-muted-foreground border-b border-border;
   }
 
   [dir="ltr"] .tradervue-table th {
-    @apply px-4 py-2 text-left text-sm font-medium text-gray-500 border-b border-gray-200;
+    @apply px-4 py-2 text-left text-sm font-medium text-muted-foreground border-b border-border;
   }
 
   .tradervue-table td {
-    @apply px-4 py-3 text-sm border-b border-gray-200;
+    @apply px-4 py-3 text-sm border-b border-border;
+  }
+
+  .tradervue-table tr:hover {
+    @apply bg-muted/50 transition-colors;
   }
 
   .tradervue-filter-pill {
-    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800;
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground transition-all duration-200 hover:bg-primary/20 cursor-pointer;
   }
 
   .calendar-day {
-    @apply w-8 h-8 flex items-center justify-center rounded-full text-sm;
+    @apply w-8 h-8 flex items-center justify-center rounded-full text-sm transition-all duration-200;
   }
 
   .calendar-day.positive {
-    @apply bg-blue-100 text-[#0299FF];
+    @apply bg-tradervue-light-green text-tradervue-green;
   }
 
   .calendar-day.negative {
@@ -176,15 +212,15 @@
   }
 
   .tradervue-tab {
-    @apply px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300;
+    @apply px-4 py-2 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground hover:border-border transition-all duration-200;
   }
 
   .tradervue-tab.active {
-    @apply border-[#0299FF] text-[#0299FF];
+    @apply border-primary text-primary;
   }
 
   .course-card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow;
+    @apply bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-all duration-300;
   }
 
   .course-list {
@@ -200,7 +236,7 @@
   }
 
   .module-number {
-    @apply flex-shrink-0 w-6 h-6 rounded-full bg-[#0299FF] text-white flex items-center justify-center text-xs font-medium;
+    @apply flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium;
   }
   
   /* Enhanced RTL menu specific styling */
@@ -309,5 +345,41 @@
   [dir="rtl"] .search-icon {
     @apply right-3 left-auto;
   }
-}
 
+  /* New 2025 animations and styles */
+  .hover-scale {
+    @apply transition-transform duration-300 hover:scale-105;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-300 hover:shadow-lg hover:shadow-primary/30;
+  }
+  
+  .pulsate {
+    @apply animate-pulse-subtle;
+  }
+  
+  .float {
+    @apply animate-float;
+  }
+  
+  .glow {
+    @apply animate-glow;
+  }
+  
+  .sidebar-link {
+    @apply relative overflow-hidden transition-all duration-300;
+  }
+  
+  .sidebar-link::after {
+    @apply content-[''] absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300 ease-in-out;
+  }
+  
+  .sidebar-link:hover::after {
+    @apply w-full;
+  }
+  
+  .sidebar-link.active::after {
+    @apply w-full;
+  }
+}

@@ -7,7 +7,7 @@ const TraderVueLogo = ({ className = "" }: { className?: string }) => {
       <img 
         src="https://algotouch.co.il/wp-content/uploads/2022/12/1White-Logo.svg" 
         alt="AlgoTouch Logo" 
-        className="h-8"
+        className="h-32 transition-all duration-300 hover:scale-105"
       />
     </div>
   );

@@ -10,10 +10,12 @@ import {
   GraduationCap,
   Search,
   FileSpreadsheet,
-  Bot
+  Bot,
+  PlusCircle
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -37,29 +39,50 @@ const Sidebar = () => {
            (path !== '/' && location.pathname.startsWith(path));
   };
 
+  const handleNewTrade = () => {
+    navigate('/new-trade');
+  };
+
   return (
-    <div className="w-60 dark:bg-sidebar dark:text-sidebar-foreground border-l border-gray-700 min-h-screen flex flex-col" dir="rtl">
-      <div className="p-4 border-b border-gray-700">
-        <TraderVueLogo className="mb-4" />
-        <div className="relative">
-          <Input type="text" placeholder="חיפוש" className="w-full pr-8 bg-gray-800 border-gray-700" />
+    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-border min-h-screen flex flex-col shadow-xl shadow-black/10 transition-all duration-300" dir="rtl">
+      <div className="p-6 border-b border-border flex justify-center">
+        <TraderVueLogo className="mb-2" />
+      </div>
+      
+      <div className="p-4 border-b border-border">
+        <div className="relative mb-4">
+          <Input type="text" placeholder="חיפוש" className="w-full pr-8 bg-gray-800/60 border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300" />
           <Search className="h-4 w-4 absolute top-3 right-3 text-gray-400" />
         </div>
+        
+        <Button 
+          onClick={handleNewTrade} 
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105"
+        >
+          <PlusCircle size={16} />
+          <span>עסקה חדשה</span>
+        </Button>
       </div>
-      <nav className="flex-1 p-4 space-y-1">
+      
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin">
         {navItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-800 text-gray-300 ${
-              isActive(item.path) ? 'active bg-gray-800 text-white font-medium' : ''
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground transition-all duration-200 sidebar-link ${
+              isActive(item.path) ? 'active bg-sidebar-accent/70 text-primary font-medium' : ''
             }`}
           >
-            <span className="ml-2">{item.icon}</span>
+            <span className="ml-2 text-primary">{item.icon}</span>
             <span>{item.name}</span>
           </Link>
         ))}
       </nav>
+      
+      <div className="p-4 border-t border-border text-xs text-center text-sidebar-foreground/70">
+        <p>AlgoTouch &copy; 2025</p>
+        <p className="mt-1">כל הזכויות שמורות</p>
+      </div>
     </div>
   );
 };
