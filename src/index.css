@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -45,23 +46,24 @@
   }
 
   .dark {
-    --background: 225 10% 8%;
+    /* Updated dark theme colors with more pleasant #0D0D2B-like tones */
+    --background: 240 75% 12%;  /* Softer dark background, closer to #0D0D2B */
     --foreground: 210 40% 98%;
 
-    --card: 224 10% 10%;
+    --card: 240 70% 13%;  /* Slightly lighter than background for depth */
     --card-foreground: 210 40% 98%;
 
-    --popover: 224 10% 10%;
+    --popover: 240 70% 13%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 202 100% 50%; /* Brand color #0299FF */
     --primary-foreground: 222.2 47.4% 11.2%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 240 30% 22%;  /* Lighter secondary for better contrast */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 213 20% 70%;
+    --muted: 240 30% 22%;
+    --muted-foreground: 217 10% 75%;  /* Brighter muted text for readability */
 
     --accent: 202 100% 50%; /* Brand color #0299FF */
     --accent-foreground: 210 40% 98%;
@@ -69,17 +71,17 @@
     --destructive: 0 62.8% 50.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 22.5%;
-    --input: 217.2 32.6% 22.5%;
+    --border: 240 30% 25%;  /* More visible borders */
+    --input: 240 30% 25%;
     --ring: 212.7 26.8% 83.9%;
 
-    --sidebar-background: 222 14% 10%;
+    --sidebar-background: 240 80% 10%;  /* Darker sidebar for contrast */
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 202 100% 50%; /* Brand color #0299FF */
     --sidebar-primary-foreground: 240 5% 94.9%;
-    --sidebar-accent: 217.2 32.6% 25.5%;
+    --sidebar-accent: 240 30% 25%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 22.5%;
+    --sidebar-border: 240 30% 20%;
     --sidebar-ring: 212.7 26.8% 83.9%;
   }
 }

@@ -15,36 +15,36 @@ const PerformanceMetrics = () => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <div className="space-y-1">
-            <span className="text-xs text-gray-400">סוג רווח/הפסד</span>
+            <span className="text-xs text-muted-foreground">סוג רווח/הפסד</span>
             <Select defaultValue="gross">
-              <SelectTrigger className="w-28 py-1 h-auto text-sm bg-gray-800 border-gray-700">
+              <SelectTrigger className="w-28 py-1 h-auto text-sm bg-secondary/30 border-border">
                 <SelectValue placeholder="סוג רווח/הפסד" />
               </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-700">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="gross">ברוטו</SelectItem>
                 <SelectItem value="net">נטו</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-gray-400">מצב תצוגה</span>
+            <span className="text-xs text-muted-foreground">מצב תצוגה</span>
             <Select defaultValue="dollar">
-              <SelectTrigger className="w-28 py-1 h-auto text-sm bg-gray-800 border-gray-700">
+              <SelectTrigger className="w-28 py-1 h-auto text-sm bg-secondary/30 border-border">
                 <SelectValue placeholder="מצב תצוגה" />
               </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-700">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="dollar">ערך ₪</SelectItem>
                 <SelectItem value="percent">ערך %</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-gray-400">סוג דוח</span>
+            <span className="text-xs text-muted-foreground">סוג דוח</span>
             <Select defaultValue="aggregate">
-              <SelectTrigger className="w-36 py-1 h-auto text-sm bg-gray-800 border-gray-700">
+              <SelectTrigger className="w-36 py-1 h-auto text-sm bg-secondary/30 border-border">
                 <SelectValue placeholder="סוג דוח" />
               </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-700">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="aggregate">רווח/הפסד מצטבר</SelectItem>
                 <SelectItem value="daily">רווח/הפסד יומי</SelectItem>
                 <SelectItem value="cumulative">רווח/הפסד מצטבר</SelectItem>
@@ -55,7 +55,7 @@ const PerformanceMetrics = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-4 relative overflow-hidden bg-gray-800 border-gray-700">
+        <Card className="p-4 relative overflow-hidden bg-card border-border shadow-md">
           <div className="flex items-center gap-3">
             <div className="relative w-16 h-16">
               <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -82,12 +82,12 @@ const PerformanceMetrics = () => {
             </div>
             <div>
               <h4 className="text-xl font-bold">1.24</h4>
-              <p className="text-sm text-gray-400">מכפיל רווח</p>
+              <p className="text-sm text-muted-foreground">מכפיל רווח</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 relative overflow-hidden bg-gray-800 border-gray-700">
+        <Card className="p-4 relative overflow-hidden bg-card border-border shadow-md">
           <div className="flex items-center gap-3">
             <div className="relative w-16 h-16">
               <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -114,38 +114,38 @@ const PerformanceMetrics = () => {
             </div>
             <div>
               <h4 className="text-xl font-bold">1.24</h4>
-              <p className="text-sm text-gray-400">עסקאות רווחיות לעומת הפסדיות</p>
+              <p className="text-sm text-muted-foreground">עסקאות רווחיות לעומת הפסדיות</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 relative overflow-hidden bg-gray-800 border-gray-700">
+        <Card className="p-4 relative overflow-hidden bg-card border-border shadow-md">
           <div className="flex items-center gap-3">
             <div className="flex flex-col">
               <h4 className="text-xl font-bold">1.24</h4>
               <div className="flex items-center gap-4 mt-1">
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-tradervue-green">₪34.82</span>
-                  <div className="w-20 h-1 bg-gray-600 rounded-full overflow-hidden">
+                  <div className="w-20 h-1 bg-muted/30 rounded-full overflow-hidden">
                     <div className="h-full bg-tradervue-green w-[70%]"></div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-red-500">₪51.32</span>
-                  <div className="w-20 h-1 bg-gray-600 rounded-full overflow-hidden">
-                    <div className="h-full bg-red-500 w-[30%]"></div>
+                  <span className="text-xs text-tradervue-red">₪51.32</span>
+                  <div className="w-20 h-1 bg-muted/30 rounded-full overflow-hidden">
+                    <div className="h-full bg-tradervue-red w-[30%]"></div>
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-gray-400 mt-1">עסקה רווחית לעומת מפסידה בממוצע</p>
+              <p className="text-sm text-muted-foreground mt-1">עסקה רווחית לעומת מפסידה בממוצע</p>
             </div>
           </div>
         </Card>
 
-        <Card className="md:col-span-3 p-4 relative overflow-hidden bg-gray-800 border-gray-700">
+        <Card className="md:col-span-3 p-4 relative overflow-hidden bg-card border-border shadow-md">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-300">רווח/הפסד</h4>
-            <h3 className="text-xl font-bold text-gray-100">₪344,456.78</h3>
+            <h4 className="text-sm font-medium text-muted-foreground">רווח/הפסד</h4>
+            <h3 className="text-xl font-bold">₪344,456.78</h3>
           </div>
           <div className="mt-2 h-14 w-full">
             <svg viewBox="0 0 300 60" className="w-full h-full">

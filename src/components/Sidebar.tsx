@@ -44,15 +44,19 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-border min-h-screen flex flex-col shadow-xl shadow-black/10 transition-all duration-300" dir="rtl">
-      <div className="p-6 border-b border-border flex justify-center">
+    <div className="w-64 dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-xl shadow-black/5 transition-all duration-300" dir="rtl">
+      <div className="p-6 border-b border-sidebar-border flex justify-center">
         <TraderVueLogo className="mb-2" />
       </div>
       
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-sidebar-border">
         <div className="relative mb-4">
-          <Input type="text" placeholder="חיפוש" className="w-full pr-8 bg-gray-800/60 border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300" />
-          <Search className="h-4 w-4 absolute top-3 right-3 text-gray-400" />
+          <Input 
+            type="text" 
+            placeholder="חיפוש" 
+            className="w-full pr-8 bg-sidebar-accent/40 border-sidebar-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300" 
+          />
+          <Search className="h-4 w-4 absolute top-3 right-3 text-muted-foreground" />
         </div>
         
         <Button 
@@ -69,8 +73,8 @@ const Sidebar = () => {
           <Link
             key={item.path}
             to={item.path}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground transition-all duration-200 sidebar-link ${
-              isActive(item.path) ? 'active bg-sidebar-accent/70 text-primary font-medium' : ''
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/50 text-sidebar-foreground transition-all duration-200 sidebar-link ${
+              isActive(item.path) ? 'active bg-sidebar-accent/30 text-primary font-medium' : ''
             }`}
           >
             <span className="ml-2 text-primary">{item.icon}</span>
@@ -79,7 +83,7 @@ const Sidebar = () => {
         ))}
       </nav>
       
-      <div className="p-4 border-t border-border text-xs text-center text-sidebar-foreground/70">
+      <div className="p-4 border-t border-sidebar-border text-xs text-center text-sidebar-foreground/70">
         <p>AlgoTouch &copy; 2025</p>
         <p className="mt-1">כל הזכויות שמורות</p>
       </div>

@@ -89,9 +89,9 @@ const TradeList = () => {
 
       <Table className="tradervue-table">
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-b border-border/40 bg-secondary/20">
             <TableCell className="w-10">
-              <input type="checkbox" className="rounded border-gray-300" />
+              <input type="checkbox" className="rounded border-border" />
             </TableCell>
             <TableCell>סמל</TableCell>
             <TableCell>תאריך</TableCell>
@@ -106,9 +106,9 @@ const TradeList = () => {
         </TableHeader>
         <TableBody>
           {mockTrades.map((trade) => (
-            <TableRow key={trade.id}>
+            <TableRow key={trade.id} className="hover:bg-secondary/10 transition-colors">
               <TableCell>
-                <input type="checkbox" className="rounded border-gray-300" />
+                <input type="checkbox" className="rounded border-border" />
               </TableCell>
               <TableCell className="font-medium">{trade.symbol}</TableCell>
               <TableCell>{trade.date}</TableCell>
@@ -123,7 +123,7 @@ const TradeList = () => {
               <TableCell>
                 <div className="flex items-center gap-2">
                   {trade.exitEfficiency}%
-                  <div className="w-12 h-2 bg-gray-600 rounded-full overflow-hidden">
+                  <div className="w-12 h-2 bg-muted/50 rounded-full overflow-hidden">
                     <div 
                       className={cn(
                         "h-full", 
@@ -136,8 +136,8 @@ const TradeList = () => {
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={cn(
-                  "bg-blue-950 text-blue-300 hover:bg-blue-950",
-                  "border-blue-800"
+                  "bg-blue-900/30 text-blue-300 hover:bg-blue-900/40",
+                  "border-blue-800/50"
                 )}>
                   {trade.side === 'Long' ? 'לונג' : 'שורט'}
                 </Badge>
@@ -145,13 +145,13 @@ const TradeList = () => {
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {trade.tags.map((tag, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs bg-gray-800 border-gray-700 text-gray-300">
+                    <Badge key={idx} variant="outline" className="text-xs bg-secondary/30 border-border/50 text-muted-foreground">
                       {tag}
                     </Badge>
                   ))}
                 </div>
               </TableCell>
-              <TableCell className="text-gray-400 truncate max-w-[160px]">
+              <TableCell className="text-muted-foreground truncate max-w-[160px]">
                 {trade.notes}
               </TableCell>
             </TableRow>
