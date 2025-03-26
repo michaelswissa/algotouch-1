@@ -50,7 +50,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster position="top-center" />
+        <Toaster />
         <Sonner position="top-right" expand={true} closeButton toastOptions={{
           classNames: {
             toast: 'group p-4 backdrop-blur-md bg-secondary/90 dark:bg-card/90 shadow-xl',

@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 142 76% 36%;
+    --primary: 202 100% 50%; /* Changed from green to brand color #0299FF */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -23,7 +23,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 142 76% 36%;
+    --accent: 202 100% 50%; /* Changed from green to brand color #0299FF */
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -37,7 +37,7 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 142 76% 36%;
+    --sidebar-primary: 202 100% 50%; /* Changed from green to brand color #0299FF */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
@@ -55,7 +55,7 @@
     --popover: 224 10% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 142 76% 50%;
+    --primary: 202 100% 50%; /* Changed from green to brand color #0299FF */
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -64,7 +64,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 213 20% 70%;
 
-    --accent: 142 76% 50%;
+    --accent: 202 100% 50%; /* Changed from green to brand color #0299FF */
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 50.6%;
@@ -76,7 +76,7 @@
 
     --sidebar-background: 222 14% 10%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 142 76% 50%;
+    --sidebar-primary: 202 100% 50%; /* Changed from green to brand color #0299FF */
     --sidebar-primary-foreground: 240 5% 94.9%;
     --sidebar-accent: 217.2 32.6% 25.5%;
     --sidebar-accent-foreground: 210 40% 98%;

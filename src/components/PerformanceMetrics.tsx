@@ -72,7 +72,7 @@ const PerformanceMetrics = () => {
                   cy="50"
                   r="40"
                   fill="none"
-                  stroke="#22c55e"
+                  stroke="#0299FF"
                   strokeWidth="12"
                   strokeDasharray="251.2"
                   strokeDashoffset="100"
@@ -104,7 +104,7 @@ const PerformanceMetrics = () => {
                   cy="50"
                   r="40"
                   fill="none"
-                  stroke="#22c55e"
+                  stroke="#0299FF"
                   strokeWidth="12"
                   strokeDasharray="251.2"
                   strokeDashoffset="125"
@@ -125,9 +125,9 @@ const PerformanceMetrics = () => {
               <h4 className="text-xl font-bold">1.24</h4>
               <div className="flex items-center gap-4 mt-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-green-500">₪34.82</span>
+                  <span className="text-xs text-tradervue-green">₪34.82</span>
                   <div className="w-20 h-1 bg-gray-600 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 w-[70%]"></div>
+                    <div className="h-full bg-tradervue-green w-[70%]"></div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -152,7 +152,7 @@ const PerformanceMetrics = () => {
               <path
                 d="M0,30 C20,40 40,50 60,35 C80,20 100,5 120,15 C140,25 160,45 180,35 C200,25 220,15 240,25 C260,35 280,45 300,30"
                 fill="none"
-                stroke="#22c55e"
+                stroke="#0299FF"
                 strokeWidth="2"
               />
             </svg>
