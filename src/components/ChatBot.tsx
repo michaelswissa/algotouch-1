@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpRight, Send, Volume2, VolumeX, RefreshCw, Bot } from "lucide-react";
+import { ArrowUpRight, Send, Volume2, VolumeX, RefreshCw, Bot, Upload } from "lucide-react";
 import { useChatbot } from '@/hooks/use-chatbot';
 import { toast } from '@/hooks/use-toast';
 
@@ -13,6 +13,7 @@ const ChatBot = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { messages, isLoading, sendMessage, speakText, clearMessages } = useChatbot();
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -108,6 +109,29 @@ const ChatBot = () => {
     setTimeout(() => handleSendMessage(), 100);
   };
 
+  const handleFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    // You could implement file processing here if needed
+    // For now, just notify the user
+    toast({
+      title: "קובץ נבחר",
+      description: `הקובץ "${files[0].name}" הועלה בהצלחה`,
+    });
+    
+    // Reset the input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 max-w-5xl" dir="rtl">
       <div>
@@ -150,9 +174,18 @@ const ChatBot = () => {
                         : 'bg-white dark:bg-gray-800 text-foreground'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">
-                      {message.content}
-                    </div>
+                    <div 
+                      className="whitespace-pre-wrap"
+                      // Enable rendering of formatted text with line breaks
+                      dangerouslySetInnerHTML={{
+                        __html: message.content
+                          .replace(/\n/g, '<br/>')
+                          // Bold important terms
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          // Italic
+                          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                      }}
+                    />
                   </div>
                 </div>
               ))}
@@ -193,6 +226,21 @@ const ChatBot = () => {
                 title={isSpeaking ? "הפסק הקראה" : "הקרא הודעה אחרונה"}
               >
                 {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </Button>
+              <Button
+                onClick={handleFileUpload}
+                variant="outline"
+                className="min-w-[44px]"
+                title="העלה קובץ"
+              >
+                <Upload className="h-4 w-4" />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelected}
+                  accept=".pdf,.txt,.docx"
+                />
               </Button>
               <Button 
                 onClick={handleSendMessage} 

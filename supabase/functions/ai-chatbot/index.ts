@@ -19,18 +19,22 @@ serve(async (req) => {
       apiKey: Deno.env.get('OPENAI_API_KEY')
     })
 
-    const { messages, action, threadId, runId } = await req.json()
+    const { messages, action, threadId, runId, ttsConfig } = await req.json()
 
-    // Initialize with a system message if needed
+    // Initialize with a detailed system message for AlgoTouch trading
     const systemMessage = {
       role: "system",
-      content: "אתה מומחה למסחר אלגוריתמי המיועד לשילוב בין מערכת AlgoTouch לפלטפורמת TradeStation. תפקידך לספק הסברים טכניים בכל הנוגע להגדרות המערכת, ניהול סיכונים, אופטימיזציה של פרמטרים ואסטרטגיות מסחר מתקדמות. אתה עונה בעברית בצורה טכנית, מפורטת וברורה."
+      content: `אתה מומחה למסחר אלגוריתמי המיועד לשילוב בין מערכת AlgoTouch לפלטפורמת TradeStation.
+תפקידך לספק הסברים טכניים ומעמיקים בכל הנוגע להגדרות המערכת, ניהול סיכונים, אופטימיזציה של פרמטרים ואסטרטגיות מסחר מתקדמות.
+הקפד לתת תשובות טכניות, מפורטות וברורות, תוך פירוק נושאים מורכבים לשלבים מובנים ודוגמאות קונקרטיות.
+התמקד בנושאים כמו הגדרת רמות תמיכה והתנגדות, Position Sizing, Stop Loss, BE Stop, Trailing Stop, Dollar Cost Averaging (DCA), Martingale, ושלושת רמות הרווח (Profit Targets).
+הסבר בפירוט כיצד להגדיר את הפרמטרים השונים ואת השימוש בכלי המסחר, הגדרות המסך, וכיצד להפעיל את הפונקציות השונות של מערכת AlgoTouch.`
     }
 
     // Action switch
     switch (action) {
       case 'chat':
-        // If using the standard chat completions API
+        // If using the standard chat completions API (no thread ID)
         if (!threadId) {
           const chatMessages = messages || []
           // Add system message if not present
@@ -38,10 +42,12 @@ serve(async (req) => {
             chatMessages.unshift(systemMessage)
           }
 
+          // Use the OpenAI o3-mini model for better reasoning capabilities
           const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-4o", // Using gpt-4o for better reasoning and response quality
             messages: chatMessages,
-            temperature: 0.7,
+            temperature: 0.5, // Slightly lower temperature for more technical/factual responses
+            reasoning_effort: "high", // Higher reasoning effort for detailed explanations
           })
 
           return new Response(
@@ -75,10 +81,22 @@ serve(async (req) => {
           })
         }
 
-        // Create a run with the assistant
+        // Create a run with the specific assistant ID
         const run = await openai.beta.threads.runs.create(thread.id, {
           assistant_id: "asst_KqyUxYuP1v5eHlILJEsH6Czz", // Using the provided assistant ID
-          instructions: "אתה מומחה למסחר אלגוריתמי. ענה בעברית בצורה טכנית, מפורטת וברורה."
+          instructions: `אתה מומחה למסחר אלגוריתמי, מומחה למערכת AlgoTouch, ובקיא בכל הקשור לפלטפורמת TradeStation.
+ענה בעברית בצורה טכנית, מפורטת ומדויקת.
+התמקד בנושאים כמו הגדרת רמות תמיכה והתנגדות, Position Sizing, Stop Loss, BE Stop, 
+Trailing Stop, שלושת רמות הרווח (Profit Targets), Dollar Cost Averaging (DCA), ושיטת Martingale.
+הסבר את הפרמטרים הטכניים בצורה מפורטת וברורה, הדגם עם מספרים ודוגמאות מוחשיות.
+נתח נושאים טכניים צעד אחר צעד, והתייחס למאפיינים ספציפיים של המערכת.`,
+          model: "gpt-4o", // Using the most capable model for the assistant
+          tools: [{"type": "file_search"}],
+          tool_resources: {
+            "file_search": {
+              "vector_store_ids": ["vs_67b64215c8548191b5984ab5316ee63a"] // Provided vector store ID
+            }
+          }
         })
 
         // Poll for run completion
@@ -86,7 +104,7 @@ serve(async (req) => {
         
         // Simple polling mechanism with timeout
         let attempts = 0
-        const maxAttempts = 30 // About 60 seconds max
+        const maxAttempts = 60 // About 120 seconds max (increased from 30 attempts)
         
         while (runStatus.status !== 'completed' && runStatus.status !== 'failed' && attempts < maxAttempts) {
           await new Promise(resolve => setTimeout(resolve, 2000))
@@ -122,14 +140,19 @@ serve(async (req) => {
         )
 
       case 'tts':
-        const text = messages[0].content
-        // Using OpenAI TTS
-        const mp3 = await openai.audio.speech.create({
+        const text = messages[0]?.content || "";
+        
+        // Configure voice parameters based on ttsConfig
+        const speechConfig = {
           model: "tts-1",
-          voice: "nova",
+          voice: "nova", // Using Nova voice for Hebrew
           input: text,
-          response_format: "mp3"
-        })
+          response_format: "mp3",
+          speed: ttsConfig?.speakingRate || 1.0
+        };
+        
+        // Using OpenAI TTS with custom parameters
+        const mp3 = await openai.audio.speech.create(speechConfig)
 
         const buffer = await mp3.arrayBuffer()
         const base64Audio = btoa(String.fromCharCode(...new Uint8Array(buffer)))
