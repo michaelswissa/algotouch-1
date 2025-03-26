@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -72,7 +71,7 @@ const Sidebar = () => {
         "p-6 border-b border-sidebar-border flex justify-center relative z-10",
         collapsed && "p-3"
       )}>
-        <TraderVueLogo className="mb-2 hover-scale" small={collapsed} />
+        <TraderVueLogo className="mb-2 hover-scale" collapsed={collapsed} />
       </div>
       
       <div className={cn(

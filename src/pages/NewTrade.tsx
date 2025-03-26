@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, ArrowLeft, Upload, Tag, ChartLineUp, PieChart } from 'lucide-react';
+import { Calendar, ArrowLeft, Upload, Tag, ChartLine, PieChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const NewTradePage = () => {
@@ -33,7 +32,7 @@ const NewTradePage = () => {
         <Card className="border-white/20 dark:border-white/5 shadow-md overflow-hidden bg-white/90 dark:bg-white/5 backdrop-blur-md">
           <CardHeader className="pb-3 border-b border-white/10">
             <CardTitle className="flex items-center gap-2">
-              <ChartLineUp className="text-primary h-5 w-5" />
+              <ChartLine className="text-primary h-5 w-5" />
               הזנת פרטי עסקה
             </CardTitle>
           </CardHeader>
