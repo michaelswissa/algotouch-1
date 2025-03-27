@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 type StockData = {
   symbol: string;
@@ -13,6 +14,7 @@ type StockData = {
 // Function to fetch real stock data from our Supabase Edge Function
 export async function fetchStockIndices(): Promise<StockData[]> {
   try {
+    console.log('Fetching stock data from edge function...');
     const { data, error } = await supabase.functions.invoke('stock-data');
     
     if (error) {
@@ -20,6 +22,7 @@ export async function fetchStockIndices(): Promise<StockData[]> {
       throw error;
     }
     
+    console.log('Successfully fetched stock data:', data);
     return data || [];
   } catch (error) {
     console.error('Error fetching stock data:', error);
@@ -77,6 +80,8 @@ export function useStockDataWithRefresh(refreshInterval = 15000) {
   const [stockData, setStockData] = React.useState<StockData[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -84,10 +89,16 @@ export function useStockDataWithRefresh(refreshInterval = 15000) {
         setLoading(true);
         const data = await fetchStockIndices();
         setStockData(data);
+        setLastUpdated(new Date());
         setError(null);
       } catch (err) {
         setError('Failed to fetch stock data');
         console.error(err);
+        toast({
+          title: "שגיאה בטעינת נתונים",
+          description: "לא ניתן להטעין את נתוני המדדים. נסה לרענן את הדף.",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -101,7 +112,7 @@ export function useStockDataWithRefresh(refreshInterval = 15000) {
 
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);
-  }, [refreshInterval]);
+  }, [refreshInterval, toast]);
 
-  return { stockData, loading, error };
+  return { stockData, loading, error, lastUpdated };
 }

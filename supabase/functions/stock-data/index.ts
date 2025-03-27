@@ -30,46 +30,88 @@ interface StockData {
   isPositive: boolean;
 }
 
-// Helper function to fetch ticker details
-async function fetchTickerDetails(symbols: string[]): Promise<PolygonTickerResponse[]> {
+// Helper function to add structured logging
+function logInfo(message: string, data?: any) {
+  console.log(`INFO: ${message}`, data ? JSON.stringify(data) : '');
+}
+
+function logError(message: string, error?: any) {
+  console.error(`ERROR: ${message}`, error ? JSON.stringify(error) : '');
+}
+
+// Helper function to fetch ticker details with retries and better error handling
+async function fetchTickerDetails(symbols: string[], retries = 2): Promise<PolygonTickerResponse[]> {
   const symbolsParam = symbols.join(',');
   const url = `https://api.polygon.io/v3/reference/tickers?ticker=${symbolsParam}&active=true&apiKey=${POLYGON_API_KEY}`;
   
   try {
-    const response = await fetch(url);
+    logInfo(`Fetching ticker details for symbols: ${symbolsParam}`);
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (response.status === 429 && retries > 0) {
+      logInfo('Rate limit hit for ticker details, retrying after delay');
+      // Wait for 1 second before retrying (adjust if needed)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return fetchTickerDetails(symbols, retries - 1);
+    }
+    
     if (!response.ok) {
-      throw new Error(`Polygon API error: ${response.status}`);
+      const errorText = await response.text();
+      logError(`Polygon API error for ticker details: ${response.status}`, errorText);
+      throw new Error(`Polygon API error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
+    logInfo(`Successfully fetched ticker details for ${data.results?.length || 0} symbols`);
     return data.results || [];
   } catch (error) {
-    console.error('Error fetching ticker details:', error);
+    logError('Error fetching ticker details', error);
     return [];
   }
 }
 
-// Helper function to fetch stock prices
-async function fetchStockPrices(symbols: string[]): Promise<Record<string, any>> {
+// Helper function to fetch stock prices with retries and better error handling
+async function fetchStockPrices(symbols: string[], retries = 2): Promise<Record<string, any>> {
   const results: Record<string, any> = {};
   
-  // Fetch each symbol's price data
+  // Fetch each symbol's price data with better error handling
   for (const symbol of symbols) {
     try {
       const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/prev?apiKey=${POLYGON_API_KEY}`;
-      const response = await fetch(url);
+      logInfo(`Fetching price data for symbol: ${symbol}`);
+      
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.status === 429 && retries > 0) {
+        logError(`Rate limit hit for ${symbol}, retrying after delay`);
+        // Wait for 1 second before retrying (adjust if needed)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const retryData = await fetchStockPrices([symbol], retries - 1);
+        if (retryData[symbol]) {
+          results[symbol] = retryData[symbol];
+        }
+        continue;
+      }
       
       if (!response.ok) {
-        console.error(`Error fetching price for ${symbol}: ${response.status}`);
+        const errorText = await response.text();
+        logError(`Error fetching price for ${symbol}: ${response.status}`, errorText);
         continue;
       }
       
       const data = await response.json();
       if (data.results && data.results.length > 0) {
+        logInfo(`Successfully fetched price data for ${symbol}`);
         results[symbol] = data.results[0];
+      } else {
+        logError(`No price data available for ${symbol}`, data);
       }
     } catch (error) {
-      console.error(`Error processing ${symbol}:`, error);
+      logError(`Error processing ${symbol}`, error);
     }
   }
   
@@ -78,14 +120,22 @@ async function fetchStockPrices(symbols: string[]): Promise<Record<string, any>>
 
 // Main handler for the edge function
 Deno.serve(async (req) => {
+  const requestStartTime = Date.now();
+  logInfo('Stock data function invoked', { 
+    method: req.method,
+    url: req.url
+  });
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    logInfo('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
   
   try {
     // Define the stock symbols we want to track
     const stockSymbols = ["SPY", "QQQ", "DIA", "TA35.TA", "BTCUSD", "GC=F"];
+    logInfo(`Starting to fetch data for ${stockSymbols.length} symbols`);
     
     // Fetch both ticker details and price data
     const [tickerDetails, priceData] = await Promise.all([
@@ -124,6 +174,7 @@ Deno.serve(async (req) => {
         };
       }
       
+      logInfo(`No price data found for ${symbol}, using fallback data`);
       // Fallback if we don't have data (should rarely happen)
       return {
         symbol: displayName,
@@ -134,12 +185,18 @@ Deno.serve(async (req) => {
       };
     });
     
+    const requestDuration = Date.now() - requestStartTime;
+    logInfo(`Request completed successfully in ${requestDuration}ms`, { 
+      symbolsCount: stockSymbols.length,
+      dataReturned: stockData.length 
+    });
+    
     return new Response(JSON.stringify(stockData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {
-    console.error('Error processing request:', error);
+    logError('Error processing request', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

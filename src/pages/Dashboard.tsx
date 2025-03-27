@@ -3,15 +3,16 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, Info, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, Info, RefreshCw, Clock } from 'lucide-react';
 import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { useNewsDataWithRefresh } from '@/lib/api/news';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import { format } from 'date-fns';
 
 const Dashboard = () => {
   const { toast } = useToast();
-  const { stockData, loading: stocksLoading, error: stocksError } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
+  const { stockData, loading: stocksLoading, error: stocksError, lastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
   const { newsData, loading: newsLoading, error: newsError } = useNewsDataWithRefresh(60000); // Refresh every minute
 
   const handleManualRefresh = () => {
@@ -22,6 +23,11 @@ const Dashboard = () => {
       duration: 2000,
     });
   };
+
+  // Format last updated time
+  const formattedLastUpdated = lastUpdated 
+    ? format(lastUpdated, 'HH:mm:ss')
+    : 'לא ידוע';
 
   return (
     <Layout>
@@ -43,10 +49,16 @@ const Dashboard = () => {
         
         {/* Stock Indices Section - First for greater prominence */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-primary" />
-            <span>מדדים בזמן אמת</span>
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <TrendingUp size={18} className="text-primary" />
+              <span>מדדים בזמן אמת</span>
+            </h2>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Clock size={14} className="mr-1" />
+              <span>עודכן לאחרונה: {formattedLastUpdated}</span>
+            </div>
+          </div>
           
           {stocksLoading && stockData.length === 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -80,7 +92,7 @@ const Dashboard = () => {
                           <ArrowUpRight className="mr-1" size={20} /> : 
                           <ArrowDownRight className="mr-1" size={20} />
                         }
-                        {index.changePercent}
+                        <span>{index.changePercent} ({index.change})</span>
                       </div>
                     </div>
                   </CardContent>
