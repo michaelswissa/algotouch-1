@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { supabase } from "@/integrations/supabase/client";
 
 type StockData = {
   symbol: string;
@@ -9,73 +10,65 @@ type StockData = {
   isPositive: boolean;
 };
 
-// Function to fetch stock data from a public API
+// Function to fetch real stock data from our Supabase Edge Function
 export async function fetchStockIndices(): Promise<StockData[]> {
   try {
-    // Using Finnhub API - normally would require API key, but 
-    // we'll simulate the response for this demo
-    const stockSymbols = ["SPY", "QQQ", "DIA", "TA35.TA", "BTC-USD", "GC=F"];
+    const { data, error } = await supabase.functions.invoke('stock-data');
     
-    // For education/demo purposes we'll simulate real data
-    // In production, this would be replaced with actual API call
-    const simulatedData: StockData[] = [
+    if (error) {
+      console.error('Error fetching stock data from edge function:', error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching stock data:', error);
+    
+    // Fallback to sample data if the API request fails
+    return [
       { 
         symbol: "S&P 500", 
-        price: (5246.67 + (Math.random() * 10 - 5)).toFixed(2),
-        changePercent: (Math.random() * 2 - 0.5).toFixed(2) + "%",
-        change: "",
-        isPositive: Math.random() > 0.4
+        price: "5246.67",
+        changePercent: "0.8%",
+        change: "42.12",
+        isPositive: true
       },
       { 
         symbol: "Nasdaq", 
-        price: (16742.39 + (Math.random() * 15 - 7)).toFixed(2),
-        changePercent: (Math.random() * 2 - 0.4).toFixed(2) + "%",
-        change: "",
-        isPositive: Math.random() > 0.4
+        price: "16742.39",
+        changePercent: "1.2%",
+        change: "198.65",
+        isPositive: true
       },
       { 
         symbol: "Dow Jones", 
-        price: (38836.50 + (Math.random() * 12 - 6)).toFixed(2),
-        changePercent: (Math.random() * 2 - 0.6).toFixed(2) + "%",
-        change: "",
-        isPositive: Math.random() > 0.4
+        price: "38836.50",
+        changePercent: "-0.3%",
+        change: "-118.54",
+        isPositive: false
       },
       { 
         symbol: "Tel Aviv 35", 
-        price: (1995.38 + (Math.random() * 8 - 4)).toFixed(2),
-        changePercent: (Math.random() * 3 - 0.8).toFixed(2) + "%",
-        change: "",
-        isPositive: Math.random() > 0.3
+        price: "1995.38",
+        changePercent: "0.5%",
+        change: "9.86",
+        isPositive: true
       },
       { 
         symbol: "Bitcoin", 
-        price: (70412.08 + (Math.random() * 500 - 250)).toFixed(2),
-        changePercent: (Math.random() * 4 - 1).toFixed(2) + "%",
-        change: "",
-        isPositive: Math.random() > 0.4
+        price: "70412.08",
+        changePercent: "2.4%",
+        change: "1650.45",
+        isPositive: true
       },
       { 
         symbol: "Gold", 
-        price: (2325.76 + (Math.random() * 6 - 3)).toFixed(2),
-        changePercent: (Math.random() * 1.2 - 0.3).toFixed(2) + "%",
-        change: "",
-        isPositive: Math.random() > 0.3
+        price: "2325.76",
+        changePercent: "0.7%",
+        change: "16.23",
+        isPositive: true
       }
     ];
-
-    // Calculate the change value based on percentage
-    return simulatedData.map(stock => {
-      const priceValue = parseFloat(stock.price);
-      const percentValue = parseFloat(stock.changePercent);
-      const change = ((priceValue * percentValue) / 100).toFixed(2);
-      return {
-        ...stock,
-        change
-      };
-    });
-  } catch (error) {
-    console.error('Error fetching stock data:', error);
-    return [];
   }
 }
 
