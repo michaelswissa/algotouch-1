@@ -1,123 +1,33 @@
+/* Add loading pulse animation for data fetching */
+.data-pulse {
+  animation: data-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 
-@layer components {
-  .tradervue-container {
-    @apply max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in;
+@keyframes data-pulse {
+  0%, 100% {
+    opacity: 1;
   }
+  50% {
+    opacity: 0.5;
+  }
+}
 
-  .tradervue-card {
-    @apply bg-card/95 rounded-lg shadow-md border border-border/60 transition-all duration-300 hover:shadow-lg dark:shadow-primary/10;
-  }
+/* Add the stock card hover effect */
+.hover-scale {
+  transition: all 0.3s ease;
+}
 
-  .elevated-card {
-    @apply bg-card/90 rounded-lg border border-border/60 shadow-lg dark:shadow-primary/20 backdrop-blur-md 
-    hover:shadow-xl transition-all duration-300 hover:border-primary/40;
-  }
+.hover-scale:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
 
-  /* Modern glass card effect */
-  .glass-card {
-    @apply bg-background/50 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-lg shadow-primary/15;
-  }
+/* Card with elevation effect */
+.elevated-card {
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
 
-  /* Navigation Links - modernized */
-  [dir="rtl"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/70 text-foreground transition-all duration-200;
-  }
-
-  [dir="rtl"] .tradervue-nav-link svg {
-    @apply ml-2 transition-transform duration-200;
-  }
-
-  [dir="ltr"] .tradervue-nav-link {
-    @apply flex items-center gap-2 px-3 py-2 rounded-md hover:bg-secondary/70 text-foreground transition-all duration-200;
-  }
-
-  [dir="ltr"] .tradervue-nav-link svg {
-    @apply mr-2 transition-transform duration-200;
-  }
-
-  .tradervue-nav-link.active {
-    @apply bg-secondary/90 text-foreground font-medium;
-  }
-
-  .tradervue-nav-link:hover svg {
-    @apply text-primary transform scale-110;
-  }
-
-  /* Trading indicators - enhanced */
-  .tradervue-positive {
-    @apply text-tradervue-green font-medium;
-  }
-
-  .tradervue-negative {
-    @apply text-tradervue-red font-medium;
-  }
-
-  /* Table styles - modernized */
-  .tradervue-table {
-    @apply w-full border-collapse;
-  }
-
-  [dir="rtl"] .tradervue-table th {
-    @apply px-4 py-3 text-right text-sm font-medium text-muted-foreground border-b border-border/60;
-  }
-
-  [dir="ltr"] .tradervue-table th {
-    @apply px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b border-border/60;
-  }
-
-  .tradervue-table td {
-    @apply px-4 py-3 text-sm border-b border-border/30;
-  }
-
-  .tradervue-table tr:hover {
-    @apply bg-muted/40 transition-colors;
-  }
-
-  /* UI components - enhanced for modern design */
-  .tradervue-filter-pill {
-    @apply inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-secondary/80 text-secondary-foreground 
-    transition-all duration-200 hover:bg-primary/40 cursor-pointer;
-  }
-
-  .calendar-day {
-    @apply w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all duration-200 hover:bg-secondary/70 cursor-pointer;
-  }
-
-  .calendar-day.positive {
-    @apply bg-tradervue-light-green/80 text-tradervue-green font-medium;
-  }
-
-  .calendar-day.negative {
-    @apply bg-tradervue-light-red/80 text-tradervue-red font-medium;
-  }
-
-  .tradervue-tab {
-    @apply px-4 py-2 text-sm font-medium text-muted-foreground border-b-2 border-transparent 
-    hover:text-foreground hover:border-border transition-all duration-200;
-  }
-
-  .tradervue-tab.active {
-    @apply border-primary text-primary;
-  }
-
-  /* Course components - modernized */
-  .course-card {
-    @apply bg-card/95 rounded-lg shadow-md border border-border hover:shadow-lg hover:border-primary/40 transition-all duration-300 backdrop-blur-sm;
-  }
-
-  .course-list {
-    @apply space-y-6;
-  }
-
-  .module-list {
-    @apply mt-4 space-y-2 text-sm;
-  }
-
-  .module-item {
-    @apply flex items-start gap-2 p-2.5 rounded-md hover:bg-secondary/70 transition-colors;
-  }
-
-  .module-number {
-    @apply flex-shrink-0 w-6 h-6 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center text-xs font-medium shadow-md shadow-primary/30;
-  }
+.elevated-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
