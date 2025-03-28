@@ -14,8 +14,8 @@ export const EconomicCalendarSection = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 pb-2">
-          <div className="rounded-lg border border-border/30 shadow-inner bg-white/50 dark:bg-black/20 mx-auto max-w-2xl">
-            <div className="mx-auto max-w-full"> 
+          <div className="rounded-lg border border-border/30 shadow-inner bg-white/50 dark:bg-black/20 mx-auto" style={{ width: 'fit-content' }}>
+            <div className="mx-auto"> 
               <iframe 
                 src="https://sslecal2.investing.com?ecoDayBackground=%230066ff&defaultFont=%230066ff&innerBorderColor=%238e989e&borderColor=%230066ff&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=2,3&features=datepicker,timezone,timeselector,filters&countries=23,5&calType=week&timeZone=8&lang=1" 
                 width="100%" 
