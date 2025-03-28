@@ -8,14 +8,14 @@ import { ChevronRight, Clock, ThumbsUp, MessageSquare, Bookmark, Share } from 'l
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
-// Stock market-related images for blog posts
+// Locally saved stock market-related images for blog posts
 const stockMarketImages = [
-  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
-  'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
-  'https://images.unsplash.com/photo-1535320903710-d993d3d77d29?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
-  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
-  'https://images.unsplash.com/photo-1535320903710-d993d3d77d29?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
-  'https://images.unsplash.com/photo-1569025690938-a00729c9e1f9?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3'
+  '/images/stock-market-1.jpg',
+  '/images/stock-market-2.jpg',
+  '/images/stock-market-3.jpg',
+  '/images/stock-market-4.jpg',
+  '/images/stock-market-5.jpg',
+  '/images/stock-market-6.jpg',
 ];
 
 interface BlogSectionProps {
@@ -27,6 +27,19 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
   
   // Show more posts in expanded view
   const postsToShow = expandedView ? blogPosts : blogPosts.slice(0, 3);
+  
+  // Process posts to ensure they have the image URL
+  const postsWithImages = postsToShow.map((post, index) => {
+    // If a post doesn't have an image, assign one from our local collection
+    if (!post.coverImage || post.coverImage.includes('unsplash.com')) {
+      const imageIndex = index % stockMarketImages.length;
+      return {
+        ...post,
+        coverImage: stockMarketImages[imageIndex]
+      };
+    }
+    return post;
+  });
   
   return (
     <div className="w-full">
@@ -73,14 +86,19 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" 
                 : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             )}>
-              {postsToShow.map((post, index) => (
+              {postsWithImages.map((post, index) => (
                 <Link key={post.id} to={`/blog/${post.id}`} className="block">
                   <Card className="overflow-hidden hover-scale transition-all duration-300 h-full">
                     <div className="relative h-40 overflow-hidden">
                       <img 
-                        src={stockMarketImages[index % stockMarketImages.length]} 
+                        src={post.coverImage} 
                         alt={post.title}
                         className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
+                        onError={(e) => {
+                          // Fallback to a local image if loading fails
+                          const target = e.target as HTMLImageElement;
+                          target.src = stockMarketImages[index % stockMarketImages.length];
+                        }}
                       />
                       <div className="absolute top-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
                         {post.tags[0] || "כללי"}

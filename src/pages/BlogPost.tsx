@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -8,16 +7,34 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, Calendar, User, Tag, ThumbsUp, MessageSquare, Bookmark, Share } from 'lucide-react';
 import { useBlogPostsWithRefresh } from '@/lib/api/blog';
 
+const stockMarketImages = [
+  '/images/stock-market-1.jpg',
+  '/images/stock-market-2.jpg',
+  '/images/stock-market-3.jpg',
+  '/images/stock-market-4.jpg',
+  '/images/stock-market-5.jpg',
+  '/images/stock-market-6.jpg',
+];
+
 const BlogPost = () => {
   const { id } = useParams();
   const { blogPosts, loading: isLoading } = useBlogPostsWithRefresh();
   
   const post = blogPosts.find(post => post.id === Number(id));
   
+  const getConsistentImage = (post: any, postIndex: number) => {
+    if (!post?.coverImage || post.coverImage.includes('unsplash.com')) {
+      return stockMarketImages[postIndex % stockMarketImages.length];
+    }
+    return post.coverImage;
+  };
+  
+  const postIndex = blogPosts.findIndex(p => p.id === Number(id));
+  const coverImage = post ? getConsistentImage(post, postIndex >= 0 ? postIndex : 0) : '';
+  
   return (
     <Layout>
       <div className="tradervue-container py-6">
-        {/* Breadcrumb navigation */}
         <div className="flex items-center mb-6 text-sm">
           <Link to="/" className="text-muted-foreground hover:text-primary">ראשי</Link>
           <ChevronRight size={16} className="mx-2 rtl-flip text-muted-foreground" />
@@ -80,9 +97,13 @@ const BlogPost = () => {
                 
                 <div className="relative h-[300px] md:h-[400px] mb-8 overflow-hidden rounded-lg">
                   <img 
-                    src={post.coverImage} 
+                    src={coverImage}
                     alt={post.title}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = stockMarketImages[0];
+                    }}
                   />
                 </div>
                 
@@ -150,30 +171,38 @@ const BlogPost = () => {
               </CardContent>
             </Card>
             
-            {/* Related Posts */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">פוסטים נוספים שעשויים לעניין אותך</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {blogPosts
                   .filter(relatedPost => relatedPost.id !== post.id)
                   .slice(0, 3)
-                  .map(relatedPost => (
-                    <Link key={relatedPost.id} to={`/blog/${relatedPost.id}`} className="block">
-                      <Card className="hover-scale h-full">
-                        <div className="h-32 overflow-hidden">
-                          <img 
-                            src={relatedPost.coverImage} 
-                            alt={relatedPost.title} 
-                            className="object-cover w-full h-full"
-                          />
-                        </div>
-                        <CardContent className="p-4">
-                          <h3 className="font-semibold line-clamp-2 mb-2">{relatedPost.title}</h3>
-                          <p className="text-xs text-muted-foreground">{relatedPost.date}</p>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
+                  .map((relatedPost, idx) => {
+                    const relatedIndex = blogPosts.findIndex(p => p.id === relatedPost.id);
+                    const relatedImage = getConsistentImage(relatedPost, relatedIndex >= 0 ? relatedIndex : idx);
+                    
+                    return (
+                      <Link key={relatedPost.id} to={`/blog/${relatedPost.id}`} className="block">
+                        <Card className="hover-scale h-full">
+                          <div className="h-32 overflow-hidden">
+                            <img 
+                              src={relatedImage}
+                              alt={relatedPost.title} 
+                              className="object-cover w-full h-full"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = stockMarketImages[idx % stockMarketImages.length];
+                              }}
+                            />
+                          </div>
+                          <CardContent className="p-4">
+                            <h3 className="font-semibold line-clamp-2 mb-2">{relatedPost.title}</h3>
+                            <p className="text-xs text-muted-foreground">{relatedPost.date}</p>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    );
+                  })}
               </div>
             </div>
           </div>
