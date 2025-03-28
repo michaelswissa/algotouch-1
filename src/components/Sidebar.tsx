@@ -4,8 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Calendar, 
-  LineChart, 
-  Notebook, 
+  ScrollText, 
   Users,
   GraduationCap,
   Search,
@@ -29,8 +28,7 @@ const Sidebar = () => {
   const navItems = [
     { path: '/dashboard', name: 'לוח בקרה', icon: <Home size={18} /> },
     { path: '/calendar', name: 'לוח שנה', icon: <Calendar size={18} /> },
-    { path: '/trades', name: 'עסקאות', icon: <LineChart size={18} /> },
-    { path: '/journal', name: 'יומן', icon: <Notebook size={18} /> },
+    { path: '/trade-journal', name: 'יומן עסקאות', icon: <ScrollText size={18} /> },
     { path: '/monthly-report', name: 'דוח חודשי', icon: <FileSpreadsheet size={18} /> },
     { path: '/community', name: 'קהילה', icon: <Users size={18} /> },
     { path: '/courses', name: 'קורסים', icon: <GraduationCap size={18} /> },
