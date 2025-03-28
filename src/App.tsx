@@ -17,6 +17,7 @@ import CourseDetail from "./pages/CourseDetail";
 import AIAssistant from "./pages/AIAssistant";
 import NotFound from "./pages/NotFound";
 import NewTrade from "./pages/NewTrade";
+import Journal from "./pages/Journal";
 
 // Configure with refresh on error
 const queryClient = new QueryClient({
@@ -69,6 +70,7 @@ const App = () => {
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/trade-journal" element={<TradeJournal />} />
             <Route path="/monthly-report" element={<MonthlyReport />} />
+            <Route path="/journal" element={<Journal />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/community" element={<Community />} />

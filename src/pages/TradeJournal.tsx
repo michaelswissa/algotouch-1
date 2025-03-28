@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import TradeFilters from '@/components/TradeFilters';
 import PerformanceMetrics from '@/components/PerformanceMetrics';
 import TradeList from '@/components/TradeList';
-import { Filter, LineChart, Plus, Search, FileText, ScrollText } from 'lucide-react';
+import { Filter, LineChart, Plus, Search, FileText, ScrollText, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -69,6 +69,10 @@ const TradeJournalPage = () => {
     // Future functionality for creating a new note
   };
 
+  const handleMonthlyReport = () => {
+    navigate('/monthly-report');
+  };
+
   return (
     <Layout>
       <div className="tradervue-container py-6">
@@ -102,6 +106,16 @@ const TradeJournalPage = () => {
             >
               <FileText size={14} />
               <span>פתק חדש</span>
+            </Button>
+            
+            <Button 
+              onClick={handleMonthlyReport}
+              variant="outline"
+              size="sm" 
+              className="gap-2 border-border/50 hover:border-primary hover:bg-primary/5 transition-all duration-300"
+            >
+              <FileSpreadsheet size={14} />
+              <span>דוח חודשי</span>
             </Button>
             
             <Button 
