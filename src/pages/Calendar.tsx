@@ -14,7 +14,7 @@ import {
   ChevronLeft 
 } from 'lucide-react';
 import { Calendar as CalendarIcon } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -33,7 +33,7 @@ const hebrewMonths = [
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
 ];
 
-const Calendar = () => {
+const CalendarPage = () => {
   // Current date for default month/year
   const currentDate = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(currentDate);
@@ -95,7 +95,7 @@ const Calendar = () => {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
+              <CalendarComponent
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => {
@@ -231,4 +231,4 @@ const Calendar = () => {
   );
 };
 
-export default Calendar;
+export default CalendarPage;

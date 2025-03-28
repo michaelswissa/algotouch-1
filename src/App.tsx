@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
-import Calendar from "./pages/Calendar";
+import CalendarPage from "./pages/Calendar";
 import TradeJournal from "./pages/TradeJournal";
 import MonthlyReport from "./pages/MonthlyReport";
 import Blog from "./pages/Blog";
@@ -67,7 +66,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/trade-journal" element={<TradeJournal />} />
             <Route path="/monthly-report" element={<MonthlyReport />} />
             <Route path="/blog" element={<Blog />} />
