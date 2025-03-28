@@ -67,12 +67,12 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                 <Card key={post.id} className="overflow-hidden hover-scale transition-all duration-300">
                   <div className="relative h-40 overflow-hidden">
                     <img 
-                      src={post.imageUrl || post.coverImage} 
+                      src={post.coverImage} 
                       alt={post.title}
                       className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
                     />
                     <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
-                      {post.category || post.tags?.[0]}
+                      {post.tags[0] || "כללי"}
                     </div>
                   </div>
                   <CardHeader className="p-4 pb-2">
