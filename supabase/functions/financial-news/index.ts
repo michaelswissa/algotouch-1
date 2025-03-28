@@ -36,74 +36,23 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // First, try to fetch from RSS feeds
-    const rssSources = [
-      {
-        url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585',
-        source: 'גלובס',
-        category: 'שוק ההון'
-      },
-      {
-        url: 'https://rss.walla.co.il/feed/4503',
-        source: 'וואלה!',
-        category: 'כלכלה'
-      },
-      {
-        url: 'https://www.calcalist.co.il/GeneralRss/0,16335,L-8,00.xml',
-        source: 'כלכליסט',
-        category: 'שוק ההון'
-      }
-    ];
-
-    // Try to fetch from multiple sources
-    let allNews: NewsItem[] = [];
-    
-    for (const source of rssSources) {
-      try {
-        logInfo(`Attempting to fetch from RSS source: ${source.source}`);
-        const feedNews = await fetchRssFeed(source.url, source.source);
-        allNews = [...allNews, ...feedNews];
-        logInfo(`Successfully fetched ${feedNews.length} items from ${source.source}`);
-      } catch (error) {
-        logError(`Error fetching from ${source.source}`, error);
-        // Continue to next source
-      }
-    }
-    
-    // If we have news items, sort by date and return the 5 most recent
-    if (allNews.length > 0) {
-      // Sort news by time (assuming time is in format "לפני X שעות/דקות" or similar)
-      // More recent news will be first
-      allNews.sort((a, b) => {
-        const aTime = parseHebrewTimeAgo(a.time);
-        const bTime = parseHebrewTimeAgo(b.time);
-        return aTime - bTime;
-      });
-      
-      // Take the first 5 items
-      const news = allNews.slice(0, 5);
-      
-      logInfo('Request completed successfully', { newsCount: news.length });
-      return new Response(JSON.stringify(news), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-    
-    // If all RSS feeds fail, try using the NewsAPI as a fallback
+    // First try NewsAPI with Hebrew news sources
     try {
-      logInfo('RSS feeds failed, attempting to fetch from NewsAPI with provided API key');
+      logInfo('Attempting to fetch from NewsAPI with Hebrew sources');
       
       // Using the provided API key
       const apiKey = '067d21a2fe2f4e3daf4d4682629e991c';
       
       // Get Hebrew business news from Israel
-      const response = await fetch('https://newsapi.org/v2/top-headlines?country=il&category=business&language=he', {
-        headers: {
-          'X-Api-Key': apiKey,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      const response = await fetch(
+        'https://newsapi.org/v2/top-headlines?country=il&category=business&language=he', 
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
         }
-      });
+      );
       
       if (!response.ok) {
         throw new Error(`NewsAPI returned status ${response.status}`);
@@ -116,14 +65,14 @@ Deno.serve(async (req) => {
         
         const news = data.articles.slice(0, 5).map((article: any, index: number) => ({
           id: index + 1,
-          title: article.title || 'No title available',
-          description: article.description || 'No description available',
+          title: article.title || 'כותרת לא זמינה',
+          description: article.description || 'תיאור לא זמין',
           time: article.publishedAt ? formatTimeAgo(new Date(article.publishedAt)) : 'לאחרונה',
           source: article.source.name || 'מקור חדשות',
-          url: article.url || 'https://www.globes.co.il/news/'
+          url: article.url || 'https://www.globes.co.il/'
         }));
         
-        logInfo('Request completed successfully with NewsAPI fallback', { newsCount: news.length });
+        logInfo('Request completed successfully with NewsAPI', { newsCount: news.length });
         return new Response(JSON.stringify(news), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
@@ -131,19 +80,68 @@ Deno.serve(async (req) => {
       }
       
       throw new Error('NewsAPI returned empty articles array');
-    } catch (error) {
-      logError('All sources failed, using fallback data', error);
-      const fallbackNews = getFallbackNews();
+    } catch (apiError) {
+      logError('Error fetching from NewsAPI, trying RSS feeds', apiError);
       
-      logInfo('Request completed with fallback data', { newsCount: fallbackNews.length });
-      return new Response(JSON.stringify(fallbackNews), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+      // If NewsAPI fails, try to fetch from RSS feeds
+      const rssSources = [
+        {
+          url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585',
+          source: 'גלובס',
+          category: 'שוק ההון'
+        },
+        {
+          url: 'https://rss.walla.co.il/feed/4503',
+          source: 'וואלה!',
+          category: 'כלכלה'
+        },
+        {
+          url: 'https://www.calcalist.co.il/GeneralRss/0,16335,L-8,00.xml',
+          source: 'כלכליסט',
+          category: 'שוק ההון'
+        }
+      ];
+
+      let allNews: NewsItem[] = [];
+      
+      for (const source of rssSources) {
+        try {
+          logInfo(`Attempting to fetch from RSS source: ${source.source}`);
+          const feedNews = await fetchRssFeed(source.url, source.source);
+          allNews = [...allNews, ...feedNews];
+          logInfo(`Successfully fetched ${feedNews.length} items from ${source.source}`);
+        } catch (error) {
+          logError(`Error fetching from ${source.source}`, error);
+          // Continue to next source
+        }
+      }
+      
+      // If we have news items, sort by date and return the 5 most recent
+      if (allNews.length > 0) {
+        // Sort news by time (assuming time is in format "לפני X שעות/דקות" or similar)
+        // More recent news will be first
+        allNews.sort((a, b) => {
+          const aTime = parseHebrewTimeAgo(a.time);
+          const bTime = parseHebrewTimeAgo(b.time);
+          return aTime - bTime;
+        });
+        
+        // Take the first 5 items
+        const news = allNews.slice(0, 5);
+        
+        logInfo('Request completed successfully with RSS feeds', { newsCount: news.length });
+        return new Response(JSON.stringify(news), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+      
+      // If all sources fail, use fallback data
+      throw new Error('All sources failed, using fallback data');
     }
   } catch (error) {
     logError('All news sources failed, using realistic fallback data', error);
-    const fallbackNews = getFallbackNews();
+    const fallbackNews = getHebrewFallbackNews();
     
     logInfo('Request completed with fallback data', { newsCount: fallbackNews.length });
     
@@ -210,7 +208,7 @@ function cleanText(text: string): string {
   return withoutHtml.replace(/\s+/g, ' ').trim();
 }
 
-// Helper function to format time ago
+// Helper function to format time ago in Hebrew
 function formatTimeAgo(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -246,8 +244,8 @@ function parseHebrewTimeAgo(timeAgo: string): number {
   }
 }
 
-// Function to get realistic fallback news data with real links
-function getFallbackNews(): NewsItem[] {
+// Function to get realistic Hebrew fallback news data with real links
+function getHebrewFallbackNews(): NewsItem[] {
   return [
     {
       id: 1,
