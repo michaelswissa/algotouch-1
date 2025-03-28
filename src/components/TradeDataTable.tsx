@@ -33,6 +33,11 @@ const TradeDataTable: React.FC<TradeDataTableProps> = ({ trades }) => {
     }
   };
 
+  // Format number with comma separators
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+  };
+
   if (!trades.length) return null;
 
   return (
@@ -67,19 +72,19 @@ const TradeDataTable: React.FC<TradeDataTableProps> = ({ trades }) => {
               </TableCell>
               <TableCell className="text-right">{formatDate(trade['Entry DateTime'])}</TableCell>
               <TableCell className="text-right">{formatDate(trade['Exit DateTime'])}</TableCell>
-              <TableCell className="text-right">{trade.EntryPrice}</TableCell>
-              <TableCell className="text-right">{trade.ExitPrice}</TableCell>
+              <TableCell className="text-right">{formatNumber(trade.EntryPrice)}</TableCell>
+              <TableCell className="text-right">{formatNumber(trade.ExitPrice)}</TableCell>
               <TableCell className={cn(
                 "font-medium text-right",
                 trade.ProfitLoss >= 0 ? "text-tradervue-green" : "text-tradervue-red"
               )}>
-                {trade.ProfitLoss >= 0 ? `₪${trade.ProfitLoss.toFixed(2)}` : `-₪${Math.abs(trade.ProfitLoss).toFixed(2)}`}
+                {trade.ProfitLoss >= 0 ? `₪${formatNumber(trade.ProfitLoss)}` : `-₪${formatNumber(Math.abs(trade.ProfitLoss))}`}
               </TableCell>
               <TableCell className={cn(
                 "font-medium text-right",
                 trade.Net >= 0 ? "text-tradervue-green" : "text-tradervue-red"
               )}>
-                {trade.Net >= 0 ? `₪${trade.Net.toFixed(2)}` : `-₪${Math.abs(trade.Net).toFixed(2)}`}
+                {trade.Net >= 0 ? `₪${formatNumber(trade.Net)}` : `-₪${formatNumber(Math.abs(trade.Net))}`}
               </TableCell>
             </TableRow>
           ))}

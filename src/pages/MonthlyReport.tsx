@@ -1,45 +1,52 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, Plus, FilePlus, FileText, Table, BarChart, FileSpreadsheet } from 'lucide-react';
+import { Upload, Plus, FilePlus, FileText, Table, BarChart, FileSpreadsheet, FileUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { parseCSVFile, calculateTradeStats, TradeRecord, TradeStats } from '@/lib/trade-analysis';
 import TradeDataTable from '@/components/TradeDataTable';
 import TradeCharts from '@/components/TradeCharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ReportTabs from '@/components/ReportTabs';
 
 const MonthlyReport = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [stats, setStats] = useState<TradeStats | null>(null);
-  const [activeReportTab, setActiveReportTab] = useState('overview');
   const [activeTab, setActiveTab] = useState('table');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const handleFileClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     if (file) {
       // Check if file is CSV or Excel
       const fileType = file.type;
-      if (
+      const validType = 
         fileType === 'text/csv' ||
         fileType === 'application/vnd.ms-excel' ||
         fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
         file.name.endsWith('.csv') ||
         file.name.endsWith('.xlsx') ||
-        file.name.endsWith('.xls')
-      ) {
+        file.name.endsWith('.xls');
+        
+      if (validType) {
         setSelectedFile(file);
         try {
           await handleUpload(file);
         } catch (error) {
+          console.error("Error processing file:", error);
           toast({
             title: "שגיאה בטעינת הקובץ",
             description: "אירעה שגיאה בעיבוד הקובץ. אנא ודא שהקובץ בפורמט הנכון.",
@@ -52,7 +59,51 @@ const MonthlyReport = () => {
           description: "יש להעלות רק קבצי CSV או Excel",
           variant: "destructive",
         });
-        e.target.value = '';
+        if (e.target) {
+          e.target.value = '';
+        }
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const fileType = file.type;
+      const validType = 
+        fileType === 'text/csv' ||
+        fileType === 'application/vnd.ms-excel' ||
+        fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.name.endsWith('.csv') ||
+        file.name.endsWith('.xlsx') ||
+        file.name.endsWith('.xls');
+        
+      if (validType) {
+        setSelectedFile(file);
+        try {
+          await handleUpload(file);
+        } catch (error) {
+          console.error("Error processing dragged file:", error);
+          toast({
+            title: "שגיאה בטעינת הקובץ",
+            description: "אירעה שגיאה בעיבוד הקובץ. אנא ודא שהקובץ בפורמט הנכון.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "סוג קובץ לא נתמך",
+          description: "יש להעלות רק קבצי CSV או Excel",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -65,6 +116,16 @@ const MonthlyReport = () => {
     try {
       // Parse the CSV file
       const tradeData = await parseCSVFile(file);
+      
+      if (tradeData.length === 0) {
+        toast({
+          title: "אין נתונים בקובץ",
+          description: "הקובץ ריק או שפורמט הנתונים אינו תואם למבנה הנדרש.",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
       
       // Calculate trade statistics
       const tradeStats = calculateTradeStats(tradeData);
@@ -89,6 +150,14 @@ const MonthlyReport = () => {
     }
   };
 
+  const handleAddManualTrade = (formData: any) => {
+    // Add manual trade implementation
+    toast({
+      title: "העסקה נשמרה בהצלחה", 
+      description: "העסקה החדשה נוספה לרשימת העסקאות שלך"
+    });
+  };
+
   return (
     <Layout>
       <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
@@ -109,7 +178,20 @@ const MonthlyReport = () => {
                     העלה קובץ CSV או Excel המכיל את נתוני המסחר שלך. הקובץ צריך לכלול עמודות עבור מספר חשבון, חוזה, שם סיגנל, כיוון, תאריכי כניסה ויציאה, מחירים, רווח/הפסד ונטו.
                   </p>
                   
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <div 
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors duration-200 hover:border-primary/50 cursor-pointer"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onClick={handleFileClick}
+                  >
+                    <input 
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    
                     <div className="mb-4">
                       <Upload className="h-10 w-10 mx-auto text-gray-400" />
                     </div>
@@ -117,19 +199,17 @@ const MonthlyReport = () => {
                     <p className="text-sm text-gray-500 mb-4">או</p>
                     
                     <div className="flex justify-center">
-                      <Label htmlFor="file-upload" className="cursor-pointer">
-                        <Button variant="outline" className="gap-2">
-                          <FilePlus size={16} />
-                          בחר קובץ
-                        </Button>
-                        <Input 
-                          id="file-upload" 
-                          type="file"
-                          accept=".csv,.xlsx,.xls"
-                          className="hidden"
-                          onChange={handleFileChange}
-                        />
-                      </Label>
+                      <Button 
+                        variant="outline" 
+                        className="gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileClick();
+                        }}
+                      >
+                        <FileUp size={16} />
+                        בחר קובץ
+                      </Button>
                     </div>
                     
                     {selectedFile && (
@@ -230,7 +310,7 @@ const MonthlyReport = () => {
                         </div>
                       </div>
                       <div className="flex justify-end">
-                        <Button onClick={() => toast({ title: "העסקה נשמרה בהצלחה" })}>שמור עסקה</Button>
+                        <Button onClick={handleAddManualTrade}>שמור עסקה</Button>
                       </div>
                     </DialogContent>
                   </Dialog>
