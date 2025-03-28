@@ -33,11 +33,11 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
       </div>
       
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex flex-row-reverse"> {/* Reversed order for RTL */}
           <TabsTrigger value="all">הכל</TabsTrigger>
-          <TabsTrigger value="news">חדשות ועדכונים</TabsTrigger>
-          <TabsTrigger value="market">סיקורי שוק</TabsTrigger>
           <TabsTrigger value="guides">מדריכים וטיפים</TabsTrigger>
+          <TabsTrigger value="market">סיקורי שוק</TabsTrigger>
+          <TabsTrigger value="news">חדשות ועדכונים</TabsTrigger>
         </TabsList>
         
         <TabsContent value="all" className="space-y-4">
@@ -72,22 +72,25 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                         alt={post.title}
                         className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
                       />
-                      <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
+                      <div className="absolute top-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
                         {post.tags[0] || "כללי"}
                       </div>
                     </div>
-                    <CardHeader className="p-4 pb-2">
+                    <CardHeader className="p-4 pb-2 text-right">
                       <CardTitle className="text-lg font-bold line-clamp-2">{post.title}</CardTitle>
                       <CardDescription className="flex items-center text-xs mt-1">
                         <Clock size={12} className="ml-1" />
                         <span>{post.date}</span>
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="p-4 pt-0">
+                    <CardContent className="p-4 pt-0 text-right">
                       <p className="text-sm line-clamp-2">{post.excerpt}</p>
                     </CardContent>
                     <CardFooter className="p-4 pt-0 flex justify-between">
-                      <div className="flex items-center space-x-4 rtl:space-x-reverse text-sm">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Share size={14} />
+                      </Button>
+                      <div className="flex items-center space-x-4 space-x-reverse text-sm">
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <ThumbsUp size={14} />
                         </Button>
@@ -98,9 +101,6 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                           <Bookmark size={14} />
                         </Button>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Share size={14} />
-                      </Button>
                     </CardFooter>
                   </Card>
                 </Link>
