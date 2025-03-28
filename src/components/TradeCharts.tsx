@@ -334,7 +334,6 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                         dataKey="value"
                         nameKey="name"
                         label={renderCustomizedPieLabel}
-                        labelFormatter={(value: any) => value.toLocaleString()}
                       >
                         {sideData.map((entry, index) => (
                           <Cell 
