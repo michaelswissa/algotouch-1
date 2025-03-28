@@ -13,13 +13,61 @@ interface NewsItem {
   description?: string;
 }
 
-// Helper function to add structured logging
+// Centralized config
+const CONFIG = {
+  newsAPI: {
+    apiKey: '067d21a2fe2f4e3daf4d4682629e991c',
+    endpoint: 'https://newsapi.org/v2/top-headlines',
+    params: {
+      country: 'il',
+      category: 'business',
+      language: 'he'
+    }
+  },
+  rssFeeds: [
+    {
+      url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585',
+      source: 'גלובס',
+      category: 'שוק ההון'
+    },
+    {
+      url: 'https://rss.walla.co.il/feed/4503',
+      source: 'וואלה!',
+      category: 'כלכלה'
+    },
+    {
+      url: 'https://www.calcalist.co.il/GeneralRss/0,16335,L-8,00.xml',
+      source: 'כלכליסט',
+      category: 'שוק ההון'
+    }
+  ],
+  maxNewsItems: 5,
+  requestTimeout: 5000 // 5 seconds timeout
+};
+
+// Helper function for structured logging
 function logInfo(message: string, data?: any) {
   console.log(`INFO: ${message}`, data ? JSON.stringify(data) : '');
 }
 
 function logError(message: string, error?: any) {
   console.error(`ERROR: ${message}`, error ? JSON.stringify(error) : '');
+}
+
+// Create a controller for timeout
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = CONFIG.requestTimeout): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // Main handler for the edge function
@@ -36,168 +84,166 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // First try NewsAPI with Hebrew news sources
+    // Strategy 1: Try NewsAPI first
     try {
-      logInfo('Attempting to fetch from NewsAPI with Hebrew sources');
-      
-      // Using the provided API key
-      const apiKey = '067d21a2fe2f4e3daf4d4682629e991c';
-      
-      // Get Hebrew business news from Israel
-      const response = await fetch(
-        'https://newsapi.org/v2/top-headlines?country=il&category=business&language=he', 
-        {
-          headers: {
-            'X-Api-Key': apiKey,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`NewsAPI returned status ${response.status}`);
+      const newsFromAPI = await fetchNewsFromAPI();
+      if (newsFromAPI.length > 0) {
+        logInfo('Successfully fetched news from NewsAPI', { count: newsFromAPI.length });
+        return createSuccessResponse(newsFromAPI);
       }
-      
-      const data = await response.json();
-      
-      if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
-        logInfo('Successfully fetched from NewsAPI', { count: data.articles.length });
-        
-        const news = data.articles.slice(0, 5).map((article: any, index: number) => ({
-          id: index + 1,
-          title: article.title || 'כותרת לא זמינה',
-          description: article.description || 'תיאור לא זמין',
-          time: article.publishedAt ? formatTimeAgo(new Date(article.publishedAt)) : 'לאחרונה',
-          source: article.source.name || 'מקור חדשות',
-          url: article.url || 'https://www.globes.co.il/'
-        }));
-        
-        logInfo('Request completed successfully with NewsAPI', { newsCount: news.length });
-        return new Response(JSON.stringify(news), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
-      
-      throw new Error('NewsAPI returned empty articles array');
+      throw new Error('NewsAPI returned empty array');
     } catch (apiError) {
       logError('Error fetching from NewsAPI, trying RSS feeds', apiError);
       
-      // If NewsAPI fails, try to fetch from RSS feeds
-      const rssSources = [
-        {
-          url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585',
-          source: 'גלובס',
-          category: 'שוק ההון'
-        },
-        {
-          url: 'https://rss.walla.co.il/feed/4503',
-          source: 'וואלה!',
-          category: 'כלכלה'
-        },
-        {
-          url: 'https://www.calcalist.co.il/GeneralRss/0,16335,L-8,00.xml',
-          source: 'כלכליסט',
-          category: 'שוק ההון'
+      // Strategy 2: If NewsAPI fails, try RSS feeds
+      try {
+        const newsFromRSS = await fetchNewsFromRSSFeeds();
+        if (newsFromRSS.length > 0) {
+          logInfo('Successfully fetched news from RSS feeds', { count: newsFromRSS.length });
+          return createSuccessResponse(newsFromRSS);
         }
-      ];
-
-      let allNews: NewsItem[] = [];
-      
-      for (const source of rssSources) {
-        try {
-          logInfo(`Attempting to fetch from RSS source: ${source.source}`);
-          const feedNews = await fetchRssFeed(source.url, source.source);
-          allNews = [...allNews, ...feedNews];
-          logInfo(`Successfully fetched ${feedNews.length} items from ${source.source}`);
-        } catch (error) {
-          logError(`Error fetching from ${source.source}`, error);
-          // Continue to next source
-        }
+        throw new Error('All RSS feeds failed');
+      } catch (rssError) {
+        logError('Error fetching from RSS feeds', rssError);
+        throw rssError; // Re-throw to use fallback data
       }
-      
-      // If we have news items, sort by date and return the 5 most recent
-      if (allNews.length > 0) {
-        // Sort news by time (assuming time is in format "לפני X שעות/דקות" or similar)
-        // More recent news will be first
-        allNews.sort((a, b) => {
-          const aTime = parseHebrewTimeAgo(a.time);
-          const bTime = parseHebrewTimeAgo(b.time);
-          return aTime - bTime;
-        });
-        
-        // Take the first 5 items
-        const news = allNews.slice(0, 5);
-        
-        logInfo('Request completed successfully with RSS feeds', { newsCount: news.length });
-        return new Response(JSON.stringify(news), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
-      
-      // If all sources fail, use fallback data
-      throw new Error('All sources failed, using fallback data');
     }
   } catch (error) {
-    logError('All news sources failed, using realistic fallback data', error);
+    logError('All news sources failed, using fallback data', error);
     const fallbackNews = getHebrewFallbackNews();
-    
     logInfo('Request completed with fallback data', { newsCount: fallbackNews.length });
     
-    return new Response(JSON.stringify(fallbackNews), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return createSuccessResponse(fallbackNews);
   }
 });
 
-// Function to fetch and parse RSS feeds
+// Helper to create consistent success responses
+function createSuccessResponse(news: NewsItem[]): Response {
+  return new Response(JSON.stringify(news), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200,
+  });
+}
+
+// Fetch news from NewsAPI
+async function fetchNewsFromAPI(): Promise<NewsItem[]> {
+  logInfo('Attempting to fetch from NewsAPI with Hebrew sources');
+  
+  const { apiKey, endpoint, params } = CONFIG.newsAPI;
+  const url = `${endpoint}?country=${params.country}&category=${params.category}&language=${params.language}`;
+  
+  const response = await fetchWithTimeout(
+    url, 
+    {
+      headers: {
+        'X-Api-Key': apiKey,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`NewsAPI returned status ${response.status}`);
+  }
+  
+  const data = await response.json();
+  
+  if (!data.articles || !Array.isArray(data.articles) || data.articles.length === 0) {
+    throw new Error('NewsAPI returned no articles');
+  }
+  
+  return data.articles.slice(0, CONFIG.maxNewsItems).map((article: any, index: number) => ({
+    id: index + 1,
+    title: article.title || 'כותרת לא זמינה',
+    description: article.description || 'תיאור לא זמין',
+    time: article.publishedAt ? formatTimeAgo(new Date(article.publishedAt)) : 'לאחרונה',
+    source: article.source.name || 'מקור חדשות',
+    url: article.url || 'https://www.globes.co.il/'
+  }));
+}
+
+// Fetch news from multiple RSS feeds
+async function fetchNewsFromRSSFeeds(): Promise<NewsItem[]> {
+  logInfo('Attempting to fetch from RSS feeds');
+  
+  const feedPromises = CONFIG.rssFeeds.map(source => 
+    fetchRssFeed(source.url, source.source)
+      .catch(error => {
+        logError(`Error fetching from ${source.source} RSS feed`, error);
+        return []; // Return empty array on error to continue with other sources
+      })
+  );
+  
+  // Wait for all feeds to resolve (either with news or empty arrays)
+  const results = await Promise.all(feedPromises);
+  
+  // Combine all news items from different sources
+  let allNews: NewsItem[] = results.flat();
+  
+  if (allNews.length === 0) {
+    throw new Error('All RSS feeds failed');
+  }
+  
+  // Sort by recency and take top items
+  allNews.sort((a, b) => {
+    const aTime = parseHebrewTimeAgo(a.time);
+    const bTime = parseHebrewTimeAgo(b.time);
+    return aTime - bTime;
+  });
+  
+  return allNews.slice(0, CONFIG.maxNewsItems);
+}
+
+// Function to fetch and parse a single RSS feed
 async function fetchRssFeed(feedUrl: string, sourceName: string): Promise<NewsItem[]> {
-  try {
-    const response = await fetch(feedUrl);
+  logInfo(`Attempting to fetch from RSS source: ${sourceName}`);
+  
+  const response = await fetchWithTimeout(feedUrl);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch RSS feed from ${sourceName}: ${response.status}`);
+  }
+  
+  const xml = await response.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, "text/xml");
+  
+  if (!doc) {
+    throw new Error(`Failed to parse XML from ${sourceName}`);
+  }
+  
+  const items = doc.querySelectorAll("item");
+  const news: NewsItem[] = [];
+  
+  let count = 0;
+  for (const item of Array.from(items)) {
+    if (count >= 10) break; // Limit to first 10 items per feed
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch RSS feed: ${response.status}`);
-    }
+    const title = item.querySelector("title")?.textContent;
+    const link = item.querySelector("link")?.textContent;
+    const pubDate = item.querySelector("pubDate")?.textContent;
+    const description = item.querySelector("description")?.textContent;
     
-    const xml = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, "text/xml");
+    // Skip items with missing essential data
+    if (!title || !link) continue;
     
-    if (!doc) {
-      throw new Error("Failed to parse XML");
-    }
+    // Parse the pubDate to a Date object
+    const pubDateTime = pubDate ? new Date(pubDate) : new Date();
     
-    const items = doc.querySelectorAll("item");
-    const news: NewsItem[] = [];
-    
-    items.forEach((item, index) => {
-      if (index >= 10) return; // Limit to first 10 items
-      
-      const title = item.querySelector("title")?.textContent || "כותרת לא זמינה";
-      const link = item.querySelector("link")?.textContent || "";
-      const pubDate = item.querySelector("pubDate")?.textContent || "";
-      const description = item.querySelector("description")?.textContent || "";
-      
-      // Parse the pubDate to a Date object
-      const pubDateTime = pubDate ? new Date(pubDate) : new Date();
-      
-      news.push({
-        id: index + 1,
-        title: cleanText(title),
-        url: link,
-        time: formatTimeAgo(pubDateTime),
-        source: sourceName,
-        description: cleanText(description)
-      });
+    news.push({
+      id: count + 1,
+      title: cleanText(title),
+      url: link,
+      time: formatTimeAgo(pubDateTime),
+      source: sourceName,
+      description: description ? cleanText(description) : undefined
     });
     
-    return news;
-  } catch (error) {
-    logError(`Error fetching RSS feed from ${sourceName}`, error);
-    return [];
+    count++;
   }
+  
+  logInfo(`Successfully fetched ${news.length} items from ${sourceName}`);
+  return news;
 }
 
 // Helper function to clean text (remove HTML and extra whitespace)
@@ -212,16 +258,18 @@ function cleanText(text: string): string {
 function formatTimeAgo(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
   
-  if (diffHours === 0) {
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    return `לפני ${diffMinutes} דקות`;
-  } else if (diffHours < 24) {
-    return `לפני ${diffHours} שעות`;
+  if (diffMinutes < 60) {
+    return `לפני ${diffMinutes || 1} דקות`;
   } else {
-    const diffDays = Math.floor(diffHours / 24);
-    return `לפני ${diffDays} ימים`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) {
+      return `לפני ${diffHours} שעות`;
+    } else {
+      const diffDays = Math.floor(diffHours / 24);
+      return `לפני ${diffDays} ימים`;
+    }
   }
 }
 
@@ -229,7 +277,7 @@ function formatTimeAgo(date: Date): string {
 function parseHebrewTimeAgo(timeAgo: string): number {
   try {
     const match = timeAgo.match(/לפני (\d+) (דקות|שעות|ימים)/);
-    if (!match) return Number.MAX_SAFE_INTEGER; // If can't parse, put it at the end
+    if (!match) return Number.MAX_SAFE_INTEGER;
     
     const value = parseInt(match[1], 10);
     const unit = match[2];
@@ -246,6 +294,7 @@ function parseHebrewTimeAgo(timeAgo: string): number {
 
 // Function to get realistic Hebrew fallback news data with real links
 function getHebrewFallbackNews(): NewsItem[] {
+  const currentTime = new Date();
   return [
     {
       id: 1,
