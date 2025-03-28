@@ -326,7 +326,7 @@ const MonthlyReport = () => {
                       <Table className="h-5 w-5 text-primary" />
                       <span>נתוני עסקאות</span>
                     </CardTitle>
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
                       <TabsList>
                         <TabsTrigger value="table">טבלה</TabsTrigger>
                         <TabsTrigger value="charts">גרפים</TabsTrigger>
@@ -336,12 +336,8 @@ const MonthlyReport = () => {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="p-4">
-                    <TabsContent value="table" className="mt-0">
-                      <TradeDataTable trades={trades} />
-                    </TabsContent>
-                    <TabsContent value="charts" className="mt-0">
-                      {stats && <TradeCharts trades={trades} stats={stats} />}
-                    </TabsContent>
+                    {activeTab === 'table' && <TradeDataTable trades={trades} />}
+                    {activeTab === 'charts' && stats && <TradeCharts trades={trades} stats={stats} />}
                   </div>
                 </CardContent>
               </Card>
