@@ -35,9 +35,9 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="all">הכל</TabsTrigger>
-          <TabsTrigger value="trending">טרנדים</TabsTrigger>
-          <TabsTrigger value="news">חדשות</TabsTrigger>
-          <TabsTrigger value="analysis">ניתוחים</TabsTrigger>
+          <TabsTrigger value="news">חדשות ועדכונים</TabsTrigger>
+          <TabsTrigger value="market">סיקורי שוק</TabsTrigger>
+          <TabsTrigger value="guides">מדריכים וטיפים</TabsTrigger>
         </TabsList>
         
         <TabsContent value="all" className="space-y-4">
@@ -78,7 +78,7 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-lg font-bold line-clamp-2">{post.title}</CardTitle>
                     <CardDescription className="flex items-center text-xs mt-1">
-                      <Clock size={12} className="mr-1" />
+                      <Clock size={12} className="ml-1" />
                       <span>{post.date}</span>
                     </CardDescription>
                   </CardHeader>
@@ -113,21 +113,21 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
           )}
         </TabsContent>
         
-        <TabsContent value="trending">
-          <div className="p-8 text-center text-muted-foreground">
-            לא נמצאו פוסטים בקטגוריה זו
-          </div>
-        </TabsContent>
-        
         <TabsContent value="news">
           <div className="p-8 text-center text-muted-foreground">
-            לא נמצאו פוסטים בקטגוריה זו
+            חדשות ועדכונים יופיעו כאן בקרוב
           </div>
         </TabsContent>
         
-        <TabsContent value="analysis">
+        <TabsContent value="market">
           <div className="p-8 text-center text-muted-foreground">
-            לא נמצאו פוסטים בקטגוריה זו
+            סיקורי שוק יופיעו כאן בקרוב
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="guides">
+          <div className="p-8 text-center text-muted-foreground">
+            מדריכים וטיפים יופיעו כאן בקרוב
           </div>
         </TabsContent>
       </Tabs>
