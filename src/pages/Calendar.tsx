@@ -197,7 +197,7 @@ const CalendarPage = () => {
             </div>
           </div>
           
-          {/* Economic Calendar Section - Modern styling */}
+          {/* Economic Calendar Section - With reduced iframe height */}
           <div className="mt-8">
             <Card className="glass-card-2025 overflow-hidden hover-glow">
               <CardHeader className="pb-2 bg-gradient-to-r from-background to-background/50">
@@ -211,7 +211,7 @@ const CalendarPage = () => {
                   <iframe 
                     src="https://sslecal2.investing.com?ecoDayBackground=%230066ff&defaultFont=%230066ff&innerBorderColor=%238e989e&borderColor=%230066ff&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=2,3&features=datepicker,timezone,timeselector,filters&countries=23,5&calType=week&timeZone=8&lang=1" 
                     width="100%" 
-                    height="450" 
+                    height="320" 
                     frameBorder="0" 
                     allowTransparency={true}
                     className="mx-auto"
