@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useBlogPosts } from '@/lib/api/blog';
+import { useBlogPostsWithRefresh } from '@/lib/api/blog';
 import { ChevronRight, Clock, ThumbsUp, MessageSquare, Bookmark, Share } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ interface BlogSectionProps {
 }
 
 const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
-  const { blogPosts, isLoading } = useBlogPosts();
+  const { blogPosts, loading: isLoading } = useBlogPostsWithRefresh();
   
   // Show more posts in expanded view
   const postsToShow = expandedView ? blogPosts : blogPosts.slice(0, 3);
@@ -67,12 +67,12 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                 <Card key={post.id} className="overflow-hidden hover-scale transition-all duration-300">
                   <div className="relative h-40 overflow-hidden">
                     <img 
-                      src={post.imageUrl} 
+                      src={post.imageUrl || post.coverImage} 
                       alt={post.title}
                       className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
                     />
                     <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
-                      {post.category}
+                      {post.category || post.tags?.[0]}
                     </div>
                   </div>
                   <CardHeader className="p-4 pb-2">
