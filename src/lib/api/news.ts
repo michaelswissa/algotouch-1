@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export type NewsItem = {
   id: number;
@@ -7,17 +8,35 @@ export type NewsItem = {
   time: string;
   source: string;
   url?: string;
+  description?: string;
 };
 
-// Function to fetch financial news
+// Function to fetch financial news from our Supabase edge function
 export async function fetchFinancialNews(): Promise<NewsItem[]> {
   try {
-    // In a real-world scenario, we would fetch from an actual news API
-    // For this demo, we'll use simulated data with more realistic content
+    console.info('Fetching financial news from edge function...');
     
+    const { data, error } = await supabase.functions.invoke('financial-news');
+    
+    if (error) {
+      console.error('Error fetching news:', error);
+      throw new Error(error.message);
+    }
+    
+    if (!data || !Array.isArray(data)) {
+      console.error('Invalid data format from news API:', data);
+      throw new Error('Invalid data format from news API');
+    }
+    
+    console.info('Successfully fetched news data:', data);
+    return data as NewsItem[];
+  } catch (error) {
+    console.error('Error fetching news:', error);
+    
+    // Return fallback data in case of an error
     const currentTime = new Date();
     
-    const simulatedNews: NewsItem[] = [
+    return [
       {
         id: 1,
         title: "וול סטריט נסגרה במגמה חיובית; S&P 500 עלה ב-0.8%",
@@ -54,11 +73,6 @@ export async function fetchFinancialNews(): Promise<NewsItem[]> {
         url: "https://www.globes.co.il"
       }
     ];
-    
-    return simulatedNews;
-  } catch (error) {
-    console.error('Error fetching news:', error);
-    return [];
   }
 }
 
@@ -67,6 +81,7 @@ export function useNewsDataWithRefresh(refreshInterval = 60000) {
   const [newsData, setNewsData] = React.useState<NewsItem[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -74,6 +89,7 @@ export function useNewsDataWithRefresh(refreshInterval = 60000) {
         setLoading(true);
         const data = await fetchFinancialNews();
         setNewsData(data);
+        setLastUpdated(new Date());
         setError(null);
       } catch (err) {
         setError('Failed to fetch news data');
@@ -93,5 +109,5 @@ export function useNewsDataWithRefresh(refreshInterval = 60000) {
     return () => clearInterval(intervalId);
   }, [refreshInterval]);
 
-  return { newsData, loading, error };
+  return { newsData, loading, error, lastUpdated };
 }

@@ -3,7 +3,7 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, Info, RefreshCw, Clock } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, Info, RefreshCw, Clock, Calendar } from 'lucide-react';
 import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { useNewsDataWithRefresh } from '@/lib/api/news';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,8 @@ import { format } from 'date-fns';
 
 const Dashboard = () => {
   const { toast } = useToast();
-  const { stockData, loading: stocksLoading, error: stocksError, lastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
-  const { newsData, loading: newsLoading, error: newsError } = useNewsDataWithRefresh(60000); // Refresh every minute
+  const { stockData, loading: stocksLoading, error: stocksError, lastUpdated: stocksLastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
+  const { newsData, loading: newsLoading, error: newsError, lastUpdated: newsLastUpdated } = useNewsDataWithRefresh(60000); // Refresh every minute
 
   const handleManualRefresh = () => {
     window.location.reload();
@@ -25,8 +25,12 @@ const Dashboard = () => {
   };
 
   // Format last updated time
-  const formattedLastUpdated = lastUpdated 
-    ? format(lastUpdated, 'HH:mm:ss')
+  const formattedStocksLastUpdated = stocksLastUpdated 
+    ? format(stocksLastUpdated, 'HH:mm:ss')
+    : 'לא ידוע';
+
+  const formattedNewsLastUpdated = newsLastUpdated 
+    ? format(newsLastUpdated, 'HH:mm:ss')
     : 'לא ידוע';
 
   return (
@@ -56,7 +60,7 @@ const Dashboard = () => {
             </h2>
             <div className="flex items-center text-sm text-muted-foreground">
               <Clock size={14} className="mr-1" />
-              <span>עודכן לאחרונה: {formattedLastUpdated}</span>
+              <span>עודכן לאחרונה: {formattedStocksLastUpdated}</span>
             </div>
           </div>
           
@@ -104,10 +108,16 @@ const Dashboard = () => {
         
         {/* News Section - Second */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Info size={18} className="text-primary" />
-            <span>חדשות שוק ההון</span>
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Info size={18} className="text-primary" />
+              <span>חדשות שוק ההון</span>
+            </h2>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Calendar size={14} className="mr-1" />
+              <span>עודכן לאחרונה: {formattedNewsLastUpdated}</span>
+            </div>
+          </div>
           
           {newsLoading && newsData.length === 0 ? (
             <Card className="elevated-card overflow-hidden">
@@ -142,6 +152,9 @@ const Dashboard = () => {
                       className="block p-4 hover:bg-secondary/50 transition-all duration-200 cursor-pointer"
                     >
                       <h3 className="font-medium text-foreground">{news.title}</h3>
+                      {news.description && (
+                        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{news.description}</p>
+                      )}
                       <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
                         <span>{news.source}</span>
                         <span>{news.time}</span>
