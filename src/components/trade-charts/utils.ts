@@ -45,7 +45,27 @@ export const prepareContractData = (trades: TradeRecord[]) => {
 };
 
 // Custom pie chart label renderer with better visibility
-export const renderCustomizedPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
+export const renderCustomizedPieLabel = ({ 
+  cx, 
+  cy, 
+  midAngle, 
+  innerRadius, 
+  outerRadius, 
+  percent, 
+  index, 
+  name, 
+  value 
+}: {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  innerRadius: number;
+  outerRadius: number;
+  percent: number;
+  index: number;
+  name: string;
+  value: number;
+}) => {
   const RADIAN = Math.PI / 180;
   const radius = outerRadius + 30;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
