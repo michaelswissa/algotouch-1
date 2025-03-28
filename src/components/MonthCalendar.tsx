@@ -1,9 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CalendarGrid from './calendar/CalendarGrid';
+import TradeDataTable from './TradeDataTable';
+import { Card, CardContent } from './ui/card';
+import { TradeRecord } from '@/lib/trade-analysis';
 
 interface MonthCalendarProps {
   month: string;
@@ -12,7 +15,71 @@ interface MonthCalendarProps {
   onDayClick?: (day: number) => void;
 }
 
+// Sample mock data for trades on specific days
+const mockTradeData: Record<string, TradeRecord[]> = {
+  '2-current': [
+    {
+      AccountNumber: "12345",
+      Contract: "NQ",
+      'Signal Name': "Breakout",
+      Side: 'Long',
+      'Entry DateTime': "2023-03-02T09:30:00",
+      'Exit DateTime': "2023-03-02T11:45:00",
+      EntryPrice: 15680,
+      ExitPrice: 15720,
+      ProfitLoss: 400,
+      Net: 385,
+      Equity: 25000
+    },
+    {
+      AccountNumber: "12345",
+      Contract: "ES",
+      'Signal Name': "Trend Follow",
+      Side: 'Long',
+      'Entry DateTime': "2023-03-02T13:15:00",
+      'Exit DateTime': "2023-03-02T14:30:00",
+      EntryPrice: 4850,
+      ExitPrice: 4865,
+      ProfitLoss: 750,
+      Net: 720,
+      Equity: 25720
+    }
+  ],
+  '9-current': [
+    {
+      AccountNumber: "12345",
+      Contract: "NQ",
+      'Signal Name': "Reversal",
+      Side: 'Short',
+      'Entry DateTime': "2023-03-09T10:15:00",
+      'Exit DateTime': "2023-03-09T11:30:00",
+      EntryPrice: 15820,
+      ExitPrice: 15750,
+      ProfitLoss: -700,
+      Net: -730,
+      Equity: 24990
+    }
+  ],
+  '17-current': [
+    {
+      AccountNumber: "12345",
+      Contract: "ES",
+      'Signal Name': "Support Bounce",
+      Side: 'Long',
+      'Entry DateTime': "2023-03-17T09:45:00",
+      'Exit DateTime': "2023-03-17T13:20:00",
+      EntryPrice: 4830,
+      ExitPrice: 4860,
+      ProfitLoss: 1500,
+      Net: 1450,
+      Equity: 26440
+    }
+  ]
+};
+
 const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalendarProps) => {
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  
   // Mock data - in a real app, this would be calculated based on month/year
   const daysWithStatus: Record<number, 'positive' | 'negative' | 'neutral'> = {
     2: 'positive',
@@ -75,12 +142,23 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
   }
 
   const handleDayClick = (day: number, month: 'current' | 'prev' | 'next') => {
+    const dayKey = `${day}-${month}`;
     if (month === 'current' && onDayClick) {
       onDayClick(day);
+    }
+    
+    // Toggle selected day
+    if (selectedDay === dayKey) {
+      setSelectedDay(null);
+    } else {
+      setSelectedDay(dayKey);
     }
   };
 
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
+
+  // Get trades for the selected day
+  const selectedDayTrades = selectedDay ? mockTradeData[selectedDay] || [] : [];
 
   return (
     <div className="w-full">
@@ -106,6 +184,27 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
         calendarDays={calendarDays}
         onDayClick={handleDayClick}
       />
+
+      {selectedDay && selectedDayTrades.length > 0 && (
+        <Card className="mt-4 animate-in slide-in-from-top-4 duration-300">
+          <CardContent className="pt-4">
+            <h4 className="text-lg font-medium mb-2 flex items-center">
+              <span>עסקאות ליום</span>
+              <span className="px-2">{selectedDay.split('-')[0]}</span>
+              <span>{month}</span>
+            </h4>
+            <TradeDataTable trades={selectedDayTrades} />
+          </CardContent>
+        </Card>
+      )}
+      
+      {selectedDay && selectedDayTrades.length === 0 && (
+        <Card className="mt-4 animate-in slide-in-from-top-4 duration-300">
+          <CardContent className="pt-4 text-center py-8">
+            <p className="text-muted-foreground">אין עסקאות ליום זה</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
