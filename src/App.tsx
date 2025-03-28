@@ -11,6 +11,7 @@ import Calendar from "./pages/Calendar";
 import TradeJournal from "./pages/TradeJournal";
 import MonthlyReport from "./pages/MonthlyReport";
 import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import Community from "./pages/Community";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
@@ -70,6 +71,7 @@ const App = () => {
             <Route path="/trade-journal" element={<TradeJournal />} />
             <Route path="/monthly-report" element={<MonthlyReport />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/community" element={<Community />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:courseId" element={<CourseDetail />} />

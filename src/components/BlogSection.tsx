@@ -64,44 +64,46 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                 : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             )}>
               {postsToShow.map((post) => (
-                <Card key={post.id} className="overflow-hidden hover-scale transition-all duration-300">
-                  <div className="relative h-40 overflow-hidden">
-                    <img 
-                      src={post.coverImage} 
-                      alt={post.title}
-                      className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
-                    />
-                    <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
-                      {post.tags[0] || "כללי"}
+                <Link key={post.id} to={`/blog/${post.id}`} className="block">
+                  <Card className="overflow-hidden hover-scale transition-all duration-300 h-full">
+                    <div className="relative h-40 overflow-hidden">
+                      <img 
+                        src={post.coverImage} 
+                        alt={post.title}
+                        className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
+                      />
+                      <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
+                        {post.tags[0] || "כללי"}
+                      </div>
                     </div>
-                  </div>
-                  <CardHeader className="p-4 pb-2">
-                    <CardTitle className="text-lg font-bold line-clamp-2">{post.title}</CardTitle>
-                    <CardDescription className="flex items-center text-xs mt-1">
-                      <Clock size={12} className="ml-1" />
-                      <span>{post.date}</span>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    <p className="text-sm line-clamp-2">{post.excerpt}</p>
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0 flex justify-between">
-                    <div className="flex items-center space-x-4 rtl:space-x-reverse text-sm">
+                    <CardHeader className="p-4 pb-2">
+                      <CardTitle className="text-lg font-bold line-clamp-2">{post.title}</CardTitle>
+                      <CardDescription className="flex items-center text-xs mt-1">
+                        <Clock size={12} className="ml-1" />
+                        <span>{post.date}</span>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <p className="text-sm line-clamp-2">{post.excerpt}</p>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0 flex justify-between">
+                      <div className="flex items-center space-x-4 rtl:space-x-reverse text-sm">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <ThumbsUp size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MessageSquare size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Bookmark size={14} />
+                        </Button>
+                      </div>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <ThumbsUp size={14} />
+                        <Share size={14} />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MessageSquare size={14} />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Bookmark size={14} />
-                      </Button>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Share size={14} />
-                    </Button>
-                  </CardFooter>
-                </Card>
+                    </CardFooter>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
