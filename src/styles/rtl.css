@@ -106,4 +106,14 @@
   [dir="rtl"] .search-icon {
     @apply right-3 left-auto;
   }
+  
+  /* Special rules for ScrollArea RTL */
+  [dir="rtl"] .space-x-reverse {
+    --tw-space-x-reverse: 1;
+  }
+  
+  [dir="rtl"] .rtl {
+    direction: rtl;
+    text-align: right;
+  }
 }

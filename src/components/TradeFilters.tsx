@@ -18,19 +18,19 @@ interface TradeFiltersProps {
 
 const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: TradeFiltersProps) => {
   return (
-    <div className="flex flex-wrap gap-4 mb-4" dir="rtl">
+    <div className="flex flex-wrap gap-4 mb-4 justify-end md:justify-start" dir="rtl">
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">סמל</label>
+        <label className="text-xs text-gray-500 block text-right">סמל</label>
         <input 
           type="text" 
           value={symbol}
           onChange={(e) => onSymbolChange?.(e.target.value)}
-          className="px-3 py-1.5 border border-gray-200 rounded-md text-sm w-28" 
+          className="px-3 py-1.5 border border-gray-200 rounded-md text-sm w-28 text-right" 
         />
       </div>
       
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">תגיות</label>
+        <label className="text-xs text-gray-500 block text-right">תגיות</label>
         <Select defaultValue="3-selected">
           <SelectTrigger className="w-36 py-1.5 h-auto">
             <SelectValue placeholder="בחר תגיות" />
@@ -45,7 +45,7 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
       </div>
       
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">כיוון</label>
+        <label className="text-xs text-gray-500 block text-right">כיוון</label>
         <Select defaultValue="long">
           <SelectTrigger className="w-28 py-1.5 h-auto">
             <SelectValue placeholder="כיוון" />
@@ -60,7 +60,7 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
 
       {!minimal && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">משך</label>
+          <label className="text-xs text-gray-500 block text-right">משך</label>
           <Select defaultValue="all">
             <SelectTrigger className="w-28 py-1.5 h-auto">
               <SelectValue placeholder="משך" />
@@ -76,7 +76,7 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
       )}
 
       <div className="space-y-1">
-        <label className="text-xs text-gray-500 invisible">תאריך</label>
+        <label className="text-xs text-gray-500 invisible block text-right">תאריך</label>
         <Button variant="outline" size="sm" className="h-[34px] gap-2">
           <Calendar size={14} />
           <span>6 ינו' - 6 פבר'</span>
@@ -85,7 +85,7 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
 
       {!minimal && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500 invisible">מתקדם</label>
+          <label className="text-xs text-gray-500 invisible block text-right">מתקדם</label>
           <Button variant="outline" size="sm" className="h-[34px]">
             <Filter size={14} className="ml-2" />
             מתקדם
@@ -95,7 +95,7 @@ const TradeFilters = ({ symbol = 'AAPL', onSymbolChange, minimal = false }: Trad
 
       {!minimal && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500 invisible">נקה</label>
+          <label className="text-xs text-gray-500 invisible block text-right">נקה</label>
           <Button variant="outline" size="sm" className="h-[34px]">
             נקה
           </Button>

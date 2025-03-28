@@ -43,7 +43,7 @@ const mockTrades: Trade[] = [
     date: '07 יוני 2024',
     pnl: -246.90,
     volume: 41,
-    executions: 1423,
+    executions: 14,
     exitEfficiency: 10,
     side: 'Long',
     tags: ['לוגופרו', 'בריאות'],
@@ -87,77 +87,79 @@ const TradeList = () => {
         <button className="tradervue-tab">נטו</button>
       </div>
 
-      <Table className="tradervue-table">
-        <TableHeader>
-          <TableRow className="border-b border-border/40 bg-secondary/20">
-            <TableCell className="w-10">
-              <input type="checkbox" className="rounded border-border" />
-            </TableCell>
-            <TableCell>סמל</TableCell>
-            <TableCell>תאריך</TableCell>
-            <TableCell>רווח/הפסד</TableCell>
-            <TableCell>נפח</TableCell>
-            <TableCell>פעולות</TableCell>
-            <TableCell>יעילות יציאה</TableCell>
-            <TableCell>כיוון</TableCell>
-            <TableCell>תגיות</TableCell>
-            <TableCell>הערות</TableCell>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {mockTrades.map((trade) => (
-            <TableRow key={trade.id} className="hover:bg-secondary/10 transition-colors">
-              <TableCell>
+      <div className="overflow-x-auto">
+        <Table className="tradervue-table w-full">
+          <TableHeader>
+            <TableRow className="border-b border-border/40 bg-secondary/20">
+              <TableCell className="w-10 text-right">
                 <input type="checkbox" className="rounded border-border" />
               </TableCell>
-              <TableCell className="font-medium">{trade.symbol}</TableCell>
-              <TableCell>{trade.date}</TableCell>
-              <TableCell className={cn(
-                trade.pnl >= 0 ? 'text-tradervue-green' : 'text-tradervue-red',
-                'font-medium'
-              )}>
-                {trade.pnl >= 0 ? `₪${trade.pnl}` : `-₪${Math.abs(trade.pnl)}`}
-              </TableCell>
-              <TableCell>{trade.volume}</TableCell>
-              <TableCell>{trade.executions}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  {trade.exitEfficiency}%
-                  <div className="w-12 h-2 bg-muted/50 rounded-full overflow-hidden">
-                    <div 
-                      className={cn(
-                        "h-full", 
-                        trade.exitEfficiency > 50 ? "bg-tradervue-green" : "bg-tradervue-red"
-                      )}
-                      style={{ width: `${trade.exitEfficiency}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className={cn(
-                  "bg-blue-900/30 text-blue-300 hover:bg-blue-900/40",
-                  "border-blue-800/50"
-                )}>
-                  {trade.side === 'Long' ? 'לונג' : 'שורט'}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-1">
-                  {trade.tags.map((tag, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs bg-secondary/30 border-border/50 text-muted-foreground">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell className="text-muted-foreground truncate max-w-[160px]">
-                {trade.notes}
-              </TableCell>
+              <TableCell className="text-right">סמל</TableCell>
+              <TableCell className="text-right">תאריך</TableCell>
+              <TableCell className="text-right">רווח/הפסד</TableCell>
+              <TableCell className="text-right">נפח</TableCell>
+              <TableCell className="text-right">פעולות</TableCell>
+              <TableCell className="text-right">יעילות יציאה</TableCell>
+              <TableCell className="text-right">כיוון</TableCell>
+              <TableCell className="text-right">תגיות</TableCell>
+              <TableCell className="text-right">הערות</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {mockTrades.map((trade) => (
+              <TableRow key={trade.id} className="hover:bg-secondary/10 transition-colors">
+                <TableCell className="text-right">
+                  <input type="checkbox" className="rounded border-border" />
+                </TableCell>
+                <TableCell className="font-medium text-right">{trade.symbol}</TableCell>
+                <TableCell className="text-right">{trade.date}</TableCell>
+                <TableCell className={cn(
+                  trade.pnl >= 0 ? 'text-tradervue-green' : 'text-tradervue-red',
+                  'font-medium text-right'
+                )}>
+                  {trade.pnl >= 0 ? `₪${trade.pnl}` : `-₪${Math.abs(trade.pnl)}`}
+                </TableCell>
+                <TableCell className="text-right">{trade.volume}</TableCell>
+                <TableCell className="text-right">{trade.executions}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center gap-2 justify-end">
+                    {trade.exitEfficiency}%
+                    <div className="w-12 h-2 bg-muted/50 rounded-full overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full", 
+                          trade.exitEfficiency > 50 ? "bg-tradervue-green" : "bg-tradervue-red"
+                        )}
+                        style={{ width: `${trade.exitEfficiency}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Badge variant="outline" className={cn(
+                    "bg-blue-900/30 text-blue-300 hover:bg-blue-900/40",
+                    "border-blue-800/50"
+                  )}>
+                    {trade.side === 'Long' ? 'לונג' : 'שורט'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {trade.tags.map((tag, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs bg-secondary/30 border-border/50 text-muted-foreground">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground truncate max-w-[160px] text-right">
+                  {trade.notes}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };
