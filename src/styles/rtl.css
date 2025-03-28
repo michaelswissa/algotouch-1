@@ -116,4 +116,13 @@
     direction: rtl;
     text-align: right;
   }
+  
+  /* RTL blog card adjustments */
+  [dir="rtl"] .card-actions {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .card-badge {
+    @apply left-2 right-auto;
+  }
 }

@@ -8,8 +8,9 @@ import { useEffect } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
-import TradeJournal from "./pages/TradeJournal"; // Updated import
+import TradeJournal from "./pages/TradeJournal";
 import MonthlyReport from "./pages/MonthlyReport";
+import Blog from "./pages/Blog";
 import Community from "./pages/Community";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
@@ -66,8 +67,9 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/calendar" element={<Calendar />} />
-            <Route path="/trade-journal" element={<TradeJournal />} /> {/* Updated route */}
+            <Route path="/trade-journal" element={<TradeJournal />} />
             <Route path="/monthly-report" element={<MonthlyReport />} />
+            <Route path="/blog" element={<Blog />} />
             <Route path="/community" element={<Community />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:courseId" element={<CourseDetail />} />

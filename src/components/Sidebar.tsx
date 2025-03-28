@@ -13,7 +13,8 @@ import {
   PlusCircle,
   Sparkles,
   ChevronRight,
-  X
+  X,
+  Newspaper
 } from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ const Sidebar = () => {
     { path: '/calendar', name: 'לוח שנה', icon: <Calendar size={18} /> },
     { path: '/trade-journal', name: 'יומן עסקאות', icon: <ScrollText size={18} /> },
     { path: '/monthly-report', name: 'דוח חודשי', icon: <FileSpreadsheet size={18} /> },
+    { path: '/blog', name: 'בלוג', icon: <Newspaper size={18} /> },
     { path: '/community', name: 'קהילה', icon: <Users size={18} /> },
     { path: '/courses', name: 'קורסים', icon: <GraduationCap size={18} /> },
     { path: '/ai-assistant', name: 'עוזר AI', icon: <Bot size={18} /> },

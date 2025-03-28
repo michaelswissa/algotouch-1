@@ -1,78 +1,136 @@
 
 import React from 'react';
-import { useBlogPostsWithRefresh } from '@/lib/api/blog';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tag, Clock, User } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBlogPosts } from '@/lib/api/blog';
+import { ChevronRight, Clock, ThumbsUp, MessageSquare, Bookmark, Share } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
-const BlogSection = () => {
-  const { blogPosts, loading, error } = useBlogPostsWithRefresh();
+interface BlogSectionProps {
+  expandedView?: boolean;
+}
 
+const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
+  const { blogPosts, isLoading } = useBlogPosts();
+  
+  // Show more posts in expanded view
+  const postsToShow = expandedView ? blogPosts : blogPosts.slice(0, 3);
+  
   return (
-    <div className="mb-8">
+    <div className="w-full">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Tag size={18} className="text-primary" />
-          <span>הבלוג שלנו</span>
-        </h2>
-        <Button variant="link" size="sm" className="text-primary">
-          לכל הפוסטים
-        </Button>
+        <h2 className="text-xl font-semibold">פוסטים אחרונים</h2>
+        {!expandedView && (
+          <Link to="/blog">
+            <Button variant="link" className="text-primary flex items-center gap-1 p-0 h-auto">
+              <span>לכל הפוסטים</span>
+              <ChevronRight size={16} className="rtl-flip" />
+            </Button>
+          </Link>
+        )}
       </div>
       
-      {loading && blogPosts.length === 0 ? (
-        <div className="grid grid-cols-1 gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="overflow-hidden animate-pulse">
-              <div className="p-4">
-                <div className="w-3/4 h-5 bg-muted rounded mb-2"></div>
-                <div className="flex gap-2 mb-2">
-                  <div className="w-20 h-4 bg-muted rounded"></div>
-                  <div className="w-24 h-4 bg-muted rounded"></div>
-                </div>
-                <div className="w-full h-16 bg-muted rounded"></div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : error ? (
-        <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
-          <p className="text-red-600 dark:text-red-400">שגיאה בטעינת פוסטים. נסה לרענן את הדף.</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {blogPosts.slice(0, 3).map(post => (
-            <Card key={post.id} className="overflow-hidden hover:border-primary/50 transition-all duration-200 hover-scale">
-              <CardContent className="p-0">
-                <a href={post.url} className="block">
-                  <div className="p-4">
-                    <h3 className="font-medium text-foreground text-lg mb-2">{post.title}</h3>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                      <div className="flex items-center gap-1">
-                        <Clock size={14} />
-                        <span>{post.date}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <User size={14} />
-                        <span>{post.author}</span>
-                      </div>
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">הכל</TabsTrigger>
+          <TabsTrigger value="trending">טרנדים</TabsTrigger>
+          <TabsTrigger value="news">חדשות</TabsTrigger>
+          <TabsTrigger value="analysis">ניתוחים</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="all" className="space-y-4">
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className="hover-scale">
+                  <CardContent className="p-4">
+                    <div className="animate-pulse">
+                      <div className="h-40 bg-muted rounded mb-3"></div>
+                      <div className="h-6 bg-muted rounded mb-2 w-3/4"></div>
+                      <div className="h-4 bg-muted rounded mb-1"></div>
+                      <div className="h-4 bg-muted rounded mb-1 w-5/6"></div>
                     </div>
-                    <p className="text-muted-foreground mb-3">{post.excerpt}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {post.tags.map(tag => (
-                        <Badge key={tag} variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                          {tag}
-                        </Badge>
-                      ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className={cn(
+              "grid gap-4",
+              expandedView 
+                ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" 
+                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            )}>
+              {postsToShow.map((post) => (
+                <Card key={post.id} className="overflow-hidden hover-scale transition-all duration-300">
+                  <div className="relative h-40 overflow-hidden">
+                    <img 
+                      src={post.imageUrl} 
+                      alt={post.title}
+                      className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
+                    />
+                    <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
+                      {post.category}
                     </div>
                   </div>
-                </a>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-lg font-bold line-clamp-2">{post.title}</CardTitle>
+                    <CardDescription className="flex items-center text-xs mt-1">
+                      <Clock size={12} className="mr-1" />
+                      <span>{post.date}</span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <p className="text-sm line-clamp-2">{post.excerpt}</p>
+                  </CardContent>
+                  <CardFooter className="p-4 pt-0 flex justify-between">
+                    <div className="flex items-center space-x-4 rtl:space-x-reverse text-sm">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <ThumbsUp size={14} />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MessageSquare size={14} />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Bookmark size={14} />
+                      </Button>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Share size={14} />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+          
+          {expandedView && blogPosts.length > 0 && (
+            <div className="flex justify-center mt-8">
+              <Button variant="outline">טען עוד</Button>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="trending">
+          <div className="p-8 text-center text-muted-foreground">
+            לא נמצאו פוסטים בקטגוריה זו
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="news">
+          <div className="p-8 text-center text-muted-foreground">
+            לא נמצאו פוסטים בקטגוריה זו
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="analysis">
+          <div className="p-8 text-center text-muted-foreground">
+            לא נמצאו פוסטים בקטגוריה זו
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
