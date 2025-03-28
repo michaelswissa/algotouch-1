@@ -1,40 +1,9 @@
 
 import React from 'react';
-import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, ArrowUp, ArrowDown } from 'lucide-react';
-
-interface CalendarDayProps {
-  day: number;
-  isToday?: boolean;
-  status?: 'positive' | 'negative' | 'neutral';
-  month: 'current' | 'prev' | 'next';
-  onClick?: () => void;
-}
-
-const CalendarDay = ({ day, isToday = false, status = 'neutral', month = 'current', onClick }: CalendarDayProps) => {
-  const getStatusClass = () => {
-    if (month !== 'current') return 'text-gray-300';
-    if (status === 'positive') return 'bg-tradervue-light-green text-tradervue-green font-medium';
-    if (status === 'negative') return 'bg-tradervue-light-red text-tradervue-red font-medium';
-    return '';
-  };
-
-  return (
-    <div 
-      onClick={onClick}
-      className={cn(
-        'h-9 w-9 flex items-center justify-center rounded-full text-sm m-auto',
-        month !== 'current' && 'text-gray-400/50',
-        getStatusClass(),
-        isToday && 'ring-2 ring-primary',
-        month === 'current' && 'hover:bg-primary/10 cursor-pointer transition-colors',
-      )}
-    >
-      {day}
-    </div>
-  );
-};
+import { CalendarDays } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import CalendarGrid from './calendar/CalendarGrid';
 
 interface MonthCalendarProps {
   month: string;
@@ -132,24 +101,11 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
         </Badge>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {daysOfWeek.map((day, index) => (
-          <div key={index} className="text-xs text-muted-foreground py-2 font-medium">
-            {day}
-          </div>
-        ))}
-        
-        {calendarDays.map((day, index) => (
-          <CalendarDay
-            key={index}
-            day={day.day}
-            status={day.status}
-            month={day.month}
-            isToday={day.isToday}
-            onClick={() => handleDayClick(day.day, day.month)}
-          />
-        ))}
-      </div>
+      <CalendarGrid 
+        daysOfWeek={daysOfWeek}
+        calendarDays={calendarDays}
+        onDayClick={handleDayClick}
+      />
     </div>
   );
 };
