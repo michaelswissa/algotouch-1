@@ -9,6 +9,7 @@ import { useNewsDataWithRefresh } from '@/lib/api/news';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
+import BlogSection from '@/components/BlogSection';
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -106,68 +107,74 @@ const Dashboard = () => {
           )}
         </div>
         
-        {/* News Section - Second */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Info size={18} className="text-primary" />
-              <span>חדשות שוק ההון</span>
-            </h2>
-            <div className="flex items-center text-sm text-muted-foreground">
-              <Calendar size={14} className="mr-1" />
-              <span>עודכן לאחרונה: {formattedNewsLastUpdated}</span>
+        {/* Layout grid for news and blog */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* News Section - Left column */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Info size={18} className="text-primary" />
+                <span>חדשות שוק ההון</span>
+              </h2>
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Calendar size={14} className="mr-1" />
+                <span>עודכן לאחרונה: {formattedNewsLastUpdated}</span>
+              </div>
             </div>
+            
+            {newsLoading && newsData.length === 0 ? (
+              <Card className="elevated-card overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="p-4 animate-pulse">
+                        <div className="w-3/4 h-5 bg-muted rounded mb-2"></div>
+                        <div className="flex justify-between">
+                          <div className="w-16 h-4 bg-muted rounded"></div>
+                          <div className="w-24 h-4 bg-muted rounded"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : newsError ? (
+              <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
+                <p className="text-red-600 dark:text-red-400">שגיאה בטעינת החדשות. נסה לרענן את הדף.</p>
+              </Card>
+            ) : (
+              <Card className="elevated-card overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border">
+                    {newsData.map(news => (
+                      <a 
+                        key={news.id} 
+                        href={news.url || "#"} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block p-4 hover:bg-secondary/50 transition-all duration-200 cursor-pointer"
+                      >
+                        <h3 className="font-medium text-foreground">{news.title}</h3>
+                        {news.description && (
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{news.description}</p>
+                        )}
+                        <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
+                          <span>{news.source}</span>
+                          <span>{news.time}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
           
-          {newsLoading && newsData.length === 0 ? (
-            <Card className="elevated-card overflow-hidden">
-              <CardContent className="p-0">
-                <div className="divide-y divide-border">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="p-4 animate-pulse">
-                      <div className="w-3/4 h-5 bg-muted rounded mb-2"></div>
-                      <div className="flex justify-between">
-                        <div className="w-16 h-4 bg-muted rounded"></div>
-                        <div className="w-24 h-4 bg-muted rounded"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : newsError ? (
-            <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
-              <p className="text-red-600 dark:text-red-400">שגיאה בטעינת החדשות. נסה לרענן את הדף.</p>
-            </Card>
-          ) : (
-            <Card className="elevated-card overflow-hidden">
-              <CardContent className="p-0">
-                <div className="divide-y divide-border">
-                  {newsData.map(news => (
-                    <a 
-                      key={news.id} 
-                      href={news.url || "#"} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="block p-4 hover:bg-secondary/50 transition-all duration-200 cursor-pointer"
-                    >
-                      <h3 className="font-medium text-foreground">{news.title}</h3>
-                      {news.description && (
-                        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{news.description}</p>
-                      )}
-                      <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
-                        <span>{news.source}</span>
-                        <span>{news.time}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Blog Section - Right column */}
+          <BlogSection />
         </div>
         
-        {/* Courses Section - Third */}
+        {/* Courses Section - Last */}
         <Courses />
       </div>
     </Layout>
