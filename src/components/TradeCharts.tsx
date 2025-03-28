@@ -47,16 +47,16 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
 
   // Prepare data for side distribution pie chart
   const sideData = [
-    { name: 'לונג', value: stats.longTrades },
-    { name: 'שורט', value: stats.shortTrades },
+    { name: 'לונג', value: stats.longTrades, label: `לונג: ${stats.longTrades}` },
+    { name: 'שורט', value: stats.shortTrades, label: `שורט: ${stats.shortTrades}` },
   ];
 
   // Prepare data for win/loss pie chart
   const winLossData = [
-    { name: 'רווח לונג', value: stats.profitableLongTrades },
-    { name: 'רווח שורט', value: stats.profitableShortTrades },
-    { name: 'הפסד לונג', value: stats.longTrades - stats.profitableLongTrades },
-    { name: 'הפסד שורט', value: stats.shortTrades - stats.profitableShortTrades },
+    { name: 'רווח לונג', value: stats.profitableLongTrades, label: `רווח לונג: ${stats.profitableLongTrades}` },
+    { name: 'רווח שורט', value: stats.profitableShortTrades, label: `רווח שורט: ${stats.profitableShortTrades}` },
+    { name: 'הפסד לונג', value: stats.longTrades - stats.profitableLongTrades, label: `הפסד לונג: ${stats.longTrades - stats.profitableLongTrades}` },
+    { name: 'הפסד שורט', value: stats.shortTrades - stats.profitableShortTrades, label: `הפסד שורט: ${stats.shortTrades - stats.profitableShortTrades}` },
   ];
 
   // Filter out any entries with zero value
@@ -75,6 +75,45 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
     contract,
     pnl
   }));
+
+  // Custom pie chart label renderer with better visibility
+  const renderCustomizedPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 30;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="#333333" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        fontSize="14"
+        fontWeight="500"
+        className="dark:fill-white"
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
+  // Custom tooltip formatter for better readability
+  const customTooltipFormatter = (value: number, name: string) => {
+    return [`${value.toFixed(2)}`, name];
+  };
+  
+  // Enhanced tooltip styles
+  const tooltipStyle = {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    border: '1px solid #ccc',
+    padding: '10px',
+    borderRadius: '5px',
+    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.15)',
+    fontSize: '14px',
+    fontWeight: 500,
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -96,16 +135,33 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={equityData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                        tickFormatter={(value) => `₪${value.toLocaleString()}`}
+                      />
+                      <Tooltip 
+                        contentStyle={tooltipStyle}
+                        formatter={(value: any) => [`₪${Number(value).toLocaleString()}`, 'הון']}
+                        labelFormatter={(label) => `תאריך: ${label}`}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={36}
+                        wrapperStyle={{ fontSize: '14px', fontWeight: 500 }}
+                      />
                       <Line 
                         type="monotone" 
                         dataKey="equity" 
                         name="הון" 
                         stroke="#8884d8" 
+                        strokeWidth={2}
                         activeDot={{ r: 8 }} 
                       />
                     </LineChart>
@@ -123,16 +179,33 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={plData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                        tickFormatter={(value) => `₪${value.toLocaleString()}`}
+                      />
+                      <Tooltip 
+                        contentStyle={tooltipStyle}
+                        formatter={(value: any) => [`₪${Number(value).toLocaleString()}`, 'רווח/הפסד']}
+                        labelFormatter={(label) => `תאריך: ${label}`}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={36}
+                        wrapperStyle={{ fontSize: '14px', fontWeight: 500 }}
+                      />
                       <Bar 
                         dataKey="profitLoss" 
                         name="רווח/הפסד" 
                         fill="#82ca9d"
                         stroke="#82ca9d"
+                        strokeWidth={1}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -159,15 +232,28 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                           <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                        tickFormatter={(value) => `₪${value.toLocaleString()}`}
+                      />
+                      <Tooltip 
+                        contentStyle={tooltipStyle}
+                        formatter={(value: any) => [`₪${Number(value).toLocaleString()}`, 'רווח/הפסד מצטבר']}
+                        labelFormatter={(label) => `תאריך: ${label}`}
+                      />
                       <Area 
                         type="monotone" 
                         dataKey="pnl" 
                         name="רווח/הפסד מצטבר" 
-                        stroke="#8884d8" 
+                        stroke="#8884d8"
+                        strokeWidth={2}
                         fillOpacity={1} 
                         fill="url(#colorPnL)" 
                       />
@@ -190,15 +276,34 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                       layout="vertical"
                       margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="contract" type="category" />
-                      <Tooltip />
-                      <Legend />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                      <XAxis 
+                        type="number" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        stroke="#666"
+                        tickFormatter={(value) => `₪${value.toLocaleString()}`}
+                      />
+                      <YAxis 
+                        dataKey="contract" 
+                        type="category" 
+                        tick={{ fontSize: 14, fill: '#333', fontWeight: 500 }}
+                        width={80}
+                        stroke="#666"
+                      />
+                      <Tooltip 
+                        contentStyle={tooltipStyle}
+                        formatter={(value: any) => [`₪${Number(value).toLocaleString()}`, 'רווח/הפסד']}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={36}
+                        wrapperStyle={{ fontSize: '14px', fontWeight: 500 }}
+                      />
                       <Bar 
                         dataKey="pnl" 
                         name="רווח/הפסד" 
-                        fill="#82ca9d" 
+                        fill="#82ca9d"
+                        radius={[0, 4, 4, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -223,18 +328,27 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                         data={sideData}
                         cx="50%"
                         cy="50%"
-                        labelLine={false}
+                        labelLine={true}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
                         nameKey="name"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        label={renderCustomizedPieLabel}
+                        labelFormatter={(value: any) => value.toLocaleString()}
                       >
                         {sideData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={COLORS[index % COLORS.length]} 
+                            stroke="#fff"
+                            strokeWidth={2}
+                          />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        contentStyle={tooltipStyle}
+                        formatter={customTooltipFormatter}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -254,12 +368,12 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                         data={filteredWinLossData}
                         cx="50%"
                         cy="50%"
-                        labelLine={false}
+                        labelLine={true}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
                         nameKey="name"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        label={renderCustomizedPieLabel}
                       >
                         {filteredWinLossData.map((entry, index) => {
                           let color;
@@ -269,10 +383,20 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
                           else if (entry.name === 'הפסד שורט') color = PIE_COLORS.LossShort;
                           else color = COLORS[index % COLORS.length];
                           
-                          return <Cell key={`cell-${index}`} fill={color} />;
+                          return (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={color} 
+                              stroke="#fff"
+                              strokeWidth={2}
+                            />
+                          );
                         })}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        contentStyle={tooltipStyle}
+                        formatter={customTooltipFormatter}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -289,15 +413,32 @@ const TradeCharts: React.FC<TradeChartsProps> = ({ trades, stats }) => {
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.tradeFrequency}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12, fill: '#666' }}
+                      stroke="#666"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: '#666' }}
+                      stroke="#666"
+                      tickFormatter={(value) => value.toString()}
+                    />
+                    <Tooltip 
+                      contentStyle={tooltipStyle}
+                      formatter={(value: any) => [value, 'מספר עסקאות']}
+                      labelFormatter={(label) => `תאריך: ${label}`}
+                    />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={36}
+                      wrapperStyle={{ fontSize: '14px', fontWeight: 500 }}
+                    />
                     <Bar 
                       dataKey="count" 
                       name="מספר עסקאות" 
-                      fill="#8884d8" 
+                      fill="#8884d8"
+                      radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
