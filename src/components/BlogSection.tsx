@@ -8,6 +8,16 @@ import { ChevronRight, Clock, ThumbsUp, MessageSquare, Bookmark, Share } from 'l
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
+// Stock market-related images for blog posts
+const stockMarketImages = [
+  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1535320903710-d993d3d77d29?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1535320903710-d993d3d77d29?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1569025690938-a00729c9e1f9?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3'
+];
+
 interface BlogSectionProps {
   expandedView?: boolean;
 }
@@ -63,12 +73,12 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
                 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" 
                 : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             )}>
-              {postsToShow.map((post) => (
+              {postsToShow.map((post, index) => (
                 <Link key={post.id} to={`/blog/${post.id}`} className="block">
                   <Card className="overflow-hidden hover-scale transition-all duration-300 h-full">
                     <div className="relative h-40 overflow-hidden">
                       <img 
-                        src={post.coverImage} 
+                        src={stockMarketImages[index % stockMarketImages.length]} 
                         alt={post.title}
                         className="object-cover w-full h-full transition-transform duration-500 hover:scale-110"
                       />

@@ -3,7 +3,7 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw, Clock } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw, Clock, BookOpen, Newspaper } from 'lucide-react';
 import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -103,11 +103,23 @@ const Dashboard = () => {
         
         {/* Blog Section */}
         <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Newspaper size={18} className="text-primary" />
+              <span>פוסטים אחרונים</span>
+            </h2>
+          </div>
           <BlogSection />
         </div>
         
         {/* Courses Section - Last */}
-        <Courses />
+        <div>
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            <BookOpen size={20} className="text-primary" />
+            <span>קורסים דיגיטליים</span>
+          </h2>
+          <Courses />
+        </div>
       </div>
     </Layout>
   );

@@ -5,6 +5,13 @@ import { GraduationCap, BookOpen, Play, ArrowLeft, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+// Stock market chart images for course thumbnails
+const chartImages = [
+  'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+  'https://images.unsplash.com/photo-1642790551116-53796effbf97?auto=format&fit=crop&q=80&w=1470&ixlib=rb-4.0.3',
+];
+
 export interface ModuleProps {
   title: string;
   duration?: string;
@@ -37,6 +44,9 @@ const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: 
     }
   };
 
+  // Get a random chart image for this course
+  const chartImage = chartImages[Math.floor(Math.random() * chartImages.length)];
+
   return (
     <Card 
       className={`glass-card-2025 hover:shadow-lg transition-all duration-300 overflow-hidden
@@ -45,9 +55,14 @@ const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: 
     >
       {/* Course thumbnail - visually appealing video preview */}
       <div className="relative w-full h-48 overflow-hidden">
-        {/* Video thumbnail background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-primary/5 z-0">
-          <div className="absolute inset-0 bg-mesh opacity-30"></div>
+        {/* Video thumbnail background - now with actual chart images */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src={chartImage} 
+            alt={title} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/30 to-primary/10 mix-blend-overlay"></div>
         </div>
         
         {/* Video overlay gradient */}
