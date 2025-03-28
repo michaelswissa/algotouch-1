@@ -1,6 +1,7 @@
 
 // Follow Deno's HTTP server implementation
 import { corsHeaders } from '../_shared/cors.ts';
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
 // Define the news item interface
 interface NewsItem {
@@ -35,15 +36,69 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Try NewsAPI with the real API key provided by user
+    // First, try to fetch from RSS feeds
+    const rssSources = [
+      {
+        url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585',
+        source: 'גלובס',
+        category: 'שוק ההון'
+      },
+      {
+        url: 'https://rss.walla.co.il/feed/4503',
+        source: 'וואלה!',
+        category: 'כלכלה'
+      },
+      {
+        url: 'https://www.calcalist.co.il/GeneralRss/0,16335,L-8,00.xml',
+        source: 'כלכליסט',
+        category: 'שוק ההון'
+      }
+    ];
+
+    // Try to fetch from multiple sources
+    let allNews: NewsItem[] = [];
+    
+    for (const source of rssSources) {
+      try {
+        logInfo(`Attempting to fetch from RSS source: ${source.source}`);
+        const feedNews = await fetchRssFeed(source.url, source.source);
+        allNews = [...allNews, ...feedNews];
+        logInfo(`Successfully fetched ${feedNews.length} items from ${source.source}`);
+      } catch (error) {
+        logError(`Error fetching from ${source.source}`, error);
+        // Continue to next source
+      }
+    }
+    
+    // If we have news items, sort by date and return the 5 most recent
+    if (allNews.length > 0) {
+      // Sort news by time (assuming time is in format "לפני X שעות/דקות" or similar)
+      // More recent news will be first
+      allNews.sort((a, b) => {
+        const aTime = parseHebrewTimeAgo(a.time);
+        const bTime = parseHebrewTimeAgo(b.time);
+        return aTime - bTime;
+      });
+      
+      // Take the first 5 items
+      const news = allNews.slice(0, 5);
+      
+      logInfo('Request completed successfully', { newsCount: news.length });
+      return new Response(JSON.stringify(news), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+    
+    // If all RSS feeds fail, try using the NewsAPI as a fallback
     try {
-      logInfo('Attempting to fetch from NewsAPI with provided API key');
+      logInfo('RSS feeds failed, attempting to fetch from NewsAPI with provided API key');
       
       // Using the provided API key
       const apiKey = '067d21a2fe2f4e3daf4d4682629e991c';
       
-      // First try business news for Israel
-      const response = await fetch('https://newsapi.org/v2/top-headlines?country=il&category=business', {
+      // Get Hebrew business news from Israel
+      const response = await fetch('https://newsapi.org/v2/top-headlines?country=il&category=business&language=he', {
         headers: {
           'X-Api-Key': apiKey,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -51,82 +106,40 @@ Deno.serve(async (req) => {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        logError(`Error fetching from NewsAPI (Israel business): ${response.status}`, errorText);
-        
-        // Try global business news as fallback
-        const globalResponse = await fetch('https://newsapi.org/v2/top-headlines?category=business&language=en', {
-          headers: {
-            'X-Api-Key': apiKey,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-        
-        if (!globalResponse.ok) {
-          const globalErrorText = await globalResponse.text();
-          logError(`Error fetching from NewsAPI (global business): ${globalResponse.status}`, globalErrorText);
-          throw new Error(`NewsAPI requests failed with status ${response.status} and ${globalResponse.status}`);
-        }
-        
-        const globalData = await globalResponse.json();
-        
-        if (globalData.articles && Array.isArray(globalData.articles) && globalData.articles.length > 0) {
-          logInfo('Successfully fetched global business news', { count: globalData.articles.length });
-          
-          const news = globalData.articles.slice(0, 5).map((article: any, index: number) => ({
-            id: index + 1,
-            title: article.title || 'No title available',
-            description: article.description || 'No description available',
-            time: article.publishedAt ? formatTimeAgo(new Date(article.publishedAt)) : 'Recently',
-            source: article.source.name || 'Unknown Source',
-            url: article.url || 'https://www.google.com/search?q=latest+financial+news'
-          }));
-          
-          logInfo('Request completed successfully', { newsCount: news.length });
-          return new Response(JSON.stringify(news), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        }
+        throw new Error(`NewsAPI returned status ${response.status}`);
       }
       
       const data = await response.json();
       
       if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
-        logInfo('Successfully fetched Israeli business news', { count: data.articles.length });
+        logInfo('Successfully fetched from NewsAPI', { count: data.articles.length });
         
         const news = data.articles.slice(0, 5).map((article: any, index: number) => ({
           id: index + 1,
           title: article.title || 'No title available',
           description: article.description || 'No description available',
-          time: article.publishedAt ? formatTimeAgo(new Date(article.publishedAt)) : 'Recently',
-          source: article.source.name || 'Unknown Source',
-          url: article.url || 'https://www.google.com/search?q=latest+financial+news'
+          time: article.publishedAt ? formatTimeAgo(new Date(article.publishedAt)) : 'לאחרונה',
+          source: article.source.name || 'מקור חדשות',
+          url: article.url || 'https://www.globes.co.il/news/'
         }));
         
-        logInfo('Request completed successfully', { newsCount: news.length });
+        logInfo('Request completed successfully with NewsAPI fallback', { newsCount: news.length });
         return new Response(JSON.stringify(news), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
-      } else {
-        logError('NewsAPI returned empty articles array', data);
-        throw new Error('NewsAPI returned empty articles array');
       }
+      
+      throw new Error('NewsAPI returned empty articles array');
     } catch (error) {
-      logError('NewsAPI attempts failed', error);
+      logError('All sources failed, using fallback data', error);
+      const fallbackNews = getFallbackNews();
       
-      // If NewsAPI fails, try alternative source
-      const backupNews = await getBackupNews();
-      if (backupNews.length > 0) {
-        logInfo('Using backup news source', { count: backupNews.length });
-        return new Response(JSON.stringify(backupNews), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
-      
-      throw new Error('All news sources failed');
+      logInfo('Request completed with fallback data', { newsCount: fallbackNews.length });
+      return new Response(JSON.stringify(fallbackNews), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
   } catch (error) {
     logError('All news sources failed, using realistic fallback data', error);
@@ -141,33 +154,60 @@ Deno.serve(async (req) => {
   }
 });
 
-// Attempt to get news from a backup source
-async function getBackupNews(): Promise<NewsItem[]> {
+// Function to fetch and parse RSS feeds
+async function fetchRssFeed(feedUrl: string, sourceName: string): Promise<NewsItem[]> {
   try {
-    // Use a free alternative API or publicly available source
-    const response = await fetch('https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=AAPL&apikey=demo');
+    const response = await fetch(feedUrl);
     
     if (!response.ok) {
-      return [];
+      throw new Error(`Failed to fetch RSS feed: ${response.status}`);
     }
     
-    const data = await response.json();
+    const xml = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "text/xml");
     
-    if (data.feed && Array.isArray(data.feed) && data.feed.length > 0) {
-      return data.feed.slice(0, 5).map((article: any, index: number) => ({
+    if (!doc) {
+      throw new Error("Failed to parse XML");
+    }
+    
+    const items = doc.querySelectorAll("item");
+    const news: NewsItem[] = [];
+    
+    items.forEach((item, index) => {
+      if (index >= 10) return; // Limit to first 10 items
+      
+      const title = item.querySelector("title")?.textContent || "כותרת לא זמינה";
+      const link = item.querySelector("link")?.textContent || "";
+      const pubDate = item.querySelector("pubDate")?.textContent || "";
+      const description = item.querySelector("description")?.textContent || "";
+      
+      // Parse the pubDate to a Date object
+      const pubDateTime = pubDate ? new Date(pubDate) : new Date();
+      
+      news.push({
         id: index + 1,
-        title: article.title || 'Financial News Update',
-        description: article.summary || article.banner_image || 'Latest news about financial markets and economic indicators.',
-        time: article.time_published ? formatTimeAgo(new Date(article.time_published)) : 'Recently',
-        source: article.source || 'Financial News Source',
-        url: article.url || 'https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=AAPL&apikey=demo'
-      }));
-    }
+        title: cleanText(title),
+        url: link,
+        time: formatTimeAgo(pubDateTime),
+        source: sourceName,
+        description: cleanText(description)
+      });
+    });
     
-    return [];
+    return news;
   } catch (error) {
+    logError(`Error fetching RSS feed from ${sourceName}`, error);
     return [];
   }
+}
+
+// Helper function to clean text (remove HTML and extra whitespace)
+function cleanText(text: string): string {
+  // Remove HTML tags
+  const withoutHtml = text.replace(/<[^>]*>?/gm, '');
+  // Remove extra whitespace
+  return withoutHtml.replace(/\s+/g, ' ').trim();
 }
 
 // Helper function to format time ago
@@ -184,6 +224,25 @@ function formatTimeAgo(date: Date): string {
   } else {
     const diffDays = Math.floor(diffHours / 24);
     return `לפני ${diffDays} ימים`;
+  }
+}
+
+// Helper function to parse Hebrew time ago for sorting
+function parseHebrewTimeAgo(timeAgo: string): number {
+  try {
+    const match = timeAgo.match(/לפני (\d+) (דקות|שעות|ימים)/);
+    if (!match) return Number.MAX_SAFE_INTEGER; // If can't parse, put it at the end
+    
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    
+    if (unit === 'דקות') return value * 60; // Convert to seconds
+    if (unit === 'שעות') return value * 60 * 60; // Convert to seconds
+    if (unit === 'ימים') return value * 24 * 60 * 60; // Convert to seconds
+    
+    return Number.MAX_SAFE_INTEGER;
+  } catch (e) {
+    return Number.MAX_SAFE_INTEGER;
   }
 }
 
