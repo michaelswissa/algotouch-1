@@ -3,7 +3,22 @@ import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import MonthCalendar from '@/components/MonthCalendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarDays, TrendingUp, TrendingDown, LineChart, ArrowUp, ArrowDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+  CalendarDays, 
+  TrendingUp, 
+  LineChart, 
+  ArrowUp, 
+  ArrowDown, 
+  ChevronRight, 
+  ChevronLeft 
+} from 'lucide-react';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 interface TradeDay {
   date: string;
@@ -12,11 +27,18 @@ interface TradeDay {
   status: "Open" | "Active";
 }
 
+// Hebrew month names
+const hebrewMonths = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+];
+
 const Calendar = () => {
   // Current date for default month/year
   const currentDate = new Date();
-  const [currentMonth] = useState(currentDate.toLocaleString('he-IL', { month: 'long' }));
-  const [currentYear] = useState(currentDate.getFullYear());
+  const [selectedDate, setSelectedDate] = useState<Date>(currentDate);
+  const [currentMonth, setCurrentMonth] = useState(hebrewMonths[currentDate.getMonth()]);
+  const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
 
   // Mock trade days data for the calendar
   const tradeDays: TradeDay[] = [
@@ -32,13 +54,62 @@ const Calendar = () => {
     { date: "2023-03-28", trades: 8, profit: 420.70, status: "Open" },
   ];
 
+  // Convert date string to formatted display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: 'numeric' });
+  };
+
+  // Navigate to previous month
+  const prevMonth = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setMonth(newDate.getMonth() - 1);
+    setSelectedDate(newDate);
+    setCurrentMonth(hebrewMonths[newDate.getMonth()]);
+    setCurrentYear(newDate.getFullYear());
+  };
+
+  // Navigate to next month
+  const nextMonth = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setMonth(newDate.getMonth() + 1);
+    setSelectedDate(newDate);
+    setCurrentMonth(hebrewMonths[newDate.getMonth()]);
+    setCurrentYear(newDate.getFullYear());
+  };
+
   return (
     <Layout>
       <div className="tradervue-container py-6">
-        <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
-          <CalendarDays size={30} className="text-primary" />
-          <span className="text-gradient-blue">לוח שנה</span>
-        </h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <CalendarDays size={30} className="text-primary" />
+            <span className="text-gradient-blue">לוח שנה</span>
+          </h1>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="border-primary/30 text-primary flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                <span className="font-medium">בחר תאריך</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  if (date) {
+                    setSelectedDate(date);
+                    setCurrentMonth(hebrewMonths[date.getMonth()]);
+                    setCurrentYear(date.getFullYear());
+                  }
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
         
         <div className="flex flex-col max-w-5xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -50,8 +121,16 @@ const Calendar = () => {
                     <CalendarDays size={18} className="text-primary" />
                     <span className="neon-text">לוח שנה מסחר</span>
                   </CardTitle>
-                  <div className="text-sm font-medium px-3 py-1 rounded-full bg-primary/10 text-primary">
-                    {currentMonth} {currentYear}
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={prevMonth}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <div className="text-sm font-medium px-3 py-1 rounded-full bg-primary/10 text-primary">
+                      {currentMonth} {currentYear}
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={nextMonth}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4">
@@ -61,6 +140,7 @@ const Calendar = () => {
                         month={currentMonth} 
                         year={currentYear} 
                         status="Open" 
+                        onDayClick={(day) => console.log(`Selected day: ${day}`)}
                       />
                     </div>
                   </div>
@@ -78,28 +158,39 @@ const Calendar = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <div className="space-y-4">
-                    {tradeDays.slice(0, 5).map((day, index) => (
-                      <div key={index} className="flex items-center justify-between py-3 px-4 border-b border-border/30 last:border-b-0 hover:bg-secondary/40 transition-colors duration-200 rounded-lg">
-                        <div>
-                          <div className="font-medium">{day.date}</div>
-                          <div className="text-sm text-muted-foreground">{day.trades} עסקאות</div>
-                        </div>
-                        <div className={`text-lg font-semibold flex items-center ${day.profit >= 0 ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
-                          {day.profit >= 0 ? (
-                            <>
-                              <ArrowUp size={16} className="mr-1" />
-                              +{day.profit.toFixed(2)}$
-                            </>
-                          ) : (
-                            <>
-                              <ArrowDown size={16} className="mr-1" />
-                              {day.profit.toFixed(2)}$
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="space-y-0">
+                    <Table>
+                      <TableBody>
+                        {tradeDays.slice(0, 5).map((day, index) => (
+                          <TableRow key={index} className="hover:bg-secondary/40 cursor-pointer">
+                            <TableCell className="text-right font-medium">
+                              {formatDate(day.date)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {day.trades} עסקאות
+                            </TableCell>
+                            <TableCell className={cn(
+                              "text-left font-semibold",
+                              day.profit >= 0 ? 'text-tradervue-green' : 'text-tradervue-red'
+                            )}>
+                              <div className="flex items-center justify-end gap-1">
+                                {day.profit >= 0 ? (
+                                  <>
+                                    <span>+{day.profit.toFixed(2)}$</span>
+                                    <ArrowUp size={14} />
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>{day.profit.toFixed(2)}$</span>
+                                    <ArrowDown size={14} />
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
