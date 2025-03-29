@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   Table,
@@ -12,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Smile, Frown, Meh, HelpCircle, Info } from 'lucide-react';
+import { emotions } from '@/components/emotional-tracker/data/emotions';
 
 interface Trade {
   id: string;
@@ -29,13 +29,19 @@ interface Trade {
   emotionalRating?: number;
 }
 
-const emotionIconMap = {
-  confident: <Smile className="text-green-500" />,
-  doubtful: <HelpCircle className="text-blue-500" />,
-  fearful: <Frown className="text-red-500" />,
-  greedy: <Meh className="text-orange-500" />,
-  frustrated: <Frown className="text-purple-500" />,
+const emotionIconMap: Record<string, JSX.Element> = {
+  confidence: <Smile className="text-green-500" />,
+  doubt: <HelpCircle className="text-blue-500" />,
+  fear: <Frown className="text-red-500" />,
+  greed: <Meh className="text-orange-500" />,
+  frustration: <Frown className="text-purple-500" />,
   undefined: <Info className="text-gray-400" />
+};
+
+const getEmotionLabel = (emotionId: string | undefined): string => {
+  if (!emotionId) return 'לא צוין';
+  const emotion = emotions.find(e => e.id === emotionId);
+  return emotion ? emotion.label : 'לא צוין';
 };
 
 const mockTrades: Trade[] = [
@@ -179,14 +185,7 @@ const TradeList = () => {
                         {emotionIconMap[trade.preTradeEmotion || 'undefined']}
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>
-                          {trade.preTradeEmotion === 'confident' && 'ביטחון'}
-                          {trade.preTradeEmotion === 'doubtful' && 'ספק'}
-                          {trade.preTradeEmotion === 'fearful' && 'פחד'}
-                          {trade.preTradeEmotion === 'greedy' && 'חמדנות'}
-                          {trade.preTradeEmotion === 'frustrated' && 'תסכול'}
-                          {!trade.preTradeEmotion && 'לא צוין'}
-                        </p>
+                        <p>{getEmotionLabel(trade.preTradeEmotion)}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -198,14 +197,7 @@ const TradeList = () => {
                         {emotionIconMap[trade.postTradeEmotion || 'undefined']}
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>
-                          {trade.postTradeEmotion === 'confident' && 'ביטחון'}
-                          {trade.postTradeEmotion === 'doubtful' && 'ספק'}
-                          {trade.postTradeEmotion === 'fearful' && 'פחד'}
-                          {trade.postTradeEmotion === 'greedy' && 'חמדנות'}
-                          {trade.postTradeEmotion === 'frustrated' && 'תסכול'}
-                          {!trade.postTradeEmotion && 'לא צוין'}
-                        </p>
+                        <p>{getEmotionLabel(trade.postTradeEmotion)}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

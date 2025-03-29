@@ -12,15 +12,20 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { emotions } from '../data/emotions';
 
-// Mock data for the trade outcome chart
-const tradeOutcomeData = [
-  { name: 'ביטחון', profit: 75, loss: 25 },
-  { name: 'פחד', profit: 40, loss: 60 },
-  { name: 'חמדנות', profit: 30, loss: 70 },
-  { name: 'תסכול', profit: 25, loss: 75 },
-  { name: 'ספק', profit: 45, loss: 55 },
-];
+// Mock data for the trade outcome chart, now using the emotions from the shared data file
+const tradeOutcomeData = emotions.map(emotion => ({
+  name: emotion.label,
+  profit: emotion.id === 'confidence' ? 75 : 
+          emotion.id === 'fear' ? 40 : 
+          emotion.id === 'greed' ? 30 : 
+          emotion.id === 'doubt' ? 45 : 25,
+  loss: emotion.id === 'confidence' ? 25 : 
+         emotion.id === 'fear' ? 60 : 
+         emotion.id === 'greed' ? 70 : 
+         emotion.id === 'doubt' ? 55 : 75,
+}));
 
 const EmotionOutcomeChart: React.FC = () => {
   return (

@@ -9,15 +9,17 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { emotions } from '../data/emotions';
 
 // Mock data for the emotion distribution chart
-const emotionPerformanceData = [
-  { name: 'ביטחון', value: 78, fill: '#4ade80' },
-  { name: 'פחד', value: 32, fill: '#f87171' },
-  { name: 'חמדנות', value: 45, fill: '#fb923c' },
-  { name: 'תסכול', value: 28, fill: '#a855f7' },
-  { name: 'ספק', value: 52, fill: '#60a5fa' },
-];
+const emotionPerformanceData = emotions.map(emotion => ({
+  name: emotion.label,
+  value: Math.floor(Math.random() * 70) + 10, // Random value between 10-80 for demo
+  fill: emotion.id === 'confidence' ? '#4ade80' : 
+        emotion.id === 'fear' ? '#f87171' : 
+        emotion.id === 'greed' ? '#fb923c' : 
+        emotion.id === 'doubt' ? '#60a5fa' : '#a855f7'
+}));
 
 const EmotionDistributionChart: React.FC = () => {
   return (
