@@ -1,7 +1,7 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,20 +53,9 @@ const tradeOutcomeData = [
   { name: 'ספק', profit: 45, loss: 55 },
 ];
 
-// Mock recent trades for emotion tracking
-const recentTrades = [
-  { id: 1, symbol: 'AAPL', date: '12 יוני, 2024', result: 'רווח', amount: '+₪542.30' },
-  { id: 2, symbol: 'TSLA', date: '10 יוני, 2024', result: 'הפסד', amount: '-₪246.75' },
-  { id: 3, symbol: 'AMZN', date: '09 יוני, 2024', result: 'רווח', amount: '+₪318.20' },
-  { id: 4, symbol: 'MSFT', date: '07 יוני, 2024', result: 'רווח', amount: '+₪187.45' },
-];
-
 const EmotionalTracker: React.FC = () => {
   const [activeTab, setActiveTab] = useState('track');
   const [selectedEmotion, setSelectedEmotion] = useState('');
-  const [preTradeEmotion, setPreTradeEmotion] = useState('');
-  const [postTradeEmotion, setPostTradeEmotion] = useState('');
-  const [tradeJournalText, setTradeJournalText] = useState('');
   
   const emotions = [
     { id: 'confidence', label: 'ביטחון', color: 'bg-green-500' },
@@ -86,16 +75,17 @@ const EmotionalTracker: React.FC = () => {
         </TabsList>
         
         <TabsContent value="track" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Daily Emotional Check-in */}
-            <Card className="hover-glow">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold">מעקב רגשי יומי</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm mb-4">איך אתה מרגיש היום לפני תחילת המסחר?</p>
-                
+          {/* Combined Emotional Check-in and Daily Reflection */}
+          <Card className="hover-glow">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-semibold">מעקב וניתוח רגשי יומי</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Daily Emotional Check-in Section */}
                 <div className="space-y-4">
+                  <p className="text-muted-foreground text-sm mb-4">איך אתה מרגיש היום לפני תחילת המסחר?</p>
+                  
                   <div className="flex flex-wrap gap-2 justify-center">
                     {emotions.map((emotion) => (
                       <Button
@@ -117,107 +107,35 @@ const EmotionalTracker: React.FC = () => {
                       className="h-24"
                     />
                   </div>
-                  
-                  <Button className="w-full mt-2 bg-primary">שמור מעקב יומי</Button>
                 </div>
-              </CardContent>
-            </Card>
-            
-            {/* Per-Trade Emotion Tracking */}
-            <Card className="hover-glow">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold">מעקב רגשי בעסקאות</CardTitle>
-              </CardHeader>
-              <CardContent>
+                
+                {/* Daily Reflection Section */}
                 <div className="space-y-4">
                   <div>
-                    <Label className="block mb-2">בחר עסקה לתיעוד</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="בחר עסקה אחרונה" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {recentTrades.map((trade) => (
-                          <SelectItem key={trade.id} value={trade.id.toString()}>
-                            {trade.symbol} - {trade.date}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="block mb-1">רגש לפני העסקה</Label>
-                    <RadioGroup value={preTradeEmotion} onValueChange={setPreTradeEmotion} className="flex flex-wrap gap-4 justify-between">
-                      {emotions.map((emotion) => (
-                        <div key={emotion.id} className="flex items-center space-x-2 space-x-reverse">
-                          <RadioGroupItem value={emotion.id} id={`pre-${emotion.id}`} />
-                          <Label htmlFor={`pre-${emotion.id}`}>{emotion.label}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="block mb-1">רגש אחרי העסקה</Label>
-                    <RadioGroup value={postTradeEmotion} onValueChange={setPostTradeEmotion} className="flex flex-wrap gap-4 justify-between">
-                      {emotions.map((emotion) => (
-                        <div key={emotion.id} className="flex items-center space-x-2 space-x-reverse">
-                          <RadioGroupItem value={emotion.id} id={`post-${emotion.id}`} />
-                          <Label htmlFor={`post-${emotion.id}`}>{emotion.label}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
+                    <Label className="block mb-2">דירוג יום המסחר</Label>
+                    <ToggleGroup type="single" className="justify-between">
+                      <ToggleGroupItem value="very-negative" className="flex-1">גרוע מאוד</ToggleGroupItem>
+                      <ToggleGroupItem value="negative" className="flex-1">גרוע</ToggleGroupItem>
+                      <ToggleGroupItem value="neutral" className="flex-1">סביר</ToggleGroupItem>
+                      <ToggleGroupItem value="positive" className="flex-1">טוב</ToggleGroupItem>
+                      <ToggleGroupItem value="very-positive" className="flex-1">מצוין</ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
                   
                   <div>
-                    <Label htmlFor="tradeReflection" className="block mb-2">תובנות מהעסקה</Label>
-                    <Textarea
-                      id="tradeReflection"
-                      value={tradeJournalText}
-                      onChange={(e) => setTradeJournalText(e.target.value)}
-                      placeholder="מה למדת מעסקה זו? האם זיהית דפוסים רגשיים שהשפיעו על ההחלטות שלך?"
-                      className="h-24"
-                    />
+                    <Label className="block mb-2">האם עקבת אחר תוכנית המסחר שלך?</Label>
+                    <ToggleGroup type="single" className="justify-between">
+                      <ToggleGroupItem value="completely" className="flex-1">לחלוטין</ToggleGroupItem>
+                      <ToggleGroupItem value="mostly" className="flex-1">ברובה</ToggleGroupItem>
+                      <ToggleGroupItem value="partially" className="flex-1">חלקית</ToggleGroupItem>
+                      <ToggleGroupItem value="rarely" className="flex-1">מעט</ToggleGroupItem>
+                      <ToggleGroupItem value="not-at-all" className="flex-1">בכלל לא</ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
-                  
-                  <Button className="w-full mt-2 bg-primary">שמור מעקב עסקה</Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* End of day reflection */}
-          <Card className="hover-glow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold">רפלקציה יומית</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm mb-4">סיכום יומי של החוויה הרגשית שלך במסחר</p>
+              </div>
               
-              <div className="space-y-4">
-                <div>
-                  <Label className="block mb-2">דירוג יום המסחר</Label>
-                  <ToggleGroup type="single" className="justify-between">
-                    <ToggleGroupItem value="very-negative" className="flex-1">גרוע מאוד</ToggleGroupItem>
-                    <ToggleGroupItem value="negative" className="flex-1">גרוע</ToggleGroupItem>
-                    <ToggleGroupItem value="neutral" className="flex-1">סביר</ToggleGroupItem>
-                    <ToggleGroupItem value="positive" className="flex-1">טוב</ToggleGroupItem>
-                    <ToggleGroupItem value="very-positive" className="flex-1">מצוין</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                
-                <div>
-                  <Label className="block mb-2">האם עקבת אחר תוכנית המסחר שלך?</Label>
-                  <ToggleGroup type="single" className="justify-between">
-                    <ToggleGroupItem value="completely" className="flex-1">לחלוטין</ToggleGroupItem>
-                    <ToggleGroupItem value="mostly" className="flex-1">ברובה</ToggleGroupItem>
-                    <ToggleGroupItem value="partially" className="flex-1">חלקית</ToggleGroupItem>
-                    <ToggleGroupItem value="rarely" className="flex-1">מעט</ToggleGroupItem>
-                    <ToggleGroupItem value="not-at-all" className="flex-1">בכלל לא</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                
+              <div className="mt-6 space-y-4">
                 <div>
                   <Label htmlFor="dailyReflection" className="block mb-2">רפלקציה יומית</Label>
                   <Textarea
@@ -235,7 +153,7 @@ const EmotionalTracker: React.FC = () => {
                   />
                 </div>
                 
-                <Button className="w-full mt-2 bg-primary">שמור רפלקציה יומית</Button>
+                <Button className="w-full mt-2 bg-primary">שמור מעקב יומי</Button>
               </div>
             </CardContent>
           </Card>
