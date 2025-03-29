@@ -46,7 +46,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
     return trades.slice(0, 3).map((trade, index) => (
       <div key={index} className="text-xs border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
         <div className="flex justify-between">
-          <span>{trade.Symbol}</span>
+          <span>{trade.Contract}</span>
           <span className={trade.Net > 0 ? "text-green-600" : "text-red-600"}>
             {trade.Net.toFixed(2)}₪
           </span>
