@@ -41,7 +41,7 @@ const emotionTrendData = generateEmotionTrendData();
 
 const EmotionTrendsChart: React.FC = () => {
   return (
-    <Card className="hover-glow">
+    <Card className="hover-glow rtl">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <LineChartIcon size={18} className="text-primary" />

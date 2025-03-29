@@ -29,7 +29,7 @@ const tradeOutcomeData = emotions.map(emotion => ({
 
 const EmotionOutcomeChart: React.FC = () => {
   return (
-    <Card className="hover-glow col-span-1 lg:col-span-2">
+    <Card className="hover-glow col-span-1 lg:col-span-2 rtl">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <BarChartIcon size={18} className="text-primary" />

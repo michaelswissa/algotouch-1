@@ -23,7 +23,7 @@ const emotionPerformanceData = emotions.map(emotion => ({
 
 const EmotionDistributionChart: React.FC = () => {
   return (
-    <Card className="hover-glow">
+    <Card className="hover-glow rtl">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <PieChartIcon size={18} className="text-primary" />
