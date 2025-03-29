@@ -6,6 +6,9 @@ import SelectedDayTrades from './calendar/SelectedDayTrades';
 import { mockTradeData, mockDaysWithStatus } from './calendar/mockTradeData';
 import { generateCalendarDays } from './calendar/calendarUtils';
 import { TradeRecord } from '@/lib/trade-analysis';
+import { PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface MonthCalendarProps {
   month: string;
@@ -16,6 +19,7 @@ interface MonthCalendarProps {
 
 const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalendarProps) => {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Generate calendar days using the utility function
   const calendarDays = generateCalendarDays(month, year, mockDaysWithStatus);
@@ -34,6 +38,14 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
     }
   };
 
+  const handleAddTrade = () => {
+    toast({
+      title: "הוספת עסקה חדשה",
+      description: "פונקציונליות להוספת עסקה תתווסף בעתיד.",
+      duration: 3000,
+    });
+  };
+
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
 
   // Get trades for the selected day
@@ -46,14 +58,24 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
     }
     return count;
   }, 0);
+  
+  // Calculate total profit in this month
+  const totalProfit = Object.entries(mockTradeData).reduce((total, [key, trades]) => {
+    if (key.includes('-current')) {
+      return total + trades.reduce((sum, trade) => sum + (trade.Net || 0), 0);
+    }
+    return total;
+  }, 0);
 
   return (
-    <div className="w-full">
+    <div className="w-full card-gradient rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
       <MonthCalendarHeader 
         month={month} 
         year={year} 
         status={status} 
         tradesCount={totalTrades}
+        totalProfit={totalProfit}
+        onAddTrade={handleAddTrade}
       />
 
       <CalendarGrid 

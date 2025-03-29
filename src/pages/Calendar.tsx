@@ -60,7 +60,7 @@ const CalendarPage = () => {
 
   return (
     <Layout>
-      <div className="tradervue-container py-6">
+      <div className="tradervue-container py-6 bg-dots">
         <CalendarHeader 
           selectedDate={selectedDate} 
           setSelectedDate={(date) => {
@@ -79,6 +79,8 @@ const CalendarPage = () => {
               currentYear={currentYear}
               prevMonth={prevMonth}
               nextMonth={nextMonth}
+              systemCurrentMonth={hebrewMonths[currentDate.getMonth()]}
+              systemCurrentYear={currentDate.getFullYear()}
             />
             
             <RecentActivitySection tradeDays={tradeDays.slice(0, 5)} />
