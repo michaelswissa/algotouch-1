@@ -5,12 +5,22 @@ import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
 import { EconomicCalendarSection } from '@/components/calendar/EconomicCalendarSection';
+import { mockTradeData, mockDaysWithStatus } from '@/components/calendar/mockTradeData';
+import { TradeRecord } from '@/lib/trade-analysis';
 
 // Hebrew month names
 const hebrewMonths = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
 ];
+
+// Define the TradeDay type with the correct status values
+interface TradeDay {
+  date: string;
+  trades: number;
+  profit: number;
+  status: "Open" | "Active";
+}
 
 const CalendarPage = () => {
   // Current date for default month/year
@@ -20,8 +30,8 @@ const CalendarPage = () => {
   const [currentMonth, setCurrentMonth] = useState(hebrewMonths[currentDate.getMonth()]);
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
 
-  // Mock trade days data for the calendar
-  const tradeDays = [
+  // Mock trade days data for the calendar with correct status types
+  const tradeDays: TradeDay[] = [
     { date: "2023-03-01", trades: 5, profit: 243.50, status: "Open" },
     { date: "2023-03-02", trades: 3, profit: -120.75, status: "Active" },
     { date: "2023-03-05", trades: 7, profit: 385.20, status: "Open" },
@@ -63,6 +73,9 @@ const CalendarPage = () => {
     setViewMode('year');
   };
 
+  // Prepare trades data for MonthCalendarSection
+  const tradesData = mockTradeData;
+
   return (
     <Layout>
       <div className="tradervue-container py-6 bg-dots">
@@ -86,10 +99,11 @@ const CalendarPage = () => {
                 systemCurrentMonth={hebrewMonths[currentDate.getMonth()]}
                 systemCurrentYear={currentDate.getFullYear()}
                 onBackToYear={handleBackToYear}
+                tradesData={tradesData}
               />
             )}
             
-            <RecentActivitySection tradeDays={tradeDays.slice(0, 5)} />
+            <RecentActivitySection tradeDays={tradeDays} />
           </div>
           
           <EconomicCalendarSection />

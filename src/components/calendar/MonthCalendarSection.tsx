@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import MonthCalendar from '@/components/MonthCalendar';
+import { TradeRecord } from '@/lib/trade-analysis';
 
 interface MonthCalendarSectionProps {
   currentMonth: string;
@@ -13,6 +14,7 @@ interface MonthCalendarSectionProps {
   systemCurrentMonth?: string;
   systemCurrentYear?: number;
   onBackToYear?: () => void;
+  tradesData?: Record<string, TradeRecord[]>;
 }
 
 export const MonthCalendarSection = ({ 
@@ -22,7 +24,8 @@ export const MonthCalendarSection = ({
   nextMonth,
   systemCurrentMonth,
   systemCurrentYear,
-  onBackToYear
+  onBackToYear,
+  tradesData
 }: MonthCalendarSectionProps) => {
   const isCurrentMonth = currentMonth === systemCurrentMonth && currentYear === systemCurrentYear;
   
@@ -54,6 +57,7 @@ export const MonthCalendarSection = ({
         year={currentYear} 
         status={isCurrentMonth ? "Active" : "Open"} 
         onBackToYear={onBackToYear}
+        tradesData={tradesData}
       />
     </div>
   );
