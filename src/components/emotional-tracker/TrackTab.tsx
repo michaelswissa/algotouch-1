@@ -1,10 +1,20 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { CheckCircle2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import EmotionButtons from './EmotionButtons';
 
 interface TrackTabProps {
@@ -16,6 +26,28 @@ const TrackTab: React.FC<TrackTabProps> = ({
   selectedEmotion, 
   setSelectedEmotion 
 }) => {
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [emotionNotes, setEmotionNotes] = useState('');
+  const [tradingDayRating, setTradingDayRating] = useState('');
+  const [followedPlan, setFollowedPlan] = useState('');
+  const [dailyReflection, setDailyReflection] = useState('');
+  const [keyInsights, setKeyInsights] = useState('');
+  const { toast } = useToast();
+
+  const handleSaveTracking = () => {
+    // Here we would save all the tracking data to a database
+    // For now, we'll just close the dialog and show a toast message
+    setConfirmDialogOpen(false);
+    
+    toast({
+      title: "נשמר בהצלחה",
+      description: "המעקב הרגשי היומי נשמר בהצלחה",
+      duration: 3000,
+    });
+    
+    // Reset form or handle other post-save operations if needed
+  };
+
   return (
     <Card className="hover-glow">
       <CardHeader className="pb-2">
@@ -38,6 +70,8 @@ const TrackTab: React.FC<TrackTabProps> = ({
                 id="emotionNotes"
                 placeholder="תאר את מצב הרוח והרגשות שלך בצורה חופשית..."
                 className="h-24"
+                value={emotionNotes}
+                onChange={(e) => setEmotionNotes(e.target.value)}
               />
             </div>
           </div>
@@ -46,7 +80,12 @@ const TrackTab: React.FC<TrackTabProps> = ({
           <div className="space-y-4">
             <div>
               <Label className="block mb-2">דירוג יום המסחר</Label>
-              <ToggleGroup type="single" className="justify-between">
+              <ToggleGroup 
+                type="single" 
+                className="justify-between"
+                value={tradingDayRating}
+                onValueChange={setTradingDayRating}
+              >
                 <ToggleGroupItem value="very-negative" className="flex-1">גרוע מאוד</ToggleGroupItem>
                 <ToggleGroupItem value="negative" className="flex-1">גרוע</ToggleGroupItem>
                 <ToggleGroupItem value="neutral" className="flex-1">סביר</ToggleGroupItem>
@@ -57,7 +96,12 @@ const TrackTab: React.FC<TrackTabProps> = ({
             
             <div>
               <Label className="block mb-2">האם עקבת אחר תוכנית המסחר שלך?</Label>
-              <ToggleGroup type="single" className="justify-between">
+              <ToggleGroup 
+                type="single" 
+                className="justify-between"
+                value={followedPlan}
+                onValueChange={setFollowedPlan}
+              >
                 <ToggleGroupItem value="completely" className="flex-1">לחלוטין</ToggleGroupItem>
                 <ToggleGroupItem value="mostly" className="flex-1">ברובה</ToggleGroupItem>
                 <ToggleGroupItem value="partially" className="flex-1">חלקית</ToggleGroupItem>
@@ -75,6 +119,8 @@ const TrackTab: React.FC<TrackTabProps> = ({
               id="dailyReflection"
               placeholder="תאר את החוויה הרגשית שלך במהלך יום המסחר. מה השפיע על הרגשות שלך? אילו החלטות היו מושפעות מרגשות?"
               className="h-32"
+              value={dailyReflection}
+              onChange={(e) => setDailyReflection(e.target.value)}
             />
           </div>
           
@@ -83,11 +129,41 @@ const TrackTab: React.FC<TrackTabProps> = ({
             <Textarea
               placeholder="מה למדת על עצמך היום? אילו דפוסים זיהית? מה תעשה אחרת מחר?"
               className="h-24"
+              value={keyInsights}
+              onChange={(e) => setKeyInsights(e.target.value)}
             />
           </div>
           
-          <Button className="w-full mt-2 bg-primary">שמור מעקב יומי</Button>
+          <Button 
+            className="w-full mt-2 bg-primary"
+            onClick={() => setConfirmDialogOpen(true)}
+          >
+            שמור מעקב יומי
+          </Button>
         </div>
+
+        {/* Confirmation Dialog */}
+        <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+          <DialogContent className="sm:max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>האם לשמור את המעקב היומי?</DialogTitle>
+              <DialogDescription>
+                לחיצה על 'שמור' תתעד את המעקב הרגשי שלך ליום זה.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-center py-4">
+              <CheckCircle2 className="h-16 w-16 text-green-500" />
+            </div>
+            <DialogFooter className="sm:justify-between flex-row-reverse">
+              <Button type="button" onClick={handleSaveTracking} className="bg-green-600 hover:bg-green-700">
+                שמור
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+                בטל
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
