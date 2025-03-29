@@ -31,7 +31,7 @@ const EmotionDistributionChart: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-72">
+        <div className="h-72" dir="ltr">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -42,9 +42,10 @@ const EmotionDistributionChart: React.FC = () => {
                 cy="50%"
                 outerRadius={80}
                 label
+                isAnimationActive={false}
               />
               <Tooltip />
-              <Legend />
+              <Legend layout="horizontal" verticalAlign="bottom" align="center" />
             </PieChart>
           </ResponsiveContainer>
         </div>

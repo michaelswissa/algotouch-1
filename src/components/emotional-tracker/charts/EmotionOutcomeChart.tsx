@@ -37,16 +37,16 @@ const EmotionOutcomeChart: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-80">
+        <div className="h-80" dir="ltr">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={tradeOutcomeData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
-              <Legend />
-              <Bar dataKey="profit" stackId="a" fill="#4ade80" name="רווח %" />
-              <Bar dataKey="loss" stackId="a" fill="#f87171" name="הפסד %" />
+              <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+              <Bar dataKey="profit" stackId="a" fill="#4ade80" name="רווח %" isAnimationActive={false} />
+              <Bar dataKey="loss" stackId="a" fill="#f87171" name="הפסד %" isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>

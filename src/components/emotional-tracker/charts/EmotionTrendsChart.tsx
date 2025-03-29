@@ -49,7 +49,7 @@ const EmotionTrendsChart: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-72">
+        <div className="h-72" dir="ltr">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={emotionTrendData}
@@ -58,7 +58,7 @@ const EmotionTrendsChart: React.FC = () => {
               <XAxis dataKey="date" />
               <YAxis />
               <Tooltip />
-              <Legend />
+              <Legend layout="horizontal" verticalAlign="bottom" align="center" />
               {emotions.map(emotion => (
                 <Line 
                   key={emotion.id}
@@ -71,6 +71,7 @@ const EmotionTrendsChart: React.FC = () => {
                     emotion.id === 'doubt' ? '#60a5fa' : '#a855f7'
                   } 
                   name={emotion.label} 
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>

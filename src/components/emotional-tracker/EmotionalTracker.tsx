@@ -10,9 +10,14 @@ const EmotionalTracker: React.FC = () => {
   const [selectedEmotion, setSelectedEmotion] = useState('');
   
   return (
-    <div className="w-full space-y-6 rtl">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 bg-white/50 dark:bg-white/5 p-1 rounded-lg w-full justify-start">
+    <div className="w-full space-y-6 rtl" dir="rtl">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={setActiveTab} 
+        className="w-full"
+        dir="rtl"
+      >
+        <TabsList className="mb-6 bg-white/50 dark:bg-white/5 p-1 rounded-lg w-full flex-row-reverse lg:flex-row justify-start">
           <TabsTrigger value="track" className="text-sm font-medium">מעקב רגשי</TabsTrigger>
           <TabsTrigger value="analysis" className="text-sm font-medium">ניתוח נתונים</TabsTrigger>
           <TabsTrigger value="insights" className="text-sm font-medium">תובנות</TabsTrigger>
