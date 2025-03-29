@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
@@ -29,6 +29,12 @@ const CalendarPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(currentDate);
   const [currentMonth, setCurrentMonth] = useState(hebrewMonths[currentDate.getMonth()]);
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
+  const [tradesData, setTradesData] = useState<Record<string, TradeRecord[]>>(mockTradeData);
+
+  // Generate random trade data for all months when the component mounts
+  useEffect(() => {
+    generateRandomTradeDataForAllMonths();
+  }, []);
 
   // Mock trade days data for the calendar with correct status types
   const tradeDays: TradeDay[] = [
@@ -38,6 +44,52 @@ const CalendarPage = () => {
     { date: "2023-03-08", trades: 2, profit: -85.30, status: "Open" },
     { date: "2023-03-10", trades: 4, profit: 195.60, status: "Active" },
   ];
+
+  // Generate random trade data for all months
+  const generateRandomTradeDataForAllMonths = () => {
+    const allMonthsTradeData: Record<string, TradeRecord[]> = {};
+    
+    // For each month, generate some random trades
+    for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+      const month = monthIndex + 1;
+      const daysInMonth = new Date(currentYear, month, 0).getDate();
+      
+      // Generate between 5-15 random days with trades for each month
+      const daysCount = Math.floor(Math.random() * 11) + 5;
+      
+      for (let i = 0; i < daysCount; i++) {
+        const day = Math.floor(Math.random() * daysInMonth) + 1;
+        const dayKey = `${day}-current`;
+        
+        // 1-4 trades per day
+        const tradesCount = Math.floor(Math.random() * 4) + 1;
+        const dayTrades = [];
+        
+        for (let j = 0; j < tradesCount; j++) {
+          const isProfit = Math.random() > 0.4; // 60% chance of profit
+          const amount = Math.floor(Math.random() * 1000) + 100;
+          
+          dayTrades.push({
+            AccountNumber: "12345",
+            Contract: ["NQ", "ES", "MES", "MNQ", "YM", "RTY"][Math.floor(Math.random() * 6)],
+            'Signal Name': ["Breakout", "Trend Follow", "Reversal", "Support", "Resistance", "VWAP", "Gap"][Math.floor(Math.random() * 7)],
+            Side: Math.random() > 0.5 ? 'Long' : 'Short',
+            'Entry DateTime': `2023-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}T${9 + Math.floor(Math.random() * 7)}:${Math.floor(Math.random() * 60)}:00`,
+            'Exit DateTime': `2023-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}T${12 + Math.floor(Math.random() * 5)}:${Math.floor(Math.random() * 60)}:00`,
+            EntryPrice: 15000 + Math.floor(Math.random() * 1000),
+            ExitPrice: 15000 + Math.floor(Math.random() * 1000),
+            ProfitLoss: isProfit ? amount : -amount,
+            Net: isProfit ? amount * 0.95 : -amount * 1.05,
+            Equity: 25000 + Math.floor(Math.random() * 5000)
+          });
+        }
+        
+        allMonthsTradeData[dayKey] = dayTrades;
+      }
+    }
+    
+    setTradesData(allMonthsTradeData);
+  };
 
   // Navigate to previous month
   const prevMonth = () => {
@@ -72,9 +124,6 @@ const CalendarPage = () => {
   const handleBackToYear = () => {
     setViewMode('year');
   };
-
-  // Prepare trades data for MonthCalendarSection
-  const tradesData = mockTradeData;
 
   return (
     <Layout>

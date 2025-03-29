@@ -41,7 +41,7 @@ export function generateCalendarDays(month: string, year: number, daysWithStatus
     });
   }
   
-  // Add days from the next month
+  // Add days from the next month to complete the grid
   const remainingCells = 42 - calendarDays.length; // 6 rows x 7 days = 42 cells
   for (let i = 1; i <= remainingCells; i++) {
     calendarDays.push({ day: i, month: 'next' as const });

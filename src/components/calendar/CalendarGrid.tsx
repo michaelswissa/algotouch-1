@@ -73,6 +73,13 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
           const dailyPnL = getDailyPnL(dayObj.day, dayObj.month);
           const hasTrades = tradeCount > 0 && dayObj.month === 'current';
           
+          // Hide cells from other months if requested
+          if (dayObj.month !== 'current') {
+            return (
+              <div key={index} className="invisible"></div>
+            );
+          }
+          
           return (
             <TooltipProvider key={index}>
               <Tooltip>

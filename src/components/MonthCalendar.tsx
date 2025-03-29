@@ -74,6 +74,50 @@ const MonthCalendar = ({
     console.log('Add trade clicked');
   };
   
+  // Generate random trade data for demonstration
+  const generateRandomTradeData = () => {
+    const randomTradesData = { ...tradesData };
+    
+    // Generate between 5-10 random days with trades
+    const daysCount = Math.floor(Math.random() * 6) + 5;
+    const daysInMonth = new Date(year, new Date(`${month} 1, ${year}`).getMonth() + 1, 0).getDate();
+    
+    for (let i = 0; i < daysCount; i++) {
+      const day = Math.floor(Math.random() * daysInMonth) + 1;
+      const dayKey = `${day}-current`;
+      
+      // 1-3 trades per day
+      const tradesCount = Math.floor(Math.random() * 3) + 1;
+      const dayTrades = [];
+      
+      for (let j = 0; j < tradesCount; j++) {
+        const isProfit = Math.random() > 0.4; // 60% chance of profit
+        const amount = Math.floor(Math.random() * 1000) + 100;
+        
+        dayTrades.push({
+          AccountNumber: "12345",
+          Contract: ["NQ", "ES", "MES", "MNQ"][Math.floor(Math.random() * 4)],
+          'Signal Name': ["Breakout", "Trend Follow", "Reversal", "Support Bounce"][Math.floor(Math.random() * 4)],
+          Side: Math.random() > 0.5 ? 'Long' : 'Short',
+          'Entry DateTime': `2023-${month}-${day}T${9 + Math.floor(Math.random() * 7)}:${Math.floor(Math.random() * 60)}:00`,
+          'Exit DateTime': `2023-${month}-${day}T${12 + Math.floor(Math.random() * 5)}:${Math.floor(Math.random() * 60)}:00`,
+          EntryPrice: 15000 + Math.floor(Math.random() * 1000),
+          ExitPrice: 15000 + Math.floor(Math.random() * 1000),
+          ProfitLoss: isProfit ? amount : -amount,
+          Net: isProfit ? amount * 0.95 : -amount * 1.05,
+          Equity: 25000 + Math.floor(Math.random() * 5000)
+        });
+      }
+      
+      randomTradesData[dayKey] = dayTrades;
+    }
+    
+    return randomTradesData;
+  };
+  
+  // Only use mockTradeData if it's not already generated
+  const enhancedTradeData = Object.keys(tradesData).length <= 10 ? generateRandomTradeData() : tradesData;
+  
   return (
     <div className="w-full border rounded-xl shadow-sm bg-card overflow-hidden">
       <MonthCalendarHeader 
@@ -91,7 +135,7 @@ const MonthCalendar = ({
           calendarDays={calendarDays}
           onDayClick={handleDayClick}
           selectedDay={selectedDay}
-          tradesData={tradesData}
+          tradesData={enhancedTradeData}
         />
       </div>
       
