@@ -12,6 +12,7 @@ interface MonthCalendarSectionProps {
   nextMonth: () => void;
   systemCurrentMonth?: string;
   systemCurrentYear?: number;
+  onBackToYear?: () => void;
 }
 
 export const MonthCalendarSection = ({ 
@@ -20,7 +21,8 @@ export const MonthCalendarSection = ({
   prevMonth, 
   nextMonth,
   systemCurrentMonth,
-  systemCurrentYear
+  systemCurrentYear,
+  onBackToYear
 }: MonthCalendarSectionProps) => {
   const isCurrentMonth = currentMonth === systemCurrentMonth && currentYear === systemCurrentYear;
   
@@ -51,6 +53,7 @@ export const MonthCalendarSection = ({
         month={currentMonth} 
         year={currentYear} 
         status={isCurrentMonth ? "Active" : "Open"} 
+        onBackToYear={onBackToYear}
       />
     </div>
   );
