@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,16 +6,21 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LineChart, BarChart, PieChart, TrendingUp, TrendingDown, Lightbulb, Info } from 'lucide-react';
+import { LineChart as LineChartIcon, BarChart as BarChartIcon, PieChart as PieChartIcon, TrendingUp, TrendingDown, Lightbulb, Info } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
-  Chart as ChartComponent,
+  LineChart,
   Line,
+  BarChart,
   Bar,
+  PieChart,
   Pie,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from 'recharts';
 
 // Mock data for the emotional charts
@@ -42,11 +46,11 @@ const emotionPerformanceData = [
 ];
 
 const tradeOutcomeData = [
-  { emotion: 'ביטחון', profit: 75, loss: 25 },
-  { emotion: 'פחד', profit: 40, loss: 60 },
-  { emotion: 'חמדנות', profit: 30, loss: 70 },
-  { emotion: 'תסכול', profit: 25, loss: 75 },
-  { emotion: 'ספק', profit: 45, loss: 55 },
+  { name: 'ביטחון', profit: 75, loss: 25 },
+  { name: 'פחד', profit: 40, loss: 60 },
+  { name: 'חמדנות', profit: 30, loss: 70 },
+  { name: 'תסכול', profit: 25, loss: 75 },
+  { name: 'ספק', profit: 45, loss: 55 },
 ];
 
 // Mock recent trades for emotion tracking
@@ -243,17 +247,19 @@ const EmotionalTracker: React.FC = () => {
             <Card className="hover-glow">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <LineChart size={18} className="text-primary" />
+                  <LineChartIcon size={18} className="text-primary" />
                   מגמות רגשיות לאורך זמן
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
-                    <Line
+                    <LineChart
                       data={emotionTrendData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
                       <Tooltip />
                       <Legend />
                       <Line type="monotone" dataKey="confidence" stroke="#4ade80" name="ביטחון" />
@@ -261,7 +267,7 @@ const EmotionalTracker: React.FC = () => {
                       <Line type="monotone" dataKey="greed" stroke="#fb923c" name="חמדנות" />
                       <Line type="monotone" dataKey="frustration" stroke="#a855f7" name="תסכול" />
                       <Line type="monotone" dataKey="doubt" stroke="#60a5fa" name="ספק" />
-                    </Line>
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -271,25 +277,26 @@ const EmotionalTracker: React.FC = () => {
             <Card className="hover-glow">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <PieChart size={18} className="text-primary" />
+                  <PieChartIcon size={18} className="text-primary" />
                   התפלגות רגשות במסחר
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
-                    <Pie
-                      data={emotionPerformanceData}
-                      nameKey="name"
-                      dataKey="value"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label
-                    >
+                    <PieChart>
+                      <Pie
+                        data={emotionPerformanceData}
+                        nameKey="name"
+                        dataKey="value"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                      />
                       <Tooltip />
                       <Legend />
-                    </Pie>
+                    </PieChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -299,22 +306,22 @@ const EmotionalTracker: React.FC = () => {
             <Card className="hover-glow col-span-1 lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <BarChart size={18} className="text-primary" />
+                  <BarChartIcon size={18} className="text-primary" />
                   השפעת רגשות על תוצאות המסחר
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <Bar
-                      data={tradeOutcomeData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
+                    <BarChart data={tradeOutcomeData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
                       <Tooltip />
                       <Legend />
                       <Bar dataKey="profit" stackId="a" fill="#4ade80" name="רווח %" />
                       <Bar dataKey="loss" stackId="a" fill="#f87171" name="הפסד %" />
-                    </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <p className="text-sm text-muted-foreground text-center mt-4">

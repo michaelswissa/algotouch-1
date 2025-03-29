@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Smile, Frown, Meh, Confused, Info } from 'lucide-react';
+import { Smile, Frown, Meh, HelpCircle, Info } from 'lucide-react';
 
 interface Trade {
   id: string;
@@ -31,7 +31,7 @@ interface Trade {
 
 const emotionIconMap = {
   confident: <Smile className="text-green-500" />,
-  doubtful: <Confused className="text-blue-500" />,
+  doubtful: <HelpCircle className="text-blue-500" />,
   fearful: <Frown className="text-red-500" />,
   greedy: <Meh className="text-orange-500" />,
   frustrated: <Frown className="text-purple-500" />,
