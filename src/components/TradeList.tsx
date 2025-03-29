@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Smile, Frown, Meh, Confused, Info } from 'lucide-react';
 
 interface Trade {
   id: string;
@@ -22,7 +24,19 @@ interface Trade {
   side: 'Long' | 'Short';
   tags: string[];
   notes: string;
+  preTradeEmotion?: 'confident' | 'doubtful' | 'fearful' | 'greedy' | 'frustrated' | undefined;
+  postTradeEmotion?: 'confident' | 'doubtful' | 'fearful' | 'greedy' | 'frustrated' | undefined;
+  emotionalRating?: number;
 }
+
+const emotionIconMap = {
+  confident: <Smile className="text-green-500" />,
+  doubtful: <Confused className="text-blue-500" />,
+  fearful: <Frown className="text-red-500" />,
+  greedy: <Meh className="text-orange-500" />,
+  frustrated: <Frown className="text-purple-500" />,
+  undefined: <Info className="text-gray-400" />
+};
 
 const mockTrades: Trade[] = [
   {
@@ -36,6 +50,9 @@ const mockTrades: Trade[] = [
     side: 'Long',
     tags: ['אופציות', 'סמית\'', '+2'],
     notes: 'הסט-אפ: מה שעשיתי...',
+    preTradeEmotion: 'confident',
+    postTradeEmotion: 'confident',
+    emotionalRating: 8
   },
   {
     id: '2',
@@ -48,6 +65,9 @@ const mockTrades: Trade[] = [
     side: 'Long',
     tags: ['לוגופרו', 'בריאות'],
     notes: 'הסט-אפ: מה שעשיתי...',
+    preTradeEmotion: 'doubtful',
+    postTradeEmotion: 'frustrated',
+    emotionalRating: 3
   },
   {
     id: '3',
@@ -60,6 +80,9 @@ const mockTrades: Trade[] = [
     side: 'Long',
     tags: ['אופציות', 'בריאות'],
     notes: 'הסט-אפ: מה שעשיתי...',
+    preTradeEmotion: 'fearful',
+    postTradeEmotion: 'confident',
+    emotionalRating: 7
   },
   {
     id: '4',
@@ -72,6 +95,9 @@ const mockTrades: Trade[] = [
     side: 'Long',
     tags: ['אופציות', 'בריאות', '+2'],
     notes: 'הסט-אפ: מה שעשיתי...',
+    preTradeEmotion: 'greedy',
+    postTradeEmotion: 'doubtful',
+    emotionalRating: 5
   },
 ];
 
@@ -101,6 +127,9 @@ const TradeList = () => {
               <TableCell className="text-right">פעולות</TableCell>
               <TableCell className="text-right">יעילות יציאה</TableCell>
               <TableCell className="text-right">כיוון</TableCell>
+              <TableCell className="text-right">רגש לפני</TableCell>
+              <TableCell className="text-right">רגש אחרי</TableCell>
+              <TableCell className="text-right">דירוג</TableCell>
               <TableCell className="text-right">תגיות</TableCell>
               <TableCell className="text-right">הערות</TableCell>
             </TableRow>
@@ -142,6 +171,62 @@ const TradeList = () => {
                   )}>
                     {trade.side === 'Long' ? 'לונג' : 'שורט'}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        {emotionIconMap[trade.preTradeEmotion || 'undefined']}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {trade.preTradeEmotion === 'confident' && 'ביטחון'}
+                          {trade.preTradeEmotion === 'doubtful' && 'ספק'}
+                          {trade.preTradeEmotion === 'fearful' && 'פחד'}
+                          {trade.preTradeEmotion === 'greedy' && 'חמדנות'}
+                          {trade.preTradeEmotion === 'frustrated' && 'תסכול'}
+                          {!trade.preTradeEmotion && 'לא צוין'}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableCell>
+                <TableCell className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        {emotionIconMap[trade.postTradeEmotion || 'undefined']}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {trade.postTradeEmotion === 'confident' && 'ביטחון'}
+                          {trade.postTradeEmotion === 'doubtful' && 'ספק'}
+                          {trade.postTradeEmotion === 'fearful' && 'פחד'}
+                          {trade.postTradeEmotion === 'greedy' && 'חמדנות'}
+                          {trade.postTradeEmotion === 'frustrated' && 'תסכול'}
+                          {!trade.postTradeEmotion && 'לא צוין'}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableCell>
+                <TableCell className="text-right">
+                  {trade.emotionalRating ? (
+                    <div className="flex items-center gap-2 justify-end">
+                      {trade.emotionalRating}/10
+                      <div className="w-12 h-2 bg-muted/50 rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full", 
+                            trade.emotionalRating > 5 ? "bg-tradervue-green" : "bg-tradervue-red"
+                          )}
+                          style={{ width: `${trade.emotionalRating * 10}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex flex-wrap gap-1 justify-end">
