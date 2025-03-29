@@ -38,15 +38,30 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
 
   // Get trades for the selected day
   const selectedDayTrades = selectedDay ? mockTradeData[selectedDay] || [] : [];
+  
+  // Count total trades in this month
+  const totalTrades = Object.keys(mockTradeData).reduce((count, key) => {
+    if (key.includes('-current')) {
+      return count + mockTradeData[key].length;
+    }
+    return count;
+  }, 0);
 
   return (
     <div className="w-full">
-      <MonthCalendarHeader month={month} year={year} status={status} />
+      <MonthCalendarHeader 
+        month={month} 
+        year={year} 
+        status={status} 
+        tradesCount={totalTrades}
+      />
 
       <CalendarGrid 
         daysOfWeek={daysOfWeek}
         calendarDays={calendarDays}
         onDayClick={handleDayClick}
+        selectedDay={selectedDay}
+        tradesData={mockTradeData}
       />
 
       {selectedDay && (
