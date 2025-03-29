@@ -6,7 +6,7 @@ import EmotionOutcomeChart from './charts/EmotionOutcomeChart';
 
 const AnalysisTab: React.FC = () => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 rtl">
       <EmotionTrendsChart />
       <EmotionDistributionChart />
       <EmotionOutcomeChart />

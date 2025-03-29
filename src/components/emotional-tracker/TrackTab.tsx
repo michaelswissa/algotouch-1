@@ -49,7 +49,7 @@ const TrackTab: React.FC<TrackTabProps> = ({
   };
 
   return (
-    <Card className="hover-glow">
+    <Card className="hover-glow rtl">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">מעקב וניתוח רגשי יומי</CardTitle>
       </CardHeader>
@@ -144,7 +144,7 @@ const TrackTab: React.FC<TrackTabProps> = ({
 
         {/* Confirmation Dialog */}
         <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-          <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogContent className="sm:max-w-md rtl" dir="rtl">
             <DialogHeader>
               <DialogTitle>האם לשמור את המעקב היומי?</DialogTitle>
               <DialogDescription>
