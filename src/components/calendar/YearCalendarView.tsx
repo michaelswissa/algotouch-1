@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { ArrowUp, ArrowDown, Info, Zap, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowUp, ArrowDown, Calendar as CalendarIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
@@ -44,54 +44,25 @@ const YearCalendarView: React.FC<YearCalendarViewProps> = ({
         <h3 className="text-2xl font-semibold text-gradient-blue">{year}</h3>
       </div>
       
-      {/* Modern legend for calendar */}
-      <div className="flex items-center justify-center gap-4 mb-6 text-sm bg-secondary/30 p-3 rounded-md shadow-sm">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 transition-all hover:scale-105">
-                <div className="w-3 h-3 bg-green-100 border border-green-300 rounded-sm"></div>
-                <span className="font-medium">רווח</span>
-                <ArrowUp size={14} className="text-green-600" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>חודשים עם רווח נטו חיובי</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      {/* Legend for calendar */}
+      <div className="flex items-center justify-center gap-6 mb-5 text-sm bg-card p-3 rounded-md shadow-sm border">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-green-50 border border-green-200 rounded-sm"></div>
+          <span className="font-medium">רווח</span>
+        </div>
 
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 transition-all hover:scale-105">
-                <div className="w-3 h-3 bg-red-100 border border-red-300 rounded-sm"></div>
-                <span className="font-medium">הפסד</span>
-                <ArrowDown size={14} className="text-red-600" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>חודשים עם רווח נטו שלילי</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-red-50 border border-red-200 rounded-sm"></div>
+          <span className="font-medium">הפסד</span>
+        </div>
 
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 transition-all hover:scale-105">
-                <div className="w-3 h-3 bg-slate-100 border border-slate-300 rounded-sm"></div>
-                <span className="font-medium">ללא פעילות</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>חודשים ללא פעילות מסחר</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-slate-50 border border-slate-200 rounded-sm"></div>
+          <span className="font-medium">ללא פעילות</span>
+        </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-3 gap-4">
         {months.map((month, index) => (
           <TooltipProvider key={month.name}>
             <Tooltip>
@@ -99,43 +70,49 @@ const YearCalendarView: React.FC<YearCalendarViewProps> = ({
                 <Card 
                   onClick={() => month.hasTradeData && onMonthSelect(index)}
                   className={cn(
-                    "py-4 px-3 cursor-pointer transition-all duration-200",
+                    "p-4 cursor-pointer transition-all duration-200 hover:shadow-md",
                     month.profit > 0 
-                      ? "bg-green-50/70 border-green-200 hover:bg-green-100/80 hover:border-green-300 dark:bg-green-950/20 dark:border-green-800/30 dark:hover:bg-green-900/30" 
+                      ? "bg-green-50 border-green-200 hover:bg-green-100/80 dark:bg-green-950/20 dark:border-green-800/30" 
                       : month.profit < 0 
-                        ? "bg-red-50/70 border-red-200 hover:bg-red-100/80 hover:border-red-300 dark:bg-red-950/20 dark:border-red-800/30 dark:hover:bg-red-900/30" 
-                        : "bg-slate-50/70 border-slate-200 hover:bg-slate-100/80 hover:border-slate-300 dark:bg-slate-900/20 dark:border-slate-800/30 dark:hover:bg-slate-800/40",
+                        ? "bg-red-50 border-red-200 hover:bg-red-100/80 dark:bg-red-950/20 dark:border-red-800/30" 
+                        : "bg-slate-50 border-slate-200 hover:bg-slate-100/80 dark:bg-slate-900/20 dark:border-slate-800/30",
                     selectedMonth === index && "ring-2 ring-primary border-primary",
-                    index === currentMonth && !selectedMonth && "ring-2 ring-secondary-foreground",
-                    !month.hasTradeData && "opacity-60 cursor-not-allowed",
-                    "shadow-sm hover:shadow-md"
+                    index === currentMonth && selectedMonth !== index && "ring-1 ring-blue-400 dark:ring-blue-500",
+                    !month.hasTradeData && "opacity-70 cursor-not-allowed",
                   )}
                 >
-                  <div className="font-bold text-center mb-2 text-lg">
+                  <div className="relative">
                     {index === currentMonth && 
-                      <Badge variant="outline" className="absolute top-2 right-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-[10px]">חודש נוכחי</Badge>
+                      <Badge className="absolute top-0 right-0 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                        חודש נוכחי
+                      </Badge>
                     }
-                    {month.name}
+                    <h4 className="text-lg font-bold text-center mb-2">{month.name}</h4>
+                    
+                    {month.hasTradeData ? (
+                      <>
+                        <div className={cn(
+                          "text-center font-semibold flex items-center justify-center gap-1 mb-3",
+                          month.profit > 0 ? "text-green-600 dark:text-green-400" : 
+                          month.profit < 0 ? "text-red-600 dark:text-red-400" : "text-slate-600"
+                        )}>
+                          {formatProfit(month.profit)}
+                          {month.profit > 0 ? 
+                            <ArrowUp size={16} /> : 
+                            month.profit < 0 ? <ArrowDown size={16} /> : null}
+                        </div>
+                        <div className="text-center">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            <CalendarIcon size={12} className="mr-1" /> {Math.floor(Math.random() * 20) + 1} עסקאות
+                          </Badge>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-2">
+                        אין נתוני מסחר
+                      </div>
+                    )}
                   </div>
-                  {month.hasTradeData && (
-                    <>
-                      <div className={cn(
-                        "text-center font-semibold flex items-center justify-center gap-1",
-                        month.profit > 0 ? "text-green-600 dark:text-green-400" : 
-                        month.profit < 0 ? "text-red-600 dark:text-red-400" : "text-slate-600"
-                      )}>
-                        {formatProfit(month.profit)}
-                        {month.profit > 0 ? 
-                          <ArrowUp size={16} className="animate-sine-move" /> : 
-                          month.profit < 0 ? <ArrowDown size={16} className="animate-sine-move" /> : null}
-                      </div>
-                      <div className="mt-3 text-center">
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                          <CalendarIcon size={12} className="mr-1" /> {Math.floor(Math.random() * 20) + 1} עסקאות
-                        </Badge>
-                      </div>
-                    </>
-                  )}
                 </Card>
               </TooltipTrigger>
               <TooltipContent>

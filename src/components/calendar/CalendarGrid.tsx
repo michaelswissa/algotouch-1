@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { TradeRecord } from '@/lib/trade-analysis';
-import { ArrowUp, ArrowDown, DollarSign, Calendar } from 'lucide-react';
+import { ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
@@ -80,14 +80,14 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                   <div
                     onClick={() => onDayClick(dayObj.day, dayObj.month)}
                     className={cn(
-                      "relative rounded-md cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[68px] border shadow-sm",
+                      "relative rounded-md cursor-pointer transition-all duration-200 flex flex-col items-center justify-start min-h-[75px] border shadow-sm",
                       dayObj.month === 'current'
                         ? "hover:shadow-md hover:border-primary/50"
                         : "text-muted-foreground opacity-40 hover:opacity-60",
                       dayObj.isToday && !isSelected && "ring-2 ring-primary",
                       isSelected && "bg-primary/10 border-primary ring-1 ring-primary/50 shadow-md",
-                      !isSelected && hasTrades && dailyPnL > 0 && "bg-green-50/80 border-green-200 dark:bg-green-950/30 dark:border-green-800/40",
-                      !isSelected && hasTrades && dailyPnL < 0 && "bg-red-50/80 border-red-200 dark:bg-red-950/30 dark:border-red-800/40",
+                      !isSelected && hasTrades && dailyPnL > 0 && "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800/40",
+                      !isSelected && hasTrades && dailyPnL < 0 && "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800/40",
                       !isSelected && dayObj.month === 'current' && !hasTrades && "bg-card border-border/60",
                       dayObj.month !== 'current' && "bg-muted/30 border-muted hover:bg-muted/50"
                     )}
@@ -106,7 +106,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                     </span>
                     
                     {hasTrades && (
-                      <div className="flex flex-col gap-1 mt-1 w-full items-center">
+                      <div className="flex flex-col gap-1 mt-2 w-full items-center">
                         <Badge 
                           variant="outline" 
                           className={cn(

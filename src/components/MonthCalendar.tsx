@@ -68,7 +68,7 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
   }, 0);
 
   return (
-    <div className="w-full card-gradient rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+    <div className="w-full border rounded-xl shadow-sm bg-card overflow-hidden">
       <MonthCalendarHeader 
         month={month} 
         year={year} 
@@ -78,21 +78,23 @@ const MonthCalendar = ({ month, year, status = 'Open', onDayClick }: MonthCalend
         onAddTrade={handleAddTrade}
       />
 
-      <CalendarGrid 
-        daysOfWeek={daysOfWeek}
-        calendarDays={calendarDays}
-        onDayClick={handleDayClick}
-        selectedDay={selectedDay}
-        tradesData={mockTradeData}
-      />
-
-      {selectedDay && (
-        <SelectedDayTrades 
-          selectedDay={selectedDay} 
-          selectedDayTrades={selectedDayTrades} 
-          month={month} 
+      <div className="p-4">
+        <CalendarGrid 
+          daysOfWeek={daysOfWeek}
+          calendarDays={calendarDays}
+          onDayClick={handleDayClick}
+          selectedDay={selectedDay}
+          tradesData={mockTradeData}
         />
-      )}
+
+        {selectedDay && (
+          <SelectedDayTrades 
+            selectedDay={selectedDay} 
+            selectedDayTrades={selectedDayTrades} 
+            month={month} 
+          />
+        )}
+      </div>
     </div>
   );
 };
