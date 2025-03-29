@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import MonthCalendar from '@/components/MonthCalendar';
 import { TradeRecord } from '@/lib/trade-analysis';
+import SelectedDayTrades from '@/components/calendar/SelectedDayTrades';
 
 interface MonthCalendarSectionProps {
   currentMonth: string;
@@ -28,6 +29,15 @@ export const MonthCalendarSection = ({
   tradesData
 }: MonthCalendarSectionProps) => {
   const isCurrentMonth = currentMonth === systemCurrentMonth && currentYear === systemCurrentYear;
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  
+  const handleDayClick = (day: number) => {
+    const dayKey = `${day}-current`;
+    setSelectedDay(dayKey);
+  };
+  
+  // Get selected day trades
+  const selectedDayTrades = selectedDay && tradesData?.[selectedDay] ? tradesData[selectedDay] : [];
   
   return (
     <div className="col-span-2">
@@ -58,6 +68,14 @@ export const MonthCalendarSection = ({
         status={isCurrentMonth ? "Active" : "Open"} 
         onBackToYear={onBackToYear}
         tradesData={tradesData}
+        onDayClick={handleDayClick}
+      />
+      
+      {/* Display selected day trades */}
+      <SelectedDayTrades 
+        selectedDay={selectedDay} 
+        selectedDayTrades={selectedDayTrades} 
+        month={currentMonth} 
       />
     </div>
   );

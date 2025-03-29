@@ -14,6 +14,7 @@ import { TradeRecord } from '@/lib/trade-analysis';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import { mockTradeData, mockDaysWithStatus } from '@/components/calendar/mockTradeData';
 import { generateCalendarDays } from '@/components/calendar/calendarUtils';
+import MonthCalendarHeader from '@/components/calendar/MonthCalendarHeader';
 
 interface MonthCalendarProps {
   month: string;
@@ -40,6 +41,26 @@ const MonthCalendar = ({
   // Generate calendar days for the month
   const calendarDays = generateCalendarDays(month, year, mockDaysWithStatus);
   
+  // Calculate total trades and profit for the month
+  const calculateMonthlyStats = () => {
+    let totalTrades = 0;
+    let totalProfit = 0;
+    
+    Object.keys(tradesData).forEach(key => {
+      if (key.includes('-current')) {
+        const trades = tradesData[key];
+        totalTrades += trades.length;
+        trades.forEach(trade => {
+          totalProfit += trade.Net || 0;
+        });
+      }
+    });
+    
+    return { totalTrades, totalProfit };
+  };
+  
+  const { totalTrades, totalProfit } = calculateMonthlyStats();
+  
   // Handle day click
   const handleDayClick = (day: number, month: 'current' | 'prev' | 'next') => {
     if (month === 'current') {
@@ -48,34 +69,21 @@ const MonthCalendar = ({
     }
   };
   
+  // Mock function for adding trades - would be implemented in a real app
+  const handleAddTrade = () => {
+    console.log('Add trade clicked');
+  };
+  
   return (
     <div className="w-full border rounded-xl shadow-sm bg-card overflow-hidden">
-      <div className="px-5 py-3 border-b bg-muted/20" dir="rtl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-primary" />
-            <h3 className="text-xl font-bold">
-              {month} {year}
-            </h3>
-            {status === 'Active' && (
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50">
-                חודש נוכחי
-              </span>
-            )}
-          </div>
-          
-          {onBackToYear && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1 text-primary border-primary/40 hover:bg-primary/10 hover:text-primary"
-              onClick={onBackToYear}
-            >
-              <span>חזרה לתצוגת שנה</span>
-            </Button>
-          )}
-        </div>
-      </div>
+      <MonthCalendarHeader 
+        month={month}
+        year={year}
+        status={status}
+        tradesCount={totalTrades}
+        totalProfit={totalProfit}
+        onAddTrade={handleAddTrade}
+      />
       
       <div className="p-4">
         <CalendarGrid 
@@ -86,6 +94,19 @@ const MonthCalendar = ({
           tradesData={tradesData}
         />
       </div>
+      
+      {onBackToYear && (
+        <div className="px-4 pb-4 pt-2 border-t">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full gap-1 text-primary border-primary/40 hover:bg-primary/10 hover:text-primary"
+            onClick={onBackToYear}
+          >
+            <span>חזרה לתצוגת שנה</span>
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

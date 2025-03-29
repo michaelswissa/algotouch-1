@@ -1,55 +1,36 @@
 
 import React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TradeRecord } from '@/lib/trade-analysis';
+import { ArrowUp, ArrowDown, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
 
 interface TradeDataTableProps {
   trades: TradeRecord[];
 }
 
-const TradeDataTable: React.FC<TradeDataTableProps> = ({ trades }) => {
-  // Format date string for display
-  const formatDate = (dateString: string) => {
+const TradeDataTable = ({ trades }: TradeDataTableProps) => {
+  if (!trades.length) return null;
+  
+  const formatTime = (dateTimeStr: string) => {
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('he-IL', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return dateString;
+      const date = new Date(dateTimeStr);
+      return format(date, 'HH:mm');
+    } catch (e) {
+      return dateTimeStr;
     }
   };
 
-  // Format number with comma separators
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
-  };
-
-  if (!trades.length) return null;
-
   return (
-    <div className="overflow-x-auto" dir="rtl">
+    <div className="overflow-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border/40 bg-secondary/20">
-            <TableHead className="text-right">קונטרקט</TableHead>
-            <TableHead className="text-right">סיגנל</TableHead>
+          <TableRow>
+            <TableHead className="text-right">חוזה</TableHead>
             <TableHead className="text-right">כיוון</TableHead>
-            <TableHead className="text-right">כניסה</TableHead>
-            <TableHead className="text-right">יציאה</TableHead>
+            <TableHead className="text-right">שעת כניסה</TableHead>
+            <TableHead className="text-right">שעת יציאה</TableHead>
             <TableHead className="text-right">מחיר כניסה</TableHead>
             <TableHead className="text-right">מחיר יציאה</TableHead>
             <TableHead className="text-right">רווח/הפסד</TableHead>
@@ -58,33 +39,57 @@ const TradeDataTable: React.FC<TradeDataTableProps> = ({ trades }) => {
         </TableHeader>
         <TableBody>
           {trades.map((trade, index) => (
-            <TableRow key={index} className="hover:bg-secondary/10">
-              <TableCell className="font-medium text-right">{trade.Contract}</TableCell>
-              <TableCell className="text-right">{trade['Signal Name']}</TableCell>
-              <TableCell className="text-right">
-                <Badge variant="outline" className={cn(
+            <TableRow key={index}>
+              <TableCell className="font-medium">{trade.Contract}</TableCell>
+              <TableCell>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-xs",
                   trade.Side === 'Long' 
-                    ? "bg-blue-900/30 text-blue-300 hover:bg-blue-900/40 border-blue-800/50" 
-                    : "bg-red-900/30 text-red-300 hover:bg-red-900/40 border-red-800/50"
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
+                    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                 )}>
-                  {trade.Side === 'Long' ? 'לונג' : 'שורט'}
-                </Badge>
+                  {trade.Side === 'Long' ? 'Long' : 'Short'}
+                </span>
               </TableCell>
-              <TableCell className="text-right">{formatDate(trade['Entry DateTime'])}</TableCell>
-              <TableCell className="text-right">{formatDate(trade['Exit DateTime'])}</TableCell>
-              <TableCell className="text-right">{formatNumber(trade.EntryPrice)}</TableCell>
-              <TableCell className="text-right">{formatNumber(trade.ExitPrice)}</TableCell>
-              <TableCell className={cn(
-                "font-medium text-right",
-                trade.ProfitLoss >= 0 ? "text-tradervue-green" : "text-tradervue-red"
-              )}>
-                {trade.ProfitLoss >= 0 ? `₪${formatNumber(trade.ProfitLoss)}` : `-₪${formatNumber(Math.abs(trade.ProfitLoss))}`}
+              <TableCell className="flex items-center gap-1">
+                <Clock size={14} className="text-muted-foreground" />
+                {formatTime(trade['Entry DateTime'])}
               </TableCell>
-              <TableCell className={cn(
-                "font-medium text-right",
-                trade.Net >= 0 ? "text-tradervue-green" : "text-tradervue-red"
-              )}>
-                {trade.Net >= 0 ? `₪${formatNumber(trade.Net)}` : `-₪${formatNumber(Math.abs(trade.Net))}`}
+              <TableCell className="flex items-center gap-1">
+                <Clock size={14} className="text-muted-foreground" />
+                {formatTime(trade['Exit DateTime'])}
+              </TableCell>
+              <TableCell>{trade.EntryPrice}</TableCell>
+              <TableCell>{trade.ExitPrice}</TableCell>
+              <TableCell 
+                className={trade.ProfitLoss > 0 ? "text-green-600" : "text-red-600"}
+              >
+                {trade.ProfitLoss > 0 ? (
+                  <span className="flex items-center">
+                    <ArrowUp size={14} />
+                    {trade.ProfitLoss.toFixed(2)}₪
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <ArrowDown size={14} />
+                    {Math.abs(trade.ProfitLoss).toFixed(2)}₪
+                  </span>
+                )}
+              </TableCell>
+              <TableCell 
+                className={trade.Net > 0 ? "text-green-600" : "text-red-600"}
+              >
+                {trade.Net > 0 ? (
+                  <span className="flex items-center">
+                    <ArrowUp size={14} />
+                    {trade.Net.toFixed(2)}₪
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <ArrowDown size={14} />
+                    {Math.abs(trade.Net).toFixed(2)}₪
+                  </span>
+                )}
               </TableCell>
             </TableRow>
           ))}
