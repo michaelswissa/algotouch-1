@@ -73,12 +73,8 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
           const dailyPnL = getDailyPnL(dayObj.day, dayObj.month);
           const hasTrades = tradeCount > 0 && dayObj.month === 'current';
           
-          // Hide cells from other months if requested
-          if (dayObj.month !== 'current') {
-            return (
-              <div key={index} className="invisible"></div>
-            );
-          }
+          // Show prev/next month days with low opacity
+          const isPrevOrNextMonth = dayObj.month !== 'current';
           
           return (
             <TooltipProvider key={index}>
@@ -88,15 +84,14 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                     onClick={() => onDayClick(dayObj.day, dayObj.month)}
                     className={cn(
                       "relative rounded-md cursor-pointer transition-all duration-200 flex flex-col items-center justify-start min-h-[75px] border shadow-sm",
-                      dayObj.month === 'current'
-                        ? "hover:shadow-md hover:border-primary/50"
-                        : "text-muted-foreground opacity-40 hover:opacity-60",
+                      isPrevOrNextMonth
+                        ? "text-muted-foreground opacity-40 hover:opacity-60 bg-muted/30 border-muted hover:bg-muted/50"
+                        : "hover:shadow-md hover:border-primary/50",
                       dayObj.isToday && !isSelected && "ring-2 ring-primary",
                       isSelected && "bg-primary/10 border-primary ring-1 ring-primary/50 shadow-md",
                       !isSelected && hasTrades && dailyPnL > 0 && "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800/40",
                       !isSelected && hasTrades && dailyPnL < 0 && "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800/40",
-                      !isSelected && dayObj.month === 'current' && !hasTrades && "bg-card border-border/60",
-                      dayObj.month !== 'current' && "bg-muted/30 border-muted hover:bg-muted/50"
+                      !isSelected && dayObj.month === 'current' && !hasTrades && "bg-card border-border/60"
                     )}
                   >
                     <span className={cn(
