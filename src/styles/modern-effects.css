@@ -92,3 +92,40 @@
     transform: translateX(0);
   }
 }
+
+/* Insight cards */
+.insight-card {
+  @apply transition-all duration-300 border rounded-md mb-2;
+}
+
+.insight-card-green {
+  @apply bg-emerald-950/30 border-emerald-800 hover:bg-emerald-900/40;
+}
+
+.insight-card-red {
+  @apply bg-red-950/30 border-red-800 hover:bg-red-900/40;
+}
+
+.insight-card-blue {
+  @apply bg-blue-950/30 border-blue-800 hover:bg-blue-900/40;
+}
+
+.recommendation-card {
+  @apply border-r-4 bg-slate-800/60 py-3 px-4 rtl hover:bg-slate-800/80 transition-all duration-200;
+}
+
+.insight-header {
+  @apply text-base font-semibold mb-1 rtl text-right;
+}
+
+.insight-text {
+  @apply text-sm text-gray-200 leading-tight rtl text-right;
+}
+
+.tool-card {
+  @apply bg-slate-900/80 hover:bg-slate-800/90 transition-colors border-slate-700 p-4 rtl text-right;
+}
+
+.quote-card {
+  @apply bg-orange-950/20 border-orange-900 hover:bg-orange-950/30 transition-colors rtl text-right;
+}
