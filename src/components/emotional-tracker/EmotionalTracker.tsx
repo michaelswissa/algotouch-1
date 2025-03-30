@@ -15,12 +15,11 @@ const EmotionalTracker: React.FC = () => {
         value={activeTab} 
         onValueChange={setActiveTab} 
         className="w-full"
-        dir="rtl"
       >
-        <TabsList className="mb-6 bg-white/5 dark:bg-white/5 p-1 rounded-lg w-full flex justify-start">
-          <TabsTrigger value="track" className="text-sm font-medium">מעקב רגשי</TabsTrigger>
-          <TabsTrigger value="analysis" className="text-sm font-medium">ניתוח נתונים</TabsTrigger>
+        <TabsList className="mb-6 bg-slate-900/30 dark:bg-white/5 p-1 rounded-lg w-full flex justify-end">
           <TabsTrigger value="insights" className="text-sm font-medium">תובנות</TabsTrigger>
+          <TabsTrigger value="analysis" className="text-sm font-medium">ניתוח נתונים</TabsTrigger>
+          <TabsTrigger value="track" className="text-sm font-medium">מעקב רגשי</TabsTrigger>
         </TabsList>
         
         <TabsContent value="track" className="space-y-6">
@@ -34,7 +33,7 @@ const EmotionalTracker: React.FC = () => {
           <AnalysisTab />
         </TabsContent>
         
-        <TabsContent value="insights" className="space-y-6">
+        <TabsContent value="insights" className="space-y-6 rtl-fade-in">
           <InsightsTab />
         </TabsContent>
       </Tabs>
