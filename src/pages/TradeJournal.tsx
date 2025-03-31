@@ -1,12 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/Layout';
-import EmotionalTracker from '@/components/EmotionalTracker';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import DailyQuestionnaire from '@/components/trade-journal/DailyQuestionnaire';
 import TradeJournalHeader from '@/components/trade-journal/TradeJournalHeader';
 import TradeNotes from '@/components/trade-journal/TradeNotes';
 import { tradeNotes } from '@/components/trade-journal/mockData';
 
 const TradeJournalPage = () => {
+  const [activeTab, setActiveTab] = useState('questionnaire');
+  
   const handleNewNote = () => {
     // Future functionality for creating a new note
   };
@@ -19,9 +22,27 @@ const TradeJournalPage = () => {
         {/* Horizontal scrollable notes section */}
         <TradeNotes notes={tradeNotes} />
         
-        {/* Main content area - Only the emotional analysis tab remains */}
-        <div className="space-y-6 animate-fade-in">
-          <EmotionalTracker />
+        {/* Main content area with tabs */}
+        <div className="space-y-6 animate-fade-in mt-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
+            <TabsList className="mb-6 bg-slate-900/30 dark:bg-white/5 p-1 rounded-lg flex justify-end">
+              <TabsTrigger value="analysis" className="text-sm font-medium">ניתוח רגשי</TabsTrigger>
+              <TabsTrigger value="questionnaire" className="text-sm font-medium">שאלון יומי</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="questionnaire" className="space-y-6">
+              <DailyQuestionnaire />
+            </TabsContent>
+            
+            <TabsContent value="analysis" className="space-y-6">
+              <div className="text-center p-8">
+                <h3 className="text-lg font-medium mb-2">ניתוח רגשי במסחר</h3>
+                <p className="text-muted-foreground">
+                  הניתוח יוצג כאן לאחר מילוי שאלונים מספר. מלא את השאלון היומי כדי לצבור נתונים.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </Layout>
