@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -205,7 +204,10 @@ const TradingReport: React.FC<TradingReportProps> = ({ data }) => {
                         variant="outline" 
                         className="bg-card/50"
                       >
-                        {getInterventionReasonText(reason)}
+                        <div className="flex items-center gap-1">
+                          <EmotionIcon emotion={reason} size={16} />
+                          <span>{getInterventionReasonText(reason)}</span>
+                        </div>
                       </Badge>
                     ))}
                   </div>

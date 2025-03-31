@@ -1,864 +1,414 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Slider } from '@/components/ui/slider';
-import { zodResolver } from '@hookform/resolvers/zod';
+import React, { useState } from 'react';
+import { z } from 'zod';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { ArrowRight, ArrowLeft, Brain, CheckCircle, HelpCircle, AlertTriangle, BarChart3, LineChart, TrendingDown, TrendingUp, Minus } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { motion } from 'framer-motion';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import EmotionIcon from './EmotionIcon';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 
-// Schema for the form
+import RatingButtons from './RatingButtons';
+import EmotionIcon from './EmotionIcon';
+import { Slider } from '@/components/ui/slider';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Frown, Meh, Smile, ThumbsUp, AlertCircle } from 'lucide-react';
+
+// Define form schema
 const formSchema = z.object({
-  feelingRating: z.string().min(1, { message: 'נא לבחור דירוג' }),
+  feelingRating: z.string(),
   feelingNotes: z.string().optional(),
-  interventionLevel: z.string().min(1, { message: 'נא לבחור אפשרות' }),
+  interventionLevel: z.enum(['none', 'slight', 'strong', 'actual']),
   interventionReasons: z.array(z.string()).optional(),
-  marketDirection: z.string().min(1, { message: 'נא לבחור כיוון שוק' }),
-  mentalState: z.string().min(1, { message: 'נא לבחור דירוג' }),
+  marketDirection: z.enum(['up', 'sideways', 'down']),
+  mentalState: z.string(),
   mentalStateNotes: z.string().optional(),
-  algoPerformanceChecked: z.string().min(1, { message: 'נא לבחור אפשרות' }),
-  algoPerformanceNotes: z.string().optional(),
-  riskPercentage: z.string().min(1, { message: 'נא להזין אחוז סיכון' }),
-  riskComfortLevel: z.string().min(1, { message: 'נא לבחור דירוג' }),
+  algoPerformanceChecked: z.enum(['yes', 'no']),
+  algoPerformanceNotes: z.string().when('algoPerformanceChecked', {
+    is: 'yes',
+    then: z.string().min(1, "אנא הזן את המסקנות העיקריות"),
+    otherwise: z.string().optional(),
+  }),
+  riskPercentage: z.string(),
+  riskComfortLevel: z.string(),
   dailyReflection: z.string().optional(),
 });
+
+type FormValues = z.infer<typeof formSchema>;
 
 interface DailyQuestionnaireProps {
   onSubmit: (data: any) => void;
 }
 
 const DailyQuestionnaire: React.FC<DailyQuestionnaireProps> = ({ onSubmit }) => {
-  const [showFeelingNotesDialog, setShowFeelingNotesDialog] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
-  const today = format(new Date(), 'dd/MM/yyyy');
+  const [showInterventionReasons, setShowInterventionReasons] = useState(false);
+  const [showAlgoNotes, setShowAlgoNotes] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      feelingRating: "",
-      feelingNotes: "",
-      interventionLevel: "",
+      feelingRating: '3',
+      feelingNotes: '',
+      interventionLevel: 'none',
       interventionReasons: [],
-      marketDirection: "",
-      mentalState: "",
-      mentalStateNotes: "",
-      algoPerformanceChecked: "",
-      algoPerformanceNotes: "",
-      riskPercentage: "1.0",
-      riskComfortLevel: "",
-      dailyReflection: "",
-    },
+      marketDirection: 'sideways',
+      mentalState: '3',
+      mentalStateNotes: '',
+      algoPerformanceChecked: 'no',
+      algoPerformanceNotes: '',
+      riskPercentage: '0.5',
+      riskComfortLevel: '3',
+      dailyReflection: '',
+    }
   });
 
-  // Watch the feeling rating to show the notes dialog when needed
-  const feelingRating = form.watch("feelingRating");
-  const interventionLevel = form.watch("interventionLevel");
-  const algoPerformanceChecked = form.watch("algoPerformanceChecked");
+  const interventionLevel = watch('interventionLevel');
+  const algoPerformanceChecked = watch('algoPerformanceChecked');
+  const riskPercentage = watch('riskPercentage');
+  const feelingRating = watch('feelingRating');
 
-  useEffect(() => {
-    if (feelingRating === "1" || feelingRating === "2") {
-      setShowFeelingNotesDialog(true);
-    }
-  }, [feelingRating]);
+  React.useEffect(() => {
+    setShowInterventionReasons(interventionLevel === 'actual');
+  }, [interventionLevel]);
 
-  const handleSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log('Form values:', values);
-    
-    // Create a data object with formatted values for the report
-    const reportData = {
-      date: today,
-      feeling: {
-        rating: parseInt(values.feelingRating),
-        notes: values.feelingNotes || "",
-      },
-      intervention: {
-        level: values.interventionLevel,
-        reasons: values.interventionReasons || [],
-      },
-      marketDirection: values.marketDirection,
-      mentalState: {
-        rating: parseInt(values.mentalState),
-        notes: values.mentalStateNotes || "",
-      },
-      algoPerformance: {
-        checked: values.algoPerformanceChecked,
-        notes: values.algoPerformanceNotes || "",
-      },
-      riskManagement: {
-        percentage: parseFloat(values.riskPercentage),
-        comfortLevel: parseInt(values.riskComfortLevel),
-      },
-      reflection: values.dailyReflection || "",
-    };
-    
-    onSubmit(reportData);
-  };
+  React.useEffect(() => {
+    setShowAlgoNotes(algoPerformanceChecked === 'yes');
+  }, [algoPerformanceChecked]);
 
-  const goToNextStep = () => {
-    if (currentStep === 1) {
-      if (!form.getValues("feelingRating") || !form.getValues("interventionLevel") || !form.getValues("marketDirection")) {
-        form.trigger(["feelingRating", "interventionLevel", "marketDirection"]);
-        return;
-      }
-    } else if (currentStep === 2) {
-      if (!form.getValues("mentalState") || !form.getValues("algoPerformanceChecked")) {
-        form.trigger(["mentalState", "algoPerformanceChecked"]);
-        return;
-      }
-    } else if (currentStep === 3) {
-      if (!form.getValues("riskPercentage") || !form.getValues("riskComfortLevel")) {
-        form.trigger(["riskPercentage", "riskComfortLevel"]);
-        return;
-      }
-    }
-    
-    setCurrentStep(prev => Math.min(prev + 1, totalSteps));
-  };
-
-  const goToPreviousStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
-  };
-
-  const stepInfo = [
-    {
-      title: "הרגשה ומצב שוק",
-      description: "כיצד אתה מרגיש ומה כיוון השוק היום",
-      icon: <Brain className="h-5 w-5 text-blue-400" />
-    },
-    {
-      title: "מצב מנטלי וביצועי אלגו",
-      description: "הערכת המוכנות המנטלית ובדיקת ביצועי האלגו",
-      icon: <BarChart3 className="h-5 w-5 text-amber-400" />
-    },
-    {
-      title: "ניהול סיכונים",
-      description: "הגדרת רמת הסיכון והנוחות עם הפסדים אפשריים",
-      icon: <AlertTriangle className="h-5 w-5 text-orange-400" />
-    },
-    {
-      title: "רפלקציה ותובנות",
-      description: "סיכום התובנות והלקחים מהיום",
-      icon: <CheckCircle className="h-5 w-5 text-green-400" />
-    }
+  const emotionOptions = [
+    { value: '1', label: 'מתוח מאוד', tooltip: 'מתוח, חושש וחסר בטחון', icon: <EmotionIcon emotion="1" animated /> },
+    { value: '2', label: 'מתוח', tooltip: 'מעט מתוח או לחוץ', icon: <EmotionIcon emotion="2" animated /> },
+    { value: '3', label: 'ניטרלי', tooltip: 'תחושה ניטרלית, לא רגוע ולא מתוח', icon: <EmotionIcon emotion="3" animated /> },
+    { value: '4', label: 'רגוע', tooltip: 'רגוע ובטוח', icon: <EmotionIcon emotion="4" animated /> },
+    { value: '5', label: 'רגוע מאוד', tooltip: 'רגוע מאוד ומפוקס', icon: <EmotionIcon emotion="5" animated /> },
   ];
 
-  const getMarketDirectionIcon = (direction: string) => {
-    switch (direction) {
-      case "up":
-        return <TrendingUp className="h-5 w-5 text-green-500" />;
-      case "sideways":
-        return <Minus className="h-5 w-5 text-yellow-500" />;
-      case "down":
-        return <TrendingDown className="h-5 w-5 text-red-500" />;
-      default:
-        return <LineChart className="h-5 w-5 text-gray-500" />;
-    }
+  const interventionReasons = [
+    { id: 'fear', label: 'פחד מהפסד', icon: <EmotionIcon emotion="fear" size={16} /> },
+    { id: 'fix', label: 'רצון לתקן', icon: <EmotionIcon emotion="fix" size={16} /> },
+    { id: 'distrust', label: 'חוסר אמון באלגו', icon: <EmotionIcon emotion="distrust" size={16} /> },
+    { id: 'greed', label: 'חמדנות / פומו', icon: <EmotionIcon emotion="greed" size={16} /> },
+  ];
+
+  const onFormSubmit = (data: FormValues) => {
+    // Format the data as required for the report
+    const formattedData = {
+      date: format(new Date(), 'dd/MM/yyyy'),
+      feeling: {
+        rating: parseInt(data.feelingRating),
+        notes: data.feelingNotes
+      },
+      intervention: {
+        level: data.interventionLevel,
+        reasons: data.interventionReasons || []
+      },
+      marketDirection: data.marketDirection,
+      mentalState: {
+        rating: parseInt(data.mentalState),
+        notes: data.mentalStateNotes
+      },
+      algoPerformance: {
+        checked: data.algoPerformanceChecked,
+        notes: data.algoPerformanceNotes
+      },
+      riskManagement: {
+        percentage: parseFloat(data.riskPercentage),
+        comfortLevel: parseInt(data.riskComfortLevel)
+      },
+      reflection: data.dailyReflection
+    };
+    
+    console.log('Form values:', data);
+    console.log('Form data:', formattedData);
+    
+    onSubmit(formattedData);
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <Card className="hover-glow shadow-md">
-          <CardHeader className="pb-3 border-b border-border/30">
-            <div className="flex items-center justify-between mb-2">
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                {stepInfo[currentStep - 1].icon}
-              </motion.div>
-              <CardTitle className="text-xl font-bold flex items-center gap-2 text-right">
-                <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                  {stepInfo[currentStep - 1].title}
-                </span>
-              </CardTitle>
+    <form onSubmit={handleSubmit(onFormSubmit)}>
+      <Card className="w-full shadow-md hover-glow">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            סיכום יומי
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="space-y-8">
+          {/* איך אתה מרגיש */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">איך אתה מרגיש?</h3>
+              <EmotionIcon emotion={feelingRating} size={28} />
             </div>
-            <CardDescription className="text-right">
-              {stepInfo[currentStep - 1].description}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="pt-6">
-            {currentStep === 1 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                {/* איך אתה מרגיש? */}
-                <FormField
-                  control={form.control}
-                  name="feelingRating"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          איך אתה מרגיש?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">דרג את מצב הרוח הכללי שלך היום (1: מתוח, 3: ניטרלי, 5: רגוע ומפוקס)</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <div className="flex justify-between items-center gap-2 rtl">
-                          {["1", "2", "3", "4", "5"].map((value) => (
-                            <div 
-                              key={value} 
-                              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${field.value === value ? 'scale-110' : 'opacity-70 hover:opacity-100'}`}
-                              onClick={() => field.onChange(value)}
-                            >
-                              <div className={`p-2 rounded-full ${field.value === value ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-secondary/40'}`}>
-                                <EmotionIcon 
-                                  emotion={value} 
-                                  size={28} 
-                                  animated={field.value === value} 
-                                />
-                              </div>
-                              <span className="text-xs mt-1">{
-                                value === "1" ? "מתוח מאוד" :
-                                value === "2" ? "מתוח" :
-                                value === "3" ? "ניטרלי" :
-                                value === "4" ? "רגוע" :
-                                "מפוקס מאוד"
-                              }</span>
-                            </div>
-                          ))}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* האם הרגשת דחף להתערב באלגו היום? */}
-                <FormField
-                  control={form.control}
-                  name="interventionLevel"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          האם הרגשת דחף להתערב באלגו היום?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">באיזו מידה הרגשת צורך להתערב בפעילות האלגוריתם</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col space-y-1 rtl"
-                        >
-                          <div className="flex items-center space-x-reverse space-x-2">
-                            <RadioGroupItem value="none" id="none" />
-                            <FormLabel htmlFor="none" className="font-normal">לא בכלל</FormLabel>
-                          </div>
-                          <div className="flex items-center space-x-reverse space-x-2">
-                            <RadioGroupItem value="slight" id="slight" />
-                            <FormLabel htmlFor="slight" className="font-normal">רצון קל</FormLabel>
-                          </div>
-                          <div className="flex items-center space-x-reverse space-x-2">
-                            <RadioGroupItem value="strong" id="strong" />
-                            <FormLabel htmlFor="strong" className="font-normal">רצון חזק</FormLabel>
-                          </div>
-                          <div className="flex items-center space-x-reverse space-x-2">
-                            <RadioGroupItem value="actual" id="actual" />
-                            <FormLabel htmlFor="actual" className="font-normal">התערבתי בפועל</FormLabel>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* סיבות להתערבות - מוצג רק אם נבחר "התערבתי בפועל" */}
-                {interventionLevel === "actual" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <div className="bg-card/20 p-4 rounded-lg border border-border/30">
-                      <FormItem className="space-y-3 rtl">
-                        <div className="flex items-center gap-2">
-                          <FormLabel className="text-base font-medium flex items-center gap-1">
-                            מה גרם לך להתערב?
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs bg-card">
-                                  <p className="text-xs">סמן את הסיבות שגרמו לך להתערב בפעילות האלגוריתם</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </FormLabel>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="interventionReasons"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row-reverse items-start space-x-0 space-x-reverse space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes("fear")}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), "fear"])
-                                        : field.onChange(field.value?.filter(value => value !== "fear"));
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="mr-2 font-normal">פחד מהפסד</FormLabel>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="interventionReasons"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row-reverse items-start space-x-0 space-x-reverse space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes("fix")}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), "fix"])
-                                        : field.onChange(field.value?.filter(value => value !== "fix"));
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="mr-2 font-normal">רצון לתקן</FormLabel>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="interventionReasons"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row-reverse items-start space-x-0 space-x-reverse space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes("distrust")}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), "distrust"])
-                                        : field.onChange(field.value?.filter(value => value !== "distrust"));
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="mr-2 font-normal">חוסר אמון באלגו</FormLabel>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="interventionReasons"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row-reverse items-start space-x-0 space-x-reverse space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes("greed")}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), "greed"])
-                                        : field.onChange(field.value?.filter(value => value !== "greed"));
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="mr-2 font-normal">חמדנות / פומו</FormLabel>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </FormItem>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* כיוון השוק */}
-                <FormField
-                  control={form.control}
-                  name="marketDirection"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          מה כיוון השוק היום?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">באיזה כיוון נע השוק היום באופן כללי</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <div className="flex justify-between items-center gap-2 rtl">
-                          {[
-                            { value: "up", label: "עולה", icon: <TrendingUp className="h-6 w-6 text-green-500" /> },
-                            { value: "sideways", label: "מדשדש", icon: <Minus className="h-6 w-6 text-yellow-500" /> },
-                            { value: "down", label: "יורד", icon: <TrendingDown className="h-6 w-6 text-red-500" /> }
-                          ].map((option) => (
-                            <div 
-                              key={option.value} 
-                              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${field.value === option.value ? 'scale-110' : 'opacity-70 hover:opacity-100'}`}
-                              onClick={() => field.onChange(option.value)}
-                            >
-                              <div className={`p-3 rounded-lg ${field.value === option.value ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-secondary/40'}`}>
-                                {option.icon}
-                              </div>
-                              <span className="text-sm mt-1">{option.label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </motion.div>
-            )}
-
-            {currentStep === 2 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                {/* איך אתה מרגיש מנטלית בנוגע למסחר היום? */}
-                <FormField
-                  control={form.control}
-                  name="mentalState"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          איך אתה מרגיש מנטלית בנוגע למסחר היום?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">דרג מ-1 (השוק תנודתי, אני חושש) עד 5 (השוק נראה יציב, אני בטוח)</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <div className="flex justify-between items-center gap-2 rtl">
-                          {["1", "2", "3", "4", "5"].map((value) => (
-                            <div 
-                              key={value} 
-                              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${field.value === value ? 'scale-110' : 'opacity-70 hover:opacity-100'}`}
-                              onClick={() => field.onChange(value)}
-                            >
-                              <div className={`p-2 rounded-full ${field.value === value ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-secondary/40'}`}>
-                                <EmotionIcon 
-                                  emotion={value} 
-                                  size={28} 
-                                  animated={field.value === value} 
-                                />
-                              </div>
-                              <span className="text-xs mt-1">{
-                                value === "1" ? "חושש מאוד" :
-                                value === "2" ? "לא בטוח" :
-                                value === "3" ? "ניטרלי" :
-                                value === "4" ? "בטוח" :
-                                "בטוח מאוד"
-                              }</span>
-                            </div>
-                          ))}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* הערות על מצב מנטלי */}
-                <FormField
-                  control={form.control}
-                  name="mentalStateNotes"
-                  render={({ field }) => (
-                    <FormItem className="rtl">
-                      <FormLabel className="text-sm font-medium flex items-center gap-1">
-                        הערות על איך ההרגשה משפיעה על קבלת ההחלטות (אופציונלי)
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          placeholder="תאר כיצד המצב המנטלי משפיע על קבלת ההחלטות שלך במסחר..."
-                          className="h-20 text-right"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* בדיקת ביצועי האלגו */}
-                <FormField
-                  control={form.control}
-                  name="algoPerformanceChecked"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          בדקת את ביצועי האלגו בשבוע האחרון?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">האם ניתחת את ביצועי האלגוריתם בתקופה האחרונה</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex space-x-reverse rtl space-x-4"
-                        >
-                          <div className="flex items-center space-x-reverse space-x-2">
-                            <RadioGroupItem value="yes" id="yes" />
-                            <FormLabel htmlFor="yes" className="font-normal">בדקתי</FormLabel>
-                          </div>
-                          <div className="flex items-center space-x-reverse space-x-2">
-                            <RadioGroupItem value="no" id="no" />
-                            <FormLabel htmlFor="no" className="font-normal">לא בדקתי</FormLabel>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* מסקנות מבדיקת האלגו - מוצג רק אם נבחר "בדקתי" */}
-                {algoPerformanceChecked === "yes" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <FormField
-                      control={form.control}
-                      name="algoPerformanceNotes"
-                      render={({ field }) => (
-                        <FormItem className="rtl">
-                          <FormLabel className="text-sm font-medium flex items-center gap-1">
-                            מהן המסקנות העיקריות או השיפורים שזיהית?
-                          </FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="תאר את המסקנות העיקריות מניתוח ביצועי האלגוריתם..."
-                              className="h-20 text-right"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
             
-            {currentStep === 3 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                {/* כמה אחוז אתה מסכן לכל עסקה? */}
-                <FormField
-                  control={form.control}
-                  name="riskPercentage"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          כמה אחוז אתה מסכן לכל עסקה?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">אחוז הסיכון מתוך ההון הכולל שאתה מוכן לסכן בכל עסקה (0.1% - 2.0%)</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                        <span className="font-medium text-primary">{field.value}%</span>
-                      </div>
-                      <FormControl>
-                        <div className="flex items-center space-x-2 rtl space-x-reverse">
-                          <span className="text-sm">0.1%</span>
-                          <Slider
-                            defaultValue={[parseFloat(field.value)]}
-                            max={2.0}
-                            min={0.1}
-                            step={0.1}
-                            onValueChange={(vals) => field.onChange(vals[0].toString())}
-                            className="flex-1"
-                          />
-                          <span className="text-sm">2.0%</span>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* מה מידת הנוחות שלך עם ההפסדים האפשריים ברמת הסיכון הנוכחית? */}
-                <FormField
-                  control={form.control}
-                  name="riskComfortLevel"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3 rtl">
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-1">
-                          מה מידת הנוחות שלך עם ההפסדים האפשריים ברמת הסיכון הנוכחית?
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs bg-card">
-                                <p className="text-xs">דרג מ-1 (לא נוח בכלל) עד 5 (נוח לגמרי)</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <div className="flex justify-between items-center gap-2 rtl">
-                          {["1", "2", "3", "4", "5"].map((value) => (
-                            <div 
-                              key={value} 
-                              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${field.value === value ? 'scale-110' : 'opacity-70 hover:opacity-100'}`}
-                              onClick={() => field.onChange(value)}
-                            >
-                              <div className={`p-2 rounded-full ${field.value === value ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-secondary/40'}`}>
-                                <EmotionIcon 
-                                  emotion={value} 
-                                  size={28} 
-                                  animated={field.value === value} 
-                                />
-                              </div>
-                              <span className="text-xs mt-1">{
-                                value === "1" ? "לא נוח כלל" :
-                                value === "2" ? "נוחות נמוכה" :
-                                value === "3" ? "נוחות בינונית" :
-                                value === "4" ? "נוחות טובה" :
-                                "נוח לגמרי"
-                              }</span>
-                            </div>
-                          ))}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </motion.div>
-            )}
-            
-            {currentStep === 4 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="bg-card/20 p-4 rounded-lg border border-border/30">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    <h3 className="text-base font-medium">תזכורת חשובה</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    רפלקציה יומית היא כלי חשוב לשיפור מתמיד. תיעוד מדויק של רגשות, מחשבות והחלטות 
-                    יאפשר לך לזהות דפוסים ולשפר את הביצועים לאורך זמן.
-                  </p>
-                </div>
-              
-                <FormField
-                  control={form.control}
-                  name="dailyReflection"
-                  render={({ field }) => (
-                    <FormItem className="rtl">
-                      <FormLabel className="text-base font-medium flex items-center gap-1">
-                        רפלקציה יומית ותובנות
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs bg-card">
-                              <p className="text-xs">רשום כאן תובנות, נקודות לשיפור או דברים שתרצה לשמר להמשך</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </FormLabel>
-                      <FormDescription className="text-sm">
-                        מה למדת היום?
-                      </FormDescription>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          placeholder="רשום כאן תובנות, נקודות לשיפור או דברים שתרצה לשמר להמשך..."
-                          className="h-32 text-right"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </motion.div>
-            )}
-            
-            <div className="flex justify-center items-center gap-2 mt-6">
-              {Array.from({ length: totalSteps }, (_, i) => (
-                <motion.div
-                  key={i}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    i + 1 === currentStep
-                      ? "w-8 bg-primary"
-                      : i + 1 < currentStep
-                      ? "w-2 bg-primary/70"
-                      : "w-2 bg-muted"
-                  }`}
-                  initial={{ opacity: 0.6 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                />
-              ))}
-            </div>
-          </CardContent>
-          
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              onClick={goToPreviousStep}
-              variant="outline"
-              disabled={currentStep === 1}
-              className="flex items-center gap-1"
-            >
-              <ArrowRight className="h-4 w-4" />
-              הקודם
-            </Button>
-            
-            {currentStep < totalSteps ? (
-              <Button
-                type="button"
-                onClick={goToNextStep}
-                className="flex items-center gap-1 bg-primary hover:bg-primary/90"
-              >
-                הבא
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
-              >
-                <CheckCircle className="h-4 w-4" />
-                שלח וצור דוח
-              </Button>
-            )}
-          </CardFooter>
-        </Card>
-      </form>
-
-      {/* Dialog for feeling notes when user selects 1 or 2 */}
-      <Dialog open={showFeelingNotesDialog} onOpenChange={setShowFeelingNotesDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-right">הערות נוספות על המצב הרגשי</DialogTitle>
-            <DialogDescription className="text-right">
-              תוכל לשתף פרטים נוספים על הסיבות למצב הרגשי שלך היום
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4">
-            <FormField
-              control={form.control}
-              name="feelingNotes"
-              render={({ field }) => (
-                <FormItem className="rtl">
-                  <FormLabel className="text-sm font-medium">תיאור הסיבות למצב הרגשי</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="לדוגמה: הרגשתי לחץ בגלל חדשות מסוימות או היה לי יום רגוע עם קצת חשש ממצבים מסוימים..."
-                      className="h-24 text-right"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
+            <RatingButtons
+              value={feelingRating}
+              onChange={(value) => setValue('feelingRating', value)}
+              options={emotionOptions}
+              showNotesForValues={['1', '2']}
+              notesValue={watch('feelingNotes')}
+              onNotesChange={(notes) => setValue('feelingNotes', notes)}
+              notesPlaceholder="תאר את התחושות שלך בצורה מפורטת..."
+              notesTitle="תאר את ההרגשה שלך"
+              notesDescription="פרט מה משפיע על ההרגשה שלך היום"
             />
-            <div className="flex justify-end mt-4">
-              <Button 
-                onClick={() => setShowFeelingNotesDialog(false)}
-                className="bg-primary hover:bg-primary/90"
-              >
-                שמור
-              </Button>
+            
+            {watch('feelingNotes') && (
+              <div className="bg-card/40 p-3 rounded-md border border-border/30 text-sm">
+                {watch('feelingNotes')}
+              </div>
+            )}
+          </div>
+          
+          <Separator className="bg-border/30" />
+          
+          {/* התערבות במסחר */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">התערבות במסחר</h3>
+            <p className="text-sm text-muted-foreground">האם הרגשת דחף להתערב באלגו היום?</p>
+            
+            <RadioGroup
+              value={interventionLevel}
+              onValueChange={(value) => setValue('interventionLevel', value as 'none' | 'slight' | 'strong' | 'actual')}
+              className="flex flex-wrap gap-3 justify-between"
+            >
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="none" id="none" />
+                <Label htmlFor="none" className="font-medium">לא בכלל</Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="slight" id="slight" />
+                <Label htmlFor="slight" className="font-medium">רצון קל</Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="strong" id="strong" />
+                <Label htmlFor="strong" className="font-medium">רצון חזק</Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="actual" id="actual" />
+                <Label htmlFor="actual" className="font-medium">התערבתי בפועל</Label>
+              </div>
+            </RadioGroup>
+            
+            {showInterventionReasons && (
+              <div className="bg-card/30 p-4 rounded-md border border-border/30 mt-3 animate-fade-in">
+                <h4 className="text-md font-medium mb-3">מה גרם לך להתערב?</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {interventionReasons.map((reason) => (
+                    <div key={reason.id} className="flex items-center space-x-2 space-x-reverse">
+                      <Checkbox
+                        id={reason.id}
+                        checked={watch('interventionReasons')?.includes(reason.id)}
+                        onCheckedChange={(checked) => {
+                          const currentReasons = watch('interventionReasons') || [];
+                          if (checked) {
+                            setValue('interventionReasons', [...currentReasons, reason.id]);
+                          } else {
+                            setValue('interventionReasons', currentReasons.filter(r => r !== reason.id));
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor={reason.id}
+                        className="text-sm font-medium flex items-center cursor-pointer"
+                      >
+                        <span className="mr-1">{reason.icon}</span>
+                        {reason.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <Separator className="bg-border/30" />
+          
+          {/* כיוון השוק */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">כיוון השוק</h3>
+            <p className="text-sm text-muted-foreground">מה כיוון השוק היום?</p>
+            
+            <RadioGroup
+              value={watch('marketDirection')}
+              onValueChange={(value) => setValue('marketDirection', value as 'up' | 'sideways' | 'down')}
+              className="flex justify-between"
+            >
+              <div className="flex flex-col items-center space-y-1">
+                <div className="h-12 w-8 bg-green-500/30 rounded-t"></div>
+                <RadioGroupItem value="up" id="up" className="mt-2" />
+                <Label htmlFor="up" className="font-medium text-green-500">עולה</Label>
+              </div>
+              
+              <div className="flex flex-col items-center space-y-1">
+                <div className="h-8 w-8 bg-yellow-500/30 rounded-t"></div>
+                <RadioGroupItem value="sideways" id="sideways" className="mt-2" />
+                <Label htmlFor="sideways" className="font-medium text-yellow-500">מדשדש</Label>
+              </div>
+              
+              <div className="flex flex-col items-center space-y-1">
+                <div className="h-12 w-8 bg-red-500/30 rounded-t"></div>
+                <RadioGroupItem value="down" id="down" className="mt-2" />
+                <Label htmlFor="down" className="font-medium text-red-500">יורד</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <Separator className="bg-border/30" />
+          
+          {/* מצב נפשי ומנטלי למסחר */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">מצב נפשי ומנטלי למסחר</h3>
+              <EmotionIcon emotion={watch('mentalState')} size={28} />
+            </div>
+            
+            <p className="text-sm text-muted-foreground">איך אתה מרגיש מנטלית בנוגע למסחר היום?</p>
+            
+            <RatingButtons
+              value={watch('mentalState')}
+              onChange={(value) => setValue('mentalState', value)}
+              options={[
+                { value: '1', label: 'השוק תנודתי, אני חושש', tooltip: 'תחושה של חשש וחוסר ודאות', icon: <Frown size={18} className="text-red-500" /> },
+                { value: '2', label: 'מעט לא בטוח', tooltip: 'חוסר בטחון קל', icon: <AlertCircle size={18} className="text-orange-500" /> },
+                { value: '3', label: 'ניטרלי', tooltip: 'תחושה ניטרלית כלפי השוק', icon: <Meh size={18} className="text-yellow-500" /> },
+                { value: '4', label: 'די בטוח', tooltip: 'תחושה של בטחון בכיוון השוק', icon: <Smile size={18} className="text-blue-500" /> },
+                { value: '5', label: 'השוק נראה יציב, אני בטוח', tooltip: 'בטחון מלא בכיוון השוק', icon: <ThumbsUp size={18} className="text-green-500" /> },
+              ]}
+            />
+            
+            <div>
+              <Textarea
+                placeholder="הוסף הערות על איך ההרגשה המנטלית משפיעה על קבלת ההחלטות שלך..."
+                value={watch('mentalStateNotes')}
+                onChange={(e) => setValue('mentalStateNotes', e.target.value)}
+                className="resize-none h-24"
+              />
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    </Form>
+          
+          <Separator className="bg-border/30" />
+          
+          {/* בדיקת ביצועי האלגו */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">בדיקת ביצועי האלגו</h3>
+            <p className="text-sm text-muted-foreground">בדקת את ביצועי האלגו בשבוע האחרון?</p>
+            
+            <RadioGroup
+              value={watch('algoPerformanceChecked')}
+              onValueChange={(value) => setValue('algoPerformanceChecked', value as 'yes' | 'no')}
+              className="flex justify-between max-w-md mx-auto"
+            >
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="yes" id="checked-yes" />
+                <Label htmlFor="checked-yes" className="font-medium">בדקתי</Label>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <RadioGroupItem value="no" id="checked-no" />
+                <Label htmlFor="checked-no" className="font-medium">לא בדקתי</Label>
+              </div>
+            </RadioGroup>
+            
+            {showAlgoNotes && (
+              <div className="animate-fade-in">
+                <Textarea
+                  placeholder="מהם המסקנות העיקריות או השיפורים שזיהית?"
+                  value={watch('algoPerformanceNotes')}
+                  onChange={(e) => setValue('algoPerformanceNotes', e.target.value)}
+                  className="resize-none h-24"
+                />
+                {errors.algoPerformanceNotes && (
+                  <p className="text-red-500 text-sm mt-1">{errors.algoPerformanceNotes.message}</p>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <Separator className="bg-border/30" />
+          
+          {/* שיפור ביצועים */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">שיפור ביצועים</h3>
+            
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <label className="text-sm font-medium">כמה אחוז אתה מסכן לכל עסקה?</label>
+                  <span className="text-sm font-semibold bg-primary/20 px-2 py-0.5 rounded">{riskPercentage}%</span>
+                </div>
+                <Slider
+                  min={0.1}
+                  max={2}
+                  step={0.1}
+                  value={[parseFloat(riskPercentage)]}
+                  onValueChange={(value) => setValue('riskPercentage', value[0].toString())}
+                  showTooltips
+                  tooltipLabels={{
+                    0.1: "0.1%",
+                    0.5: "0.5%",
+                    1: "1%",
+                    1.5: "1.5%",
+                    2: "2%"
+                  }}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">מה מידת הנוחות שלך עם ההפסדים האפשריים ברמת הסיכון הנוכחית?</label>
+                <RatingButtons
+                  value={watch('riskComfortLevel')}
+                  onChange={(value) => setValue('riskComfortLevel', value)}
+                  options={[
+                    { value: '1', label: 'לא נוח בכלל', tooltip: 'הפסדים גורמים לי לחרדה משמעותית', icon: <Frown size={18} className="text-red-500" /> },
+                    { value: '2', label: 'לא נוח', tooltip: 'הפסדים גורמים לי לאי נוחות', icon: <AlertCircle size={18} className="text-orange-500" /> },
+                    { value: '3', label: 'ניטרלי', tooltip: 'הפסדים לא מטרידים אותי יותר מדי', icon: <Meh size={18} className="text-yellow-500" /> },
+                    { value: '4', label: 'נוח', tooltip: 'אני מרגיש בנוח יחסית עם הפסדים', icon: <Smile size={18} className="text-blue-500" /> },
+                    { value: '5', label: 'נוח לגמרי', tooltip: 'הפסדים הם חלק מהמשחק ואני מקבל אותם בקלות', icon: <ThumbsUp size={18} className="text-green-500" /> },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <Separator className="bg-border/30" />
+          
+          {/* תיעוד רפלקציה יומית */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">תיעוד רפלקציה יומית ותובנות</h3>
+            
+            <Alert className="bg-primary/10 border-primary/30">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription>
+                רפלקציה יומית היא כלי חשוב לשיפור מתמיד. תיעוד מדויק של רגשות, מחשבות והחלטות יאפשר לך לזהות דפוסים ולשפר את הביצועים לאורך זמן.
+              </AlertDescription>
+            </Alert>
+            
+            <div>
+              <label className="text-sm font-medium block mb-2">
+                מה למדת היום? רשום כאן תובנות, נקודות לשיפור או דברים שתרצה לשמר להמשך.
+              </label>
+              <Textarea
+                placeholder="הוסף את התובנות וההערות שלך כאן..."
+                value={watch('dailyReflection')}
+                onChange={(e) => setValue('dailyReflection', e.target.value)}
+                className="resize-none h-36"
+              />
+            </div>
+          </div>
+        </CardContent>
+        
+        <CardFooter className="justify-end space-x-reverse space-x-2 pt-4">
+          <Button type="submit" className="gap-2 bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-105">
+            שלח את הסיכום היומי
+          </Button>
+        </CardFooter>
+      </Card>
+    </form>
   );
 };
 
