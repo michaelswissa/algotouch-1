@@ -6,7 +6,7 @@ import DailyQuestionnaire from '@/components/trade-journal/DailyQuestionnaire';
 import TradeJournalHeader from '@/components/trade-journal/TradeJournalHeader';
 import TradeNotes from '@/components/trade-journal/TradeNotes';
 import { tradeNotes } from '@/components/trade-journal/mockData';
-import QuestionnaireResults from '@/components/trade-journal/QuestionnaireResults';
+import QuestionnaireResults from '@/components/trade-journal/results';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
