@@ -1,9 +1,8 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import QuestionStep from './QuestionStep';
 
 interface InterventionStepProps {
@@ -24,82 +23,123 @@ const InterventionStep: React.FC<InterventionStepProps> = ({
   onInterventionReasonsChange,
   errors,
 }) => {
-  const interventionReasonsList = [
-    { id: 'fear', label: 'פחד מהפסד' },
-    { id: 'fix', label: 'רצון לתקן עסקה' },
-    { id: 'distrust', label: 'חוסר אמון באלגו' },
-    { id: 'greed', label: 'חמדנות / FOMO' },
-  ];
-
-  const handleReasonChange = (checked: boolean | string, reasonId: string) => {
-    if (checked) {
-      onInterventionReasonsChange([...interventionReasons, reasonId]);
-    } else {
-      onInterventionReasonsChange(interventionReasons.filter(r => r !== reasonId));
-    }
-  };
-
   return (
-    <QuestionStep title="האם הרגשת דחף להתערב באלגו היום🔁?" icon="🔁">
-      <RadioGroup
-        value={algoIntervention}
-        onValueChange={onAlgoInterventionChange}
-        className="flex flex-col gap-4 mt-6"
-        dir="rtl"
-      >
-        <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <RadioGroupItem value="none" id="none" className="border-primary" />
-          <Label htmlFor="none" className="text-lg font-medium flex items-center gap-2 cursor-pointer">
-            <span className="text-2xl">✅</span> לא בכלל
-          </Label>
-        </div>
-        
-        <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <RadioGroupItem value="wanted" id="wanted" className="border-primary" />
-          <Label htmlFor="wanted" className="text-lg font-medium flex items-center gap-2 cursor-pointer">
-            <span className="text-2xl">⚠️</span> רציתי להתערב
-          </Label>
-        </div>
-        
-        <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <RadioGroupItem value="intervened" id="intervened" className="border-primary" />
-          <Label htmlFor="intervened" className="text-lg font-medium flex items-center gap-2 cursor-pointer">
-            <span className="text-2xl">❗</span> התערבתי בפועל
-          </Label>
-        </div>
-      </RadioGroup>
-      
-      {errors.algoIntervention && (
-        <p className="text-red-500 text-sm mt-1">{errors.algoIntervention.message}</p>
-      )}
-      
-      {algoIntervention === 'intervened' && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 p-5 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20"
+    <QuestionStep title="האם הרגשת דחף להתערב באלגו היום?" icon="🔁">
+      <div className="space-y-6">
+        <RadioGroup
+          value={algoIntervention}
+          onValueChange={onAlgoInterventionChange}
+          className="flex flex-col space-y-4"
+          dir="rtl"
         >
-          <h3 className="text-lg font-medium mb-3 text-red-700 dark:text-red-300">מה גרם לך להתערב?</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {interventionReasonsList.map((reason) => (
-              <div key={reason.id} className="flex items-center space-x-2 space-x-reverse">
-                <Checkbox
-                  id={reason.id}
-                  checked={interventionReasons.includes(reason.id)}
-                  onCheckedChange={(checked) => handleReasonChange(checked, reason.id)}
-                  className="data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
-                />
-                <Label
-                  htmlFor={reason.id}
-                  className="text-md font-medium cursor-pointer"
-                >
-                  {reason.label}
-                </Label>
-              </div>
-            ))}
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <RadioGroupItem value="none" id="intervention-none" />
+            <Label htmlFor="intervention-none" className="font-medium">✅ לא בכלל</Label>
           </div>
-        </motion.div>
-      )}
+          
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <RadioGroupItem value="wanted" id="intervention-wanted" />
+            <Label htmlFor="intervention-wanted" className="font-medium">⚠️ רציתי להתערב</Label>
+          </div>
+          
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <RadioGroupItem value="intervened" id="intervention-intervened" />
+            <Label htmlFor="intervention-intervened" className="font-medium">❗ התערבתי בפועל</Label>
+          </div>
+        </RadioGroup>
+        
+        {algoIntervention === 'intervened' && (
+          <div className="bg-muted/40 p-4 rounded-md border border-border/40 mt-2 animate-fade-in space-y-3">
+            <h3 className="font-medium text-right">מה הייתה הסיבה להתערבות?</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Checkbox
+                  id="fear"
+                  checked={interventionReasons.includes('fear')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      onInterventionReasonsChange([...interventionReasons, 'fear']);
+                    } else {
+                      onInterventionReasonsChange(interventionReasons.filter((r) => r !== 'fear'));
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="fear"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  פחד מהפסד
+                </label>
+              </div>
+              
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Checkbox
+                  id="greed"
+                  checked={interventionReasons.includes('greed')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      onInterventionReasonsChange([...interventionReasons, 'greed']);
+                    } else {
+                      onInterventionReasonsChange(interventionReasons.filter((r) => r !== 'greed'));
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="greed"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  חמדנות / רצון להרוויח יותר
+                </label>
+              </div>
+              
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Checkbox
+                  id="control"
+                  checked={interventionReasons.includes('control')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      onInterventionReasonsChange([...interventionReasons, 'control']);
+                    } else {
+                      onInterventionReasonsChange(interventionReasons.filter((r) => r !== 'control'));
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="control"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  רצון לשלוט במסחר
+                </label>
+              </div>
+              
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Checkbox
+                  id="distrust"
+                  checked={interventionReasons.includes('distrust')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      onInterventionReasonsChange([...interventionReasons, 'distrust']);
+                    } else {
+                      onInterventionReasonsChange(interventionReasons.filter((r) => r !== 'distrust'));
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="distrust"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  חוסר אמון באלגו
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {errors.algoIntervention && (
+          <p className="text-red-500 text-sm mt-1">{errors.algoIntervention.message}</p>
+        )}
+      </div>
     </QuestionStep>
   );
 };

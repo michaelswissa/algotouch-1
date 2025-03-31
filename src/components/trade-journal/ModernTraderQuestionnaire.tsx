@@ -8,7 +8,7 @@ interface ModernTraderQuestionnaireProps {
 
 const ModernTraderQuestionnaire: React.FC<ModernTraderQuestionnaireProps> = ({ onSubmit }) => {
   return (
-    <div className="max-w-3xl mx-auto" dir="rtl">
+    <div className="w-full mx-auto" dir="rtl">
       <QuestionnaireForm onSubmit={onSubmit} />
     </div>
   );

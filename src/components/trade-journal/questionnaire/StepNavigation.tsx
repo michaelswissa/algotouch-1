@@ -29,21 +29,8 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
+      dir="rtl"
     >
-      {currentStep > 0 && currentStep < stepsCount ? (
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onPrev}
-          className="gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/30 transition-all duration-300"
-        >
-          <ChevronRight className="h-4 w-4" />
-          הקודם
-        </Button>
-      ) : (
-        <div></div>
-      )}
-      
       {currentStep < stepsCount - 1 ? (
         <Button 
           type="button"
@@ -72,6 +59,20 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
           {isSubmitting ? 'שולח...' : 'שלח את השאלון'}
           <Send className="h-4 w-4" />
         </Button>
+      )}
+      
+      {currentStep > 0 && currentStep < stepsCount ? (
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onPrev}
+          className="gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/30 transition-all duration-300"
+        >
+          <ChevronRight className="h-4 w-4" />
+          הקודם
+        </Button>
+      ) : (
+        <div></div>
       )}
     </motion.div>
   );

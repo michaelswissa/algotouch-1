@@ -1,19 +1,60 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TradeJournalHeader from '@/components/trade-journal/TradeJournalHeader';
 import TradeNotes from '@/components/trade-journal/TradeNotes';
-import { tradeNotes } from '@/components/trade-journal/mockData';
 import ModernTraderQuestionnaire from '@/components/trade-journal/ModernTraderQuestionnaire';
 import TradingReport from '@/components/trade-journal/TradingReport';
 import { useToast } from '@/hooks/use-toast';
 
+interface ReportData {
+  id: number;
+  date: string;
+  emotional: {
+    state: string;
+    notes?: string;
+  };
+  intervention: {
+    level: string;
+    reasons: string[];
+  };
+  market: {
+    surprise: string;
+    notes?: string;
+  };
+  confidence: {
+    level: number;
+  };
+  algoPerformance: {
+    checked: string;
+    notes?: string;
+  };
+  risk: {
+    percentage: number;
+    comfortLevel: number;
+  };
+  insight?: string;
+}
+
 const TradeJournalPage = () => {
   const [activeTab, setActiveTab] = useState('questionnaire');
   const [questionnaireSubmitted, setQuestionnaireSubmitted] = useState(false);
-  const [reportData, setReportData] = useState<any>(null);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [savedReports, setSavedReports] = useState<ReportData[]>([]);
   const { toast } = useToast();
+  
+  // Load saved reports from localStorage on component mount
+  useEffect(() => {
+    const storedReports = localStorage.getItem('tradingReports');
+    if (storedReports) {
+      try {
+        setSavedReports(JSON.parse(storedReports));
+      } catch (error) {
+        console.error('Error parsing stored reports:', error);
+      }
+    }
+  }, []);
   
   const handleNewNote = () => {
     // Future functionality for creating a new note
@@ -21,27 +62,38 @@ const TradeJournalPage = () => {
 
   const handleQuestionnaireSubmit = async (data: any) => {
     console.log('Form data:', data);
-    setReportData(data);
+    
+    // Create a new report with unique ID
+    const newReport: ReportData = {
+      ...data,
+      id: Date.now(), // Use timestamp as ID
+    };
+    
+    setReportData(newReport);
     setQuestionnaireSubmitted(true);
     setActiveTab('report');
+    
+    // Save the new report to savedReports
+    const updatedReports = [newReport, ...savedReports];
+    setSavedReports(updatedReports);
+    
+    // Store updated reports in localStorage
+    localStorage.setItem('tradingReports', JSON.stringify(updatedReports));
     
     toast({
       title: "השאלון נשלח בהצלחה",
       description: "הדוח היומי שלך נוצר ונשמר לתיעוד",
       duration: 3000,
     });
-
-    // Here you would typically save the data to the backend
-    // For now, we're just setting it in state
   };
 
   return (
     <Layout>
-      <div className="tradervue-container py-6">
+      <div className="tradervue-container py-6" dir="rtl">
         <TradeJournalHeader onNewNote={handleNewNote} />
         
         {/* Horizontal scrollable notes section */}
-        <TradeNotes notes={tradeNotes} />
+        <TradeNotes notes={savedReports} />
         
         {/* Main content area with tabs */}
         <div className="space-y-6 animate-fade-in mt-6">

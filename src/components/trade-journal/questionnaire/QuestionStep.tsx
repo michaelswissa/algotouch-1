@@ -17,10 +17,10 @@ const QuestionStep: React.FC<QuestionStepProps> = ({
   className
 }) => {
   return (
-    <div className={cn("space-y-6", className)} dir="rtl">
-      <h2 className="text-xl font-semibold flex items-center gap-2 text-primary/90">
-        {icon}
+    <div className={cn("space-y-6 text-right", className)} dir="rtl">
+      <h2 className="text-xl font-semibold flex items-center gap-2 text-primary/90 justify-end">
         {title}
+        {icon}
       </h2>
       <div className="space-y-6">
         {children}

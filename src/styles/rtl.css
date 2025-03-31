@@ -195,6 +195,10 @@
 
   /* Questionnaire specific RTL fixes */
   [dir="rtl"] .questionnaire-container {
+    @apply text-right w-full;
+  }
+  
+  [dir="rtl"] .questionnaire-container .form-group {
     @apply text-right;
   }
 
@@ -209,15 +213,10 @@
   [dir="rtl"] .checkbox-group {
     @apply text-right;
   }
-
-  /* Improved RTL for toggle buttons */
-  [dir="rtl"] .toggle-group {
-    @apply flex-row-reverse;
-  }
   
-  /* Fix tab spacing in RTL */
-  [dir="rtl"] .tabs-list {
-    @apply flex-row-reverse;
+  /* Fix for animation direction in RTL */
+  [dir="rtl"] .slide-in {
+    animation-direction: reverse;
   }
   
   /* Ensure form elements align correctly */
@@ -235,5 +234,37 @@
   /* Rating buttons with RTL support */
   [dir="rtl"] .rating-buttons {
     @apply flex-row-reverse;
+  }
+
+  /* Additional questionnaire RTL fixes */
+  [dir="rtl"] .question-step {
+    @apply text-right;
+  }
+  
+  [dir="rtl"] .question-title {
+    @apply flex flex-row-reverse;
+  }
+  
+  [dir="rtl"] .confidence-scale {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .intervention-options {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .completion-content {
+    @apply text-right;
+  }
+  
+  /* Mobile RTL adjustments */
+  @media (max-width: 640px) {
+    [dir="rtl"] .mobile-nav {
+      @apply right-0 left-auto;
+    }
+    
+    [dir="rtl"] .questionnaire-container {
+      @apply px-2;
+    }
   }
 }
