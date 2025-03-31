@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,10 +6,8 @@ import TradeJournalHeader from '@/components/trade-journal/TradeJournalHeader';
 import TradeNotes from '@/components/trade-journal/TradeNotes';
 import { tradeNotes } from '@/components/trade-journal/mockData';
 import QuestionnaireResults from '@/components/trade-journal/QuestionnaireResults';
-import { createClient } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-const supabase = createClient();
 
 const TradeJournalPage = () => {
   const [activeTab, setActiveTab] = useState('questionnaire');
