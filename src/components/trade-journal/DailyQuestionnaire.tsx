@@ -29,15 +29,23 @@ const formSchema = z.object({
   mentalState: z.string(),
   mentalStateNotes: z.string().optional(),
   algoPerformanceChecked: z.enum(['yes', 'no']),
-  algoPerformanceNotes: z.string().when('algoPerformanceChecked', {
-    is: 'yes',
-    then: z.string().min(1, "אנא הזן את המסקנות העיקריות"),
-    otherwise: z.string().optional(),
-  }),
+  algoPerformanceNotes: z.string().optional(),
   riskPercentage: z.string(),
   riskComfortLevel: z.string(),
   dailyReflection: z.string().optional(),
-});
+}).refine(
+  (data) => {
+    // If algoPerformanceChecked is 'yes', then algoPerformanceNotes should not be empty
+    if (data.algoPerformanceChecked === 'yes') {
+      return !!data.algoPerformanceNotes;
+    }
+    return true;
+  },
+  {
+    message: "אנא הזן את המסקנות העיקריות",
+    path: ["algoPerformanceNotes"],
+  }
+);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -347,14 +355,6 @@ const DailyQuestionnaire: React.FC<DailyQuestionnaireProps> = ({ onSubmit }) => 
                   step={0.1}
                   value={[parseFloat(riskPercentage)]}
                   onValueChange={(value) => setValue('riskPercentage', value[0].toString())}
-                  showTooltips
-                  tooltipLabels={{
-                    0.1: "0.1%",
-                    0.5: "0.5%",
-                    1: "1%",
-                    1.5: "1.5%",
-                    2: "2%"
-                  }}
                 />
               </div>
               
