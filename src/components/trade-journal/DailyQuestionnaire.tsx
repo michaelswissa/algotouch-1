@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -38,7 +37,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
-import { QuestionnaireResults } from './QuestionnaireResults';
+import QuestionnaireResults from './QuestionnaireResults';
 
 // Component to display emoji slider with tooltips
 const EmotionSlider: React.FC<{
