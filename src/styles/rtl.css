@@ -125,4 +125,37 @@
   [dir="rtl"] .card-badge {
     @apply left-2 right-auto;
   }
+
+  /* Radio and checkbox RTL */
+  [dir="rtl"] .radio-group-item,
+  [dir="rtl"] .checkbox-item {
+    @apply mr-0 ml-2;
+  }
+
+  /* Form elements spacing for RTL */
+  [dir="rtl"] .form-control {
+    @apply text-right;
+  }
+
+  /* Tooltip RTL */
+  [dir="rtl"] [data-popper-placement="left"] {
+    @apply right-8 left-auto;
+  }
+
+  /* Image flip for directional icons */
+  [dir="rtl"] .direction-icon {
+    transform: rotateY(180deg);
+  }
+
+  /* Slider RTL */
+  [dir="rtl"] .slider-value {
+    transform: translateX(50%);
+    right: 50%;
+    left: auto;
+  }
+
+  /* Chart labels for RTL */
+  [dir="rtl"] .recharts-text {
+    text-anchor: end;
+  }
 }
