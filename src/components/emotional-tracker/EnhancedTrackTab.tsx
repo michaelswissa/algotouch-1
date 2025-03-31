@@ -35,7 +35,7 @@ const EnhancedTrackTab: React.FC<EnhancedTrackTabProps> = ({
   const [emotionNotes, setEmotionNotes] = useState('');
   const [tradingDayRating, setTradingDayRating] = useState('');
   const [followedPlan, setFollowedPlan] = useState('');
-  const [psychologicalPatterns, setPsychologicalPatterns] = useState<string[]>([]);
+  const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
   const [preMarketSleep, setPreMarketSleep] = useState('');
   const [stressLevel, setStressLevel] = useState(5);
   const [dailyReflection, setDailyReflection] = useState('');
@@ -56,6 +56,16 @@ const EnhancedTrackTab: React.FC<EnhancedTrackTabProps> = ({
   const getEmotionDescription = () => {
     const emotion = enhancedEmotions.find(e => e.id === selectedEmotion);
     return emotion?.description || '';
+  };
+
+  const handlePatternSelect = (patternId: string) => {
+    if (!selectedPatterns.includes(patternId)) {
+      setSelectedPatterns([...selectedPatterns, patternId]);
+    }
+  };
+
+  const handlePatternRemove = (patternId: string) => {
+    setSelectedPatterns(selectedPatterns.filter(id => id !== patternId));
   };
 
   return (
@@ -167,7 +177,7 @@ const EnhancedTrackTab: React.FC<EnhancedTrackTabProps> = ({
                   בחר דפוסים פסיכולוגיים שאתה חווה או מזהה היום:
                 </p>
                 
-                <Select>
+                <Select onValueChange={handlePatternSelect}>
                   <SelectTrigger>
                     <SelectValue placeholder="בחר דפוסים פסיכולוגיים" />
                   </SelectTrigger>
@@ -181,19 +191,25 @@ const EnhancedTrackTab: React.FC<EnhancedTrackTabProps> = ({
                 </Select>
                 
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                    פחד מהחמצה (FOMO)
-                    <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
-                      ✕
-                    </Button>
-                  </div>
-                  
-                  <div className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                    הימנעות מהפסד
-                    <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
-                      ✕
-                    </Button>
-                  </div>
+                  {selectedPatterns.map(patternId => {
+                    const pattern = psychologicalPatterns.find(p => p.id === patternId);
+                    return pattern ? (
+                      <div 
+                        key={pattern.id}
+                        className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-3 py-1 rounded-full text-sm flex items-center gap-1"
+                      >
+                        {pattern.name}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-5 w-5 rounded-full"
+                          onClick={() => handlePatternRemove(pattern.id)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ) : null;
+                  })}
                 </div>
               </div>
             </div>
