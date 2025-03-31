@@ -18,14 +18,14 @@ const ConfidenceStep: React.FC<ConfidenceStepProps> = ({
 }) => {
   return (
     <QuestionStep title="איך היית מדרג את רמת הביטחון שלך במסחר היום?" icon="🧠">
-      <div className="mt-8 space-y-8" dir="rtl">
+      <div className="mt-8 space-y-8">
         <div className="relative">
-          <div className="absolute -top-10 left-0 right-0 flex justify-between px-2">
-            <span className="text-sm font-medium text-green-500">ביטחון גבוה ותחושת שליטה</span>
+          <div className="absolute -top-10 right-0 left-0 flex justify-between px-2">
             <span className="text-sm font-medium text-red-500">חשש מתנודתיות</span>
+            <span className="text-sm font-medium text-green-500">ביטחון גבוה ותחושת שליטה</span>
           </div>
           
-          <div className="flex flex-row-reverse justify-between mt-8">
+          <div className="flex justify-between mt-8">
             {[1, 2, 3, 4, 5].map((value) => (
               <div 
                 key={value} 

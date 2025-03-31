@@ -256,7 +256,38 @@
   [dir="rtl"] .completion-content {
     @apply text-right;
   }
-  
+
+  /* Animation direction overrides for RTL */
+  [dir="rtl"] .animate-slide-in-right {
+    animation-name: slide-in-right-rtl;
+  }
+
+  @keyframes slide-in-right-rtl {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(0); }
+  }
+
+  [dir="rtl"] .animate-slide-out-right {
+    animation-name: slide-out-right-rtl;
+  }
+
+  @keyframes slide-out-right-rtl {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Card heading RTL adjustments */
+  [dir="rtl"] .card-title,
+  [dir="rtl"] h1, 
+  [dir="rtl"] h2, 
+  [dir="rtl"] h3, 
+  [dir="rtl"] h4, 
+  [dir="rtl"] h5, 
+  [dir="rtl"] h6,
+  [dir="rtl"] p {
+    text-align: right;
+  }
+
   /* Mobile RTL adjustments */
   @media (max-width: 640px) {
     [dir="rtl"] .mobile-nav {

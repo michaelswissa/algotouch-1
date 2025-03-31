@@ -92,7 +92,7 @@ const TradeJournalPage = () => {
       <div className="tradervue-container py-6" dir="rtl">
         <TradeJournalHeader onNewNote={handleNewNote} />
         
-        {/* Horizontal scrollable notes section */}
+        {/* Horizontal scrollable notes section - now shows saved reports */}
         <TradeNotes notes={savedReports} />
         
         {/* Main content area with tabs */}
