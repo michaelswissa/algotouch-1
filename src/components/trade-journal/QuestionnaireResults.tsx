@@ -7,7 +7,9 @@ import {
   BarChart3,
   PieChart,
   TrendingUp,
-  HelpCircle
+  HelpCircle,
+  Brain,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart as RechartPieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
@@ -31,6 +33,7 @@ interface QuestionnaireResultsProps {
   };
   insight: string;
   interventionReasons: string[];
+  isLoadingInsight?: boolean;
 }
 
 // Map for translating reason codes to Hebrew labels
@@ -111,7 +114,8 @@ const generateTrendData = (currentValue: number, metric: string) => {
 const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({ 
   metrics, 
   insight, 
-  interventionReasons 
+  interventionReasons,
+  isLoadingInsight = false
 }) => {
   // Prepare data for the bar chart
   const barData = [
@@ -198,6 +202,47 @@ const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({
       animate={{ opacity: 1 }}
       className="rtl"
     >
+      <Card className="hover-glow shadow-md mb-8">
+        <CardHeader className="pb-3 border-b border-border/30">
+          <CardTitle className="text-xl font-bold flex items-center gap-2 text-right">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: 0 }}
+            >
+              <Brain className="h-5 w-5 text-primary" />
+            </motion.div>
+            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              תובנה AI מותאמת אישית
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className={`p-5 rounded-md border ${alertLevel.bgColor} relative`}
+          >
+            {isLoadingInsight ? (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <p className="mr-3 text-base">מייצר תובנה מותאמת אישית...</p>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                {alertLevel.icon}
+                <div>
+                  <p className={`text-base leading-relaxed ${alertLevel.textColor}`}>
+                    {insight}
+                  </p>
+                  <p className="text-xs mt-3 text-muted-foreground opacity-70">* התובנה נוצרה באמצעות AI בהתבסס על הנתונים שהזנת</p>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </CardContent>
+      </Card>
+
       <Card className="hover-glow shadow-md">
         <CardHeader className="pb-3 border-b border-border/30">
           <CardTitle className="text-xl font-bold flex items-center gap-2 text-right">
@@ -213,21 +258,8 @@ const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-8">
-          {/* Metrics summary and insight */}
+          {/* Metrics summary */}
           <div className="space-y-6">
-            {/* Insight message with alert level */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              className={`p-4 rounded-md border ${alertLevel.bgColor}`}
-            >
-              <div className="flex gap-3">
-                {alertLevel.icon}
-                <p className={`text-base ${alertLevel.textColor}`}>{insight}</p>
-              </div>
-            </motion.div>
-
             {/* Metrics overview cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <motion.div 
@@ -411,7 +443,6 @@ const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({
                       <Bar 
                         dataKey="value" 
                         name="ערך" 
-                        fill="#0066FF" 
                         radius={[4, 4, 0, 0]} 
                         fillOpacity={0.8}
                         stroke="#0066FF"
@@ -425,97 +456,12 @@ const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({
                 </div>
               </motion.div>
               
-              {/* Trend Chart */}
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="bg-card/30 p-4 rounded-lg shadow-sm border border-muted"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-medium flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    מגמות שבועיות
-                  </h3>
-                </div>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={omrsTrendData}
-                      margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#ccc" }} />
-                      <YAxis tick={{ fontSize: 12, fill: "#ccc" }} domain={[0, 5]} />
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: '12px', color: "#fff" }} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="OMRS" 
-                        name="מוכנות מנטלית" 
-                        stroke="#22c55e" 
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="text-xs text-muted-foreground mt-3 text-center">
-                  מגמת המוכנות המנטלית שלך בשבוע האחרון
-                </div>
-              </motion.div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* AI Alert Chart */}
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.6 }}
-                className="bg-card/30 p-4 rounded-lg shadow-sm border border-muted"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-medium flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    מדד האזהרה השבועי
-                  </h3>
-                </div>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={aiTrendData}
-                      margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#ccc" }} />
-                      <YAxis tick={{ fontSize: 12, fill: "#ccc" }} domain={[0, 5]} />
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: '12px', color: "#fff" }} />
-                      {/* Add a reference line at AI = 2.5 to show the warning threshold */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="AI" 
-                        name="מדד אזהרה" 
-                        stroke="#ef4444" 
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="text-xs text-muted-foreground mt-3 text-center">
-                  ערך מדד האזהרה מעל 2.5 מצביע על סיכון ומצריך זהירות
-                </div>
-              </motion.div>
-              
               {/* Pie Chart - only show if there are intervention reasons */}
               {interventionReasons.length > 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.6 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
                   className="bg-card/30 p-4 rounded-lg shadow-sm border border-muted"
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -553,26 +499,93 @@ const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.6 }}
-                  className="bg-card/30 p-4 rounded-lg shadow-sm border border-muted flex flex-col items-center justify-center"
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="bg-card/30 p-4 rounded-lg shadow-sm border border-muted"
                 >
-                  <div className="flex items-center justify-center flex-col gap-3">
-                    <CheckCircle2 className="h-12 w-12 text-green-500 opacity-60" />
-                    <h3 className="text-base font-medium text-center">לא נרשמו התערבויות באלגוריתם</h3>
-                    <p className="text-sm text-muted-foreground text-center max-w-md">
-                      אין נתונים על סיבות להתערבות. המשך לשמור על משמעת עצמית גבוהה והימנע מלהתערב בפעילות האלגוריתם.
-                    </p>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-medium flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      מגמות שבועיות
+                    </h3>
+                  </div>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={omrsTrendData}
+                        margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#ccc" }} />
+                        <YAxis tick={{ fontSize: 12, fill: "#ccc" }} domain={[0, 5]} />
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: '12px', color: "#fff" }} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="OMRS" 
+                          name="מוכנות מנטלית" 
+                          stroke="#22c55e" 
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-3 text-center">
+                    מגמת המוכנות המנטלית שלך בשבוע האחרון
                   </div>
                 </motion.div>
               )}
             </div>
+            
+            {/* AI trend chart */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="bg-card/30 p-4 rounded-lg shadow-sm border border-muted"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  מדד האזהרה השבועי
+                </h3>
+              </div>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={aiTrendData}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#ccc" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "#ccc" }} domain={[0, 5]} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: '12px', color: "#fff" }} />
+                    {/* Add a reference line at AI = 2.5 to show the warning threshold */}
+                    <Line 
+                      type="monotone" 
+                      dataKey="AI" 
+                      name="מדד אזהרה" 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-xs text-muted-foreground mt-3 text-center">
+                ערך מדד האזהרה מעל 2.5 מצביע על סיכון ומצריך זהירות
+              </div>
+            </motion.div>
           </div>
           
-          {/* Explanations section */}
+          {/* Help section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
             className="bg-card/50 p-4 rounded-lg shadow-sm border border-muted"
           >
             <h3 className="text-base font-medium mb-3 border-r-4 border-primary/60 pr-2">הסבר המדדים</h3>
@@ -624,16 +637,6 @@ const QuestionnaireResults: React.FC<QuestionnaireResultsProps> = ({
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   מדד המשקלל גורמי סיכון להתנהגות רגשית לא יציבה. ערך מעל 2.5 מהווה אזהרה.
-                </p>
-              </div>
-              
-              <div className="space-y-1.5">
-                <div className="flex gap-2">
-                  <span className="font-medium text-teal-400">CALC</span>
-                  <span className="text-muted-foreground text-sm">(נוסחת חישוב)</span>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  OMRS = ESS - (0.5 × II) - (0.5 × External Factors) - Stress Points
                 </p>
               </div>
             </div>
