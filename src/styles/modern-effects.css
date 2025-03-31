@@ -95,23 +95,43 @@
 
 /* Insight cards */
 .insight-card {
-  @apply transition-all duration-300 border rounded-md mb-2;
+  @apply transition-all duration-300 border rounded-md mb-2 overflow-hidden;
 }
 
 .insight-card-green {
   @apply bg-emerald-950/30 border-emerald-800 hover:bg-emerald-900/40;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
+}
+
+.insight-card-green:hover {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
 }
 
 .insight-card-red {
   @apply bg-red-950/30 border-red-800 hover:bg-red-900/40;
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.1);
+}
+
+.insight-card-red:hover {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
 }
 
 .insight-card-blue {
   @apply bg-blue-950/30 border-blue-800 hover:bg-blue-900/40;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+}
+
+.insight-card-blue:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
 }
 
 .recommendation-card {
   @apply border-r-4 bg-slate-800/60 py-3 px-4 rtl hover:bg-slate-800/80 transition-all duration-200;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.recommendation-card:hover {
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
 }
 
 .insight-header {
@@ -124,8 +144,121 @@
 
 .tool-card {
   @apply bg-slate-900/80 hover:bg-slate-800/90 transition-colors border-slate-700 p-4 rtl text-right;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.tool-card:hover {
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
 }
 
 .quote-card {
   @apply bg-orange-950/20 border-orange-900 hover:bg-orange-950/30 transition-colors rtl text-right;
+  box-shadow: 0 0 10px rgba(234, 88, 12, 0.1);
+}
+
+.quote-card:hover {
+  box-shadow: 0 0 15px rgba(234, 88, 12, 0.2);
+}
+
+/* Breathing animation for calming elements */
+.breathing-element {
+  animation: breathing 6s ease-in-out infinite;
+}
+
+@keyframes breathing {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+}
+
+/* Charts glow effect */
+.chart-glow {
+  @apply transition-all duration-500;
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.2));
+}
+
+.chart-glow:hover {
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
+}
+
+/* Progress bar animation */
+.animate-progress {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  width: 50%;
+  height: 100%;
+  transform: translateX(-150%);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(150%);
+  }
+}
+
+/* Emotional indicator pulse animation */
+.emotion-pulse {
+  animation: emotion-pulse 2s ease-in-out infinite;
+}
+
+@keyframes emotion-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+/* Pattern reveal animation */
+.pattern-reveal {
+  animation: pattern-reveal 0.7s ease-out;
+}
+
+@keyframes pattern-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Psychological insight float animation */
+.insight-float {
+  animation: insight-float 8s ease-in-out infinite;
+}
+
+@keyframes insight-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }

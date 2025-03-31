@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { emotions, Emotion } from './data/emotions';
+import { enhancedEmotions } from './data/enhanced-emotions';
 
 interface EmotionButtonsProps {
   selectedEmotion: string;
@@ -14,11 +14,14 @@ const EmotionButtons: React.FC<EmotionButtonsProps> = ({
 }) => {
   return (
     <div className="flex flex-wrap gap-2 justify-center rtl">
-      {emotions.map((emotion) => (
+      {enhancedEmotions.map((emotion) => (
         <Button
           key={emotion.id}
           variant={selectedEmotion === emotion.id ? "default" : "outline"}
-          className={`${selectedEmotion === emotion.id ? emotion.color + ' text-white' : ''} flex-1 min-w-24`}
+          className={`${selectedEmotion === emotion.id ? emotion.color + ' text-white shadow-md' : ''} 
+            flex-1 min-w-[100px] transition-all duration-300 hover:shadow-md
+            ${selectedEmotion === emotion.id ? 'transform scale-105' : ''}
+          `}
           onClick={() => setSelectedEmotion(emotion.id)}
         >
           {emotion.label}

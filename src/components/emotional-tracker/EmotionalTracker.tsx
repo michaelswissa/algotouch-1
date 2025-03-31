@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TrackTab from './TrackTab';
 import AnalysisTab from './AnalysisTab';
 import InsightsTab from './InsightsTab';
+import EnhancedTrackTab from './EnhancedTrackTab';
 
 const EmotionalTracker: React.FC = () => {
   const [activeTab, setActiveTab] = useState('track');
@@ -23,7 +24,7 @@ const EmotionalTracker: React.FC = () => {
         </TabsList>
         
         <TabsContent value="track" className="space-y-6">
-          <TrackTab 
+          <EnhancedTrackTab
             selectedEmotion={selectedEmotion}
             setSelectedEmotion={setSelectedEmotion}
           />
