@@ -11,6 +11,7 @@ interface RatingButtonsProps {
     value: string;
     label: string;
     tooltip?: string;
+    icon?: React.ReactNode;
   }[];
   className?: string;
 }
@@ -34,9 +35,10 @@ const RatingButtons: React.FC<RatingButtonsProps> = ({
                 onClick={() => onChange(option.value)}
                 className={cn(
                   "flex-1 transition-all duration-200",
-                  value === option.value && "bg-primary text-primary-foreground"
+                  value === option.value && "bg-primary text-primary-foreground ring-2 ring-primary/20"
                 )}
               >
+                {option.icon && <span className="mr-1">{option.icon}</span>}
                 {option.label}
               </Button>
             </TooltipTrigger>
