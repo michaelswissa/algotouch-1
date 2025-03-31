@@ -92,12 +92,12 @@ const TradeJournalPage = () => {
       <div className="tradervue-container py-6" dir="rtl">
         <TradeJournalHeader onNewNote={handleNewNote} />
         
-        {/* Horizontal scrollable notes section - now shows saved reports */}
+        {/* Horizontal scrollable notes section - showing saved reports */}
         <TradeNotes notes={savedReports} />
         
         {/* Main content area with tabs */}
         <div className="space-y-6 animate-fade-in mt-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6 bg-slate-900/30 dark:bg-white/5 p-1 rounded-lg flex justify-end gap-2">
               <TabsTrigger 
                 value="report" 
