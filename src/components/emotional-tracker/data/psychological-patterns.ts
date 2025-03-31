@@ -1,4 +1,5 @@
 
+// Define the psychological pattern data structure
 export interface PsychologicalPattern {
   id: string;
   name: string;
@@ -71,3 +72,49 @@ export const psychologicalPatterns: PsychologicalPattern[] = [
     ]
   }
 ];
+
+// Function to detect psychological patterns based on emotional states and behaviors
+export const detectPatterns = (
+  emotionHistory: string[], // Array of emotion IDs in chronological order
+  tradingBehaviors: string[], // Array of observed trading behavior IDs
+  recentLosses: number, // Number of recent consecutive losses
+  timeAfterLoss: number // Minutes since last loss
+): string[] => {
+  const detectedPatterns: string[] = [];
+  
+  // Check for FOMO pattern
+  if (emotionHistory.includes('anxiety') && 
+      tradingBehaviors.includes('late_entry_after_move')) {
+    detectedPatterns.push('fomo');
+  }
+  
+  // Check for loss aversion
+  if (emotionHistory.includes('fear') && 
+      (tradingBehaviors.includes('moving_stops_further') || 
+       tradingBehaviors.includes('late_exit_losing_trade'))) {
+    detectedPatterns.push('loss_aversion');
+  }
+  
+  // Check for confirmation bias
+  if (emotionHistory.includes('confidence') && 
+      tradingBehaviors.includes('ignoring_contrary_evidence')) {
+    detectedPatterns.push('confirmation_bias');
+  }
+  
+  // Check for revenge trading
+  if (recentLosses > 0 && 
+      timeAfterLoss < 60 && 
+      (emotionHistory.includes('frustration') || emotionHistory.includes('anger')) &&
+      tradingBehaviors.includes('increased_position_size')) {
+    detectedPatterns.push('revenge_trading');
+  }
+  
+  // Check for overconfidence
+  if (emotionHistory.includes('confidence') && 
+      (tradingBehaviors.includes('increased_position_size') || 
+       tradingBehaviors.includes('ignoring_analysis_for_gut'))) {
+    detectedPatterns.push('overconfidence');
+  }
+  
+  return detectedPatterns;
+};
