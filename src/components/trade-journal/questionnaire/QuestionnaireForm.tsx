@@ -290,8 +290,8 @@ const QuestionnaireForm: React.FC<QuestionnaireFormProps> = ({ onSubmit }) => {
             isLastStep={currentStep === steps.length}
           />
         </CardFooter>
-      </form>
-    </Card>
+      </Card>
+    </form>
   );
 };
 
