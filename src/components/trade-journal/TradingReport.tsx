@@ -1,378 +1,340 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
-import { CircleCheck, CircleX, AlertTriangle, Smile, Clock, BarChart3, LineChart, TrendingUp, TrendingDown, Minus, Brain, Zap, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import EmotionIcon from './EmotionIcon';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
+import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, CheckIcon, AlertTriangle, CheckCircle2, XCircle, Info } from 'lucide-react';
 
 interface TradingReportProps {
   data: {
     date: string;
-    feeling: {
-      rating: number;
-      notes: string;
+    emotional: {
+      state: string;
+      notes?: string;
     };
     intervention: {
       level: string;
       reasons: string[];
     };
-    marketDirection: string;
-    mentalState: {
-      rating: number;
-      notes: string;
+    market: {
+      surprise: string;
+      notes?: string;
+    };
+    confidence: {
+      level: number;
     };
     algoPerformance: {
       checked: string;
-      notes: string;
+      notes?: string;
     };
-    riskManagement: {
+    risk: {
       percentage: number;
       comfortLevel: number;
     };
-    reflection: string;
+    insight?: string;
   };
 }
 
 const TradingReport: React.FC<TradingReportProps> = ({ data }) => {
-  const today = data.date || format(new Date(), 'dd/MM/yyyy');
-  
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2,
+        delayChildren: 0.3,
+      },
+    },
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  };
+
+  // Helper function to map intervention level to UI elements
   const getInterventionIcon = () => {
     switch (data.intervention.level) {
-      case "none":
-        return <CircleCheck className="h-5 w-5 text-green-500" />;
-      case "slight":
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case "strong":
-        return <AlertTriangle className="h-5 w-5 text-orange-500" />;
-      case "actual":
-        return <CircleX className="h-5 w-5 text-red-500" />;
+      case 'none':
+        return <CheckCircle2 className="text-green-500" size={24} />;
+      case 'wanted':
+        return <AlertTriangle className="text-amber-500" size={24} />;
+      case 'intervened':
+        return <XCircle className="text-red-500" size={24} />;
       default:
-        return <Clock className="h-5 w-5 text-gray-500" />;
+        return <Info className="text-blue-500" size={24} />;
     }
   };
-  
+
   const getInterventionText = () => {
     switch (data.intervention.level) {
-      case "none":
-        return "לא בכלל";
-      case "slight":
-        return "רצון קל";
-      case "strong":
-        return "רצון חזק";
-      case "actual":
-        return "התערבתי בפועל";
+      case 'none':
+        return 'לא שיניתי';
+      case 'wanted':
+        return 'רציתי להתערב';
+      case 'intervened':
+        return 'התערבתי בפועל';
       default:
-        return "לא צוין";
+        return 'לא צוין';
     }
   };
 
-  const getMarketDirectionIcon = () => {
-    switch (data.marketDirection) {
-      case "up":
-        return <TrendingUp className="h-5 w-5 text-green-500" />;
-      case "sideways":
-        return <Minus className="h-5 w-5 text-yellow-500" />;
-      case "down":
-        return <TrendingDown className="h-5 w-5 text-red-500" />;
+  // Helper function to map market direction to UI elements
+  const getMarketIcon = () => {
+    switch (data.market.surprise) {
+      case 'no':
+        return <CheckIcon className="text-green-500" size={24} />;
+      case 'yes':
+        return <AlertTriangle className="text-amber-500" size={24} />;
       default:
-        return <LineChart className="h-5 w-5 text-gray-500" />;
-    }
-  };
-  
-  const getMarketDirectionText = () => {
-    switch (data.marketDirection) {
-      case "up":
-        return "עולה";
-      case "sideways":
-        return "מדשדש";
-      case "down":
-        return "יורד";
-      default:
-        return "לא צוין";
+        return <Info className="text-blue-500" size={24} />;
     }
   };
 
-  const getInterventionReasonText = (reason: string) => {
-    switch (reason) {
-      case "fear":
-        return "פחד מהפסד";
-      case "fix":
-        return "רצון לתקן";
-      case "distrust":
-        return "חוסר אמון באלגו";
-      case "greed":
-        return "חמדנות / פומו";
-      default:
-        return reason;
-    }
+  const getConfidenceLevelColor = (level: number) => {
+    if (level <= 2) return 'bg-red-500';
+    if (level === 3) return 'bg-amber-500';
+    return 'bg-green-500';
+  };
+
+  const getComfortLevelColor = (level: number) => {
+    if (level <= 2) return 'bg-red-500';
+    if (level === 3) return 'bg-amber-500';
+    return 'bg-green-500';
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+      className="max-w-3xl mx-auto"
+      variants={container}
+      initial="hidden"
+      animate="show"
     >
-      <Card className="mb-8 hover-glow shadow-md">
-        <CardHeader className="pb-3 border-b border-border/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{today}</span>
-              </div>
-              <Button variant="outline" size="icon" className="h-8 w-8">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                דוח מסחר יומי
-              </span>
-            </CardTitle>
-          </div>
+      <Card className="shadow-lg border-primary/20 hover-glow">
+        <CardHeader className="bg-primary/5 pb-4 border-b border-border/30">
+          <CardTitle className="text-2xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+            🚀 דוח יומי | {data.date}
+          </CardTitle>
         </CardHeader>
         
-        <CardContent className="p-6 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* מצב רגשי כללי */}
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <Smile className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">מצב רגשי כללי</h3>
-              </div>
-              
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">הרגשה כללית:</span>
-                <div className="flex items-center gap-1">
-                  <EmotionIcon emotion={data.feeling.rating.toString()} size={28} />
+        <CardContent className="p-6 space-y-6">
+          {/* Emotional State Section */}
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              😌 מצב רגשי כללי
+            </h3>
+            
+            <div className="bg-card/50 p-4 rounded-lg border border-border/30 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-4xl mb-2">{data.emotional.state}</div>
+                <div className="text-sm text-muted-foreground">
+                  {data.emotional.state === '😣' && 'מתוח'}
+                  {data.emotional.state === '😕' && 'לא רגוע'}
+                  {data.emotional.state === '😐' && 'ניטרלי'}
+                  {data.emotional.state === '🙂' && 'רגוע'}
+                  {data.emotional.state === '😎' && 'מפוקס ובטוח'}
                 </div>
               </div>
               
-              <Progress 
-                value={data.feeling.rating * 20} 
-                className="h-2 mb-3"
-                indicatorClassName={
-                  data.feeling.rating <= 2 ? "bg-red-500" :
-                  data.feeling.rating === 3 ? "bg-amber-500" :
-                  "bg-green-500"
-                }
-              />
-              
-              {data.feeling.notes && (
-                <div className="mt-3 bg-card/40 p-3 rounded border border-border/30 text-sm text-right">
-                  {data.feeling.notes}
+              {data.emotional.notes && (
+                <div className="flex-1 bg-secondary/30 p-3 rounded-md text-sm">
+                  {data.emotional.notes}
                 </div>
               )}
             </div>
+          </motion.div>
+          
+          <Separator className="my-6" />
+          
+          {/* Intervention Section */}
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              🔁 התערבות באלגו
+            </h3>
             
-            {/* התערבות באלגו */}
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <Zap className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">התערבות באלגו</h3>
+            <div className="bg-card/50 p-4 rounded-lg border border-border/30">
+              <div className="flex items-center gap-3 mb-3">
+                {getInterventionIcon()}
+                <span className="font-medium">{getInterventionText()}</span>
               </div>
               
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-muted-foreground">האם היה דחף להתערב?</span>
-                <div className="flex items-center gap-2">
-                  {getInterventionIcon()}
-                  <span className={`text-sm ${
-                    data.intervention.level === "none" ? "text-green-500" :
-                    data.intervention.level === "slight" ? "text-yellow-500" :
-                    data.intervention.level === "strong" ? "text-orange-500" :
-                    "text-red-500"
-                  }`}>
-                    {getInterventionText()}
-                  </span>
-                </div>
-              </div>
-              
-              {data.intervention.level === "actual" && data.intervention.reasons.length > 0 && (
-                <div>
-                  <span className="text-sm text-muted-foreground block mb-2">סיבות להתערבות:</span>
-                  <div className="flex flex-wrap gap-2 justify-end">
-                    {data.intervention.reasons.map((reason, index) => (
-                      <Badge 
-                        key={index} 
-                        variant="outline" 
-                        className="bg-card/50"
+              {data.intervention.level === 'intervened' && data.intervention.reasons.length > 0 && (
+                <div className="mt-3">
+                  <div className="text-sm font-medium mb-2">הסיבות להתערבות:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {data.intervention.reasons.map((reason) => (
+                      <div 
+                        key={reason} 
+                        className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-1 rounded-full text-sm"
                       >
-                        <div className="flex items-center gap-1">
-                          <EmotionIcon emotion={reason} size={16} />
-                          <span>{getInterventionReasonText(reason)}</span>
-                        </div>
-                      </Badge>
+                        {reason === 'fear' && 'פחד מהפסד'}
+                        {reason === 'fix' && 'רצון לתקן עסקה'}
+                        {reason === 'distrust' && 'חוסר אמון באלגו'}
+                        {reason === 'greed' && 'חמדנות / FOMO'}
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
             </div>
+          </motion.div>
+          
+          <Separator className="my-6" />
+          
+          {/* Market Direction Section */}
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              📈 כיוון השוק
+            </h3>
             
-            {/* כיוון השוק */}
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <LineChart className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">כיוון השוק</h3>
+            <div className="bg-card/50 p-4 rounded-lg border border-border/30">
+              <div className="flex items-center gap-3 mb-3">
+                {getMarketIcon()}
+                <span className="font-medium">
+                  {data.market.surprise === 'no' ? 'השוק התנהג כצפוי' : 'השוק הפתיע אותי'}
+                </span>
               </div>
               
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">מגמת השוק:</span>
-                <div className="flex items-center gap-2">
-                  {getMarketDirectionIcon()}
-                  <span className={`text-sm ${
-                    data.marketDirection === "up" ? "text-green-500" :
-                    data.marketDirection === "sideways" ? "text-yellow-500" :
-                    data.marketDirection === "down" ? "text-red-500" :
-                    "text-gray-500"
-                  }`}>
-                    {getMarketDirectionText()}
-                  </span>
+              {data.market.surprise === 'yes' && data.market.notes && (
+                <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-md text-sm text-amber-800 dark:text-amber-300 mt-2">
+                  {data.market.notes}
                 </div>
-              </div>
-              
-              <div className="h-16 mt-3 flex items-end justify-center">
-                <div className="w-full flex items-end justify-between">
-                  <div className={`h-12 w-8 rounded-t ${data.marketDirection === "down" ? "bg-red-500/70" : "bg-card/30"}`}></div>
-                  <div className={`h-8 w-8 rounded-t ${data.marketDirection === "sideways" ? "bg-yellow-500/70" : "bg-card/30"}`}></div>
-                  <div className={`h-12 w-8 rounded-t ${data.marketDirection === "up" ? "bg-green-500/70" : "bg-card/30"}`}></div>
-                </div>
-              </div>
+              )}
             </div>
+          </motion.div>
+          
+          <Separator className="my-6" />
+          
+          {/* Confidence Section */}
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              🧠 ביטחון במסחר
+            </h3>
             
-            {/* מצב מנטלי במסחר */}
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <Brain className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">מצב מנטלי במסחר</h3>
-              </div>
-              
+            <div className="bg-card/50 p-4 rounded-lg border border-border/30">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">הרגשה מנטלית:</span>
-                <div className="flex items-center gap-1">
-                  <EmotionIcon emotion={data.mentalState.rating.toString()} size={28} />
-                </div>
+                <span className="text-sm font-medium">רמת הביטחון:</span>
+                <span className="font-bold text-lg">{data.confidence.level}/5</span>
               </div>
               
-              <Progress 
-                value={data.mentalState.rating * 20} 
-                className="h-2 mb-3"
-                indicatorClassName={
-                  data.mentalState.rating <= 2 ? "bg-red-500" :
-                  data.mentalState.rating === 3 ? "bg-amber-500" :
-                  "bg-green-500"
-                }
-              />
-              
-              {data.mentalState.notes && (
-                <div className="mt-3 bg-card/40 p-3 rounded border border-border/30 text-sm text-right">
-                  {data.mentalState.notes}
-                </div>
-              )}
-            </div>
-            
-            {/* בדיקת ביצועי האלגו */}
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">בדיקת ביצועי האלגו</h3>
-              </div>
-              
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-muted-foreground">האם נבדקו ביצועי האלגו?</span>
-                <div className="flex items-center gap-2">
-                  {data.algoPerformance.checked === "yes" ? (
-                    <CircleCheck className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <CircleX className="h-5 w-5 text-red-500" />
-                  )}
-                  <span className={`text-sm ${data.algoPerformance.checked === "yes" ? "text-green-500" : "text-red-500"}`}>
-                    {data.algoPerformance.checked === "yes" ? "נבדקו" : "לא נבדקו"}
-                  </span>
-                </div>
-              </div>
-              
-              {data.algoPerformance.checked === "yes" && data.algoPerformance.notes && (
-                <div>
-                  <span className="text-sm text-muted-foreground block mb-2">מסקנות עיקריות:</span>
-                  <div className="bg-card/40 p-3 rounded border border-border/30 text-sm text-right">
-                    {data.algoPerformance.notes}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* שיפור ביצועים */}
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <Zap className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">שיפור ביצועים</h3>
-              </div>
-              
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">אחוז סיכון בעסקה:</span>
-                  <span className="font-medium text-primary">{data.riskManagement.percentage}%</span>
-                </div>
-                
-                <Progress 
-                  value={(data.riskManagement.percentage / 2) * 100} 
-                  className="h-2 mb-1"
-                  indicatorClassName={
-                    data.riskManagement.percentage > 1.5 ? "bg-red-500" :
-                    data.riskManagement.percentage > 0.8 ? "bg-amber-500" :
-                    "bg-green-500"
-                  }
+              <div className="h-4 bg-muted/50 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${getConfidenceLevelColor(data.confidence.level)}`}
+                  style={{ width: `${(data.confidence.level / 5) * 100}%` }}
                 />
               </div>
               
+              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                <span>חשש מתנודתיות</span>
+                <span>ביטחון גבוה ותחושת שליטה</span>
+              </div>
+            </div>
+          </motion.div>
+          
+          <Separator className="my-6" />
+          
+          {/* Algo Performance Section */}
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              📊 בדיקת ביצועי האלגו
+            </h3>
+            
+            <div className="bg-card/50 p-4 rounded-lg border border-border/30">
+              <div className="flex items-center gap-3 mb-3">
+                {data.algoPerformance.checked === 'yes' ? (
+                  <CheckCircle2 className="text-green-500" size={24} />
+                ) : (
+                  <XCircle className="text-red-500" size={24} />
+                )}
+                <span className="font-medium">
+                  {data.algoPerformance.checked === 'yes' ? 'בדקתי' : 'לא הספקתי לבדוק'}
+                </span>
+              </div>
+              
+              {data.algoPerformance.checked === 'yes' && data.algoPerformance.notes && (
+                <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-md text-sm text-blue-800 dark:text-blue-300 mt-2">
+                  {data.algoPerformance.notes}
+                </div>
+              )}
+            </div>
+          </motion.div>
+          
+          <Separator className="my-6" />
+          
+          {/* Risk Management Section */}
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              ⚙️ שאלות שיפור
+            </h3>
+            
+            <div className="bg-card/50 p-4 rounded-lg border border-border/30 space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">מידת נוחות עם הפסדים:</span>
-                  <div className="flex items-center gap-1">
-                    <EmotionIcon emotion={data.riskManagement.comfortLevel.toString()} size={24} />
-                  </div>
+                  <span className="text-sm font-medium">אחוז סיכון בעסקה:</span>
+                  <span className="font-bold text-lg">{data.risk.percentage}%</span>
                 </div>
                 
-                <Progress 
-                  value={data.riskManagement.comfortLevel * 20} 
-                  className="h-2 mb-3"
-                  indicatorClassName={
-                    data.riskManagement.comfortLevel <= 2 ? "bg-red-500" :
-                    data.riskManagement.comfortLevel === 3 ? "bg-amber-500" :
-                    "bg-green-500"
-                  }
-                />
-              </div>
-            </div>
-          </div>
-          
-          {/* רפלקציה יומית */}
-          {data.reflection && (
-            <div className="bg-card/30 p-4 rounded-lg border border-border/40 rtl">
-              <div className="flex items-center gap-2 mb-4">
-                <Brain className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">רפלקציה יומית</h3>
+                <div className="h-4 bg-muted/50 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500"
+                    style={{ width: `${(data.risk.percentage / 2) * 100}%` }}
+                  />
+                </div>
               </div>
               
-              <div className="bg-primary/10 p-4 rounded-lg border border-primary/30 text-right">
-                {data.reflection}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">רמת נוחות עם הפסדים:</span>
+                  <span className="font-bold text-lg">{data.risk.comfortLevel}/5</span>
+                </div>
+                
+                <div className="h-4 bg-muted/50 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${getComfortLevelColor(data.risk.comfortLevel)}`}
+                    style={{ width: `${(data.risk.comfortLevel / 5) * 100}%` }}
+                  />
+                </div>
+                
+                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                  <span>לא נוח בכלל</span>
+                  <span>נוח לגמרי</span>
+                </div>
               </div>
             </div>
+          </motion.div>
+          
+          {/* Daily Insight Section */}
+          {data.insight && (
+            <>
+              <Separator className="my-6" />
+              
+              <motion.div className="space-y-4" variants={item}>
+                <h3 className="text-xl font-semibold flex items-center gap-2">
+                  ✍️ מה למדת היום?
+                </h3>
+                
+                <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg text-blue-800 dark:text-blue-200 border border-blue-100 dark:border-blue-900/30">
+                  {data.insight}
+                </div>
+              </motion.div>
+            </>
           )}
           
-          <div className="flex justify-end mt-4">
-            <Button className="gap-2 bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-105">
-              <Calendar className="h-4 w-4" />
-              שמור בפתקים
-            </Button>
-          </div>
+          {/* AI Insight Section - Placeholder */}
+          <Separator className="my-6" />
+          
+          <motion.div className="space-y-4" variants={item}>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              ✨ תובנה יומית מ-AlgoTouch AI
+            </h3>
+            
+            <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+              <p>
+                בסיס על הדיווח שלך, הנה כמה תובנות: שים לב לאיך המצב הרגשי שלך משפיע על התערבות באלגו. 
+                תן לאלגו לעבוד באופן עצמאי גם כשהשוק מפתיע, הפחתת התערבות תוביל לתוצאות טובות יותר לאורך זמן.
+              </p>
+            </div>
+          </motion.div>
         </CardContent>
       </Card>
     </motion.div>

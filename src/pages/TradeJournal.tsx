@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DailyQuestionnaire from '@/components/trade-journal/DailyQuestionnaire';
 import TradeJournalHeader from '@/components/trade-journal/TradeJournalHeader';
 import TradeNotes from '@/components/trade-journal/TradeNotes';
 import { tradeNotes } from '@/components/trade-journal/mockData';
+import ModernTraderQuestionnaire from '@/components/trade-journal/ModernTraderQuestionnaire';
 import TradingReport from '@/components/trade-journal/TradingReport';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,7 +58,7 @@ const TradeJournalPage = () => {
             </TabsList>
             
             <TabsContent value="questionnaire" className="space-y-6">
-              <DailyQuestionnaire onSubmit={handleQuestionnaireSubmit} />
+              <ModernTraderQuestionnaire onSubmit={handleQuestionnaireSubmit} />
             </TabsContent>
             
             <TabsContent value="report" className="space-y-6">
