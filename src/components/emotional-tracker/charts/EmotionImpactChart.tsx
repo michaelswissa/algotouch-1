@@ -119,6 +119,14 @@ const EmotionImpactChart: React.FC<EmotionImpactChartProps> = ({
     }
   };
   
+  // Define YAxis domain based on metric
+  const getYAxisDomain = () => {
+    if (metric === 'winRate') {
+      return [0, 100] as [number, number];
+    }
+    return undefined; // Auto calculate domain for other metrics
+  };
+  
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -169,7 +177,7 @@ const EmotionImpactChart: React.FC<EmotionImpactChartProps> = ({
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="emotion" />
               <YAxis 
-                domain={metric === 'winRate' ? [0, 100] : 'auto'}
+                domain={getYAxisDomain()}
                 tickFormatter={(value) => formatValue(value)}
               />
               <Tooltip content={<CustomTooltip />} />
