@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import QuestionStep from './QuestionStep';
 
@@ -19,25 +18,14 @@ const ConfidenceStep: React.FC<ConfidenceStepProps> = ({
 }) => {
   return (
     <QuestionStep title="איך היית מדרג את רמת הביטחון שלך במסחר היום?" icon="🧠">
-      <div className="mt-8 space-y-8">
-        <Label className="block text-lg mb-6">סרגל מ-1 עד 5:</Label>
-        
-        <div className="relative pt-8">
-          <div className="absolute -top-2 left-0 right-0 flex justify-between px-2">
+      <div className="mt-8 space-y-8" dir="rtl">
+        <div className="relative pt-2">
+          <div className="absolute -top-10 left-0 right-0 flex justify-between px-2">
             <span className="text-sm font-medium text-red-500">חשש מתנודתיות</span>
             <span className="text-sm font-medium text-green-500">ביטחון גבוה ותחושת שליטה</span>
           </div>
           
-          <Slider
-            min={1}
-            max={5}
-            step={1}
-            value={[parseInt(confidenceLevel)]}
-            onValueChange={(value) => onConfidenceLevelChange(value[0].toString())}
-            className="my-8"
-          />
-          
-          <div className="flex justify-between mt-4">
+          <div className="flex justify-between mt-8">
             {[1, 2, 3, 4, 5].map((value) => (
               <div 
                 key={value} 

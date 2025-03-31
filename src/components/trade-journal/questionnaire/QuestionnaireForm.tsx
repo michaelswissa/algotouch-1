@@ -98,7 +98,7 @@ const QuestionnaireForm: React.FC<QuestionnaireFormProps> = ({ onSubmit }) => {
 
   const steps = [
     { id: 'emotional', title: '😌 איך הרגשת במהלך המסחר היום?' },
-    { id: 'intervention', title: '🔁 שינית פעולה של האלגו היום?' },
+    { id: 'intervention', title: '🔁 האם הרגשת דחף להתערב באלגו היום?' },
     { id: 'market', title: '📈 האם כיוון השוק הפתיע אותך היום?' },
     { id: 'confidence', title: '🧠 איך היית מדרג את רמת הביטחון שלך במסחר היום?' },
     { id: 'performance', title: '📊 האם בדקת את ביצועי האלגו בשבוע האחרון?' },
@@ -184,7 +184,7 @@ const QuestionnaireForm: React.FC<QuestionnaireFormProps> = ({ onSubmit }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)}>
+    <form onSubmit={handleSubmit(onFormSubmit)} dir="rtl" className="questionnaire-container">
       <Card className="overflow-hidden shadow-lg border-primary/20 bg-gradient-to-br from-card/90 to-card hover:shadow-xl transition-all duration-500">
         <CardHeader className="relative pb-2 bg-primary/5">
           <CardTitle className="text-2xl text-center font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">

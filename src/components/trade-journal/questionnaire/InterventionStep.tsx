@@ -40,16 +40,17 @@ const InterventionStep: React.FC<InterventionStepProps> = ({
   };
 
   return (
-    <QuestionStep title="שינית פעולה של האלגו היום?" icon="🔁">
+    <QuestionStep title="האם הרגשת דחף להתערב באלגו היום🔁?" icon="🔁">
       <RadioGroup
         value={algoIntervention}
         onValueChange={onAlgoInterventionChange}
         className="flex flex-col gap-4 mt-6"
+        dir="rtl"
       >
         <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
           <RadioGroupItem value="none" id="none" className="border-primary" />
           <Label htmlFor="none" className="text-lg font-medium flex items-center gap-2 cursor-pointer">
-            <span className="text-2xl">✅</span> לא שיניתי
+            <span className="text-2xl">✅</span> לא בכלל
           </Label>
         </div>
         
@@ -63,7 +64,7 @@ const InterventionStep: React.FC<InterventionStepProps> = ({
         <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
           <RadioGroupItem value="intervened" id="intervened" className="border-primary" />
           <Label htmlFor="intervened" className="text-lg font-medium flex items-center gap-2 cursor-pointer">
-            <span className="text-2xl">❗</span> שיניתי בפועל
+            <span className="text-2xl">❗</span> התערבתי בפועל
           </Label>
         </div>
       </RadioGroup>

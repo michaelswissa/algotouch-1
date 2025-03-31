@@ -192,4 +192,48 @@
   [dir="rtl"] .recharts-legend-item {
     @apply ml-0 mr-2;
   }
+
+  /* Questionnaire specific RTL fixes */
+  [dir="rtl"] .questionnaire-container {
+    @apply text-right;
+  }
+
+  [dir="rtl"] .step-navigation {
+    @apply flex-row-reverse;
+  }
+
+  [dir="rtl"] .radio-group {
+    @apply text-right;
+  }
+
+  [dir="rtl"] .checkbox-group {
+    @apply text-right;
+  }
+
+  /* Improved RTL for toggle buttons */
+  [dir="rtl"] .toggle-group {
+    @apply flex-row-reverse;
+  }
+  
+  /* Fix tab spacing in RTL */
+  [dir="rtl"] .tabs-list {
+    @apply flex-row-reverse;
+  }
+  
+  /* Ensure form elements align correctly */
+  [dir="rtl"] input[type="text"],
+  [dir="rtl"] input[type="number"],
+  [dir="rtl"] textarea {
+    @apply text-right;
+  }
+  
+  /* Star rating RTL fix */
+  [dir="rtl"] .star-rating {
+    @apply flex-row-reverse;
+  }
+  
+  /* Rating buttons with RTL support */
+  [dir="rtl"] .rating-buttons {
+    @apply flex-row-reverse;
+  }
 }
