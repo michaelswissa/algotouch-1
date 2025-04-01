@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { FileSpreadsheet } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -7,33 +7,37 @@ import { parseCSVFile, calculateTradeStats, TradeRecord, TradeStats } from '@/li
 import TradeUploadCard from '@/components/trade-report/TradeUploadCard';
 import TradeReportContent from '@/components/trade-report/TradeReportContent';
 import StatsCard from '@/components/trade-report/StatsCard';
+import { useFileUpload } from '@/hooks/use-file-upload';
 
 const MonthlyReport = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [activeTab, setActiveTab] = useState('table');
   const { toast } = useToast();
 
-  const handleFileSelected = async (file: File) => {
-    setSelectedFile(file);
-    try {
-      await handleUpload(file);
-    } catch (error) {
-      console.error("Error processing file:", error);
-      toast({
-        title: "שגיאה בטעינת הקובץ",
-        description: "אירעה שגיאה בעיבוד הקובץ. אנא ודא שהקובץ בפורמט הנכון.",
-        variant: "destructive",
-      });
+  const { 
+    selectedFile, 
+    isUploading, 
+    handleFileSelected,
+    resetFile
+  } = useFileUpload({
+    onFileAccepted: async (file) => {
+      try {
+        await handleUpload(file);
+      } catch (error) {
+        console.error("Error processing file:", error);
+        toast({
+          title: "שגיאה בטעינת הקובץ",
+          description: "אירעה שגיאה בעיבוד הקובץ. אנא ודא שהקובץ בפורמט הנכון.",
+          variant: "destructive",
+        });
+        resetFile();
+      }
     }
-  };
+  });
 
   const handleUpload = async (file: File) => {
     if (!file) return;
-    
-    setIsUploading(true);
     
     try {
       const tradeData = await parseCSVFile(file);
@@ -44,7 +48,6 @@ const MonthlyReport = () => {
           description: "הקובץ ריק או שפורמט הנתונים אינו תואם למבנה הנדרש.",
           variant: "destructive",
         });
-        setIsUploading(false);
         return;
       }
       
@@ -59,13 +62,7 @@ const MonthlyReport = () => {
       });
     } catch (error) {
       console.error("Error processing file:", error);
-      toast({
-        title: "שגיאה בעיבוד הקובץ",
-        description: "אירעה שגיאה בעיבוד הקובץ. אנא ודא שהקובץ בפורמט הנכון.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
+      throw error;
     }
   };
 

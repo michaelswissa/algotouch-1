@@ -1,8 +1,8 @@
+
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, FileUp, FileText } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
-import { isValidTradeDataFile, getInvalidFileTypeMessage } from '@/lib/file-validation';
+import { useFileUpload } from '@/hooks/use-file-upload';
 
 interface FileUploadAreaProps {
   selectedFile: File | null;
@@ -16,54 +16,18 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   onFileChange
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  
+  const { 
+    handleFileChange, 
+    handleDragOver, 
+    handleDrop 
+  } = useFileUpload({
+    onFileAccepted: onFileChange
+  });
 
   const handleFileClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    if (file) {
-      if (isValidTradeDataFile(file)) {
-        onFileChange(file);
-      } else {
-        const errorMsg = getInvalidFileTypeMessage();
-        toast({
-          title: errorMsg.title,
-          description: errorMsg.description,
-          variant: "destructive",
-        });
-        if (e.target) {
-          e.target.value = '';
-        }
-      }
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (isValidTradeDataFile(file)) {
-        onFileChange(file);
-      } else {
-        const errorMsg = getInvalidFileTypeMessage();
-        toast({
-          title: errorMsg.title,
-          description: errorMsg.description,
-          variant: "destructive",
-        });
-      }
     }
   };
 
