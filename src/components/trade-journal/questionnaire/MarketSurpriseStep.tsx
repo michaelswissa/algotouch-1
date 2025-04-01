@@ -32,15 +32,15 @@ const MarketSurpriseStep: React.FC<MarketSurpriseStepProps> = ({
         className="flex flex-col gap-4 mt-6"
         dir="rtl"
       >
-        <div className="flex items-center justify-end space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <Label htmlFor="no-surprise" className="text-lg font-medium cursor-pointer text-right">
+        <div className="flex items-center justify-end space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition text-right">
+          <Label htmlFor="no-surprise" className="text-lg font-medium cursor-pointer">
             לא, השוק התנהג כצפוי
           </Label>
           <RadioGroupItem value="no" id="no-surprise" className="border-primary" />
         </div>
         
-        <div className="flex items-center justify-end space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <Label htmlFor="yes-surprise" className="text-lg font-medium cursor-pointer text-right">
+        <div className="flex items-center justify-end space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition text-right">
+          <Label htmlFor="yes-surprise" className="text-lg font-medium cursor-pointer">
             כן, השוק היה שונה מהציפיות שלי
           </Label>
           <RadioGroupItem value="yes" id="yes-surprise" className="border-primary" />
@@ -61,12 +61,13 @@ const MarketSurpriseStep: React.FC<MarketSurpriseStepProps> = ({
           <Textarea
             id="marketSurpriseNotes"
             placeholder="תאר במה השוק היה שונה מציפיותיך..."
-            className="border-amber-200 dark:border-amber-900/30 focus-visible:ring-amber-500 bg-white/80 dark:bg-black/20 resize-none h-24"
+            className="border-amber-200 dark:border-amber-900/30 focus-visible:ring-amber-500 bg-white/80 dark:bg-black/20 resize-none h-24 text-right"
             value={marketSurpriseNotes}
             onChange={(e) => onMarketSurpriseNotesChange(e.target.value)}
+            dir="rtl"
           />
           {errors.marketSurpriseNotes && (
-            <p className="text-red-500 text-sm">
+            <p className="text-red-500 text-sm text-right">
               {errors.marketSurpriseNotes.message}
             </p>
           )}

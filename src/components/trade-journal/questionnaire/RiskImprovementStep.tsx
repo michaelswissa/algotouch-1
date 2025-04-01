@@ -24,7 +24,7 @@ const RiskImprovementStep: React.FC<RiskImprovementStepProps> = ({
   errors,
 }) => {
   return (
-    <QuestionStep title="שאלות שיפור מהיר" icon="⚙️">
+    <QuestionStep title="רמת סיכון" icon="⚙️">
       <div className="space-y-8">
         <div className="space-y-4">
           <div className="flex justify-between items-center">
