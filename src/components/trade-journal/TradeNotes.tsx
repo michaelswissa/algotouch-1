@@ -1,9 +1,21 @@
 
-import React from 'react';
-import { FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileText, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 // Updated note data structure for reports
 interface TradeNote {
@@ -24,9 +36,13 @@ interface TradeNote {
 
 interface TradeNotesProps {
   notes: TradeNote[];
+  onDeleteNote?: (noteId: number) => void;
 }
 
-const TradeNotes: React.FC<TradeNotesProps> = ({ notes }) => {
+const TradeNotes: React.FC<TradeNotesProps> = ({ notes, onDeleteNote }) => {
+  const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
+  const { toast } = useToast();
+  
   // Helper function to get a summary based on the report data
   const getReportSummary = (note: TradeNote) => {
     let summary = '';
@@ -67,6 +83,25 @@ const TradeNotes: React.FC<TradeNotesProps> = ({ notes }) => {
     
     return tags;
   };
+
+  const handleDeleteClick = (id: number) => {
+    setNoteToDelete(id);
+  };
+
+  const confirmDelete = () => {
+    if (noteToDelete !== null && onDeleteNote) {
+      onDeleteNote(noteToDelete);
+      toast({
+        title: "נמחק בהצלחה",
+        description: "הדוח היומי נמחק מההיסטוריה",
+      });
+    }
+    setNoteToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setNoteToDelete(null);
+  };
   
   return (
     <div className="mb-8 animate-fade-in">
@@ -83,11 +118,22 @@ const TradeNotes: React.FC<TradeNotesProps> = ({ notes }) => {
             notes.map((note) => (
               <Card key={note.id} className="inline-block w-[300px] shrink-0 hover-scale hover-glow">
                 <CardContent className="p-4">
-                  <div className="flex items-start gap-2 mb-2">
-                    <FileText size={16} className="text-primary mt-0.5" />
-                    <div className="rtl text-right">
-                      <h3 className="font-medium whitespace-normal">דוח יומי</h3>
-                      <p className="text-xs text-muted-foreground mt-1">{note.date}</p>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive ml-auto"
+                      onClick={() => handleDeleteClick(note.id)}
+                    >
+                      <Trash2 size={16} />
+                      <span className="sr-only">מחק דוח</span>
+                    </Button>
+                    <div className="flex items-start gap-2">
+                      <FileText size={16} className="text-primary mt-0.5" />
+                      <div className="rtl text-right">
+                        <h3 className="font-medium whitespace-normal">דוח יומי</h3>
+                        <p className="text-xs text-muted-foreground mt-1">{note.date}</p>
+                      </div>
                     </div>
                   </div>
                   
@@ -119,6 +165,27 @@ const TradeNotes: React.FC<TradeNotesProps> = ({ notes }) => {
           )}
         </div>
       </ScrollArea>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={noteToDelete !== null} onOpenChange={(open) => !open && cancelDelete()}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>האם אתה בטוח שברצונך למחוק?</AlertDialogTitle>
+            <AlertDialogDescription>
+              פעולה זו תמחק את הדוח היומי לצמיתות ולא ניתן יהיה לשחזר אותו.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse sm:justify-start">
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              מחק
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

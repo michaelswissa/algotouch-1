@@ -45,6 +45,24 @@ const TradeJournalPage = () => {
     // Future functionality for creating a new note
   };
 
+  const handleDeleteNote = (noteId: number) => {
+    // Filter out the note with the given ID
+    const updatedReports = savedReports.filter(report => report.id !== noteId);
+    
+    // Update state
+    setSavedReports(updatedReports);
+    
+    // Update localStorage
+    localStorage.setItem('tradingReports', JSON.stringify(updatedReports));
+    
+    // If the deleted note is the current report being viewed, reset the report view
+    if (reportData && reportData.id === noteId) {
+      setReportData(null);
+      setQuestionnaireSubmitted(false);
+      setActiveTab('questionnaire');
+    }
+  };
+
   const handleQuestionnaireSubmit = async (data: FormattedData) => {
     setIsLoading(true);
     
@@ -88,7 +106,10 @@ const TradeJournalPage = () => {
         <TradeJournalHeader onNewNote={handleNewNote} />
         
         {/* Horizontal scrollable notes section - showing saved reports */}
-        <TradeNotes notes={savedReports} />
+        <TradeNotes 
+          notes={savedReports} 
+          onDeleteNote={handleDeleteNote}
+        />
         
         {/* Main content area with tabs */}
         <div className="space-y-6 animate-fade-in mt-6">
