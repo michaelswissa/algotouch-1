@@ -48,7 +48,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
         <div className="flex justify-between">
           <span>{trade.Contract}</span>
           <span className={trade.Net > 0 ? "text-green-600" : "text-red-600"}>
-            {trade.Net.toFixed(2)}₪
+            ${trade.Net.toFixed(2)}
           </span>
         </div>
       </div>
@@ -129,7 +129,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                             ) : (
                               <ArrowDown size={10} className="inline" />
                             )}
-                            <span>{Math.abs(dailyPnL).toFixed(0)}₪</span>
+                            <span>${Math.abs(dailyPnL).toFixed(0)}</span>
                           </div>
                         )}
                       </div>
@@ -153,8 +153,8 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                               dailyPnL > 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : 
                               dailyPnL < 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : ""
                             )}>
-                              {dailyPnL > 0 ? `רווח: ${dailyPnL.toFixed(2)}₪` : 
-                               dailyPnL < 0 ? `הפסד: ${Math.abs(dailyPnL).toFixed(2)}₪` : 
+                              {dailyPnL > 0 ? `רווח: $${dailyPnL.toFixed(2)}` : 
+                               dailyPnL < 0 ? `הפסד: $${Math.abs(dailyPnL).toFixed(2)}` : 
                                'אין רווח/הפסד'}
                             </span>
                           </div>

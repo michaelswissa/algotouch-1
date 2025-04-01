@@ -57,12 +57,12 @@ const SelectedDayTrades = ({ selectedDay, selectedDayTrades, month }: SelectedDa
                 {totalPnL > 0 ? (
                   <>
                     <TrendingUp size={15} />
-                    <span className="font-medium">רווח: {totalPnL.toFixed(2)}₪</span>
+                    <span className="font-medium">רווח: ${totalPnL.toFixed(2)}</span>
                   </>
                 ) : (
                   <>
                     <TrendingDown size={15} />
-                    <span className="font-medium">הפסד: {Math.abs(totalPnL).toFixed(2)}₪</span>
+                    <span className="font-medium">הפסד: ${Math.abs(totalPnL).toFixed(2)}</span>
                   </>
                 )}
               </div>
@@ -79,7 +79,7 @@ const SelectedDayTrades = ({ selectedDay, selectedDayTrades, month }: SelectedDa
                 <DollarSign size={16} className="text-primary" />
                 <span className="text-sm font-medium">עסקה ממוצעת</span>
               </div>
-              <span className="font-semibold">{avgTradeSize.toFixed(2)}₪</span>
+              <span className="font-semibold">${avgTradeSize.toFixed(2)}</span>
             </div>
             
             <div className="bg-secondary/20 p-3 rounded-lg flex items-center justify-between">

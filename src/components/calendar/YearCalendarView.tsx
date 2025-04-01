@@ -85,15 +85,15 @@ export const YearCalendarView = ({ year, onMonthSelect }: YearCalendarViewProps)
                   {month.value > 0 ? (
                     <>
                       <ArrowUp size={14} />
-                      <span>{month.value.toFixed(2)}₪</span>
+                      <span>${month.value.toFixed(2)}</span>
                     </>
                   ) : month.value < 0 ? (
                     <>
                       <ArrowDown size={14} />
-                      <span>{Math.abs(month.value).toFixed(2)}₪</span>
+                      <span>${Math.abs(month.value).toFixed(2)}</span>
                     </>
                   ) : (
-                    <span>0.00₪</span>
+                    <span>$0.00</span>
                   )}
                 </div>
               </div>
