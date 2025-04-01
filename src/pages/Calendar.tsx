@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { YearCalendarView } from '@/components/calendar/YearCalendarView';
@@ -31,18 +32,23 @@ const CalendarPage = () => {
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
   
   // Get trades data from the global store
-  const { tradesByDay, globalTrades } = useTradingDataStore();
-  const [tradesData, setTradesData] = useState<Record<string, TradeRecord[]>>(tradesByDay);
+  const [tradesData, setTradesData] = useState<Record<string, TradeRecord[]>>({});
+  const [globalTrades, setGlobalTrades] = useState<TradeRecord[]>([]);
 
-  // Initialize with store data or fallback to mock data if empty
+  // Access store with useEffect instead of direct store access to fix the hooks error
   useEffect(() => {
-    if (Object.keys(tradesByDay).length > 0) {
-      setTradesData(tradesByDay);
-    } else if (Object.keys(tradesData).length === 0) {
-      // Only use mock data if we don't have real data and no data has been set yet
-      setTradesData(mockTradeData);
-    }
-  }, [tradesByDay]);
+    const store = useTradingDataStore.getState();
+    setTradesData(store.tradesByDay);
+    setGlobalTrades(store.globalTrades);
+    
+    // Subscribe to store changes
+    const unsubscribe = useTradingDataStore.subscribe((state) => {
+      setTradesData(state.tradesByDay);
+      setGlobalTrades(state.globalTrades);
+    });
+    
+    return () => unsubscribe();
+  }, []);
 
   // Generate trade days for the recent activity section
   const generateTradeDays = (): TradeDay[] => {
@@ -149,7 +155,7 @@ const CalendarPage = () => {
                 systemCurrentMonth={hebrewMonths[currentDate.getMonth()]}
                 systemCurrentYear={currentDate.getFullYear()}
                 onBackToYear={handleBackToYear}
-                tradesData={tradesData}
+                tradesData={Object.keys(tradesData).length > 0 ? tradesData : mockTradeData}
               />
             )}
             

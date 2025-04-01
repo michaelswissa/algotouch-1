@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { FileSpreadsheet } from 'lucide-react';
@@ -54,6 +55,7 @@ const MonthlyReport = () => {
       setTrades(tradeData);
       setStats(tradeStats);
       
+      // Update global store with trade data
       setGlobalTrades(tradeData);
       
       toast({
