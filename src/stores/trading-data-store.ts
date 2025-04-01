@@ -19,12 +19,8 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
   globalTrades: [],
   setGlobalTrades: (trades) => {
     console.log("Setting global trades:", trades.length);
-    set({ 
-      globalTrades: trades,
-      lastUpdateTimestamp: Date.now()
-    });
     
-    // Update tradesByDay format right after setting trades
+    // Process trades by day when setting global trades
     const tradesByDay: Record<string, TradeRecord[]> = {};
     
     trades.forEach(trade => {
@@ -62,8 +58,12 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         `${tradesByDay[sampleKey].length} trades`);
     }
     
-    // Update state with processed data
-    set({ tradesByDay });
+    // Update state with all data in one operation to prevent infinite updates
+    set({ 
+      globalTrades: trades,
+      tradesByDay,
+      lastUpdateTimestamp: Date.now()
+    });
   },
   
   tradesByDay: {},

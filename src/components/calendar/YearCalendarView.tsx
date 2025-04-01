@@ -3,12 +3,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface MonthData {
-  name: string;
-  value: number;
-  trades: number;
-}
+import { useTradingDataStore } from '@/stores/trading-data-store';
 
 interface YearCalendarViewProps {
   year: number;
@@ -22,21 +17,39 @@ export const YearCalendarView = ({ year, onMonthSelect }: YearCalendarViewProps)
     'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
   ];
   
-  // Mock data for months
-  const monthsData: MonthData[] = [
-    { name: 'ינואר', value: 1250.75, trades: 12 },
-    { name: 'פברואר', value: -450.25, trades: 8 },
-    { name: 'מרץ', value: 780.50, trades: 15 },
-    { name: 'אפריל', value: 1450.30, trades: 20 },
-    { name: 'מאי', value: -320.10, trades: 6 },
-    { name: 'יוני', value: 650.90, trades: 11 },
-    { name: 'יולי', value: -150.40, trades: 5 },
-    { name: 'אוגוסט', value: 920.80, trades: 14 },
-    { name: 'ספטמבר', value: 670.20, trades: 9 },
-    { name: 'אוקטובר', value: 1100.60, trades: 17 },
-    { name: 'נובמבר', value: 580.30, trades: 10 },
-    { name: 'דצמבר', value: 0, trades: 0 },
-  ];
+  // Get trading data from store
+  const { globalTrades } = useTradingDataStore();
+  
+  // Process trades to calculate monthly stats
+  const getMonthlyData = () => {
+    // Initialize array with empty data for all months
+    const monthsData = hebrewMonths.map(name => ({
+      name,
+      value: 0,
+      trades: 0
+    }));
+    
+    if (globalTrades.length === 0) {
+      return monthsData;
+    }
+    
+    // Calculate values for each month
+    globalTrades.forEach(trade => {
+      const entryDate = new Date(trade['Entry DateTime']);
+      const tradeYear = entryDate.getFullYear();
+      
+      // Only process trades from the selected year
+      if (tradeYear === year) {
+        const monthIndex = entryDate.getMonth();
+        monthsData[monthIndex].trades += 1;
+        monthsData[monthIndex].value += trade.Net || 0;
+      }
+    });
+    
+    return monthsData;
+  };
+  
+  const monthsData = getMonthlyData();
   
   // Current month
   const currentMonth = new Date().getMonth();

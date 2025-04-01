@@ -5,9 +5,10 @@ import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
 import { EconomicCalendarSection } from '@/components/calendar/EconomicCalendarSection';
-import { TradeRecord } from '@/lib/trade-analysis';
 import { useTradingDataStore } from '@/stores/trading-data-store';
 import { useToast } from "@/hooks/use-toast";
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Hebrew month names
 const hebrewMonths = [
@@ -31,10 +32,10 @@ const CalendarPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(currentDate);
   const [currentMonth, setCurrentMonth] = useState(hebrewMonths[currentDate.getMonth()]);
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
+  const [hasShownToast, setHasShownToast] = useState(false);
   
   // State for trades data from the store
   const { tradesByDay, globalTrades, lastUpdateTimestamp } = useTradingDataStore();
-  const [hasShownToast, setHasShownToast] = useState(false);
   
   // Show toast when trades are loaded - only once
   useEffect(() => {
@@ -53,7 +54,7 @@ const CalendarPage = () => {
     }
   }, [globalTrades, tradesByDay, toast, hasShownToast]);
 
-  // Generate trade days for the recent activity section
+  // Generate trade days for the recent activity section using real data
   const generateTradeDays = (): TradeDay[] => {
     if (globalTrades.length === 0) {
       return [];
@@ -81,7 +82,7 @@ const CalendarPage = () => {
         date,
         trades: value.count,
         profit: value.profit,
-        status: Math.random() > 0.5 ? "Open" : "Active" // Random status for demonstration
+        status: value.profit >= 0 ? "Active" : "Open" // Set status based on profit
       });
     });
     
@@ -112,6 +113,16 @@ const CalendarPage = () => {
     setCurrentYear(newDate.getFullYear());
   };
 
+  // Navigate to previous year
+  const prevYear = () => {
+    setCurrentYear(prev => prev - 1);
+  };
+
+  // Navigate to next year
+  const nextYear = () => {
+    setCurrentYear(prev => prev + 1);
+  };
+
   // Handle month selection from year view
   const handleMonthSelect = (month: string) => {
     const monthIndex = hebrewMonths.indexOf(month);
@@ -139,6 +150,28 @@ const CalendarPage = () => {
     <Layout>
       <div className="tradervue-container py-6 bg-dots">
         <div className="flex flex-col max-w-5xl mx-auto">
+          {viewMode === 'year' && (
+            <div className="flex justify-between items-center mb-4">
+              <Button 
+                onClick={prevYear} 
+                variant="outline"
+                className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                size="sm"
+              >
+                <ChevronRight size={16} />
+                <span>שנה קודמת</span>
+              </Button>
+              <Button 
+                onClick={nextYear} 
+                variant="outline"
+                className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                size="sm"
+              >
+                <span>שנה הבאה</span>
+                <ChevronLeft size={16} />
+              </Button>
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {viewMode === 'year' ? (
               // Year view - show all months
