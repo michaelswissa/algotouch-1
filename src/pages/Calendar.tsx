@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { CalendarPageHeader } from '@/components/calendar/CalendarPageHeader';
 import { CalendarPageContent } from '@/components/calendar/CalendarPageContent';
@@ -23,10 +23,12 @@ const CalendarPage = () => {
   } = useCalendar();
 
   // Log loaded data on render for debugging
-  console.log("Calendar render state:", { 
-    tradesByDayCount: Object.keys(tradesByDay).length,
-    lastUpdate: new Date(lastUpdateTimestamp).toLocaleTimeString()
-  });
+  useEffect(() => {
+    console.log("Calendar render state:", { 
+      tradesByDayCount: Object.keys(tradesByDay).length,
+      lastUpdate: new Date(lastUpdateTimestamp).toLocaleTimeString()
+    });
+  }, [tradesByDay, lastUpdateTimestamp]);
 
   // Current date for reference
   const currentDate = new Date();

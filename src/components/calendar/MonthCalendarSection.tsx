@@ -34,6 +34,7 @@ export const MonthCalendarSection = ({
   useEffect(() => {
     console.log("MonthCalendarSection: Received trades data with", 
       Object.keys(tradesData).length, "days");
+    console.log("Available days:", Object.keys(tradesData).join(", "));
   }, [tradesData]);
   
   const handleDayClick = (day: number) => {
@@ -44,7 +45,7 @@ export const MonthCalendarSection = ({
   };
   
   // Get selected day trades
-  const selectedDayTrades = selectedDay && tradesData?.[selectedDay] ? tradesData[selectedDay] : [];
+  const selectedDayTrades = selectedDay && tradesData[selectedDay] ? tradesData[selectedDay] : [];
   console.log("Selected day trades:", selectedDayTrades.length);
   
   return (

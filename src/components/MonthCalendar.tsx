@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
   Tooltip,
@@ -32,6 +32,14 @@ const MonthCalendar = ({
 }: MonthCalendarProps) => {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   
+  // Log received data for debugging
+  useEffect(() => {
+    console.log("MonthCalendar received tradesData:", Object.keys(tradesData).length, "days");
+    if (Object.keys(tradesData).length > 0) {
+      console.log("Sample data key:", Object.keys(tradesData)[0]);
+    }
+  }, [tradesData]);
+  
   // Days of week in Hebrew
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
   
@@ -61,7 +69,10 @@ const MonthCalendar = ({
   // Handle day click
   const handleDayClick = (day: number, month: 'current' | 'prev' | 'next') => {
     if (month === 'current') {
-      setSelectedDay(`${day}-${month}`);
+      const dayKey = `${day}-${month}`;
+      console.log(`Day ${day} clicked, setting selected day to: ${dayKey}`);
+      console.log(`Available trade keys:`, Object.keys(tradesData || {}));
+      setSelectedDay(dayKey);
       if (onDayClick) onDayClick(day);
     }
   };

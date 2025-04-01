@@ -29,7 +29,15 @@ export const useCalendar = () => {
   const [hasShownToast, setHasShownToast] = useState(false);
   
   // State for trades data from the store
-  const { tradesByDay, globalTrades, lastUpdateTimestamp } = useTradingDataStore();
+  const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
+  
+  // Ensure tradesByDay is updated whenever globalTrades changes
+  useEffect(() => {
+    if (globalTrades.length > 0) {
+      console.log("useCalendar: Ensuring tradesByDay is updated with globalTrades");
+      updateTradesByDay();
+    }
+  }, [globalTrades, updateTradesByDay]);
   
   // Show toast when trades are loaded - only once
   useEffect(() => {
