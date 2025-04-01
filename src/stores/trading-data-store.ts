@@ -12,6 +12,7 @@ interface TradingDataState {
   
   // For debugging
   lastUpdateTimestamp: number;
+  clearAllData: () => void; // Added to clear all data for testing
 }
 
 export const useTradingDataStore = create<TradingDataState>((set, get) => ({
@@ -54,18 +55,35 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
           tradesByDay[dayKey] = [];
         }
         
-        tradesByDay[dayKey].push(trade);
+        tradesByDay[dayKey].push({...trade});
       } catch (error) {
         console.error('Error processing trade for calendar:', error, trade);
       }
     });
     
     console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
+    
+    // Log some sample data to debug
+    if (Object.keys(tradesByDay).length > 0) {
+      const sampleKey = Object.keys(tradesByDay)[0];
+      console.log(`Sample data for ${sampleKey}:`, 
+        `${tradesByDay[sampleKey].length} trades`);
+    }
+    
     set({ 
       tradesByDay,
       lastUpdateTimestamp: Date.now()
     });
   },
   
-  lastUpdateTimestamp: 0
+  lastUpdateTimestamp: 0,
+  
+  clearAllData: () => {
+    console.log("Clearing all trading data");
+    set({
+      globalTrades: [],
+      tradesByDay: {},
+      lastUpdateTimestamp: Date.now()
+    });
+  }
 }));

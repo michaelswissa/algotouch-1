@@ -98,11 +98,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                       "text-md mt-2 font-medium",
                       isSelected 
                         ? "text-primary" 
-                        : dayObj.status === 'positive' 
-                          ? "text-green-600 dark:text-green-400" 
-                          : dayObj.status === 'negative' 
-                            ? "text-red-600 dark:text-red-400" 
-                            : ""
+                        : ""
                     )}>
                       {dayObj.day}
                     </span>

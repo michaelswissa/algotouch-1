@@ -19,6 +19,14 @@ const MonthlyReport = () => {
   // Get the trading store functions to update global trades
   const tradingStore = useTradingDataStore();
 
+  // Ensure store is updated when trades change locally
+  useEffect(() => {
+    if (trades.length > 0) {
+      tradingStore.setGlobalTrades(trades);
+      console.log("MonthlyReport: Updated global store with", trades.length, "trades");
+    }
+  }, [trades, tradingStore]);
+
   const {
     selectedFile,
     isUploading,
@@ -61,13 +69,13 @@ const MonthlyReport = () => {
       setTrades(tradeData);
       setStats(tradeStats);
       
-      // Update global store with trade data
+      // Update global store with trade data (this is redundant but as a safeguard)
       tradingStore.setGlobalTrades(tradeData);
       console.log("Global store updated with trades");
       
       toast({
         title: "הקובץ הועלה בהצלחה",
-        description: `'${file.name}' נוסף לדוח העסקאות שלך`
+        description: `'${file.name}' נוסף לדוח העסקאות שלך והנתונים זמינים גם בלוח השנה`,
       });
     } catch (error) {
       console.error("Error processing file:", error);

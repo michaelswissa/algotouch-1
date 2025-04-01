@@ -5,9 +5,9 @@ import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
 import { EconomicCalendarSection } from '@/components/calendar/EconomicCalendarSection';
-import { mockTradeData, mockDaysWithStatus } from '@/components/calendar/mockTradeData';
 import { TradeRecord } from '@/lib/trade-analysis';
 import { useTradingDataStore } from '@/stores/trading-data-store';
+import { useToast } from "@/hooks/use-toast";
 
 // Hebrew month names
 const hebrewMonths = [
@@ -24,6 +24,7 @@ interface TradeDay {
 }
 
 const CalendarPage = () => {
+  const { toast } = useToast();
   // Current date for default month/year
   const currentDate = new Date();
   const [viewMode, setViewMode] = useState<'year' | 'month'>('year');
@@ -33,7 +34,6 @@ const CalendarPage = () => {
   
   // State for trades data from the store
   const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
-  const [hasRealData, setHasRealData] = useState(false);
   
   // Force an update when component mounts and whenever the store changes
   useEffect(() => {
@@ -43,28 +43,25 @@ const CalendarPage = () => {
       `Last update: ${new Date(lastUpdateTimestamp).toLocaleTimeString()}`
     );
     
-    // Check if we have real data
-    const hasTrades = globalTrades.length > 0 && Object.keys(tradesByDay).length > 0;
-    setHasRealData(hasTrades);
-    
     // Force an update if we have global trades but no days organized
     if (globalTrades.length > 0 && Object.keys(tradesByDay).length === 0) {
       console.log("Calendar: Found global trades but no organized days, updating...");
       updateTradesByDay();
     }
-  }, [globalTrades, tradesByDay, lastUpdateTimestamp, updateTradesByDay]);
+    
+    // Show toast when trades are loaded
+    if (globalTrades.length > 0 && lastUpdateTimestamp > 0) {
+      toast({
+        title: "נתוני מסחר נטענו",
+        description: `${globalTrades.length} עסקאות ב-${Object.keys(tradesByDay).length} ימים נטענו ללוח השנה`
+      });
+    }
+  }, [globalTrades, tradesByDay, lastUpdateTimestamp, updateTradesByDay, toast]);
 
   // Generate trade days for the recent activity section
   const generateTradeDays = (): TradeDay[] => {
     if (globalTrades.length === 0) {
-      // Return mock data if no real trades exist
-      return [
-        { date: "2023-03-01", trades: 5, profit: 243.50, status: "Open" },
-        { date: "2023-03-02", trades: 3, profit: -120.75, status: "Active" },
-        { date: "2023-03-05", trades: 7, profit: 385.20, status: "Open" },
-        { date: "2023-03-08", trades: 2, profit: -85.30, status: "Open" },
-        { date: "2023-03-10", trades: 4, profit: 195.60, status: "Active" },
-      ];
+      return [];
     }
     
     // Create real trade days from the global trades
@@ -99,7 +96,7 @@ const CalendarPage = () => {
       .slice(0, 5);
   };
 
-  // Mock trade days data for the calendar with correct status types
+  // Trade days data for the calendar
   const tradeDays: TradeDay[] = generateTradeDays();
 
   // Navigate to previous month
@@ -136,9 +133,8 @@ const CalendarPage = () => {
     setViewMode('year');
   };
 
-  // Check if we have real data to display (much more explicit check)
+  // Debug logging
   console.log("Calendar render state:", { 
-    hasRealData, 
     tradesByDayCount: Object.keys(tradesByDay).length,
     globalTradesCount: globalTrades.length
   });
@@ -166,7 +162,7 @@ const CalendarPage = () => {
                 systemCurrentMonth={hebrewMonths[currentDate.getMonth()]}
                 systemCurrentYear={currentDate.getFullYear()}
                 onBackToYear={handleBackToYear}
-                tradesData={hasRealData ? tradesByDay : mockTradeData}
+                tradesData={tradesByDay}
               />
             )}
             
