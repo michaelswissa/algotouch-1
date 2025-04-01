@@ -31,36 +31,32 @@ const CalendarPage = () => {
   const [currentMonth, setCurrentMonth] = useState(hebrewMonths[currentDate.getMonth()]);
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
   
-  // State for trades data
-  const [tradesData, setTradesData] = useState<Record<string, TradeRecord[]>>({});
-  const traderStore = useTradingDataStore();
+  // State for trades data from the store
+  const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
+  const [hasRealData, setHasRealData] = useState(false);
   
-  // Subscribe to store changes and initialize data
+  // Force an update when component mounts and whenever the store changes
   useEffect(() => {
-    console.log("Calendar: Initializing with store data", traderStore.tradesByDay);
-    
-    // Set initial data
-    setTradesData(traderStore.tradesByDay);
-    
-    // Subscribe to store changes
-    const unsubscribe = useTradingDataStore.subscribe(
-      (state) => {
-        console.log("Calendar: Store updated", state.tradesByDay);
-        setTradesData(state.tradesByDay);
-      }
+    console.log("Calendar: Initializing with store data", 
+      `Global trades: ${globalTrades.length}`,
+      `Days with trades: ${Object.keys(tradesByDay).length}`,
+      `Last update: ${new Date(lastUpdateTimestamp).toLocaleTimeString()}`
     );
     
-    // Force update on mount to ensure data is populated
-    traderStore.updateTradesByDay();
+    // Check if we have real data
+    const hasTrades = globalTrades.length > 0 && Object.keys(tradesByDay).length > 0;
+    setHasRealData(hasTrades);
     
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+    // Force an update if we have global trades but no days organized
+    if (globalTrades.length > 0 && Object.keys(tradesByDay).length === 0) {
+      console.log("Calendar: Found global trades but no organized days, updating...");
+      updateTradesByDay();
+    }
+  }, [globalTrades, tradesByDay, lastUpdateTimestamp, updateTradesByDay]);
 
   // Generate trade days for the recent activity section
   const generateTradeDays = (): TradeDay[] => {
-    if (traderStore.globalTrades.length === 0) {
+    if (globalTrades.length === 0) {
       // Return mock data if no real trades exist
       return [
         { date: "2023-03-01", trades: 5, profit: 243.50, status: "Open" },
@@ -74,7 +70,7 @@ const CalendarPage = () => {
     // Create real trade days from the global trades
     const tradeMap = new Map<string, { count: number, profit: number }>();
     
-    traderStore.globalTrades.forEach(trade => {
+    globalTrades.forEach(trade => {
       const date = new Date(trade['Entry DateTime']).toISOString().split('T')[0];
       if (!tradeMap.has(date)) {
         tradeMap.set(date, { count: 0, profit: 0 });
@@ -140,9 +136,12 @@ const CalendarPage = () => {
     setViewMode('year');
   };
 
-  // Check if we have real data to display
-  const hasRealData = Object.keys(tradesData).length > 0;
-  console.log("Calendar rendering with:", hasRealData ? "Real data" : "Mock data", tradesData);
+  // Check if we have real data to display (much more explicit check)
+  console.log("Calendar render state:", { 
+    hasRealData, 
+    tradesByDayCount: Object.keys(tradesByDay).length,
+    globalTradesCount: globalTrades.length
+  });
 
   return (
     <Layout>
@@ -167,7 +166,7 @@ const CalendarPage = () => {
                 systemCurrentMonth={hebrewMonths[currentDate.getMonth()]}
                 systemCurrentYear={currentDate.getFullYear()}
                 onBackToYear={handleBackToYear}
-                tradesData={hasRealData ? tradesData : mockTradeData}
+                tradesData={hasRealData ? tradesByDay : mockTradeData}
               />
             )}
             

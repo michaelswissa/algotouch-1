@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
@@ -26,10 +26,16 @@ export const MonthCalendarSection = ({
   systemCurrentMonth,
   systemCurrentYear,
   onBackToYear,
-  tradesData
+  tradesData = {}
 }: MonthCalendarSectionProps) => {
   const isCurrentMonth = currentMonth === systemCurrentMonth && currentYear === systemCurrentYear;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  
+  // Effect to log when tradesData changes
+  useEffect(() => {
+    console.log("MonthCalendarSection: Received trades data with", 
+      Object.keys(tradesData).length, "days");
+  }, [tradesData]);
   
   const handleDayClick = (day: number) => {
     const dayKey = `${day}-current`;
