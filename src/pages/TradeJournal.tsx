@@ -7,34 +7,10 @@ import TradeNotes from '@/components/trade-journal/TradeNotes';
 import ModernTraderQuestionnaire from '@/components/trade-journal/ModernTraderQuestionnaire';
 import TradingReport from '@/components/trade-journal/TradingReport';
 import { useToast } from '@/hooks/use-toast';
+import { FormattedData } from '@/components/trade-journal/questionnaire/schema';
 
-interface ReportData {
+interface ReportData extends FormattedData {
   id: number;
-  date: string;
-  emotional: {
-    state: string;
-    notes?: string;
-  };
-  intervention: {
-    level: string;
-    reasons: string[];
-  };
-  market: {
-    surprise: string;
-    notes?: string;
-  };
-  confidence: {
-    level: number;
-  };
-  algoPerformance: {
-    checked: string;
-    notes?: string;
-  };
-  risk: {
-    percentage: number;
-    comfortLevel: number;
-  };
-  insight?: string;
 }
 
 const TradeJournalPage = () => {
@@ -42,49 +18,68 @@ const TradeJournalPage = () => {
   const [questionnaireSubmitted, setQuestionnaireSubmitted] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [savedReports, setSavedReports] = useState<ReportData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
   // Load saved reports from localStorage on component mount
   useEffect(() => {
-    const storedReports = localStorage.getItem('tradingReports');
-    if (storedReports) {
-      try {
+    try {
+      setIsLoading(true);
+      const storedReports = localStorage.getItem('tradingReports');
+      if (storedReports) {
         setSavedReports(JSON.parse(storedReports));
-      } catch (error) {
-        console.error('Error parsing stored reports:', error);
       }
+    } catch (error) {
+      console.error('Error parsing stored reports:', error);
+      toast({
+        variant: "destructive",
+        title: "שגיאה בטעינת הדוחות השמורים",
+        description: "לא ניתן היה לטעון את ההיסטוריה של הדוחות שלך",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
   
   const handleNewNote = () => {
     // Future functionality for creating a new note
   };
 
-  const handleQuestionnaireSubmit = async (data: any) => {
-    console.log('Form data:', data);
+  const handleQuestionnaireSubmit = async (data: FormattedData) => {
+    setIsLoading(true);
     
-    // Create a new report with unique ID
-    const newReport: ReportData = {
-      ...data,
-      id: Date.now(), // Use timestamp as ID
-    };
-    
-    setReportData(newReport);
-    setQuestionnaireSubmitted(true);
-    setActiveTab('report');
-    
-    // Save the new report to savedReports
-    const updatedReports = [newReport, ...savedReports];
-    setSavedReports(updatedReports);
-    
-    // Store updated reports in localStorage
-    localStorage.setItem('tradingReports', JSON.stringify(updatedReports));
-    
-    toast({
-      title: "השאלון נשלח בהצלחה",
-      description: "הדוח היומי שלך נוצר ונשמר לתיעוד",
-      duration: 3000,
-    });
+    try {
+      console.log('Form data:', data);
+      
+      // Create a new report with unique ID
+      const newReport: ReportData = {
+        ...data,
+        id: Date.now(), // Use timestamp as ID
+      };
+      
+      // Small delay to simulate processing
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setReportData(newReport);
+      setQuestionnaireSubmitted(true);
+      setActiveTab('report');
+      
+      // Save the new report to savedReports
+      const updatedReports = [newReport, ...savedReports];
+      setSavedReports(updatedReports);
+      
+      // Store updated reports in localStorage
+      localStorage.setItem('tradingReports', JSON.stringify(updatedReports));
+    } catch (error) {
+      console.error('Error handling questionnaire submission:', error);
+      toast({
+        variant: "destructive",
+        title: "שגיאה בשמירת הדוח",
+        description: "לא ניתן היה לשמור את הדוח שלך. נסה שוב מאוחר יותר.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -110,7 +105,10 @@ const TradeJournalPage = () => {
             </TabsList>
             
             <TabsContent value="questionnaire" className="space-y-6">
-              <ModernTraderQuestionnaire onSubmit={handleQuestionnaireSubmit} />
+              <ModernTraderQuestionnaire 
+                onSubmit={handleQuestionnaireSubmit} 
+                isLoading={isLoading}
+              />
             </TabsContent>
             
             <TabsContent value="report" className="space-y-6">
