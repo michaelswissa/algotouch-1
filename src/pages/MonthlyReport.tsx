@@ -16,7 +16,7 @@ const MonthlyReport = () => {
   const [activeTab, setActiveTab] = useState('table');
   const { toast } = useToast();
   
-  const { setGlobalTrades } = useTradingDataStore();
+  const tradingStore = useTradingDataStore();
 
   const {
     selectedFile,
@@ -39,6 +39,14 @@ const MonthlyReport = () => {
     }
   });
 
+  // Add trades data to Zustand store for calendar integration
+  useEffect(() => {
+    if (trades.length > 0) {
+      console.log("MonthlyReport: Setting global trades", trades.length);
+      tradingStore.setGlobalTrades(trades);
+    }
+  }, [trades]);
+
   const handleUpload = async (file: File) => {
     if (!file) return;
     try {
@@ -52,11 +60,13 @@ const MonthlyReport = () => {
         return;
       }
       const tradeStats = calculateTradeStats(tradeData);
+      
+      console.log("File uploaded successfully with", tradeData.length, "trades");
       setTrades(tradeData);
       setStats(tradeStats);
       
       // Update global store with trade data
-      setGlobalTrades(tradeData);
+      tradingStore.setGlobalTrades(tradeData);
       
       toast({
         title: "הקובץ הועלה בהצלחה",

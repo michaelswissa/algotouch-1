@@ -33,11 +33,14 @@ export const MonthCalendarSection = ({
   
   const handleDayClick = (day: number) => {
     const dayKey = `${day}-current`;
+    console.log(`Day ${day} clicked, looking for trades with key: ${dayKey}`);
+    console.log(`Available trade keys:`, Object.keys(tradesData || {}));
     setSelectedDay(dayKey);
   };
   
   // Get selected day trades
   const selectedDayTrades = selectedDay && tradesData?.[selectedDay] ? tradesData[selectedDay] : [];
+  console.log("Selected day trades:", selectedDayTrades.length);
   
   return (
     <div className="col-span-2">

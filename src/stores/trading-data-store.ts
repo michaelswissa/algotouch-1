@@ -16,7 +16,7 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
   setGlobalTrades: (trades) => {
     set({ globalTrades: trades });
     // After setting global trades, update the calendar format
-    get().updateTradesByDay();
+    setTimeout(() => get().updateTradesByDay(), 0); // Use setTimeout to ensure state is updated first
   },
   
   tradesByDay: {},
@@ -25,18 +25,29 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
     const tradesByDay: Record<string, TradeRecord[]> = {};
     
     trades.forEach(trade => {
-      // Format date to get day number
-      const entryDate = new Date(trade['Entry DateTime']);
-      const day = entryDate.getDate();
-      const dayKey = `${day}-current`;
-      
-      if (!tradesByDay[dayKey]) {
-        tradesByDay[dayKey] = [];
+      try {
+        // Format date to get day number
+        const entryDate = new Date(trade['Entry DateTime']);
+        
+        if (isNaN(entryDate.getTime())) {
+          console.error('Invalid date:', trade['Entry DateTime']);
+          return;
+        }
+        
+        const day = entryDate.getDate();
+        const dayKey = `${day}-current`;
+        
+        if (!tradesByDay[dayKey]) {
+          tradesByDay[dayKey] = [];
+        }
+        
+        tradesByDay[dayKey].push(trade);
+      } catch (error) {
+        console.error('Error processing trade for calendar:', error, trade);
       }
-      
-      tradesByDay[dayKey].push(trade);
     });
     
+    console.log('Updated tradesByDay:', tradesByDay);
     set({ tradesByDay });
   }
 }));
