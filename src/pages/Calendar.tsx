@@ -33,30 +33,25 @@ const CalendarPage = () => {
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
   
   // State for trades data from the store
-  const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
+  const { tradesByDay, globalTrades, lastUpdateTimestamp } = useTradingDataStore();
+  const [hasShownToast, setHasShownToast] = useState(false);
   
-  // Force an update when component mounts and whenever the store changes
+  // Show toast when trades are loaded - only once
   useEffect(() => {
-    console.log("Calendar: Initializing with store data", 
-      `Global trades: ${globalTrades.length}`,
-      `Days with trades: ${Object.keys(tradesByDay).length}`,
-      `Last update: ${new Date(lastUpdateTimestamp).toLocaleTimeString()}`
-    );
-    
-    // Force an update if we have global trades but no days organized
-    if (globalTrades.length > 0 && Object.keys(tradesByDay).length === 0) {
-      console.log("Calendar: Found global trades but no organized days, updating...");
-      updateTradesByDay();
-    }
-    
-    // Show toast when trades are loaded
-    if (globalTrades.length > 0 && lastUpdateTimestamp > 0) {
+    if (globalTrades.length > 0 && !hasShownToast) {
+      console.log("Calendar: Found trades data:", 
+        `Global trades: ${globalTrades.length}`,
+        `Days with trades: ${Object.keys(tradesByDay).length}`
+      );
+      
       toast({
         title: "נתוני מסחר נטענו",
         description: `${globalTrades.length} עסקאות ב-${Object.keys(tradesByDay).length} ימים נטענו ללוח השנה`
       });
+      
+      setHasShownToast(true);
     }
-  }, [globalTrades, tradesByDay, lastUpdateTimestamp, updateTradesByDay, toast]);
+  }, [globalTrades, tradesByDay, toast, hasShownToast]);
 
   // Generate trade days for the recent activity section
   const generateTradeDays = (): TradeDay[] => {
@@ -133,10 +128,11 @@ const CalendarPage = () => {
     setViewMode('year');
   };
 
-  // Debug logging
+  // Log loaded data on render for debugging
   console.log("Calendar render state:", { 
     tradesByDayCount: Object.keys(tradesByDay).length,
-    globalTradesCount: globalTrades.length
+    globalTradesCount: globalTrades.length,
+    lastUpdate: new Date(lastUpdateTimestamp).toLocaleTimeString()
   });
 
   return (

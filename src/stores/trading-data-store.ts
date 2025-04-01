@@ -24,8 +24,46 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
       lastUpdateTimestamp: Date.now()
     });
     
-    // Immediately update the tradesByDay format after setting trades
-    get().updateTradesByDay();
+    // Update tradesByDay format right after setting trades
+    const tradesByDay: Record<string, TradeRecord[]> = {};
+    
+    trades.forEach(trade => {
+      try {
+        // Format date to get day number
+        const entryDateString = trade['Entry DateTime'];
+        const entryDate = new Date(entryDateString);
+        
+        if (isNaN(entryDate.getTime())) {
+          console.error('Invalid date:', entryDateString);
+          return;
+        }
+        
+        // Get the day of the month
+        const day = entryDate.getDate();
+        // Use consistent format for keys
+        const dayKey = `${day}-current`;
+        
+        if (!tradesByDay[dayKey]) {
+          tradesByDay[dayKey] = [];
+        }
+        
+        tradesByDay[dayKey].push({...trade});
+      } catch (error) {
+        console.error('Error processing trade for calendar:', error, trade);
+      }
+    });
+    
+    console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
+    
+    // Log some sample data to debug
+    if (Object.keys(tradesByDay).length > 0) {
+      const sampleKey = Object.keys(tradesByDay)[0];
+      console.log(`Sample data for ${sampleKey}:`, 
+        `${tradesByDay[sampleKey].length} trades`);
+    }
+    
+    // Update state with processed data
+    set({ tradesByDay });
   },
   
   tradesByDay: {},

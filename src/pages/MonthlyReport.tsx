@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { FileSpreadsheet } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -18,10 +18,13 @@ const MonthlyReport = () => {
   
   // Get the trading store functions to update global trades
   const tradingStore = useTradingDataStore();
+  // Reference to track if we've already synced data to the store
+  const initialSyncRef = useRef(false);
 
-  // Ensure store is updated when trades change locally
+  // Ensure store is updated only when trades change locally
   useEffect(() => {
-    if (trades.length > 0) {
+    if (trades.length > 0 && !initialSyncRef.current) {
+      initialSyncRef.current = true;
       tradingStore.setGlobalTrades(trades);
       console.log("MonthlyReport: Updated global store with", trades.length, "trades");
     }
@@ -69,9 +72,8 @@ const MonthlyReport = () => {
       setTrades(tradeData);
       setStats(tradeStats);
       
-      // Update global store with trade data (this is redundant but as a safeguard)
-      tradingStore.setGlobalTrades(tradeData);
-      console.log("Global store updated with trades");
+      // Reset the sync flag to allow updating the store with new data
+      initialSyncRef.current = false;
       
       toast({
         title: "הקובץ הועלה בהצלחה",
