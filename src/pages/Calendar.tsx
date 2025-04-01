@@ -5,7 +5,6 @@ import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
 import { EconomicCalendarSection } from '@/components/calendar/EconomicCalendarSection';
-import { mockTradeData, mockDaysWithStatus } from '@/components/calendar/mockTradeData';
 import { TradeRecord } from '@/lib/trade-analysis';
 import { useTradingDataStore } from '@/stores/trading-data-store';
 
@@ -33,7 +32,6 @@ const CalendarPage = () => {
   
   // State for trades data from the store
   const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
-  const [hasRealData, setHasRealData] = useState(false);
   
   // Force an update when component mounts and whenever the store changes
   useEffect(() => {
@@ -43,10 +41,6 @@ const CalendarPage = () => {
       `Last update: ${new Date(lastUpdateTimestamp).toLocaleTimeString()}`
     );
     
-    // Check if we have real data
-    const hasTrades = globalTrades.length > 0 && Object.keys(tradesByDay).length > 0;
-    setHasRealData(hasTrades);
-    
     // Force an update if we have global trades but no days organized
     if (globalTrades.length > 0 && Object.keys(tradesByDay).length === 0) {
       console.log("Calendar: Found global trades but no organized days, updating...");
@@ -54,17 +48,11 @@ const CalendarPage = () => {
     }
   }, [globalTrades, tradesByDay, lastUpdateTimestamp, updateTradesByDay]);
 
-  // Generate trade days for the recent activity section
+  // Generate trade days for the recent activity section - using real data
   const generateTradeDays = (): TradeDay[] => {
     if (globalTrades.length === 0) {
-      // Return mock data if no real trades exist
-      return [
-        { date: "2023-03-01", trades: 5, profit: 243.50, status: "Open" },
-        { date: "2023-03-02", trades: 3, profit: -120.75, status: "Active" },
-        { date: "2023-03-05", trades: 7, profit: 385.20, status: "Open" },
-        { date: "2023-03-08", trades: 2, profit: -85.30, status: "Open" },
-        { date: "2023-03-10", trades: 4, profit: 195.60, status: "Active" },
-      ];
+      // Return empty array if no real trades exist
+      return [];
     }
     
     // Create real trade days from the global trades
@@ -89,7 +77,7 @@ const CalendarPage = () => {
         date,
         trades: value.count,
         profit: value.profit,
-        status: Math.random() > 0.5 ? "Open" : "Active" // Random status for demonstration
+        status: "Open" // Default status
       });
     });
     
@@ -99,7 +87,7 @@ const CalendarPage = () => {
       .slice(0, 5);
   };
 
-  // Mock trade days data for the calendar with correct status types
+  // Generate trade days based on real data
   const tradeDays: TradeDay[] = generateTradeDays();
 
   // Navigate to previous month
@@ -136,9 +124,8 @@ const CalendarPage = () => {
     setViewMode('year');
   };
 
-  // Check if we have real data to display (much more explicit check)
+  // Log state for debugging
   console.log("Calendar render state:", { 
-    hasRealData, 
     tradesByDayCount: Object.keys(tradesByDay).length,
     globalTradesCount: globalTrades.length
   });
@@ -157,7 +144,7 @@ const CalendarPage = () => {
                 />
               </div>
             ) : (
-              // Month view - show days in selected month
+              // Month view - show days in selected month - always use real data
               <MonthCalendarSection 
                 currentMonth={currentMonth}
                 currentYear={currentYear}
@@ -166,7 +153,7 @@ const CalendarPage = () => {
                 systemCurrentMonth={hebrewMonths[currentDate.getMonth()]}
                 systemCurrentYear={currentDate.getFullYear()}
                 onBackToYear={handleBackToYear}
-                tradesData={hasRealData ? tradesByDay : mockTradeData}
+                tradesData={tradesByDay}
               />
             )}
             
