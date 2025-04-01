@@ -24,6 +24,7 @@ interface CalendarGridProps {
 const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, tradesData = {} }: CalendarGridProps) => {
   // Function to get trade count for a specific day
   const getTradeCount = (day: number, month: 'current' | 'prev' | 'next'): number => {
+    // Make sure we're using the correct day key format
     const dayKey = `${day}-${month}`;
     return tradesData[dayKey]?.length || 0;
   };

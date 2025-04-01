@@ -37,6 +37,8 @@ const MonthCalendar = ({
     console.log("MonthCalendar received tradesData:", Object.keys(tradesData).length, "days");
     if (Object.keys(tradesData).length > 0) {
       console.log("Sample data key:", Object.keys(tradesData)[0]);
+      const sampleKey = Object.keys(tradesData)[0];
+      console.log("Sample trades count:", tradesData[sampleKey].length);
     }
   }, [tradesData]);
   
