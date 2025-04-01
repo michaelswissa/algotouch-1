@@ -30,19 +30,20 @@ const MarketSurpriseStep: React.FC<MarketSurpriseStepProps> = ({
         value={marketSurprise}
         onValueChange={onMarketSurpriseChange}
         className="flex flex-col gap-4 mt-6"
+        dir="rtl"
       >
-        <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <RadioGroupItem value="no" id="no-surprise" className="border-primary" />
-          <Label htmlFor="no-surprise" className="text-lg font-medium cursor-pointer">
+        <div className="flex items-center justify-end space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
+          <Label htmlFor="no-surprise" className="text-lg font-medium cursor-pointer text-right">
             לא, השוק התנהג כצפוי
           </Label>
+          <RadioGroupItem value="no" id="no-surprise" className="border-primary" />
         </div>
         
-        <div className="flex items-center space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
-          <RadioGroupItem value="yes" id="yes-surprise" className="border-primary" />
-          <Label htmlFor="yes-surprise" className="text-lg font-medium cursor-pointer">
+        <div className="flex items-center justify-end space-x-3 space-x-reverse p-4 rounded-lg bg-primary/5 hover:bg-primary/10 transition">
+          <Label htmlFor="yes-surprise" className="text-lg font-medium cursor-pointer text-right">
             כן, השוק היה שונה מהציפיות שלי
           </Label>
+          <RadioGroupItem value="yes" id="yes-surprise" className="border-primary" />
         </div>
       </RadioGroup>
       

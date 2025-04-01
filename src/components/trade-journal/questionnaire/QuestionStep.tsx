@@ -17,8 +17,8 @@ const QuestionStep: React.FC<QuestionStepProps> = ({
   className
 }) => {
   return (
-    <div className={cn("space-y-6", className)}>
-      <h2 className="text-2xl font-semibold flex items-center gap-3 text-primary">
+    <div className={cn("space-y-8", className)} dir="rtl">
+      <h2 className="text-2xl font-semibold flex items-center gap-3 text-primary text-right">
         {icon}
         {title}
       </h2>

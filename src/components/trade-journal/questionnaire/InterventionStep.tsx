@@ -48,9 +48,11 @@ const InterventionStep: React.FC<InterventionStepProps> = ({
           </div>
         </RadioGroup>
         
-        {algoIntervention === 'intervened' && (
+        {(algoIntervention === 'intervened' || algoIntervention === 'wanted') && (
           <div className="bg-muted/40 p-4 rounded-md border border-border/40 mt-2 animate-fade-in space-y-3">
-            <h3 className="font-medium text-right">מה הייתה הסיבה להתערבות?</h3>
+            <h3 className="font-medium text-right">
+              {algoIntervention === 'intervened' ? "מה הייתה הסיבה להתערבות?" : "מה גרם לך לרצות להתערב?"}
+            </h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex items-center space-x-2 space-x-reverse">
