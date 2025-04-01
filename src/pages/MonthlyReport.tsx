@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +30,6 @@ const MonthlyReport = () => {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     if (file) {
-      // Check if file is CSV or Excel
       const fileType = file.type;
       const validType = 
         fileType === 'text/csv' ||
@@ -114,7 +112,6 @@ const MonthlyReport = () => {
     setIsUploading(true);
     
     try {
-      // Parse the CSV file
       const tradeData = await parseCSVFile(file);
       
       if (tradeData.length === 0) {
@@ -127,10 +124,8 @@ const MonthlyReport = () => {
         return;
       }
       
-      // Calculate trade statistics
       const tradeStats = calculateTradeStats(tradeData);
       
-      // Update state with parsed data and stats
       setTrades(tradeData);
       setStats(tradeStats);
       
@@ -151,7 +146,6 @@ const MonthlyReport = () => {
   };
 
   const handleAddManualTrade = (formData: any) => {
-    // Add manual trade implementation
     toast({
       title: "העסקה נשמרה בהצלחה", 
       description: "העסקה החדשה נוספה לרשימת העסקאות שלך"
@@ -400,13 +394,13 @@ const MonthlyReport = () => {
                     <span className="font-medium">{stats?.riskRewardRatio || '0:0'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">מסחר הטוב ביותר:</span>
+                    <span className="text-gray-600">העסקה הכי רווחית:</span>
                     <span className="font-medium text-tradervue-green">
                       {stats?.bestTrade ? `$${stats.bestTrade.toFixed(2)}` : '$0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">מסחר הגרוע ביותר:</span>
+                    <span className="text-gray-600">העסקה הכי מפסידה:</span>
                     <span className="font-medium text-tradervue-red">
                       {stats?.worstTrade ? `-$${Math.abs(stats.worstTrade).toFixed(2)}` : '$0.00'}
                     </span>
