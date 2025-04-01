@@ -55,16 +55,6 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
     ));
   };
 
-  // Determine day status based on PnL
-  const getDayStatusFromTrades = (day: number, month: 'current' | 'prev' | 'next'): 'positive' | 'negative' | 'neutral' => {
-    if (month !== 'current') return 'neutral';
-    
-    const dailyPnL = getDailyPnL(day, month);
-    if (dailyPnL > 0) return 'positive';
-    if (dailyPnL < 0) return 'negative';
-    return 'neutral';
-  };
-
   return (
     <div className="w-full mt-2">
       <div className="grid grid-cols-7 gap-1 mb-1 text-center" dir="rtl">
@@ -82,9 +72,6 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
           const tradeCount = getTradeCount(dayObj.day, dayObj.month);
           const dailyPnL = getDailyPnL(dayObj.day, dayObj.month);
           const hasTrades = tradeCount > 0 && dayObj.month === 'current';
-          
-          // Calculate status based on PnL for days with trades
-          const tradeStatus = hasTrades ? getDayStatusFromTrades(dayObj.day, dayObj.month) : undefined;
           
           // Show prev/next month days with low opacity
           const isPrevOrNextMonth = dayObj.month !== 'current';
@@ -111,9 +98,9 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                       "text-md mt-2 font-medium",
                       isSelected 
                         ? "text-primary" 
-                        : tradeStatus === 'positive' 
+                        : dayObj.status === 'positive' 
                           ? "text-green-600 dark:text-green-400" 
-                          : tradeStatus === 'negative' 
+                          : dayObj.status === 'negative' 
                             ? "text-red-600 dark:text-red-400" 
                             : ""
                     )}>
