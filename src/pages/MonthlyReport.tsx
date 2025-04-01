@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { FileSpreadsheet } from 'lucide-react';
@@ -8,20 +7,20 @@ import TradeUploadCard from '@/components/trade-report/TradeUploadCard';
 import TradeReportContent from '@/components/trade-report/TradeReportContent';
 import StatsCard from '@/components/trade-report/StatsCard';
 import { useFileUpload } from '@/hooks/use-file-upload';
-
 const MonthlyReport = () => {
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [activeTab, setActiveTab] = useState('table');
-  const { toast } = useToast();
-
-  const { 
-    selectedFile, 
-    isUploading, 
+  const {
+    toast
+  } = useToast();
+  const {
+    selectedFile,
+    isUploading,
     handleFileSelected,
     resetFile
   } = useFileUpload({
-    onFileAccepted: async (file) => {
+    onFileAccepted: async file => {
       try {
         await handleUpload(file);
       } catch (error) {
@@ -29,52 +28,43 @@ const MonthlyReport = () => {
         toast({
           title: "שגיאה בטעינת הקובץ",
           description: "אירעה שגיאה בעיבוד הקובץ. אנא ודא שהקובץ בפורמט הנכון.",
-          variant: "destructive",
+          variant: "destructive"
         });
         resetFile();
       }
     }
   });
-
   const handleUpload = async (file: File) => {
     if (!file) return;
-    
     try {
       const tradeData = await parseCSVFile(file);
-      
       if (tradeData.length === 0) {
         toast({
           title: "אין נתונים בקובץ",
           description: "הקובץ ריק או שפורמט הנתונים אינו תואם למבנה הנדרש.",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
-      
       const tradeStats = calculateTradeStats(tradeData);
-      
       setTrades(tradeData);
       setStats(tradeStats);
-      
       toast({
         title: "הקובץ הועלה בהצלחה",
-        description: `'${file.name}' נוסף לדוח העסקאות שלך`,
+        description: `'${file.name}' נוסף לדוח העסקאות שלך`
       });
     } catch (error) {
       console.error("Error processing file:", error);
       throw error;
     }
   };
-
   const handleAddManualTrade = (formData: any) => {
     toast({
-      title: "העסקה נשמרה בהצלחה", 
+      title: "העסקה נשמרה בהצלחה",
       description: "העסקה החדשה נוספה לרשימת העסקאות שלך"
     });
   };
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
         <h1 className="text-3xl font-bold mb-6 flex items-center gap-3">
           <FileSpreadsheet className="text-primary" size={30} />
@@ -83,28 +73,16 @@ const MonthlyReport = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
-            <TradeUploadCard 
-              selectedFile={selectedFile}
-              isUploading={isUploading}
-              onFileChange={handleFileSelected}
-              onAddManualTrade={handleAddManualTrade}
-            />
+            <TradeUploadCard selectedFile={selectedFile} isUploading={isUploading} onFileChange={handleFileSelected} onAddManualTrade={handleAddManualTrade} />
             
-            <TradeReportContent 
-              trades={trades} 
-              stats={stats} 
-              activeTab={activeTab} 
-              setActiveTab={setActiveTab} 
-            />
+            <TradeReportContent trades={trades} stats={stats} activeTab={activeTab} setActiveTab={setActiveTab} />
           </div>
           
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 px-[3px] my-[9px] py-0 mx-0">
             <StatsCard stats={stats} />
           </div>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default MonthlyReport;

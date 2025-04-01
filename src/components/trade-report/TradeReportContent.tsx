@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table } from 'lucide-react';
@@ -6,23 +5,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TradeRecord, TradeStats } from '@/lib/trade-analysis';
 import TradeDataTable from '@/components/TradeDataTable';
 import TradeCharts from '@/components/TradeCharts';
-
 interface TradeReportContentProps {
   trades: TradeRecord[];
   stats: TradeStats | null;
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
-
-const TradeReportContent: React.FC<TradeReportContentProps> = ({ 
-  trades, 
-  stats, 
-  activeTab, 
-  setActiveTab 
+const TradeReportContent: React.FC<TradeReportContentProps> = ({
+  trades,
+  stats,
+  activeTab,
+  setActiveTab
 }) => {
   if (trades.length === 0) {
-    return (
-      <Card>
+    return <Card className="mx-0">
         <CardHeader>
           <CardTitle>עסקאות אחרונות</CardTitle>
         </CardHeader>
@@ -37,12 +33,9 @@ const TradeReportContent: React.FC<TradeReportContentProps> = ({
             </div>
           </div>
         </CardContent>
-      </Card>
-    );
+      </Card>;
   }
-
-  return (
-    <Card className="glass-card-2025">
+  return <Card className="glass-card-2025">
       <CardHeader className="border-b pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -63,8 +56,6 @@ const TradeReportContent: React.FC<TradeReportContentProps> = ({
           {activeTab === 'charts' && stats && <TradeCharts trades={trades} stats={stats} />}
         </div>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default TradeReportContent;
