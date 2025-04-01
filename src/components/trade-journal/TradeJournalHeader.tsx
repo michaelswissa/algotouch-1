@@ -26,7 +26,7 @@ const TradeJournalHeader: React.FC<TradeJournalHeaderProps> = ({ onNewNote }) =>
         <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
           <ScrollText size={24} />
         </span>
-        <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">יומן עסקאות</span>
+        <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">יומן מסחר</span>
       </h1>
       
       <div className="flex gap-3 items-center">

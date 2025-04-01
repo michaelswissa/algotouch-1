@@ -163,7 +163,7 @@ const MonthlyReport = () => {
       <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
         <h1 className="text-3xl font-bold mb-6 flex items-center gap-3">
           <FileSpreadsheet className="text-primary" size={30} />
-          <span className="text-gradient-blue">דוח חודשי</span>
+          <span className="text-gradient-blue">דוח עסקאות</span>
         </h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -378,13 +378,13 @@ const MonthlyReport = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">רווח/הפסד:</span>
                     <span className={`font-medium ${stats?.profitLoss && stats.profitLoss >= 0 ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
-                      {stats?.profitLoss ? (stats.profitLoss >= 0 ? `₪${stats.profitLoss.toFixed(2)}` : `-₪${Math.abs(stats.profitLoss).toFixed(2)}`) : '₪0.00'}
+                      {stats?.profitLoss ? (stats.profitLoss >= 0 ? `$${stats.profitLoss.toFixed(2)}` : `-$${Math.abs(stats.profitLoss).toFixed(2)}`) : '$0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">נטו:</span>
                     <span className={`font-medium ${stats?.netProfit && stats.netProfit >= 0 ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
-                      {stats?.netProfit ? (stats.netProfit >= 0 ? `₪${stats.netProfit.toFixed(2)}` : `-₪${Math.abs(stats.netProfit).toFixed(2)}`) : '₪0.00'}
+                      {stats?.netProfit ? (stats.netProfit >= 0 ? `$${stats.netProfit.toFixed(2)}` : `-$${Math.abs(stats.netProfit).toFixed(2)}`) : '$0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -402,13 +402,13 @@ const MonthlyReport = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">מסחר הטוב ביותר:</span>
                     <span className="font-medium text-tradervue-green">
-                      {stats?.bestTrade ? `₪${stats.bestTrade.toFixed(2)}` : '₪0.00'}
+                      {stats?.bestTrade ? `$${stats.bestTrade.toFixed(2)}` : '$0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">מסחר הגרוע ביותר:</span>
                     <span className="font-medium text-tradervue-red">
-                      {stats?.worstTrade ? `-₪${Math.abs(stats.worstTrade).toFixed(2)}` : '₪0.00'}
+                      {stats?.worstTrade ? `-$${Math.abs(stats.worstTrade).toFixed(2)}` : '$0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">

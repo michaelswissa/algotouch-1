@@ -29,8 +29,7 @@ const TradeDataTable = ({ trades }: TradeDataTableProps) => {
           <TableRow>
             <TableHead className="text-right">חוזה</TableHead>
             <TableHead className="text-right">כיוון</TableHead>
-            <TableHead className="text-right">שעת כניסה</TableHead>
-            <TableHead className="text-right">שעת יציאה</TableHead>
+            <TableHead className="text-right">שעת כניסה/יציאה</TableHead>
             <TableHead className="text-right">מחיר כניסה</TableHead>
             <TableHead className="text-right">מחיר יציאה</TableHead>
             <TableHead className="text-right">רווח/הפסד</TableHead>
@@ -51,13 +50,17 @@ const TradeDataTable = ({ trades }: TradeDataTableProps) => {
                   {trade.Side === 'Long' ? 'Long' : 'Short'}
                 </span>
               </TableCell>
-              <TableCell className="flex items-center gap-1">
-                <Clock size={14} className="text-muted-foreground" />
-                {formatTime(trade['Entry DateTime'])}
-              </TableCell>
-              <TableCell className="flex items-center gap-1">
-                <Clock size={14} className="text-muted-foreground" />
-                {formatTime(trade['Exit DateTime'])}
+              <TableCell>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1">
+                    <Clock size={14} className="text-muted-foreground" />
+                    <span>כניסה: {formatTime(trade['Entry DateTime'])}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock size={14} className="text-muted-foreground" />
+                    <span>יציאה: {formatTime(trade['Exit DateTime'])}</span>
+                  </div>
+                </div>
               </TableCell>
               <TableCell>{trade.EntryPrice}</TableCell>
               <TableCell>{trade.ExitPrice}</TableCell>
@@ -67,12 +70,12 @@ const TradeDataTable = ({ trades }: TradeDataTableProps) => {
                 {trade.ProfitLoss > 0 ? (
                   <span className="flex items-center">
                     <ArrowUp size={14} />
-                    {trade.ProfitLoss.toFixed(2)}₪
+                    ${trade.ProfitLoss.toFixed(2)}
                   </span>
                 ) : (
                   <span className="flex items-center">
                     <ArrowDown size={14} />
-                    {Math.abs(trade.ProfitLoss).toFixed(2)}₪
+                    ${Math.abs(trade.ProfitLoss).toFixed(2)}
                   </span>
                 )}
               </TableCell>
@@ -82,12 +85,12 @@ const TradeDataTable = ({ trades }: TradeDataTableProps) => {
                 {trade.Net > 0 ? (
                   <span className="flex items-center">
                     <ArrowUp size={14} />
-                    {trade.Net.toFixed(2)}₪
+                    ${trade.Net.toFixed(2)}
                   </span>
                 ) : (
                   <span className="flex items-center">
                     <ArrowDown size={14} />
-                    {Math.abs(trade.Net).toFixed(2)}₪
+                    ${Math.abs(trade.Net).toFixed(2)}
                   </span>
                 )}
               </TableCell>

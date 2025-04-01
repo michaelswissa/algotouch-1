@@ -152,7 +152,7 @@ const TradeList = () => {
                   trade.pnl >= 0 ? 'text-tradervue-green' : 'text-tradervue-red',
                   'font-medium text-right'
                 )}>
-                  {trade.pnl >= 0 ? `₪${trade.pnl}` : `-₪${Math.abs(trade.pnl)}`}
+                  {trade.pnl >= 0 ? `$${trade.pnl}` : `-$${Math.abs(trade.pnl)}`}
                 </TableCell>
                 <TableCell className="text-right">{trade.volume}</TableCell>
                 <TableCell className="text-right">{trade.executions}</TableCell>
