@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { FileSpreadsheet } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -7,13 +7,16 @@ import TradeUploadCard from '@/components/trade-report/TradeUploadCard';
 import TradeReportContent from '@/components/trade-report/TradeReportContent';
 import StatsCard from '@/components/trade-report/StatsCard';
 import { useFileUpload } from '@/hooks/use-file-upload';
+import { useTradingDataStore } from '@/stores/trading-data-store';
+
 const MonthlyReport = () => {
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [activeTab, setActiveTab] = useState('table');
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
+  
+  const { setGlobalTrades } = useTradingDataStore();
+
   const {
     selectedFile,
     isUploading,
@@ -34,6 +37,7 @@ const MonthlyReport = () => {
       }
     }
   });
+
   const handleUpload = async (file: File) => {
     if (!file) return;
     try {
@@ -49,6 +53,9 @@ const MonthlyReport = () => {
       const tradeStats = calculateTradeStats(tradeData);
       setTrades(tradeData);
       setStats(tradeStats);
+      
+      setGlobalTrades(tradeData);
+      
       toast({
         title: "הקובץ הועלה בהצלחה",
         description: `'${file.name}' נוסף לדוח העסקאות שלך`
@@ -58,13 +65,16 @@ const MonthlyReport = () => {
       throw error;
     }
   };
+
   const handleAddManualTrade = (formData: any) => {
     toast({
       title: "העסקה נשמרה בהצלחה",
       description: "העסקה החדשה נוספה לרשימת העסקאות שלך"
     });
   };
-  return <Layout>
+
+  return (
+    <Layout>
       <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
         <h1 className="text-3xl font-bold mb-6 flex items-center gap-3">
           <FileSpreadsheet className="text-primary" size={30} />
@@ -83,6 +93,8 @@ const MonthlyReport = () => {
           </div>
         </div>
       </div>
-    </Layout>;
+    </Layout>
+  );
 };
+
 export default MonthlyReport;
