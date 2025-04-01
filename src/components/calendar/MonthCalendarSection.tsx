@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
 import MonthCalendar from '@/components/MonthCalendar';
 import { TradeRecord } from '@/lib/trade-analysis';
 import SelectedDayTrades from '@/components/calendar/SelectedDayTrades';
+import { MonthHeader } from '@/components/calendar/MonthHeader';
 
 interface MonthCalendarSectionProps {
   currentMonth: string;
@@ -49,26 +49,7 @@ export const MonthCalendarSection = ({
   
   return (
     <div className="col-span-2">
-      <div className="flex justify-between items-center mb-4">
-        <Button 
-          onClick={prevMonth} 
-          variant="outline"
-          className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
-          size="sm"
-        >
-          <ChevronRight size={16} />
-          <span>חודש קודם</span>
-        </Button>
-        <Button 
-          onClick={nextMonth} 
-          variant="outline"
-          className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
-          size="sm"
-        >
-          <span>חודש הבא</span>
-          <ChevronLeft size={16} />
-        </Button>
-      </div>
+      <MonthHeader prevMonth={prevMonth} nextMonth={nextMonth} />
       
       <MonthCalendar 
         month={currentMonth} 
