@@ -23,7 +23,7 @@ const TradeUploadCard: React.FC<TradeUploadCardProps> = ({
         <FileUploadArea selectedFile={selectedFile} isUploading={isUploading} onFileChange={onFileChange} />
         
         <div className="flex justify-between items-center border-t pt-4">
-          <p className="text-sm text-gray-500">או</p>
+          <p className="text-sm text-center text-slate-400">או</p>
           <AddTradeDialog onAddTrade={onAddManualTrade} />
         </div>
       </CardContent>

@@ -27,7 +27,7 @@ const TradeReportContent: React.FC<TradeReportContentProps> = ({
             <div>
               <Table className="h-16 w-16 mx-auto text-gray-300 mb-4" />
               <h3 className="text-lg font-medium mb-2">אין עסקאות להצגה</h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-slate-400">
                 העלה קובץ CSV או הוסף עסקה ידנית כדי לראות את העסקאות שלך כאן.
               </p>
             </div>

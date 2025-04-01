@@ -26,9 +26,8 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
     }
   };
   return <div className="mb-6">
-      <p className="text-gray-600 mb-4">
-        העלה קובץ CSV או Excel המכיל את נתוני המסחר שלך. הקובץ צריך לכלול עמודות עבור מספר חשבון, חוזה, שם סיגנל, כיוון, תאריכי כניסה ויציאה, מחירים, רווח/הפסד ונטו.
-      </p>
+      <p className="mb-4 text-slate-400">העלה קובץ CSV או Excel המכיל את נתוני המסחר שלך. אפשר לייצא את הקובץ מאפליקציית 
+&quot;AlgoTouchAnalyzer&quot; ב-Tradestation.</p>
       
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors duration-200 hover:border-primary/50 cursor-pointer" onDragOver={handleDragOver} onDrop={handleDrop} onClick={handleFileClick}>
         <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
