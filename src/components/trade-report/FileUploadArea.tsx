@@ -1,8 +1,8 @@
-
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, FileUp, FileText } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { isValidTradeDataFile, getInvalidFileTypeMessage } from '@/lib/file-validation';
 
 interface FileUploadAreaProps {
   selectedFile: File | null;
@@ -27,21 +27,13 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     if (file) {
-      const fileType = file.type;
-      const validType = 
-        fileType === 'text/csv' ||
-        fileType === 'application/vnd.ms-excel' ||
-        fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.name.endsWith('.csv') ||
-        file.name.endsWith('.xlsx') ||
-        file.name.endsWith('.xls');
-        
-      if (validType) {
+      if (isValidTradeDataFile(file)) {
         onFileChange(file);
       } else {
+        const errorMsg = getInvalidFileTypeMessage();
         toast({
-          title: "סוג קובץ לא נתמך",
-          description: "יש להעלות רק קבצי CSV או Excel",
+          title: errorMsg.title,
+          description: errorMsg.description,
           variant: "destructive",
         });
         if (e.target) {
@@ -62,21 +54,13 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      const fileType = file.type;
-      const validType = 
-        fileType === 'text/csv' ||
-        fileType === 'application/vnd.ms-excel' ||
-        fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.name.endsWith('.csv') ||
-        file.name.endsWith('.xlsx') ||
-        file.name.endsWith('.xls');
-        
-      if (validType) {
+      if (isValidTradeDataFile(file)) {
         onFileChange(file);
       } else {
+        const errorMsg = getInvalidFileTypeMessage();
         toast({
-          title: "סוג קובץ לא נתמך",
-          description: "יש להעלות רק קבצי CSV או Excel",
+          title: errorMsg.title,
+          description: errorMsg.description,
           variant: "destructive",
         });
       }
