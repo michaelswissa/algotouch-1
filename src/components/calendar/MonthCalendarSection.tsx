@@ -30,6 +30,15 @@ export const MonthCalendarSection = ({
   const isCurrentMonth = currentMonth === systemCurrentMonth && currentYear === systemCurrentYear;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   
+  // Hebrew month names for getting the month index
+  const hebrewMonths = [
+    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  ];
+  
+  // Get month index
+  const monthIndex = hebrewMonths.indexOf(currentMonth);
+  
   // Reset selected day when month changes
   useEffect(() => {
     setSelectedDay(null);
@@ -37,28 +46,37 @@ export const MonthCalendarSection = ({
   
   // Log for debugging
   useEffect(() => {
-    if (tradesData && Object.keys(tradesData).length > 0) {
-      console.log("MonthCalendarSection: Trade data received", Object.keys(tradesData).length, "days with trades");
+    console.log(`MonthCalendarSection: Rendering ${currentMonth} ${currentYear}, monthIndex=${monthIndex}`);
+    console.log(`MonthCalendarSection: Total trade days in store: ${Object.keys(tradesData).length}`);
+    
+    // Filter trades only for this month and year
+    const filteredDays = Object.keys(tradesData).filter(key => {
+      const parts = key.split('-');
+      return parts.length === 3 && 
+             parseInt(parts[1]) === monthIndex && 
+             parseInt(parts[2]) === currentYear;
+    });
+    
+    console.log(`MonthCalendarSection: Filtered trade days for this month: ${filteredDays.length}`);
+    
+    if (filteredDays.length > 0) {
+      console.log("Sample days with trades:", filteredDays.slice(0, 3));
       
-      // Add more detailed logging
-      const totalTrades = Object.values(tradesData).reduce((sum, trades) => sum + trades.length, 0);
-      console.log("Total trades in this month:", totalTrades);
-      
-      // Log the first few days with trade data
-      const sampleDays = Object.keys(tradesData).slice(0, 3);
-      sampleDays.forEach(day => {
-        console.log(`Day ${day} has ${tradesData[day].length} trades with profit: $${
-          tradesData[day].reduce((sum, trade) => sum + (trade.Net || 0), 0).toFixed(2)
+      // Log details about the first few days
+      filteredDays.slice(0, 3).forEach(day => {
+        const trades = tradesData[day];
+        console.log(`Day ${day} has ${trades.length} trades with profit: $${
+          trades.reduce((sum, trade) => sum + (trade.Net || 0), 0).toFixed(2)
         }`);
       });
     } else {
-      console.log("MonthCalendarSection: No trade data available for this month");
+      console.log(`No trades found for ${currentMonth} ${currentYear}`);
     }
-  }, [tradesData]);
+  }, [tradesData, currentMonth, currentYear, monthIndex]);
   
   const handleDayClick = (day: number) => {
-    // CRITICAL: Always use consistent key format - day-current
-    const dayKey = `${day}-current`;
+    // New format: Create a key with day-month-year
+    const dayKey = `${day}-${monthIndex}-${currentYear}`;
     console.log("Day clicked:", dayKey, "Has trades:", tradesData[dayKey]?.length || 0);
     
     // Set the selected day

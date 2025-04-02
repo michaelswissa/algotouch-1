@@ -19,25 +19,33 @@ interface CalendarGridProps {
   onDayClick: (day: number, month: 'current' | 'prev' | 'next') => void;
   selectedDay?: string | null;
   tradesData?: Record<string, TradeRecord[]>;
+  currentMonthIndex?: number;
+  currentYear?: number;
 }
 
 // Helper functions to get trade data for a specific day
-const getTradeCount = (day: number, month: 'current' | 'prev' | 'next', tradesData: Record<string, TradeRecord[]>) => {
+const getTradeCount = (day: number, month: 'current' | 'prev' | 'next', 
+                       monthIndex: number, year: number, 
+                       tradesData: Record<string, TradeRecord[]>) => {
   if (month !== 'current') return 0;
-  const dayKey = `${day}-current`;
+  const dayKey = `${day}-${monthIndex}-${year}`;
   return tradesData[dayKey]?.length || 0;
 };
 
-const getDailyPnL = (day: number, month: 'current' | 'prev' | 'next', tradesData: Record<string, TradeRecord[]>) => {
+const getDailyPnL = (day: number, month: 'current' | 'prev' | 'next', 
+                     monthIndex: number, year: number, 
+                     tradesData: Record<string, TradeRecord[]>) => {
   if (month !== 'current') return 0;
-  const dayKey = `${day}-current`;
+  const dayKey = `${day}-${monthIndex}-${year}`;
   const trades = tradesData[dayKey] || [];
   return trades.reduce((total, trade) => total + (trade.Net || 0), 0);
 };
 
-const getTradesPreview = (day: number, month: 'current' | 'prev' | 'next', tradesData: Record<string, TradeRecord[]>) => {
+const getTradesPreview = (day: number, month: 'current' | 'prev' | 'next', 
+                          monthIndex: number, year: number, 
+                          tradesData: Record<string, TradeRecord[]>) => {
   if (month !== 'current') return null;
-  const dayKey = `${day}-current`;
+  const dayKey = `${day}-${monthIndex}-${year}`;
   const trades = tradesData[dayKey] || [];
   
   if (trades.length === 0) return null;
@@ -55,7 +63,18 @@ const getTradesPreview = (day: number, month: 'current' | 'prev' | 'next', trade
   ));
 };
 
-const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, tradesData = {} }: CalendarGridProps) => {
+const CalendarGrid = ({ 
+  daysOfWeek, 
+  calendarDays, 
+  onDayClick, 
+  selectedDay, 
+  tradesData = {},
+  currentMonthIndex = 0,
+  currentYear = new Date().getFullYear()
+}: CalendarGridProps) => {
+  
+  console.log("CalendarGrid render with month:", currentMonthIndex, "year:", currentYear);
+  
   return (
     <div className="w-full mt-2">
       <div className="grid grid-cols-7 gap-1 mb-1 text-center" dir="rtl">
@@ -68,11 +87,14 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
       
       <div className="grid grid-cols-7 gap-2 text-center" dir="rtl">
         {calendarDays.map((dayObj, index) => {
-          // Always format the day key consistently
-          const dayKey = dayObj.month === 'current' ? `${dayObj.day}-current` : `${dayObj.day}-${dayObj.month}`;
+          // Create a key that includes the month and year
+          const dayKey = dayObj.month === 'current' 
+            ? `${dayObj.day}-${currentMonthIndex}-${currentYear}` 
+            : `${dayObj.day}-${dayObj.month}`;
+            
           const isSelected = selectedDay === dayKey;
-          const tradeCount = getTradeCount(dayObj.day, dayObj.month, tradesData);
-          const dailyPnL = getDailyPnL(dayObj.day, dayObj.month, tradesData);
+          const tradeCount = getTradeCount(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData);
+          const dailyPnL = getDailyPnL(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData);
           const hasTrades = tradeCount > 0 && dayObj.month === 'current';
           
           // Show prev/next month days with low opacity
@@ -162,7 +184,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                           </div>
                           
                           <div className="mt-1">
-                            {getTradesPreview(dayObj.day, dayObj.month, tradesData)}
+                            {getTradesPreview(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData)}
                             {tradeCount > 3 && (
                               <div className="text-xs text-muted-foreground mt-1 text-center">
                                 + עוד {tradeCount - 3} עסקאות נוספות

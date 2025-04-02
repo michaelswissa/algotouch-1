@@ -30,6 +30,15 @@ const MonthCalendar = ({
     setSelectedDay(null);
   }, [month, year]);
   
+  // Hebrew month names
+  const hebrewMonths = [
+    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  ];
+  
+  // Get month index (0-11)
+  const monthIndex = hebrewMonths.indexOf(month);
+  
   // Days of week in Hebrew
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
   
@@ -41,8 +50,15 @@ const MonthCalendar = ({
     let totalTrades = 0;
     let totalProfit = 0;
     
+    // Filter trades only for the current month and year
     Object.keys(tradesData).forEach(key => {
-      if (tradesData[key] && tradesData[key].length) {
+      // New format: day-month-year
+      const parts = key.split('-');
+      const keyMonth = parseInt(parts[1]);
+      const keyYear = parseInt(parts[2]);
+      
+      // Check if this trade belongs to the current month and year
+      if (keyMonth === monthIndex && keyYear === year) {
         const trades = tradesData[key];
         totalTrades += trades.length;
         trades.forEach(trade => {
@@ -56,10 +72,15 @@ const MonthCalendar = ({
   
   const { totalTrades, totalProfit } = calculateMonthlyStats();
   
+  console.log(`MonthCalendar: For ${month} ${year} - monthIndex=${monthIndex}, found ${totalTrades} trades with profit ${totalProfit}`);
+  
   // Handle day click
   const handleDayClick = (day: number, month: 'current' | 'prev' | 'next') => {
     if (month === 'current') {
-      const dayKey = `${day}-current`;
+      // Create key in the new format
+      const dayKey = `${day}-${monthIndex}-${year}`;
+      console.log("Day clicked:", dayKey, "Has trades:", tradesData[dayKey]?.length || 0);
+      
       setSelectedDay(dayKey);
       if (onDayClick) onDayClick(day);
     }
@@ -83,6 +104,8 @@ const MonthCalendar = ({
           onDayClick={handleDayClick}
           selectedDay={selectedDay}
           tradesData={tradesData}
+          currentMonthIndex={monthIndex}
+          currentYear={year}
         />
       </div>
       

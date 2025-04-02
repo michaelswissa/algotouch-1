@@ -16,6 +16,7 @@ interface SelectedDayTradesProps {
 const SelectedDayTrades = ({ selectedDay, selectedDayTrades, month }: SelectedDayTradesProps) => {
   if (!selectedDay) return null;
 
+  // New format: day-month-year
   const dayNumber = selectedDay.split('-')[0];
   
   // If no trades for this day, show empty state
