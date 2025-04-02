@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
-  publicPaths = ['/subscription', '/auth']
+  publicPaths = ['/auth']
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
@@ -34,6 +34,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Allow access to public paths regardless of auth status
   if (isPublicPath) {
+    return <>{children}</>;
+  }
+
+  // For subscription page, redirect to auth if not authenticated
+  if (location.pathname === '/subscription' || location.pathname.startsWith('/subscription/')) {
+    if (!isAuthenticated) {
+      console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
+      return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
+    }
     return <>{children}</>;
   }
 

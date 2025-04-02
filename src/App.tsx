@@ -22,6 +22,7 @@ import Journal from "./pages/Journal";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Subscription from "./pages/Subscription";
+import Index from "./pages/Index";
 
 // Configure with refresh on error
 const queryClient = new QueryClient({
@@ -70,8 +71,8 @@ const App = () => {
               }
             }} />
             <Routes>
-              {/* Redirect root to auth page */}
-              <Route path="/" element={<Navigate to="/auth" replace />} />
+              {/* Root route - redirects to auth page */}
+              <Route path="/" element={<Index />} />
               
               {/* Public routes */}
               <Route path="/auth" element={
@@ -80,9 +81,17 @@ const App = () => {
                 </ProtectedRoute>
               } />
               
-              {/* Subscription routes - accessible to all */}
-              <Route path="/subscription/:planId" element={<Subscription />} />
-              <Route path="/subscription" element={<Subscription />} />
+              {/* Subscription routes - protected to ensure auth first */}
+              <Route path="/subscription/:planId" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
+              <Route path="/subscription" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
               
               {/* Protected routes - require authentication */}
               <Route path="/dashboard" element={

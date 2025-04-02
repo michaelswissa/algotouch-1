@@ -13,6 +13,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
+  const state = location.state as { from?: Location, redirectToSubscription?: boolean };
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -41,9 +42,12 @@ const Auth = () => {
     );
   }
 
-  // If user is already authenticated, redirect to dashboard
+  // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
-    console.log("Auth page: User is authenticated, redirecting to dashboard");
+    console.log("Auth page: User is authenticated, redirecting to appropriate page");
+    if (state?.redirectToSubscription) {
+      return <Navigate to="/subscription" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 
