@@ -2,8 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart } from 'lucide-react';
 export const EconomicCalendarSection = () => {
-  return <div className="mt-8 col-span-3 w-full mx-0">
-      <Card className="glass-card-2025 overflow-hidden hover-glow my-0 px-[170px]">
+  return <div className="mt-8 col-span-3 w-full mx-[2px] px-[167px]">
+      <Card className="glass-card-2025 overflow-hidden hover-glow my-0 px-0">
         <CardHeader className="pb-2 bg-gradient-to-r from-background to-background/50 text-center">
           <CardTitle className="text-xl flex items-center justify-center gap-2">
             <LineChart size={18} className="text-primary" />
