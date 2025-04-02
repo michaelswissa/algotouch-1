@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { sendWelcomeEmail } from '@/lib/email-service';
+import { useNavigate } from 'react-router-dom';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
@@ -14,6 +15,7 @@ interface SignupFormProps {
 
 const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const { signUp } = useAuth();
+  const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,11 +50,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       const fullName = `${firstName} ${lastName}`;
       await sendWelcomeEmail(email, fullName);
       
+      toast.success('נרשמת בהצלחה! עכשיו נמשיך לבחירת תכנית מנוי.');
+      
       if (onSignupSuccess) {
         onSignupSuccess();
+      } else {
+        // Redirect to subscription page after successful signup
+        navigate('/subscription');
       }
-      
-      toast.success('נרשמת בהצלחה! אנא בדוק את הדוא"ל שלך לאימות.');
     } catch (error) {
       console.error('Signup error:', error);
       toast.error('אירעה שגיאה בתהליך ההרשמה. אנא נסה שוב מאוחר יותר.');

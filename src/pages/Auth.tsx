@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
+import { ArrowRightIcon } from 'lucide-react';
 
 const Auth = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -17,9 +18,20 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
       <div className="w-full max-w-md space-y-6">
         <AuthHeader />
+        
+        <div className="mb-6 text-center">
+          <div className="inline-flex items-center justify-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-2">
+            <ArrowRightIcon className="mr-1 h-3 w-3" />
+            <span>התחברות נדרשת</span>
+          </div>
+          <h2 className="text-xl font-semibold">ברוכים הבאים ל-AlgoTouch</h2>
+          <p className="text-muted-foreground mt-1">
+            אנא התחבר או הירשם כדי לקבל גישה לכל התכנים
+          </p>
+        </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
           <TabsList className="grid grid-cols-2 w-full">
@@ -32,7 +44,10 @@ const Auth = () => {
           </TabsContent>
           
           <TabsContent value="signup">
-            <SignupForm />
+            <SignupForm onSignupSuccess={() => {
+              // After signup, redirect to subscription page to complete payment
+              window.location.href = '/subscription';
+            }} />
           </TabsContent>
         </Tabs>
       </div>
