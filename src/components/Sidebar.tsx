@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, ScrollText, Users, GraduationCap, Search, FileSpreadsheet, Bot, PlusCircle, Sparkles, ChevronRight, X, Newspaper } from 'lucide-react';
@@ -80,7 +79,7 @@ const Sidebar = () => {
             </span>
             {!collapsed && <span>{item.name}</span>}
             
-            {isActive(item.path) && <span className={cn("absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary/80 rounded-l-md", collapsed && "w-1 right-0")}></span>}
+            {isActive(item.path) && <span className=""></span>}
           </Link>)}
       </nav>
       
