@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { TokenData } from './utils/paymentHelpers';
+import { Json } from '@/integrations/supabase/types';
 
 interface RegisterUserParams {
   registrationData: any;
@@ -44,6 +45,9 @@ export const registerUser = async ({ registrationData, tokenData }: RegisterUser
     const trialEndsAt = new Date();
     trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
     
+    // Convert TokenData to Json type for Supabase
+    const paymentMethodJson = tokenData as unknown as Json;
+    
     const { error: subscriptionError } = await supabase
       .from('subscriptions')
       .insert({
@@ -51,7 +55,7 @@ export const registerUser = async ({ registrationData, tokenData }: RegisterUser
         plan_type: registrationData.planId,
         status: 'trial',
         trial_ends_at: trialEndsAt.toISOString(),
-        payment_method: tokenData,
+        payment_method: paymentMethodJson,
         contract_signed: true,
         contract_signed_at: new Date().toISOString()
       });
@@ -66,7 +70,7 @@ export const registerUser = async ({ registrationData, tokenData }: RegisterUser
       subscription_id: userData.user.id,
       amount: 0,
       status: 'trial_started',
-      payment_method: tokenData
+      payment_method: paymentMethodJson
     });
     
     const { error: profileError } = await supabase
