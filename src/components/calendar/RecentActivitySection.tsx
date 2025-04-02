@@ -31,6 +31,8 @@ export const RecentActivitySection = ({ tradeDays: propTradeDays }: RecentActivi
     const tradeMap = new Map<string, { count: number, profit: number }>();
     
     globalTrades.forEach(trade => {
+      if (!trade['Entry DateTime']) return;
+
       const date = new Date(trade['Entry DateTime']).toISOString().split('T')[0];
       if (!tradeMap.has(date)) {
         tradeMap.set(date, { count: 0, profit: 0 });
@@ -60,7 +62,7 @@ export const RecentActivitySection = ({ tradeDays: propTradeDays }: RecentActivi
   };
 
   // Use provided tradeDays from props if available, otherwise generate from globalTrades
-  const tradeDaysToDisplay = propTradeDays || generateTradeDays();
+  const tradeDaysToDisplay = propTradeDays && propTradeDays.length > 0 ? propTradeDays : generateTradeDays();
 
   // If no data, show message
   if (tradeDaysToDisplay.length === 0) {

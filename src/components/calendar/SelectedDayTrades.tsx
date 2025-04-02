@@ -45,6 +45,27 @@ const SelectedDayTrades = ({ selectedDay, selectedDayTrades, month }: SelectedDa
     ? Math.round((winningTrades / selectedDayTrades.length) * 100) 
     : 0;
 
+  // Calculate average trade duration (if available)
+  let avgTradeDuration = "--";
+  const tradesWithDuration = selectedDayTrades.filter(trade => 
+    trade['Entry DateTime'] && trade['Exit DateTime']
+  );
+  
+  if (tradesWithDuration.length > 0) {
+    let totalMinutes = 0;
+    tradesWithDuration.forEach(trade => {
+      const entryTime = new Date(trade['Entry DateTime']).getTime();
+      const exitTime = new Date(trade['Exit DateTime']).getTime();
+      const durationMinutes = Math.round((exitTime - entryTime) / (1000 * 60));
+      totalMinutes += durationMinutes;
+    });
+    
+    const averageMinutes = Math.round(totalMinutes / tradesWithDuration.length);
+    if (!isNaN(averageMinutes) && averageMinutes > 0) {
+      avgTradeDuration = `${averageMinutes}`;
+    }
+  }
+
   return (
     <Card className="mt-4 animate-in slide-in-from-top-4 duration-300 border-primary/20 shadow-md">
       <CardContent className="pt-4">
@@ -79,7 +100,7 @@ const SelectedDayTrades = ({ selectedDay, selectedDayTrades, month }: SelectedDa
             </div>
             <div className="flex items-center gap-1 text-sm px-2 py-1 bg-secondary/50 rounded-full">
               <Clock size={14} className="text-muted-foreground" />
-              <span>זמן ממוצע: -- דקות</span>
+              <span>זמן ממוצע: {avgTradeDuration} דקות</span>
             </div>
           </div>
         </div>
