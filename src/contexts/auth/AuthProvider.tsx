@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -50,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       // Safely check if any user has the email we're looking for
-      const existingUser = existingUsers?.users?.find(user => 
+      const existingUser = existingUsers?.users?.find((user: User) => 
         user.email && user.email.toLowerCase() === email.toLowerCase()
       );
       
