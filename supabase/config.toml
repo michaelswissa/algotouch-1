@@ -1,5 +1,6 @@
 
 project_id = "ndhakvhrrkczgylcmyoc"
+
 [api]
 enabled = true
 port = 54321
@@ -59,11 +60,13 @@ verify_jwt = true
 
 [functions.takbull-payment]
 verify_jwt = true
+
 [functions.takbull-payment.import_map]
 imports = { serve = "https://deno.land/std@0.168.0/http/server.ts" }
 
 [functions.takbull-webhook]
 verify_jwt = false
+
 [functions.takbull-webhook.import_map]
 imports = { 
   serve = "https://deno.land/std@0.168.0/http/server.ts",
@@ -72,6 +75,7 @@ imports = {
 
 [functions.izidoc-sign]
 verify_jwt = true
+
 [functions.izidoc-sign.import_map]
 imports = { 
   serve = "https://deno.land/std@0.168.0/http/server.ts",
