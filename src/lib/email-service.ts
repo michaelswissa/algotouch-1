@@ -101,22 +101,36 @@ export async function sendPasswordResetEmail(userEmail: string, resetLink: strin
     subject: 'איפוס סיסמה ל-AlgoTouch',
     html: `
     <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #4a90e2;">AlgoTouch</h1>
-        <p style="font-size: 18px; color: #666;">פלטפורמת המסחר החכמה</p>
+      <div style="text-align: center; margin-bottom: 30px; background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+        <img src="https://algotouch.co.il/wp-content/uploads/2022/12/1White-Logo.svg" alt="AlgoTouch" style="height: 60px; margin-bottom: 10px;">
+        <h1 style="color: #4a90e2; margin: 10px 0;">AlgoTouch</h1>
+        <p style="font-size: 18px; color: #666; margin: 0;">פלטפורמת המסחר החכמה</p>
       </div>
-      <h2>איפוס סיסמה</h2>
-      <p>קיבלנו בקשה לאיפוס הסיסמה לחשבון שלך ב-AlgoTouch.</p>
-      <p>כדי לאפס את הסיסמה ולהמשיך להשתמש בכל הכלים החכמים שלנו, אנא לחץ/י על הכפתור הבא:</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${resetLink}" style="display: inline-block; background-color: #4a90e2; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">אפס סיסמה</a>
+      
+      <div style="background-color: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <h2 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px; margin-bottom: 20px;">בקשה לאיפוס סיסמה</h2>
+        
+        <p style="font-size: 16px; line-height: 1.6;">שלום,</p>
+        <p style="font-size: 16px; line-height: 1.6;">קיבלנו בקשה לאיפוס הסיסמה לחשבון שלך ב-<strong>AlgoTouch</strong>.</p>
+        <p style="font-size: 16px; line-height: 1.6;">כדי לאפס את הסיסמה ולהמשיך להשתמש בפלטפורמת המסחר החכמה שלנו, אנא לחץ/י על הכפתור הבא:</p>
+        
+        <div style="text-align: center; margin: 35px 0;">
+          <a href="${resetLink}" style="display: inline-block; background-color: #4a90e2; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; box-shadow: 0 3px 6px rgba(0,0,0,0.1);">איפוס סיסמה</a>
+        </div>
+        
+        <p style="font-size: 16px; line-height: 1.6;">אם הכפתור לא עובד, אנא העתק/י את הקישור הבא לדפדפן שלך:</p>
+        <p style="background-color: #f5f5f5; padding: 12px; border-radius: 5px; word-break: break-all; margin: 15px 0; font-size: 14px;">${resetLink}</p>
+        
+        <div style="background-color: #fafafa; border-right: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 5px;">
+          <p style="margin: 0; font-size: 15px;"><strong>שים/י לב:</strong> קישור זה תקף למשך 24 שעות בלבד.</p>
+          <p style="margin: 10px 0 0 0; font-size: 15px;">אם לא ביקשת לאפס את הסיסמה שלך, אנא התעלם/י מהודעה זו וצור/י קשר עם צוות התמיכה שלנו בהקדם.</p>
+        </div>
       </div>
-      <p>אם הכפתור לא עובד, אנא העתק/י את הקישור הבא לדפדפן שלך:</p>
-      <p style="background-color: #f5f5f5; padding: 10px; border-radius: 3px; word-break: break-all;">${resetLink}</p>
-      <p>קישור זה תקף למשך 24 שעות. אם לא ביקשת לאפס את הסיסמה שלך, אנא התעלם מהודעה זו וצור קשר עם צוות התמיכה שלנו.</p>
+      
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea; text-align: center; font-size: 14px; color: #666;">
-        <p>בברכה,<br>צוות AlgoTouch</p>
-        <p>למידע נוסף: <a href="mailto:support@algotouch.co.il" style="color: #4a90e2; text-decoration: none;">support@algotouch.co.il</a></p>
+        <p style="margin-bottom: 10px;">בברכה,<br><strong>צוות AlgoTouch</strong></p>
+        <p style="margin: 0;">מוקד תמיכה: <a href="mailto:support@algotouch.co.il" style="color: #4a90e2; text-decoration: none;">support@algotouch.co.il</a></p>
+        <p style="margin-top: 15px; font-size: 12px; color: #999;">© 2024 AlgoTouch. כל הזכויות שמורות.</p>
       </div>
     </div>
     `,

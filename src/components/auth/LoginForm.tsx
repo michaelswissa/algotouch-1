@@ -59,8 +59,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       if (error) throw error;
       
       // Send custom email with the reset link
-      // Fix: The resetPasswordForEmail method doesn't return a user object
-      // We'll just use the redirect URL directly
       const resetLink = `${window.location.origin}/reset-password`;
       await sendPasswordResetEmail(email, resetLink);
       
