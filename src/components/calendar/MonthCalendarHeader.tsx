@@ -66,12 +66,12 @@ const MonthCalendarHeader = ({
             {totalProfit > 0 ? (
               <>
                 <ArrowUp size={14} />
-                <span>{totalProfit.toFixed(2)}₪</span>
+                <span>${totalProfit.toFixed(2)}</span>
               </>
             ) : (
               <>
                 <ArrowDown size={14} />
-                <span>{Math.abs(totalProfit).toFixed(2)}₪</span>
+                <span>${Math.abs(totalProfit).toFixed(2)}</span>
               </>
             )}
           </span>

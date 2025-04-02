@@ -27,6 +27,11 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
       try {
         // Format date to get day number
         const entryDateString = trade['Entry DateTime'];
+        if (!entryDateString) {
+          console.error('Missing entry date for trade:', trade);
+          return;
+        }
+        
         const entryDate = new Date(entryDateString);
         
         if (isNaN(entryDate.getTime())) {
@@ -49,6 +54,7 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
     });
     
     console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
+    console.log('Sample days with trades:', Object.keys(tradesByDay).slice(0, 5));
     
     // Update state with all data in one operation to prevent infinite updates
     set({ 
@@ -69,6 +75,11 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
       try {
         // Format date to get day number
         const entryDateString = trade['Entry DateTime'];
+        if (!entryDateString) {
+          console.error('Missing entry date for trade:', trade);
+          return;
+        }
+        
         const entryDate = new Date(entryDateString);
         
         if (isNaN(entryDate.getTime())) {
@@ -89,6 +100,9 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         console.error('Error processing trade for calendar:', error, trade);
       }
     });
+    
+    console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
+    console.log('Sample days with trades:', Object.keys(tradesByDay).slice(0, 5));
     
     set({ 
       tradesByDay,

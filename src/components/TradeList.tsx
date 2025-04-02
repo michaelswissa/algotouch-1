@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   Table,
@@ -12,21 +13,11 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Smile, Frown, Meh, HelpCircle, Info } from 'lucide-react';
 import { emotions } from '@/components/emotional-tracker/data/emotions';
+import { useTradingDataStore } from '@/stores/trading-data-store';
 
-interface Trade {
+interface EmotionRecord {
   id: string;
-  symbol: string;
-  date: string;
-  pnl: number;
-  volume: number;
-  executions: number;
-  exitEfficiency: number;
-  side: 'Long' | 'Short';
-  tags: string[];
-  notes: string;
-  preTradeEmotion?: 'confident' | 'doubtful' | 'fearful' | 'greedy' | 'frustrated' | undefined;
-  postTradeEmotion?: 'confident' | 'doubtful' | 'fearful' | 'greedy' | 'frustrated' | undefined;
-  emotionalRating?: number;
+  label: string;
 }
 
 const emotionIconMap: Record<string, JSX.Element> = {
@@ -44,70 +35,19 @@ const getEmotionLabel = (emotionId: string | undefined): string => {
   return emotion ? emotion.label : 'לא צוין';
 };
 
-const mockTrades: Trade[] = [
-  {
-    id: '1',
-    symbol: 'MGOGL',
-    date: '20 יוני 2024',
-    pnl: 781.52,
-    volume: 123,
-    executions: 12,
-    exitEfficiency: 60,
-    side: 'Long',
-    tags: ['אופציות', 'סמית\'', '+2'],
-    notes: 'הסט-אפ: מה שעשיתי...',
-    preTradeEmotion: 'confident',
-    postTradeEmotion: 'confident',
-    emotionalRating: 8
-  },
-  {
-    id: '2',
-    symbol: 'VERO',
-    date: '07 יוני 2024',
-    pnl: -246.90,
-    volume: 41,
-    executions: 14,
-    exitEfficiency: 10,
-    side: 'Long',
-    tags: ['לוגופרו', 'בריאות'],
-    notes: 'הסט-אפ: מה שעשיתי...',
-    preTradeEmotion: 'doubtful',
-    postTradeEmotion: 'frustrated',
-    emotionalRating: 3
-  },
-  {
-    id: '3',
-    symbol: 'HOLO',
-    date: '05 יוני 2024',
-    pnl: 808.01,
-    volume: 1420,
-    executions: 235,
-    exitEfficiency: 43,
-    side: 'Long',
-    tags: ['אופציות', 'בריאות'],
-    notes: 'הסט-אפ: מה שעשיתי...',
-    preTradeEmotion: 'fearful',
-    postTradeEmotion: 'confident',
-    emotionalRating: 7
-  },
-  {
-    id: '4',
-    symbol: 'LSDI',
-    date: '31 מאי 2024',
-    pnl: 18.50,
-    volume: 1,
-    executions: 8,
-    exitEfficiency: 98,
-    side: 'Long',
-    tags: ['אופציות', 'בריאות', '+2'],
-    notes: 'הסט-אפ: מה שעשיתי...',
-    preTradeEmotion: 'greedy',
-    postTradeEmotion: 'doubtful',
-    emotionalRating: 5
-  },
-];
-
 const TradeList = () => {
+  // Use real data from the store instead of mock data
+  const { globalTrades } = useTradingDataStore();
+  
+  // If no trades, show empty state
+  if (globalTrades.length === 0) {
+    return (
+      <div dir="rtl" className="p-8 text-center">
+        <p className="text-muted-foreground">לא נמצאו עסקאות. נא להעלות קובץ עסקאות.</p>
+      </div>
+    );
+  }
+  
   return (
     <div dir="rtl">
       <div className="flex gap-4 mb-4 overflow-x-auto">
@@ -130,107 +70,41 @@ const TradeList = () => {
               <TableCell className="text-right">תאריך</TableCell>
               <TableCell className="text-right">רווח/הפסד</TableCell>
               <TableCell className="text-right">נפח</TableCell>
-              <TableCell className="text-right">פעולות</TableCell>
-              <TableCell className="text-right">יעילות יציאה</TableCell>
+              <TableCell className="text-right">מחיר כניסה</TableCell>
+              <TableCell className="text-right">מחיר יציאה</TableCell>
               <TableCell className="text-right">כיוון</TableCell>
-              <TableCell className="text-right">רגש לפני</TableCell>
-              <TableCell className="text-right">רגש אחרי</TableCell>
-              <TableCell className="text-right">דירוג</TableCell>
-              <TableCell className="text-right">תגיות</TableCell>
               <TableCell className="text-right">הערות</TableCell>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockTrades.map((trade) => (
-              <TableRow key={trade.id} className="hover:bg-secondary/10 transition-colors">
+            {globalTrades.slice(0, 10).map((trade, index) => (
+              <TableRow key={index} className="hover:bg-secondary/10 transition-colors">
                 <TableCell className="text-right">
                   <input type="checkbox" className="rounded border-border" />
                 </TableCell>
-                <TableCell className="font-medium text-right">{trade.symbol}</TableCell>
-                <TableCell className="text-right">{trade.date}</TableCell>
+                <TableCell className="font-medium text-right">{trade.Contract}</TableCell>
+                <TableCell className="text-right">
+                  {new Date(trade['Entry DateTime']).toLocaleDateString('he-IL')}
+                </TableCell>
                 <TableCell className={cn(
-                  trade.pnl >= 0 ? 'text-tradervue-green' : 'text-tradervue-red',
+                  trade.Net >= 0 ? 'text-tradervue-green' : 'text-tradervue-red',
                   'font-medium text-right'
                 )}>
-                  {trade.pnl >= 0 ? `$${trade.pnl}` : `-$${Math.abs(trade.pnl)}`}
+                  {trade.Net >= 0 ? `$${trade.Net?.toFixed(2)}` : `-$${Math.abs(trade.Net).toFixed(2)}`}
                 </TableCell>
-                <TableCell className="text-right">{trade.volume}</TableCell>
-                <TableCell className="text-right">{trade.executions}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center gap-2 justify-end">
-                    {trade.exitEfficiency}%
-                    <div className="w-12 h-2 bg-muted/50 rounded-full overflow-hidden">
-                      <div 
-                        className={cn(
-                          "h-full", 
-                          trade.exitEfficiency > 50 ? "bg-tradervue-green" : "bg-tradervue-red"
-                        )}
-                        style={{ width: `${trade.exitEfficiency}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </TableCell>
+                <TableCell className="text-right">1</TableCell>
+                <TableCell className="text-right">${trade.EntryPrice?.toFixed(2)}</TableCell>
+                <TableCell className="text-right">${trade.ExitPrice?.toFixed(2)}</TableCell>
                 <TableCell className="text-right">
                   <Badge variant="outline" className={cn(
                     "bg-blue-900/30 text-blue-300 hover:bg-blue-900/40",
                     "border-blue-800/50"
                   )}>
-                    {trade.side === 'Long' ? 'לונג' : 'שורט'}
+                    {trade.Side === 'Long' ? 'לונג' : 'שורט'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        {emotionIconMap[trade.preTradeEmotion || 'undefined']}
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{getEmotionLabel(trade.preTradeEmotion)}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableCell>
-                <TableCell className="text-right">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        {emotionIconMap[trade.postTradeEmotion || 'undefined']}
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{getEmotionLabel(trade.postTradeEmotion)}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableCell>
-                <TableCell className="text-right">
-                  {trade.emotionalRating ? (
-                    <div className="flex items-center gap-2 justify-end">
-                      {trade.emotionalRating}/10
-                      <div className="w-12 h-2 bg-muted/50 rounded-full overflow-hidden">
-                        <div 
-                          className={cn(
-                            "h-full", 
-                            trade.emotionalRating > 5 ? "bg-tradervue-green" : "bg-tradervue-red"
-                          )}
-                          style={{ width: `${trade.emotionalRating * 10}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {trade.tags.map((tag, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs bg-secondary/30 border-border/50 text-muted-foreground">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
                 <TableCell className="text-muted-foreground truncate max-w-[160px] text-right">
-                  {trade.notes}
+                  {trade['Signal Name'] || '-'}
                 </TableCell>
               </TableRow>
             ))}

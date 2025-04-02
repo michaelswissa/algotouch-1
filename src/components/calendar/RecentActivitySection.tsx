@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowDown, ArrowUp, CalendarDays } from 'lucide-react';
@@ -21,9 +21,14 @@ export const RecentActivitySection = ({ tradeDays: propTradeDays }: RecentActivi
   // Get real trade data from store
   const { globalTrades } = useTradingDataStore();
   
+  useEffect(() => {
+    console.log("RecentActivitySection: globalTrades count =", globalTrades.length);
+  }, [globalTrades.length]);
+  
   // Generate trade days from actual uploaded data
   const generateTradeDays = (): TradeDay[] => {
     if (globalTrades.length === 0) {
+      console.log("RecentActivitySection: No global trades available");
       return [];
     }
     
@@ -55,6 +60,9 @@ export const RecentActivitySection = ({ tradeDays: propTradeDays }: RecentActivi
       });
     });
     
+    // Log to help with debugging
+    console.log("RecentActivitySection: Generated", result.length, "trade days");
+    
     // Sort by date descending and take the 5 most recent
     return result
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -63,6 +71,10 @@ export const RecentActivitySection = ({ tradeDays: propTradeDays }: RecentActivi
 
   // Use provided tradeDays from props if available, otherwise generate from globalTrades
   const tradeDaysToDisplay = propTradeDays && propTradeDays.length > 0 ? propTradeDays : generateTradeDays();
+
+  useEffect(() => {
+    console.log("RecentActivitySection: Displaying", tradeDaysToDisplay.length, "trade days");
+  }, [tradeDaysToDisplay.length]);
 
   // If no data, show message
   if (tradeDaysToDisplay.length === 0) {

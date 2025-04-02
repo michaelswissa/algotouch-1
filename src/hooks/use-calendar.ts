@@ -31,13 +31,29 @@ export const useCalendar = () => {
   // State for trades data from the store
   const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
   
-  // For debugging - log data on mount
+  // For debugging - log data on mount and when values change
   useEffect(() => {
     console.log("useCalendar: Initial state", { 
       globalTradesCount: globalTrades.length,
       tradesByDayCount: Object.keys(tradesByDay).length,
       viewMode
     });
+    
+    if (globalTrades.length > 0) {
+      console.log("useCalendar: Sample trades:", globalTrades.slice(0, 2));
+    }
+    
+    if (Object.keys(tradesByDay).length > 0) {
+      console.log("useCalendar: Days with trades:", Object.keys(tradesByDay));
+      
+      // Check data in a sample day
+      const sampleDay = Object.keys(tradesByDay)[0];
+      console.log(`Sample day ${sampleDay} has:`, 
+        tradesByDay[sampleDay].length, 
+        "trades with total profit:", 
+        tradesByDay[sampleDay].reduce((sum, t) => sum + (t.Net || 0), 0)
+      );
+    }
   }, [globalTrades.length, tradesByDay, viewMode]);
   
   // Ensure tradesByDay is updated whenever globalTrades changes
@@ -68,6 +84,7 @@ export const useCalendar = () => {
   // Generate trade days for the recent activity section using real data
   const generateTradeDays = (): TradeDay[] => {
     if (globalTrades.length === 0) {
+      console.log("useCalendar: No trades data available for generating trade days");
       return [];
     }
     
@@ -98,6 +115,9 @@ export const useCalendar = () => {
         status: value.profit >= 0 ? "Active" : "Open" // Set status based on profit
       });
     });
+    
+    // Log detailed information
+    console.log("useCalendar: Generated", result.length, "trade days for recent activity");
     
     // Sort by date descending and take the 5 most recent
     return result

@@ -13,8 +13,8 @@ interface CalendarDayProps {
 const CalendarDay = ({ day, isToday = false, status = 'neutral', month = 'current', onClick }: CalendarDayProps) => {
   const getStatusClass = () => {
     if (month !== 'current') return 'text-gray-300';
-    if (status === 'positive') return 'bg-tradervue-light-green text-tradervue-green font-medium';
-    if (status === 'negative') return 'bg-tradervue-light-red text-tradervue-red font-medium';
+    if (status === 'positive') return 'bg-green-50 text-green-700 font-medium';
+    if (status === 'negative') return 'bg-red-50 text-red-700 font-medium';
     return '';
   };
 
