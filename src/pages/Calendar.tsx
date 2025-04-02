@@ -28,6 +28,15 @@ const CalendarPage = () => {
       tradesByDayCount: Object.keys(tradesByDay).length,
       lastUpdate: new Date(lastUpdateTimestamp).toLocaleTimeString()
     });
+    
+    // Debug data by logging keys
+    if (Object.keys(tradesByDay).length > 0) {
+      console.log("Calendar days with data:", Object.keys(tradesByDay).join(", "));
+      
+      // Check a sample day
+      const sampleKey = Object.keys(tradesByDay)[0];
+      console.log(`Sample day ${sampleKey} has ${tradesByDay[sampleKey].length} trades`);
+    }
   }, [tradesByDay, lastUpdateTimestamp]);
 
   // Current date for reference

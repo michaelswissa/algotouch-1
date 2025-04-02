@@ -40,6 +40,7 @@ export const MonthCalendarSection = ({
   }, [tradesData]);
   
   const handleDayClick = (day: number) => {
+    // Important: Always use 'current' to match the pattern in tradesByDay
     const dayKey = `${day}-current`;
     console.log(`Day ${day} clicked, looking for trades with key: ${dayKey}`);
     console.log(`Available trade keys:`, Object.keys(tradesData || {}));

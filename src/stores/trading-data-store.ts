@@ -36,7 +36,7 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         
         // Get the day of the month
         const day = entryDate.getDate();
-        // Use consistent format for keys
+        // Use consistent format for keys - IMPORTANT! Always use 'current'
         const dayKey = `${day}-current`;
         
         if (!tradesByDay[dayKey]) {
@@ -86,7 +86,7 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         
         // Get the day of the month
         const day = entryDate.getDate();
-        // Use consistent format for keys
+        // Use consistent format for keys - IMPORTANT! Always use 'current'
         const dayKey = `${day}-current`;
         
         if (!tradesByDay[dayKey]) {

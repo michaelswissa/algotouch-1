@@ -22,23 +22,31 @@ interface CalendarGridProps {
 }
 
 const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, tradesData = {} }: CalendarGridProps) => {
-  // Function to get trade count for a specific day
+  // Function to get trade count for a specific day - IMPORTANT CHANGE: always use -current format
   const getTradeCount = (day: number, month: 'current' | 'prev' | 'next'): number => {
-    // Make sure we're using the correct day key format
-    const dayKey = `${day}-${month}`;
+    if (month !== 'current') return 0;
+    
+    // The consistent key format: day-current
+    const dayKey = `${day}-current`;
     return tradesData[dayKey]?.length || 0;
   };
 
   // Calculate daily profit/loss
   const getDailyPnL = (day: number, month: 'current' | 'prev' | 'next'): number => {
-    const dayKey = `${day}-${month}`;
+    if (month !== 'current') return 0;
+    
+    // The consistent key format: day-current
+    const dayKey = `${day}-current`;
     const trades = tradesData[dayKey] || [];
     return trades.reduce((total, trade) => total + (trade.Net || 0), 0);
   };
 
   // Get a preview of trades for tooltip
   const getTradesPreview = (day: number, month: 'current' | 'prev' | 'next') => {
-    const dayKey = `${day}-${month}`;
+    if (month !== 'current') return null;
+    
+    // The consistent key format: day-current
+    const dayKey = `${day}-current`;
     const trades = tradesData[dayKey] || [];
     
     if (trades.length === 0) return null;
@@ -68,7 +76,8 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
       
       <div className="grid grid-cols-7 gap-2 text-center" dir="rtl">
         {calendarDays.map((dayObj, index) => {
-          const dayKey = `${dayObj.day}-${dayObj.month}`;
+          // Always format the day key consistently
+          const dayKey = dayObj.month === 'current' ? `${dayObj.day}-current` : `${dayObj.day}-${dayObj.month}`;
           const isSelected = selectedDay === dayKey;
           const tradeCount = getTradeCount(dayObj.day, dayObj.month);
           const dailyPnL = getDailyPnL(dayObj.day, dayObj.month);

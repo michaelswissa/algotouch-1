@@ -38,22 +38,23 @@ const MonthCalendar = ({
     if (Object.keys(tradesData).length > 0) {
       console.log("Sample data key:", Object.keys(tradesData)[0]);
       const sampleKey = Object.keys(tradesData)[0];
-      console.log("Sample trades count:", tradesData[sampleKey].length);
+      console.log("Sample trades count:", tradesData[sampleKey]?.length || 0);
     }
   }, [tradesData]);
   
   // Days of week in Hebrew
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
   
-  // Generate calendar days for the month
+  // Generate calendar days for the month - pass empty object for now, we'll handle status in CalendarGrid
   const calendarDays = generateCalendarDays(month, year, {});
   
-  // Calculate total trades and profit for the month
+  // Calculate total trades and profit for the month using real data
   const calculateMonthlyStats = () => {
     let totalTrades = 0;
     let totalProfit = 0;
     
     Object.keys(tradesData).forEach(key => {
+      // Only count days with the 'current' format (real data)
       if (key.includes('-current')) {
         const trades = tradesData[key];
         totalTrades += trades.length;
@@ -79,11 +80,6 @@ const MonthCalendar = ({
     }
   };
   
-  // Mock function for adding trades - would be implemented in a real app
-  const handleAddTrade = () => {
-    console.log('Add trade clicked');
-  };
-  
   return (
     <div className="w-full border rounded-xl shadow-sm bg-card overflow-hidden">
       <MonthCalendarHeader 
@@ -92,7 +88,7 @@ const MonthCalendar = ({
         status={status}
         tradesCount={totalTrades}
         totalProfit={totalProfit}
-        onAddTrade={handleAddTrade}
+        onAddTrade={() => console.log('Add trade clicked')}
       />
       
       <div className="p-4">
