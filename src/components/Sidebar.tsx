@@ -1,16 +1,23 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, ScrollText, Users, GraduationCap, Search, FileSpreadsheet, Bot, X, ChevronRight, Newspaper } from 'lucide-react';
+import { 
+  Home, Calendar, ScrollText, Users, GraduationCap, Search, 
+  FileSpreadsheet, Bot, X, ChevronRight, Newspaper, 
+  UserCircle, LogOut, CreditCard
+} from 'lucide-react';
 import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const { user, isAuthenticated, loading, signOut } = useAuth();
   
   const navItems = [{
     path: '/dashboard',
@@ -46,8 +53,26 @@ const Sidebar = () => {
     icon: <Bot size={18} />
   }];
   
+  const accountItems = [{
+    path: '/profile',
+    name: 'הפרופיל שלי',
+    icon: <UserCircle size={18} />
+  }, {
+    path: '/subscription',
+    name: 'המנוי שלי',
+    icon: <CreditCard size={18} />
+  }];
+  
   const isActive = (path: string) => {
     return location.pathname === path || path !== '/' && location.pathname.startsWith(path);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
   
   return <div className={cn("dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/10 transition-all duration-300 relative overflow-hidden", collapsed ? "w-16" : "w-64")} dir="rtl">
@@ -68,6 +93,54 @@ const Sidebar = () => {
           </div>}
       </div>
       
+      {/* User section */}
+      {!collapsed && (
+        <div className="p-4 border-b border-sidebar-border relative z-10">
+          {loading ? (
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          ) : isAuthenticated ? (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UserCircle className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">{user?.user_metadata?.first_name || 'משתמש'} {user?.user_metadata?.last_name || ''}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 w-full"
+                onClick={handleSignOut}
+              >
+                <LogOut size={14} />
+                התנתק
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">אינך מחובר כרגע</p>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => navigate('/auth')}
+              >
+                התחבר
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Main navigation */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto scrollbar-thin relative z-10">
         {navItems.map(item => <Link key={item.path} to={item.path} className={cn("flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/15 text-sidebar-foreground transition-all duration-200 sidebar-link", isActive(item.path) && "active bg-sidebar-accent/10 text-primary font-medium", collapsed && "justify-center px-2")}>
             <span className={cn("transition-colors duration-300", isActive(item.path) ? "text-primary" : "text-primary/60")}>
@@ -78,6 +151,28 @@ const Sidebar = () => {
             {isActive(item.path) && <span className=""></span>}
           </Link>)}
       </nav>
+      
+      {/* Account navigation */}
+      {isAuthenticated && !collapsed && (
+        <div className="p-2 border-t border-sidebar-border relative z-10">
+          <p className="px-3 py-1 text-xs text-muted-foreground">חשבון</p>
+          {accountItems.map(item => (
+            <Link 
+              key={item.path} 
+              to={item.path} 
+              className={cn(
+                "flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/15 text-sidebar-foreground transition-all duration-200 sidebar-link", 
+                isActive(item.path) && "active bg-sidebar-accent/10 text-primary font-medium"
+              )}
+            >
+              <span className={cn("transition-colors duration-300", isActive(item.path) ? "text-primary" : "text-primary/60")}>
+                {item.icon}
+              </span>
+              <span>{item.name}</span>
+            </Link>
+          ))}
+        </div>
+      )}
       
       <div className={cn("p-4 border-t border-sidebar-border text-xs relative z-10 flex flex-col items-center justify-center", collapsed && "p-2")}>
         {!collapsed ? <div className="w-full flex flex-col items-center justify-center text-center">

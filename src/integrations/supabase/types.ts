@@ -16,6 +16,7 @@ export type Database = {
           key_name: string
           key_value: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -23,6 +24,7 @@ export type Database = {
           key_name: string
           key_value: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -30,6 +32,135 @@ export type Database = {
           key_name?: string
           key_value?: string
           updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      payment_history: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          id: string
+          payment_date: string | null
+          payment_method: Json | null
+          status: string
+          subscription_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          payment_date?: string | null
+          payment_method?: Json | null
+          status: string
+          subscription_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          payment_date?: string | null
+          payment_method?: Json | null
+          status?: string
+          subscription_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_history_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          birth_date: string | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          postal_code: string | null
+          street: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          contract_signed: boolean | null
+          contract_signed_at: string | null
+          created_at: string | null
+          current_period_ends_at: string | null
+          id: string
+          payment_method: Json | null
+          plan_type: string
+          status: string
+          trial_ends_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          contract_signed?: boolean | null
+          contract_signed_at?: string | null
+          created_at?: string | null
+          current_period_ends_at?: string | null
+          id?: string
+          payment_method?: Json | null
+          plan_type?: string
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          contract_signed?: boolean | null
+          contract_signed_at?: string | null
+          created_at?: string | null
+          current_period_ends_at?: string | null
+          id?: string
+          payment_method?: Json | null
+          plan_type?: string
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -38,7 +169,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: {
+          user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
