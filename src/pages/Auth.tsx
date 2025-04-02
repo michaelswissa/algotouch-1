@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
-import { ArrowRightIcon } from 'lucide-react';
 
 const Auth = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -23,13 +22,9 @@ const Auth = () => {
         <AuthHeader />
         
         <div className="mb-6 text-center">
-          <div className="inline-flex items-center justify-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-2">
-            <ArrowRightIcon className="mr-1 h-3 w-3" />
-            <span>התחברות נדרשת</span>
-          </div>
           <h2 className="text-xl font-semibold">ברוכים הבאים ל-AlgoTouch</h2>
           <p className="text-muted-foreground mt-1">
-            אנא התחבר או הירשם כדי לקבל גישה לכל התכנים
+            ברוכים הבאים ל-AlgoTouch
           </p>
         </div>
 

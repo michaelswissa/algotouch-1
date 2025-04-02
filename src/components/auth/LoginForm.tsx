@@ -87,7 +87,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="login-password">סיסמה</Label>
               <Button 
                 type="button" 
                 variant="link" 
@@ -97,6 +96,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               >
                 {resettingPassword ? 'שולח...' : 'שכחת סיסמה?'}
               </Button>
+              <Label htmlFor="login-password">סיסמה</Label>
             </div>
             <Input 
               id="login-password" 
