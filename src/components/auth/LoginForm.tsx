@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { sendPasswordResetEmail } from '@/lib/email-service';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LoginFormProps {
@@ -51,16 +50,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     try {
       setResettingPassword(true);
       
-      // Get reset link from Supabase auth
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Use Supabase's built-in password reset functionality
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       
       if (error) throw error;
-      
-      // Send custom email with the reset link
-      const resetLink = `${window.location.origin}/reset-password`;
-      await sendPasswordResetEmail(email, resetLink);
       
       toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');
     } catch (error) {
