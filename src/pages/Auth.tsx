@@ -24,12 +24,20 @@ const Auth = () => {
     }
   }, [location]);
 
+  // Check if the state specifies to show the signup tab
+  useEffect(() => {
+    if (state?.redirectToSubscription) {
+      setActiveTab('signup');
+    }
+  }, [state]);
+
   // Check if there's registration data in session storage
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
+      console.log("Auth: Registration data found, redirecting to subscription");
       // If registration is in progress, redirect to subscription page
-      navigate('/subscription', { replace: true });
+      navigate('/subscription', { replace: true, state: { isRegistering: true } });
     }
   }, [navigate]);
 

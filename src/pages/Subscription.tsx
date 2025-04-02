@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useParams, Navigate, useNavigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
 import DigitalContractForm from '@/components/DigitalContractForm';
@@ -22,9 +22,15 @@ const Subscription = () => {
   const [registrationData, setRegistrationData] = useState<any>(null);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isRegistering = location.state?.isRegistering === true;
 
   useEffect(() => {
-    console.log('Subscription page: Checking for registration data and subscription status');
+    console.log('Subscription page: Checking for registration data and subscription status', {
+      isAuthenticated,
+      isRegistering,
+      planId
+    });
     
     // Check for registration data from session storage (for new sign-ups)
     const storedData = sessionStorage.getItem('registration_data');
@@ -98,7 +104,7 @@ const Subscription = () => {
     } else {
       setIsCheckingSubscription(false);
     }
-  }, [user, planId, isAuthenticated]);
+  }, [user, planId, isAuthenticated, isRegistering]);
 
   // Show loading state while checking subscription
   if (loading || isCheckingSubscription) {
@@ -115,6 +121,12 @@ const Subscription = () => {
   if (isAuthenticated && hasActiveSubscription) {
     console.log('User has active subscription, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // If no registration data is found and user is not authenticated, redirect to auth
+  if (!isAuthenticated && !registrationData && !isRegistering) {
+    console.log('No registration data found and user is not authenticated, redirecting to auth');
+    return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
   }
 
   const handlePlanSelect = (planId: string) => {

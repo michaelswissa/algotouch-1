@@ -20,6 +20,28 @@ const UserSubscription = () => {
     return <LoadingSkeleton />;
   }
 
+  // Check if user has registration data in progress
+  const hasRegistrationInProgress = !!sessionStorage.getItem('registration_data');
+  
+  if (hasRegistrationInProgress) {
+    return (
+      <SubscriptionCard 
+        title="השלם את תהליך ההרשמה" 
+        description="התחלת את תהליך ההרשמה. אנא השלם את התהליך כדי לקבל גישה מלאה."
+        showSubscribeButton={true}
+      >
+        <div className="text-center py-6">
+          <Button 
+            onClick={() => navigate('/subscription')}
+            className="mx-auto"
+          >
+            המשך להרשמה
+          </Button>
+        </div>
+      </SubscriptionCard>
+    );
+  }
+
   if (!subscription) {
     return (
       <SubscriptionCard 

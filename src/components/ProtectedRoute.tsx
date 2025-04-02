@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
@@ -17,11 +17,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
-
-  // Check if the current path is in the publicPaths array
-  const isPublicPath = publicPaths.some(path => 
-    location.pathname === path || location.pathname.startsWith(`${path}/`)
-  );
+  const [hasRegistrationData, setHasRegistrationData] = useState(false);
+  
+  useEffect(() => {
+    // Check for registration data in session storage
+    const registrationData = sessionStorage.getItem('registration_data');
+    setHasRegistrationData(!!registrationData);
+  }, [location.pathname]);
 
   // Show consistent loader while auth is initializing
   if (!initialized || loading) {
@@ -32,18 +34,29 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
+  // Check for registration in progress from location state
+  const isRegistering = location.state?.isRegistering === true;
+
   // Allow access to public paths regardless of auth status
-  if (isPublicPath) {
+  if (isPublicPath(location.pathname, publicPaths)) {
     return <>{children}</>;
   }
 
-  // For subscription page, redirect to auth if not authenticated
-  if (location.pathname === '/subscription' || location.pathname.startsWith('/subscription/')) {
-    if (!isAuthenticated) {
-      console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
-      return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
+  // Special case for subscription page - allow access if:
+  // 1. User is authenticated OR
+  // 2. User is in registration process (has data in sessionStorage) OR
+  // 3. User is redirected directly from signup (isRegistering state)
+  if (isSubscriptionPath(location.pathname)) {
+    if (isAuthenticated || hasRegistrationData || isRegistering) {
+      console.log("ProtectedRoute: Allowing access to subscription path", {
+        isAuthenticated,
+        hasRegistrationData,
+        isRegistering
+      });
+      return <>{children}</>;
     }
-    return <>{children}</>;
+    console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
+    return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
   }
 
   if (requireAuth && !isAuthenticated) {
@@ -60,5 +73,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   return <>{children}</>;
 };
+
+// Helper functions to improve readability
+function isPublicPath(path: string, publicPaths: string[]): boolean {
+  return publicPaths.some(publicPath => 
+    path === publicPath || path.startsWith(`${publicPath}/`)
+  );
+}
+
+function isSubscriptionPath(path: string): boolean {
+  return path === '/subscription' || path.startsWith('/subscription/');
+}
 
 export default ProtectedRoute;
