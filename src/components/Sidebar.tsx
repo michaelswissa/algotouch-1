@@ -5,10 +5,12 @@ import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+
   const navItems = [{
     path: '/dashboard',
     name: 'לוח בקרה',
@@ -42,19 +44,20 @@ const Sidebar = () => {
     name: 'עוזר AI',
     icon: <Bot size={18} />
   }];
+
   const isActive = (path: string) => {
     return location.pathname === path || path !== '/' && location.pathname.startsWith(path);
   };
+
   const handleNewTrade = () => {
     navigate('/new-trade');
   };
+
   return <div className={cn("dark:bg-sidebar dark:text-sidebar-foreground border-l border-sidebar-border min-h-screen flex flex-col shadow-lg shadow-primary/10 transition-all duration-300 relative overflow-hidden", collapsed ? "w-16" : "w-64")} dir="rtl">
-      {/* Modern toggle button */}
       <Button variant="ghost" size="icon" className="absolute top-3 left-3 z-20 h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-muted-foreground" onClick={() => setCollapsed(!collapsed)}>
         {collapsed ? <ChevronRight size={14} /> : <X size={14} />}
       </Button>
       
-      {/* Modern subtle background pattern */}
       <div className="absolute inset-0 bg-mesh opacity-5 pointer-events-none"></div>
       
       <div className={cn("p-6 border-b border-sidebar-border flex justify-center relative z-10", collapsed && "p-3")}>
@@ -67,7 +70,6 @@ const Sidebar = () => {
             <Search className="h-4 w-4 absolute top-3 right-3 text-muted-foreground" />
           </div>}
         
-        {/* Modern action button */}
         <Button onClick={handleNewTrade} className={cn("bg-gradient-to-r from-primary/90 to-primary/70 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.03] group", collapsed ? "w-10 h-10 p-0 rounded-full mx-auto" : "w-full")}>
           <PlusCircle size={16} className="group-hover:rotate-90 transition-transform duration-300" />
           {!collapsed && <span>עסקה חדשה</span>}
@@ -82,19 +84,23 @@ const Sidebar = () => {
             </span>
             {!collapsed && <span>{item.name}</span>}
             
-            {/* Modern active indicator */}
             {isActive(item.path) && <span className={cn("absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary/80 rounded-l-md", collapsed && "w-1 right-0")}></span>}
           </Link>)}
       </nav>
       
       <div className={cn("p-4 border-t border-sidebar-border text-xs text-center text-sidebar-foreground/60 relative z-10", collapsed && "p-2")}>
-        {!collapsed ? <>
+        {!collapsed ? 
+          <div className="text-center">
             <p className="text-center">AlgoTouch &copy; 2025</p>
             <p className="mt-1 text-center">כל הזכויות שמורות</p>
-          </> : <div className="text-center">
+          </div> 
+          : 
+          <div className="text-center">
             <span>&copy;</span>
-          </div>}
+          </div>
+        }
       </div>
     </div>;
 };
+
 export default Sidebar;
