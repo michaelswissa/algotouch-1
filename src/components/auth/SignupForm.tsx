@@ -4,15 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
 }
 
 const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
-  const { registerUser } = useAuth();
+  const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,16 +38,46 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
     
     try {
       setSigningUp(true);
-      await registerUser(email, password, {
-        firstName,
-        lastName,
-        phone
-      });
       
-      // No need to call onSignupSuccess - navigation is handled in the registerUser function
-    } catch (error) {
-      console.error('Signup error:', error);
-      // Error toast is shown in the registerUser function
+      // Check if user already exists
+      const { data: existingUsers, error: checkError } = await supabase.auth.admin
+        .listUsers({ 
+          page: 1,
+          perPage: 100
+        });
+      
+      if (checkError) {
+        console.error('Error checking existing user:', checkError);
+        throw new Error('אירעה שגיאה בבדיקת משתמש קיים');
+      }
+      
+      // Check if email already exists
+      const existingUser = existingUsers?.users?.find((user: any) => 
+        user.email && user.email.toLowerCase() === email.toLowerCase()
+      );
+      
+      if (existingUser) {
+        throw new Error('משתמש עם כתובת אימייל זו כבר קיים במערכת');
+      }
+      
+      // Store registration data in session storage but don't create the user account yet
+      sessionStorage.setItem('registration_data', JSON.stringify({
+        email,
+        password,
+        userData: {
+          firstName,
+          lastName,
+          phone
+        }
+      }));
+      
+      toast.success('הפרטים נשמרו בהצלחה');
+      
+      // Navigate to subscription page
+      navigate('/subscription');
+    } catch (error: any) {
+      console.error('Signup validation error:', error);
+      toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');
     } finally {
       setSigningUp(false);
     }
@@ -125,7 +156,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={signingUp}>
-            {signingUp ? 'מבצע הרשמה...' : 'המשך לחתימה על הסכם'}
+            {signingUp ? 'בודק פרטים...' : 'המשך לבחירת תכנית'}
           </Button>
         </CardFooter>
       </form>

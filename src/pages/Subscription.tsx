@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -33,11 +34,13 @@ const Subscription = () => {
       if (data.contractSigned) {
         setCurrentStep(3);
         setSelectedPlan(data.planId);
-      } else {
+      } else if (data.planId) {
         setCurrentStep(2);
+        setSelectedPlan(data.planId);
       }
     }
     
+    // For logged-in users, check subscription status
     const checkSubscription = async () => {
       if (user?.id) {
         const { data, error } = await supabase
@@ -67,12 +70,14 @@ const Subscription = () => {
     }
   }, [user, planId]);
 
-  if (!loading && !isAuthenticated && !registrationData) {
-    return <Navigate to="/auth?tab=signup" replace />;
+  // If a logged-in user visits this page, check if they already have a subscription
+  if (!loading && isAuthenticated && hasActiveSubscription) {
+    return <Navigate to="/dashboard" replace />;
   }
   
-  if (!loading && hasActiveSubscription) {
-    return <Navigate to="/dashboard" replace />;
+  // If no registration data and not logged in, redirect to signup
+  if (!loading && !isAuthenticated && !registrationData) {
+    return <Navigate to="/auth?tab=signup" replace />;
   }
 
   const handlePlanSelect = (planId: string) => {
@@ -89,6 +94,15 @@ const Subscription = () => {
   };
 
   const handleContractSign = () => {
+    if (registrationData) {
+      const updatedData = {
+        ...registrationData,
+        contractSigned: true,
+        contractSignedAt: new Date().toISOString()
+      };
+      sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+    }
+    
     setCurrentStep(3);
   };
 

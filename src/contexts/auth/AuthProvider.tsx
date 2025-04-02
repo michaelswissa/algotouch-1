@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -33,122 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription.unsubscribe();
   }, [navigate]);
-
-  const registerUser = async (email: string, password: string, userData: any) => {
-    try {
-      setLoading(true);
-      
-      const { data: existingUsers, error: checkError } = await supabase.auth.admin
-        .listUsers({ 
-          page: 1,
-          perPage: 100
-        });
-      
-      if (checkError) {
-        console.error('Error checking existing user:', checkError);
-      }
-      
-      // Safely check if any user has the email we're looking for
-      const existingUser = existingUsers?.users?.find((user: User) => 
-        user.email && user.email.toLowerCase() === email.toLowerCase()
-      );
-      
-      if (existingUser) {
-        throw new Error('משתמש עם כתובת אימייל זו כבר קיים במערכת');
-      }
-      
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          data: {
-            first_name: userData.firstName,
-            last_name: userData.lastName,
-            registration_complete: false,
-            signup_step: 'contract',
-            signup_date: new Date().toISOString()
-          },
-        }
-      });
-      
-      if (error) {
-        toast.error(error.message);
-        throw error;
-      }
-      
-      if (!data.user) {
-        throw new Error('יצירת משתמש נכשלה');
-      }
-      
-      sessionStorage.setItem('registration_data', JSON.stringify({
-        userId: data.user.id,
-        email,
-        password,
-        userData
-      }));
-      
-      toast.success('רישום ראשוני בוצע בהצלחה');
-      
-      navigate('/subscription');
-    } catch (error) {
-      console.error('Error registering:', error);
-      toast.error(error.message || 'אירעה שגיאה בתהליך הרישום');
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const completeRegistration = async (userId: string, email: string, password: string, userData: any) => {
-    try {
-      setLoading(true);
-      
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (signInError) {
-        console.error('Error signing in after registration:', signInError);
-        throw signInError;
-      }
-      
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          phone: userData.phone,
-          birth_date: userData.birthDate,
-          street: userData.street,
-          city: userData.city,
-          postal_code: userData.postalCode,
-          country: userData.country || 'Israel'
-        })
-        .eq('id', userId);
-      
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-      }
-      
-      await supabase.auth.updateUser({
-        data: {
-          registration_complete: true,
-          signup_step: 'completed'
-        }
-      });
-      
-      sessionStorage.removeItem('registration_data');
-      
-      toast.success('ההרשמה הושלמה בהצלחה!');
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error completing registration:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -222,8 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     isAuthenticated: !!user,
     signIn,
-    registerUser,
-    completeRegistration,
     signOut,
     updateProfile
   };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { CreditCard, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/auth';
+import { useNavigate } from 'react-router-dom';
 
 interface PaymentFormProps {
   planId: string;
@@ -16,7 +15,7 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) => {
-  const { completeRegistration } = useAuth();
+  const navigate = useNavigate();
   const [cardNumber, setCardNumber] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -24,13 +23,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [registrationData, setRegistrationData] = useState<any>(null);
 
-  // Get registration data from session storage
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       setRegistrationData(JSON.parse(storedData));
+    } else {
+      toast.error('נתוני הרשמה חסרים, אנא חזור לדף ההרשמה');
+      navigate('/auth?tab=signup');
     }
-  }, []);
+  }, [navigate]);
 
   const planDetails = {
     monthly: {
@@ -48,24 +49,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   const plan = planId === 'annual' ? planDetails.annual : planDetails.monthly;
 
   const formatCardNumber = (value: string) => {
-    // Remove all non-digits
     const digits = value.replace(/\D/g, '');
-    
-    // Split into groups of 4 and join with spaces
     const formatted = digits.match(/.{1,4}/g)?.join(' ') || digits;
-    
     return formatted;
   };
 
   const formatExpiryDate = (value: string) => {
-    // Remove all non-digits
     const digits = value.replace(/\D/g, '');
-    
-    // Format as MM/YY
     if (digits.length > 2) {
       return `${digits.substring(0, 2)}/${digits.substring(2, 4)}`;
     }
-    
     return digits;
   };
 
@@ -85,10 +78,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     try {
       setIsProcessing(true);
       
-      // This would use Takbull API in production
-      // For now, we're simulating a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       const tokenData = {
         lastFourDigits: cardNumber.slice(-4),
         expiryMonth: expiryDate.split('/')[0],
@@ -96,14 +85,35 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         cardholderName
       };
       
-      // Create subscription record for the new user
+      const { data: userData, error: userError } = await supabase.auth.signUp({
+        email: registrationData.email,
+        password: registrationData.password,
+        options: {
+          data: {
+            first_name: registrationData.userData.firstName,
+            last_name: registrationData.userData.lastName,
+            registration_complete: true,
+            signup_step: 'completed',
+            signup_date: new Date().toISOString()
+          }
+        }
+      });
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      if (!userData.user) {
+        throw new Error('יצירת משתמש נכשלה');
+      }
+      
       const trialEndsAt = new Date();
       trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
       
-      const { error } = await supabase
+      const { error: subscriptionError } = await supabase
         .from('subscriptions')
         .insert({
-          user_id: registrationData.userId,
+          user_id: userData.user.id,
           plan_type: planId,
           status: 'trial',
           trial_ends_at: trialEndsAt.toISOString(),
@@ -112,32 +122,39 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
           contract_signed_at: new Date().toISOString()
         });
       
-      if (error) {
-        throw error;
+      if (subscriptionError) {
+        throw subscriptionError;
       }
       
-      // Create payment history record
       await supabase.from('payment_history').insert({
-        user_id: registrationData.userId,
-        subscription_id: registrationData.userId, // This should be the subscription ID in a real scenario
-        amount: 0, // Free trial
+        user_id: userData.user.id,
+        subscription_id: userData.user.id,
+        amount: 0,
         status: 'trial_started',
         payment_method: tokenData
       });
       
-      // Complete the registration process
-      await completeRegistration(
-        registrationData.userId,
-        registrationData.email,
-        registrationData.password,
-        registrationData.userData
-      );
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: registrationData.userData.firstName,
+          last_name: registrationData.userData.lastName,
+          phone: registrationData.userData.phone
+        })
+        .eq('id', userData.user.id);
+      
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+      }
       
       toast.success('התשלום נקלט בהצלחה! נרשמת לתקופת ניסיון חינם');
+      
+      sessionStorage.removeItem('registration_data');
+      
       onPaymentComplete();
     } catch (error) {
-      console.error('Payment error:', error);
-      toast.error('אירעה שגיאה בעיבוד התשלום. נסה שנית מאוחר יותר.');
+      console.error('Payment/registration error:', error);
+      toast.error('אירעה שגיאה בתהליך ההרשמה. נסה שנית מאוחר יותר.');
     } finally {
       setIsProcessing(false);
     }
@@ -218,7 +235,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <Button type="submit" className="w-full" disabled={isProcessing}>
-            {isProcessing ? 'מעבד תשלום...' : 'הירשם לתקופת ניסיון חינם'}
+            {isProcessing ? 'מעבד תשלום והרשמה...' : 'סיים הרשמה לתקופת ניסיון חינם'}
           </Button>
           <p className="text-xs text-center text-muted-foreground max-w-md mx-auto">
             ע"י לחיצה על כפתור זה, אתה מאשר את פרטי התשלום לחיוב אוטומטי לאחר תקופת הניסיון
