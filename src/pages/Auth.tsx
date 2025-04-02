@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth';
 import AuthHeader from '@/components/auth/AuthHeader';
@@ -12,6 +12,7 @@ const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -27,9 +28,9 @@ const Auth = () => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       // If registration is in progress, redirect to subscription page
-      window.location.href = '/subscription';
+      navigate('/subscription', { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
   // Show loading state while auth is initializing
   if (!initialized || loading) {

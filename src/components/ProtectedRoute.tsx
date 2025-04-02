@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
-  publicPaths = ['/subscription']
+  publicPaths = ['/subscription', '/auth']
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();

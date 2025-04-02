@@ -6,9 +6,10 @@ import { cn } from '@/lib/utils';
 interface LayoutProps {
   children: React.ReactNode;
   className?: string;
+  hideSidebar?: boolean;
 }
 
-const Layout = ({ children, className }: LayoutProps) => {
+const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
   useEffect(() => {
     // Add dark class to html element
     document.documentElement.classList.add('dark');
@@ -16,8 +17,12 @@ const Layout = ({ children, className }: LayoutProps) => {
 
   return (
     <div className="flex h-screen overflow-hidden dark:bg-background dark:text-foreground transition-all duration-300" dir="rtl">
-      <Sidebar />
-      <main className={cn("flex-1 overflow-y-auto p-4 animate-fade-in bg-main-background bg-cover bg-center bg-fixed bg-no-repeat relative", className)}>
+      {!hideSidebar && <Sidebar />}
+      <main className={cn(
+        "flex-1 overflow-y-auto p-4 animate-fade-in bg-main-background bg-cover bg-center bg-fixed bg-no-repeat relative", 
+        hideSidebar && "w-full",
+        className
+      )}>
         {/* Modern subtle background pattern */}
         <div className="absolute inset-0 bg-dots opacity-5 pointer-events-none"></div>
         

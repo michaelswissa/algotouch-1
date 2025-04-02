@@ -118,7 +118,7 @@ const Subscription = () => {
   };
 
   return (
-    <Layout className="py-8">
+    <Layout className="py-8" hideSidebar={true}>
       <div className="max-w-5xl mx-auto px-4" dir="rtl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">השלמת תהליך ההרשמה</h1>
