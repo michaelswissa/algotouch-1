@@ -26,7 +26,8 @@ const CalendarPage = () => {
   useEffect(() => {
     console.log("Calendar render state:", { 
       tradesByDayCount: Object.keys(tradesByDay).length,
-      lastUpdate: new Date(lastUpdateTimestamp).toLocaleTimeString()
+      lastUpdate: new Date(lastUpdateTimestamp).toLocaleTimeString(),
+      viewMode
     });
     
     // Debug data by logging keys
@@ -37,7 +38,7 @@ const CalendarPage = () => {
       const sampleKey = Object.keys(tradesByDay)[0];
       console.log(`Sample day ${sampleKey} has ${tradesByDay[sampleKey].length} trades`);
     }
-  }, [tradesByDay, lastUpdateTimestamp]);
+  }, [tradesByDay, lastUpdateTimestamp, viewMode]);
 
   // Current date for reference
   const currentDate = new Date();

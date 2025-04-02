@@ -38,12 +38,19 @@ export const MonthCalendarSection = ({
       console.log("Available days:", Object.keys(tradesData).join(", "));
     }
   }, [tradesData]);
+
+  // Reset selected day when month changes
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [currentMonth, currentYear]);
   
   const handleDayClick = (day: number) => {
-    // Important: Always use 'current' to match the pattern in tradesByDay
+    // CRITICAL: Always use consistent key format - day-current
     const dayKey = `${day}-current`;
     console.log(`Day ${day} clicked, looking for trades with key: ${dayKey}`);
     console.log(`Available trade keys:`, Object.keys(tradesData || {}));
+    
+    // Set the selected day
     setSelectedDay(dayKey);
   };
   

@@ -32,6 +32,11 @@ const MonthCalendar = ({
 }: MonthCalendarProps) => {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   
+  // Reset selected day when month changes
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [month, year]);
+  
   // Log received data for debugging
   useEffect(() => {
     console.log("MonthCalendar received tradesData:", Object.keys(tradesData).length, "days");
@@ -54,8 +59,8 @@ const MonthCalendar = ({
     let totalProfit = 0;
     
     Object.keys(tradesData).forEach(key => {
-      // Only count days with the 'current' format (real data)
-      if (key.includes('-current')) {
+      // Only count real data
+      if (tradesData[key] && tradesData[key].length) {
         const trades = tradesData[key];
         totalTrades += trades.length;
         trades.forEach(trade => {

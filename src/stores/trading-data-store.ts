@@ -34,9 +34,8 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
           return;
         }
         
-        // Get the day of the month
+        // Get the day of the month - ALWAYS use this consistent format
         const day = entryDate.getDate();
-        // Use consistent format for keys - IMPORTANT! Always use 'current'
         const dayKey = `${day}-current`;
         
         if (!tradesByDay[dayKey]) {
@@ -50,6 +49,7 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
     });
     
     console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
+    console.log('All day keys:', Object.keys(tradesByDay).join(', '));
     
     // Log some sample data to debug
     if (Object.keys(tradesByDay).length > 0) {
@@ -84,9 +84,8 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
           return;
         }
         
-        // Get the day of the month
+        // Get the day of the month - ALWAYS use this consistent format
         const day = entryDate.getDate();
-        // Use consistent format for keys - IMPORTANT! Always use 'current'
         const dayKey = `${day}-current`;
         
         if (!tradesByDay[dayKey]) {
@@ -100,6 +99,7 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
     });
     
     console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
+    console.log('All day keys:', Object.keys(tradesByDay).join(', '));
     
     // Log some sample data to debug
     if (Object.keys(tradesByDay).length > 0) {
