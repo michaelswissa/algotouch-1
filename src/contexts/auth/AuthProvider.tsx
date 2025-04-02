@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -41,15 +42,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: existingUsers, error: checkError } = await supabase.auth.admin
         .listUsers({ 
           page: 1,
-          perPage: 1
+          perPage: 100
         });
       
       if (checkError) {
         console.error('Error checking existing user:', checkError);
       }
       
+      // Safely check if any user has the email we're looking for
       const existingUser = existingUsers?.users?.find(user => 
-        user.email?.toLowerCase() === email.toLowerCase()
+        user.email && user.email.toLowerCase() === email.toLowerCase()
       );
       
       if (existingUser) {
