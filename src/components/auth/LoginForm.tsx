@@ -50,7 +50,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     try {
       setResettingPassword(true);
       
-      // Use Supabase's built-in password reset functionality
+      // Use Supabase's built-in password reset functionality with custom templates
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
