@@ -22,6 +22,7 @@ const Subscription = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Check for registration data from session storage (for new sign-ups)
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       const data = JSON.parse(storedData);
@@ -43,42 +44,44 @@ const Subscription = () => {
     // For logged-in users, check subscription status
     const checkSubscription = async () => {
       if (user?.id) {
-        const { data, error } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (data && !error) {
-          setHasActiveSubscription(true);
-        }
-        
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile) {
-          setFullName(`${profile.first_name || ''} ${profile.last_name || ''}`);
+        try {
+          const { data, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (data && !error) {
+            setHasActiveSubscription(true);
+          }
+          
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile) {
+            setFullName(`${profile.first_name || ''} ${profile.last_name || ''}`);
+          }
+        } catch (error) {
+          console.error("Error checking subscription:", error);
         }
       }
     };
     
-    if (user) {
+    if (isAuthenticated && user) {
       checkSubscription();
     }
-  }, [user, planId]);
+  }, [user, planId, isAuthenticated]);
 
   // If a logged-in user visits this page, check if they already have a subscription
   if (!loading && isAuthenticated && hasActiveSubscription) {
     return <Navigate to="/dashboard" replace />;
   }
   
-  // If no registration data and not logged in, redirect to signup
-  if (!loading && !isAuthenticated && !registrationData) {
-    return <Navigate to="/auth?tab=signup" replace />;
-  }
+  // We don't redirect non-authenticated users anymore - we allow them to proceed
+  // with the subscription process using session storage data
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
@@ -110,7 +113,7 @@ const Subscription = () => {
     setCurrentStep(4);
     
     setTimeout(() => {
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     }, 3000);
   };
 
@@ -152,7 +155,7 @@ const Subscription = () => {
             <p className="text-green-700 dark:text-green-300 mb-6">
               ברכות! נרשמת בהצלחה לתקופת ניסיון חינם. כעת יש לך גישה מלאה למערכת.
             </p>
-            <Button onClick={() => navigate('/dashboard')} className="gap-2">
+            <Button onClick={() => navigate('/dashboard', { replace: true })} className="gap-2">
               המשך לדף הבית <ChevronRight className="h-4 w-4 -rotate-180" />
             </Button>
           </div>

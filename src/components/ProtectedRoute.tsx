@@ -7,14 +7,21 @@ import { Spinner } from '@/components/ui/spinner';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAuth?: boolean;
+  publicPaths?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requireAuth = true 
+  requireAuth = true,
+  publicPaths = ['/subscription']
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
+
+  // Check if the current path is in the publicPaths array
+  const isPublicPath = publicPaths.some(path => 
+    location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
 
   // Show consistent loader while auth is initializing
   if (!initialized || loading) {
@@ -23,6 +30,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <Spinner size="lg" />
       </div>
     );
+  }
+
+  // Allow access to public paths regardless of auth status
+  if (isPublicPath) {
+    return <>{children}</>;
   }
 
   if (requireAuth && !isAuthenticated) {

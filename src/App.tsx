@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -80,16 +79,10 @@ const App = () => {
                   <Auth />
                 </ProtectedRoute>
               } />
-              <Route path="/subscription/:planId" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
-              <Route path="/subscription" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
+              
+              {/* Subscription routes - accessible to all */}
+              <Route path="/subscription/:planId" element={<Subscription />} />
+              <Route path="/subscription" element={<Subscription />} />
               
               {/* Protected routes - require authentication */}
               <Route path="/dashboard" element={

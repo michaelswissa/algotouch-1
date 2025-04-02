@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
@@ -39,28 +38,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
     try {
       setSigningUp(true);
       
-      // Check if user already exists
-      const { data: existingUsers, error: checkError } = await supabase.auth.admin
-        .listUsers({ 
-          page: 1,
-          perPage: 100
-        });
-      
-      if (checkError) {
-        console.error('Error checking existing user:', checkError);
-        throw new Error('אירעה שגיאה בבדיקת משתמש קיים');
-      }
-      
-      // Check if email already exists
-      const existingUser = existingUsers?.users?.find((user: any) => 
-        user.email && user.email.toLowerCase() === email.toLowerCase()
-      );
-      
-      if (existingUser) {
-        throw new Error('משתמש עם כתובת אימייל זו כבר קיים במערכת');
-      }
-      
-      // Store registration data in session storage but don't create the user account yet
+      // Store registration data in session storage without checking for existing user
       sessionStorage.setItem('registration_data', JSON.stringify({
         email,
         password,
@@ -74,7 +52,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       toast.success('הפרטים נשמרו בהצלחה');
       
       // Navigate to subscription page
-      navigate('/subscription');
+      navigate('/subscription', { replace: true });
     } catch (error: any) {
       console.error('Signup validation error:', error);
       toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');
