@@ -1,12 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { TradeRecord } from '@/lib/trade-analysis';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
@@ -37,20 +30,10 @@ const MonthCalendar = ({
     setSelectedDay(null);
   }, [month, year]);
   
-  // Log received data for debugging
-  useEffect(() => {
-    console.log("MonthCalendar received tradesData:", Object.keys(tradesData).length, "days");
-    if (Object.keys(tradesData).length > 0) {
-      console.log("Sample data key:", Object.keys(tradesData)[0]);
-      const sampleKey = Object.keys(tradesData)[0];
-      console.log("Sample trades count:", tradesData[sampleKey]?.length || 0);
-    }
-  }, [tradesData]);
-  
   // Days of week in Hebrew
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
   
-  // Generate calendar days for the month - pass empty object for now, we'll handle status in CalendarGrid
+  // Generate calendar days for the month
   const calendarDays = generateCalendarDays(month, year, {});
   
   // Calculate total trades and profit for the month using real data
@@ -77,9 +60,7 @@ const MonthCalendar = ({
   // Handle day click
   const handleDayClick = (day: number, month: 'current' | 'prev' | 'next') => {
     if (month === 'current') {
-      const dayKey = `${day}-${month}`;
-      console.log(`Day ${day} clicked, setting selected day to: ${dayKey}`);
-      console.log(`Available trade keys:`, Object.keys(tradesData || {}));
+      const dayKey = `${day}-current`;
       setSelectedDay(dayKey);
       if (onDayClick) onDayClick(day);
     }

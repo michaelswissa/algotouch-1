@@ -5,6 +5,7 @@ import { TradeRecord } from '@/lib/trade-analysis';
 import { ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { getTradeCount, getDailyPnL, getTradesPreview } from './TradeUtils';
 
 interface CalendarDay {
   day: number;
@@ -22,48 +23,6 @@ interface CalendarGridProps {
 }
 
 const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, tradesData = {} }: CalendarGridProps) => {
-  // Function to get trade count for a specific day - IMPORTANT CHANGE: always use -current format
-  const getTradeCount = (day: number, month: 'current' | 'prev' | 'next'): number => {
-    if (month !== 'current') return 0;
-    
-    // The consistent key format: day-current
-    const dayKey = `${day}-current`;
-    return tradesData[dayKey]?.length || 0;
-  };
-
-  // Calculate daily profit/loss
-  const getDailyPnL = (day: number, month: 'current' | 'prev' | 'next'): number => {
-    if (month !== 'current') return 0;
-    
-    // The consistent key format: day-current
-    const dayKey = `${day}-current`;
-    const trades = tradesData[dayKey] || [];
-    return trades.reduce((total, trade) => total + (trade.Net || 0), 0);
-  };
-
-  // Get a preview of trades for tooltip
-  const getTradesPreview = (day: number, month: 'current' | 'prev' | 'next') => {
-    if (month !== 'current') return null;
-    
-    // The consistent key format: day-current
-    const dayKey = `${day}-current`;
-    const trades = tradesData[dayKey] || [];
-    
-    if (trades.length === 0) return null;
-    
-    // Return first 3 trades for preview
-    return trades.slice(0, 3).map((trade, index) => (
-      <div key={index} className="text-xs border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
-        <div className="flex justify-between">
-          <span>{trade.Contract}</span>
-          <span className={trade.Net > 0 ? "text-green-600" : "text-red-600"}>
-            ${trade.Net.toFixed(2)}
-          </span>
-        </div>
-      </div>
-    ));
-  };
-
   return (
     <div className="w-full mt-2">
       <div className="grid grid-cols-7 gap-1 mb-1 text-center" dir="rtl">
@@ -79,8 +38,8 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
           // Always format the day key consistently
           const dayKey = dayObj.month === 'current' ? `${dayObj.day}-current` : `${dayObj.day}-${dayObj.month}`;
           const isSelected = selectedDay === dayKey;
-          const tradeCount = getTradeCount(dayObj.day, dayObj.month);
-          const dailyPnL = getDailyPnL(dayObj.day, dayObj.month);
+          const tradeCount = getTradeCount(dayObj.day, dayObj.month, tradesData);
+          const dailyPnL = getDailyPnL(dayObj.day, dayObj.month, tradesData);
           const hasTrades = tradeCount > 0 && dayObj.month === 'current';
           
           // Show prev/next month days with low opacity
@@ -170,7 +129,7 @@ const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, trade
                           </div>
                           
                           <div className="mt-1">
-                            {getTradesPreview(dayObj.day, dayObj.month)}
+                            {getTradesPreview(dayObj.day, dayObj.month, tradesData)}
                             {tradeCount > 3 && (
                               <div className="text-xs text-muted-foreground mt-1 text-center">
                                 + עוד {tradeCount - 3} עסקאות נוספות

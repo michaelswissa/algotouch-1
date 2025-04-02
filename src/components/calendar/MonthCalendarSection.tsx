@@ -30,15 +30,6 @@ export const MonthCalendarSection = ({
   const isCurrentMonth = currentMonth === systemCurrentMonth && currentYear === systemCurrentYear;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   
-  // Effect to log when tradesData changes
-  useEffect(() => {
-    console.log("MonthCalendarSection: Received trades data with", 
-      Object.keys(tradesData).length, "days");
-    if (Object.keys(tradesData).length > 0) {
-      console.log("Available days:", Object.keys(tradesData).join(", "));
-    }
-  }, [tradesData]);
-
   // Reset selected day when month changes
   useEffect(() => {
     setSelectedDay(null);
@@ -47,8 +38,6 @@ export const MonthCalendarSection = ({
   const handleDayClick = (day: number) => {
     // CRITICAL: Always use consistent key format - day-current
     const dayKey = `${day}-current`;
-    console.log(`Day ${day} clicked, looking for trades with key: ${dayKey}`);
-    console.log(`Available trade keys:`, Object.keys(tradesData || {}));
     
     // Set the selected day
     setSelectedDay(dayKey);
@@ -56,7 +45,6 @@ export const MonthCalendarSection = ({
   
   // Get selected day trades
   const selectedDayTrades = selectedDay && tradesData[selectedDay] ? tradesData[selectedDay] : [];
-  console.log("Selected day trades:", selectedDayTrades.length);
   
   return (
     <div className="col-span-2">
