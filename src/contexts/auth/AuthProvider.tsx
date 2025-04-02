@@ -43,14 +43,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       
       // First, check if email already exists
+      // Using the search functionality instead of filter
       const { data: existingUsers, error: checkError } = await supabase.auth.admin
-        .listUsers({ filter: { email } });
+        .listUsers({ 
+          page: 1,
+          perPage: 1,
+          query: email
+        });
       
       if (checkError) {
         console.error('Error checking existing user:', checkError);
       }
       
-      if (existingUsers && existingUsers.length > 0) {
+      // Check if users array has any entries
+      if (existingUsers && existingUsers.users && existingUsers.users.length > 0) {
         throw new Error('משתמש עם כתובת אימייל זו כבר קיים במערכת');
       }
       
