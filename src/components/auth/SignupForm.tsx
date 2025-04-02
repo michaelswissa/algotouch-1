@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { sendWelcomeEmail } from '@/lib/email-service';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
@@ -25,10 +27,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
     e.preventDefault();
     
     if (!email || !password || !firstName || !lastName) {
+      toast.error('אנא מלא את כל שדות החובה');
       return;
     }
     
     if (password !== passwordConfirm) {
+      toast.error('הסיסמאות אינן תואמות');
       return;
     }
     
@@ -39,11 +43,19 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         lastName,
         phone
       });
+      
+      // Send welcome email via our custom email service
+      const fullName = `${firstName} ${lastName}`;
+      await sendWelcomeEmail(email, fullName);
+      
       if (onSignupSuccess) {
         onSignupSuccess();
       }
+      
+      toast.success('נרשמת בהצלחה! אנא בדוק את הדוא"ל שלך לאימות.');
     } catch (error) {
       console.error('Signup error:', error);
+      toast.error('אירעה שגיאה בתהליך ההרשמה. אנא נסה שוב מאוחר יותר.');
     } finally {
       setSigningUp(false);
     }
