@@ -52,10 +52,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       
       toast.success('נרשמת בהצלחה! עכשיו נמשיך לבחירת תכנית מנוי.');
       
+      // Proceed to subscription page directly without waiting for email verification
       if (onSignupSuccess) {
         onSignupSuccess();
       } else {
-        // Redirect to subscription page after successful signup
         navigate('/subscription');
       }
     } catch (error) {

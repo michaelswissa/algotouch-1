@@ -72,14 +72,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, userData: any) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({ 
+      // Use emailRedirectTo: undefined to prevent waiting for email verification
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
           data: {
             first_name: userData.firstName,
             last_name: userData.lastName
-          }
+          },
+          emailRedirectTo: undefined // Don't require email verification
         }
       });
       
@@ -88,44 +90,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      // Update the profile with additional data
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          phone: userData.phone,
-          birth_date: userData.birthDate,
-          street: userData.street,
-          city: userData.city,
-          postal_code: userData.postalCode,
-          country: userData.country || 'Israel'
-        })
-        .eq('id', user?.id);
+      // Set the user immediately after signup
+      // This allows us to create profile and subscription records
+      if (data.user) {
+        setUser(data.user);
       
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
+        // Update the profile with additional data
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            phone: userData.phone,
+            birth_date: userData.birthDate,
+            street: userData.street,
+            city: userData.city,
+            postal_code: userData.postalCode,
+            country: userData.country || 'Israel'
+          })
+          .eq('id', data.user.id);
+        
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
+        
+        // Create subscription record with trial status
+        const trialEndsAt = new Date();
+        trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
+        
+        const { error: subscriptionError } = await supabase
+          .from('subscriptions')
+          .insert({
+            user_id: data.user.id,
+            status: 'trial',
+            plan_type: 'monthly',
+            trial_ends_at: trialEndsAt.toISOString()
+          });
+        
+        if (subscriptionError) {
+          console.error('Error creating subscription record:', subscriptionError);
+        }
       }
       
-      // Create subscription record with trial status
-      const trialEndsAt = new Date();
-      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
-      
-      const { error: subscriptionError } = await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: user?.id,
-          status: 'trial',
-          plan_type: 'monthly',
-          trial_ends_at: trialEndsAt.toISOString()
-        });
-      
-      if (subscriptionError) {
-        console.error('Error creating subscription record:', subscriptionError);
-      }
-      
-      toast.success('נרשמת בהצלחה! אנא בדוק את הדוא"ל שלך לאימות.');
-      navigate('/auth');
+      toast.success('נרשמת בהצלחה!');
+      // We don't navigate here, but let the signup component handle it
     } catch (error) {
       console.error('Error signing up:', error);
       throw error;
