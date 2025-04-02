@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,15 @@ const Auth = () => {
   const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
+  // Get initial tab from URL if present
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab === 'signup') {
+      setActiveTab('signup');
+    }
+  }, []);
+
   // If user is already authenticated, redirect to dashboard
   if (isAuthenticated && !loading) {
     return <Navigate to="/dashboard" replace />;
@@ -21,10 +30,6 @@ const Auth = () => {
       <div className="w-full max-w-md space-y-6">
         <AuthHeader />
         
-        <div className="mb-6 text-center">
-          <h2 className="text-xl font-semibold">ברוכים הבאים ל-AlgoTouch</h2>
-        </div>
-
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="signup">הרשמה</TabsTrigger>

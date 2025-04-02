@@ -72,7 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, userData: any) => {
     try {
       setLoading(true);
-      // Use emailRedirectTo: undefined to prevent waiting for email verification
+      
+      // First, create the user without logging them in
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -81,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             first_name: userData.firstName,
             last_name: userData.lastName
           },
-          emailRedirectTo: undefined // Don't require email verification
+          emailRedirectTo: undefined
         }
       });
       
@@ -90,50 +91,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      // Set the user immediately after signup
-      // This allows us to create profile and subscription records
-      if (data.user) {
-        setUser(data.user);
-      
-        // Update the profile with additional data
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            first_name: userData.firstName,
-            last_name: userData.lastName,
-            phone: userData.phone,
-            birth_date: userData.birthDate,
-            street: userData.street,
-            city: userData.city,
-            postal_code: userData.postalCode,
-            country: userData.country || 'Israel'
-          })
-          .eq('id', data.user.id);
-        
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
-        }
-        
-        // Create subscription record with trial status
-        const trialEndsAt = new Date();
-        trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
-        
-        const { error: subscriptionError } = await supabase
-          .from('subscriptions')
-          .insert({
-            user_id: data.user.id,
-            status: 'trial',
-            plan_type: 'monthly',
-            trial_ends_at: trialEndsAt.toISOString()
-          });
-        
-        if (subscriptionError) {
-          console.error('Error creating subscription record:', subscriptionError);
-        }
+      if (!data.user) {
+        throw new Error('User creation failed');
       }
       
+      // After successful signup, sign in with the credentials
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (signInError) {
+        console.error('Error signing in after signup:', signInError);
+        throw signInError;
+      }
+      
+      // Now the user is signed in, update their profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          phone: userData.phone,
+          birth_date: userData.birthDate,
+          street: userData.street,
+          city: userData.city,
+          postal_code: userData.postalCode,
+          country: userData.country || 'Israel'
+        })
+        .eq('id', data.user.id);
+      
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+      }
+      
+      // Create subscription record with trial status
+      const trialEndsAt = new Date();
+      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
+      
+      const { error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: data.user.id,
+          status: 'trial',
+          plan_type: 'monthly',
+          trial_ends_at: trialEndsAt.toISOString()
+        });
+      
+      if (subscriptionError) {
+        console.error('Error creating subscription record:', subscriptionError);
+      }
+      
+      // Now set the user in state
+      setUser(data.user);
       toast.success('נרשמת בהצלחה!');
-      // We don't navigate here, but let the signup component handle it
+      
+      // Don't navigate here, let the component handle it
     } catch (error) {
       console.error('Error signing up:', error);
       throw error;
