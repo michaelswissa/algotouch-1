@@ -56,20 +56,20 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner position="top-right" expand={true} closeButton toastOptions={{
-          classNames: {
-            toast: 'group p-4 backdrop-blur-md bg-secondary/90 dark:bg-card/90 shadow-xl',
-            title: 'text-base font-semibold text-foreground',
-            description: 'text-sm text-muted-foreground',
-            actionButton: 'bg-primary text-primary-foreground',
-            cancelButton: 'bg-secondary text-secondary-foreground',
-            error: '!bg-red-500/20 border-red-500/50',
-            success: '!bg-green-500/20 border-green-500/50',
-          }
-        }} />
         <BrowserRouter>
           <AuthProvider>
+            <Toaster />
+            <Sonner position="top-right" expand={true} closeButton toastOptions={{
+              classNames: {
+                toast: 'group p-4 backdrop-blur-md bg-secondary/90 dark:bg-card/90 shadow-xl',
+                title: 'text-base font-semibold text-foreground',
+                description: 'text-sm text-muted-foreground',
+                actionButton: 'bg-primary text-primary-foreground',
+                cancelButton: 'bg-secondary text-secondary-foreground',
+                error: '!bg-red-500/20 border-red-500/50',
+                success: '!bg-green-500/20 border-green-500/50',
+              }
+            }} />
             <Routes>
               {/* Redirect root to auth page */}
               <Route path="/" element={<Navigate to="/auth" replace />} />
