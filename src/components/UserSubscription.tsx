@@ -9,7 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addMonths, parseISO, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { Json } from '@/integrations/supabase/types';
 
+// Updated Subscription interface to match the data structure from Supabase
 interface Subscription {
   id: string;
   plan_type: string;
@@ -20,7 +22,7 @@ interface Subscription {
     lastFourDigits: string;
     expiryMonth: string;
     expiryYear: string;
-  } | null;
+  } | Json | null;
 }
 
 const UserSubscription = () => {
@@ -43,7 +45,18 @@ const UserSubscription = () => {
             throw error;
           }
           
-          setSubscription(data);
+          // Convert Supabase data to our Subscription type
+          if (data) {
+            const formattedSubscription: Subscription = {
+              id: data.id,
+              plan_type: data.plan_type,
+              status: data.status,
+              trial_ends_at: data.trial_ends_at,
+              current_period_ends_at: data.current_period_ends_at,
+              payment_method: data.payment_method
+            };
+            setSubscription(formattedSubscription);
+          }
         } catch (error) {
           console.error('Error fetching subscription:', error);
         } finally {
@@ -84,6 +97,20 @@ const UserSubscription = () => {
       nextBillingDate = format(periodEndDate, 'dd/MM/yyyy', { locale: he });
     }
     
+    // Process payment method safely
+    let paymentMethodDetails = null;
+    if (subscription.payment_method) {
+      // Check if payment_method has the expected structure
+      const paymentMethod = subscription.payment_method as any;
+      if (paymentMethod.lastFourDigits) {
+        paymentMethodDetails = {
+          lastFourDigits: paymentMethod.lastFourDigits,
+          expiryMonth: paymentMethod.expiryMonth,
+          expiryYear: paymentMethod.expiryYear
+        };
+      }
+    }
+    
     return {
       planName,
       planPrice,
@@ -91,7 +118,7 @@ const UserSubscription = () => {
       nextBillingDate,
       progressValue,
       daysLeft,
-      paymentMethod: subscription.payment_method
+      paymentMethod: paymentMethodDetails
     };
   };
 
