@@ -33,8 +33,8 @@ const MonthCalendar = ({
   // Days of week in Hebrew
   const daysOfWeek = ['יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת', 'יום א׳'];
   
-  // Generate calendar days for the month
-  const calendarDays = generateCalendarDays(month, year, {});
+  // Generate calendar days for the month using real data
+  const calendarDays = generateCalendarDays(month, year, tradesData);
   
   // Calculate total trades and profit for the month using real data
   const calculateMonthlyStats = () => {
@@ -42,7 +42,6 @@ const MonthCalendar = ({
     let totalProfit = 0;
     
     Object.keys(tradesData).forEach(key => {
-      // Only count real data
       if (tradesData[key] && tradesData[key].length) {
         const trades = tradesData[key];
         totalTrades += trades.length;

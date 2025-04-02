@@ -1,63 +1,83 @@
 
+import { TradeRecord } from '@/lib/trade-analysis';
+
 /**
- * Generate calendar days for a month grid view
+ * Generates calendar days for a specific month
  */
-export function generateCalendarDays(month: string, year: number, daysWithStatus: Record<number, 'positive' | 'negative' | 'neutral'>) {
-  // Map Hebrew month names to numerical values
-  const hebrewMonthsMap: Record<string, number> = {
-    'ינואר': 0, 'פברואר': 1, 'מרץ': 2, 'אפריל': 3, 'מאי': 4, 'יוני': 5,
-    'יולי': 6, 'אוגוסט': 7, 'ספטמבר': 8, 'אוקטובר': 9, 'נובמבר': 10, 'דצמבר': 11
-  };
+export function generateCalendarDays(
+  month: string,
+  year: number,
+  tradesData: Record<string, TradeRecord[]>
+) {
+  // Hebrew month names
+  const hebrewMonths = [
+    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  ];
   
-  // Convert Hebrew month to numerical month
-  const monthIndex = hebrewMonthsMap[month];
+  // Get current date for "today" highlighting
+  const today = new Date();
   
-  // Get the first day of the month (0 = Sunday, 1 = Monday, etc.)
-  const firstDayOfMonth = new Date(year, monthIndex, 1).getDay();
+  // Get month index (0-11)
+  const monthIndex = hebrewMonths.indexOf(month);
   
-  // Adjust for the week starting with Monday in Hebrew calendar (Sunday is 0, so we adjust to 6 for Sunday)
-  const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+  // First day of month
+  const firstDay = new Date(year, monthIndex, 1);
   
-  // Get the number of days in the month
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  // Last day of month
+  const lastDay = new Date(year, monthIndex + 1, 0);
   
-  // Get the number of days in the previous month
+  // Day of week of first day (0 = Sunday, 1 = Monday, ...)
+  // Convert to match Hebrew calendar where week starts with Monday (0 = Monday)
+  let firstDayOfWeek = firstDay.getDay();
+  firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+  
+  // Number of days in month
+  const daysInMonth = lastDay.getDate();
+  
+  // Number of days in previous month
   const prevMonth = new Date(year, monthIndex, 0);
   const daysInPrevMonth = prevMonth.getDate();
   
-  // Check if current month/year matches today
-  const currentDate = new Date();
-  const today = currentDate.getDate();
-  const isCurrentMonth = 
-    currentDate.getMonth() === monthIndex && 
-    currentDate.getFullYear() === year;
+  // Calendar Array (6 weeks x 7 days)
+  const calendar = [];
   
-  // Generate an array of days for the calendar grid
-  const calendarDays = [];
-  
-  // Add days from the previous month
-  for (let i = adjustedFirstDay - 1; i >= 0; i--) {
-    calendarDays.push({ day: daysInPrevMonth - i, month: 'prev' as const });
-  }
-  
-  // Add days from the current month
-  for (let i = 1; i <= daysInMonth; i++) {
-    calendarDays.push({ 
-      day: i, 
-      month: 'current' as const, 
-      status: daysWithStatus[i] || 'neutral',
-      isToday: isCurrentMonth && today === i
+  // Add previous month days
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    calendar.push({
+      day: daysInPrevMonth - firstDayOfWeek + i + 1,
+      month: 'prev',
     });
   }
   
-  // Add days from the next month to complete the grid (up to 6 rows)
-  // Calculate how many days are needed to fill all rows
-  const daysToAdd = 42 - calendarDays.length; // 6 rows x 7 days = 42
-  
-  // Add only enough days to complete the grid rows
-  for (let i = 1; i <= daysToAdd; i++) {
-    calendarDays.push({ day: i, month: 'next' as const });
+  // Add current month days
+  for (let i = 1; i <= daysInMonth; i++) {
+    const isToday = 
+      today.getDate() === i && 
+      today.getMonth() === monthIndex && 
+      today.getFullYear() === year;
+      
+    // Now we check for real trade data
+    const dayKey = `${i}-current`;
+    const hasTrades = tradesData && tradesData[dayKey] && tradesData[dayKey].length > 0;
+    const dailyProfit = hasTrades ? tradesData[dayKey].reduce((sum, trade) => sum + (trade.Net || 0), 0) : 0;
+      
+    calendar.push({
+      day: i,
+      month: 'current',
+      isToday: isToday,
+      status: hasTrades ? (dailyProfit > 0 ? 'positive' : 'negative') : 'neutral'
+    });
   }
   
-  return calendarDays;
+  // Add next month days
+  const remainingDays = 42 - calendar.length; // 6x7 grid
+  for (let i = 1; i <= remainingDays; i++) {
+    calendar.push({
+      day: i,
+      month: 'next',
+    });
+  }
+  
+  return calendar;
 }

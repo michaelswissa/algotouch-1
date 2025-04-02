@@ -5,7 +5,6 @@ import { TradeRecord } from '@/lib/trade-analysis';
 import { ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import { getTradeCount, getDailyPnL, getTradesPreview } from './TradeUtils';
 
 interface CalendarDay {
   day: number;
@@ -21,6 +20,40 @@ interface CalendarGridProps {
   selectedDay?: string | null;
   tradesData?: Record<string, TradeRecord[]>;
 }
+
+// Helper functions to get trade data for a specific day
+const getTradeCount = (day: number, month: 'current' | 'prev' | 'next', tradesData: Record<string, TradeRecord[]>) => {
+  if (month !== 'current') return 0;
+  const dayKey = `${day}-current`;
+  return tradesData[dayKey]?.length || 0;
+};
+
+const getDailyPnL = (day: number, month: 'current' | 'prev' | 'next', tradesData: Record<string, TradeRecord[]>) => {
+  if (month !== 'current') return 0;
+  const dayKey = `${day}-current`;
+  const trades = tradesData[dayKey] || [];
+  return trades.reduce((total, trade) => total + (trade.Net || 0), 0);
+};
+
+const getTradesPreview = (day: number, month: 'current' | 'prev' | 'next', tradesData: Record<string, TradeRecord[]>) => {
+  if (month !== 'current') return null;
+  const dayKey = `${day}-current`;
+  const trades = tradesData[dayKey] || [];
+  
+  if (trades.length === 0) return null;
+  
+  // Return first 3 trades for preview
+  return trades.slice(0, 3).map((trade, index) => (
+    <div key={index} className="text-xs border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
+      <div className="flex justify-between">
+        <span>{trade.Contract}</span>
+        <span className={trade.Net > 0 ? "text-green-600" : "text-red-600"}>
+          ${trade.Net.toFixed(2)}
+        </span>
+      </div>
+    </div>
+  ));
+};
 
 const CalendarGrid = ({ daysOfWeek, calendarDays, onDayClick, selectedDay, tradesData = {} }: CalendarGridProps) => {
   return (

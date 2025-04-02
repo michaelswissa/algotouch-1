@@ -31,6 +31,15 @@ export const useCalendar = () => {
   // State for trades data from the store
   const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
   
+  // For debugging - log data on mount
+  useEffect(() => {
+    console.log("useCalendar: Initial state", { 
+      globalTradesCount: globalTrades.length,
+      tradesByDayCount: Object.keys(tradesByDay).length,
+      viewMode
+    });
+  }, []);
+  
   // Ensure tradesByDay is updated whenever globalTrades changes
   useEffect(() => {
     if (globalTrades.length > 0) {
@@ -66,6 +75,8 @@ export const useCalendar = () => {
     const tradeMap = new Map<string, { count: number, profit: number }>();
     
     globalTrades.forEach(trade => {
+      if (!trade['Entry DateTime']) return;
+      
       const date = new Date(trade['Entry DateTime']).toISOString().split('T')[0];
       if (!tradeMap.has(date)) {
         tradeMap.set(date, { count: 0, profit: 0 });

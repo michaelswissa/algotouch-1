@@ -35,9 +35,17 @@ export const MonthCalendarSection = ({
     setSelectedDay(null);
   }, [currentMonth, currentYear]);
   
+  // Log for debugging
+  useEffect(() => {
+    if (tradesData && Object.keys(tradesData).length > 0) {
+      console.log("MonthCalendarSection: Trade data received", Object.keys(tradesData).length, "days with trades");
+    }
+  }, [tradesData]);
+  
   const handleDayClick = (day: number) => {
     // CRITICAL: Always use consistent key format - day-current
     const dayKey = `${day}-current`;
+    console.log("Day clicked:", dayKey, "Has trades:", tradesData[dayKey]?.length || 0);
     
     // Set the selected day
     setSelectedDay(dayKey);
