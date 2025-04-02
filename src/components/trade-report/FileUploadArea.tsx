@@ -27,7 +27,7 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
     }
   };
   return <div className="mb-6">
-      <p className="mb-4 text-slate-400 text-center w-full">העלה קובץ CSV או Excel המכיל את נתוני המסחר שלך. אפשר לייצא את הקובץ מאפליקציית 
+      <p className="mb-4 text-slate-400 text-right w-full">העלה קובץ CSV או Excel המכיל את נתוני המסחר שלך. אפשר לייצא את הקובץ מאפליקציית 
 &quot;AlgoTouchAnalyzer&quot; ב-Tradestation.</p>
       
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center transition-colors duration-200 hover:border-primary/50 cursor-pointer" onDragOver={handleDragOver} onDrop={handleDrop} onClick={handleFileClick}>
