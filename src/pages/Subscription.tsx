@@ -5,7 +5,7 @@ import Layout from '@/components/Layout';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
 import DigitalContractForm from '@/components/DigitalContractForm';
 import PaymentForm from '@/components/PaymentForm';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { Button } from '@/components/ui/button';
 import { Check, ChevronRight } from 'lucide-react';
 import { Steps, Step } from '@/components/subscription/Steps';
