@@ -79,14 +79,14 @@ const Auth = () => {
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center justify-center space-y-2 text-center">
           <TraderVueLogo className="h-16 w-auto mb-4" />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">ברוכים הבאים ל-TraderVue</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">ברוכים הבאים ל-AlgoTouch</h1>
           <p className="text-muted-foreground">התחבר לחשבונך או צור חשבון חדש להתחלת השימוש</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
           <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="login">התחברות</TabsTrigger>
             <TabsTrigger value="signup">הרשמה</TabsTrigger>
+            <TabsTrigger value="login">התחברות</TabsTrigger>
           </TabsList>
           
           <TabsContent value="login">
