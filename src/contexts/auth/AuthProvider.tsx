@@ -37,6 +37,124 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Registration - Create a temporary account without signing in
+  const registerUser = async (email: string, password: string, userData: any) => {
+    try {
+      setLoading(true);
+      
+      // First, check if email already exists
+      const { data: existingUsers, error: checkError } = await supabase.auth.admin
+        .listUsers({ filter: { email } });
+      
+      if (checkError) {
+        console.error('Error checking existing user:', checkError);
+      }
+      
+      if (existingUsers && existingUsers.length > 0) {
+        throw new Error('משתמש עם כתובת אימייל זו כבר קיים במערכת');
+      }
+      
+      // Create a user without signing them in
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            registration_complete: false, // Mark that registration is incomplete
+            signup_step: 'contract', // Next step in the flow
+            signup_date: new Date().toISOString()
+          },
+        }
+      });
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+      
+      if (!data.user) {
+        throw new Error('יצירת משתמש נכשלה');
+      }
+      
+      // After successful registration, store signup data
+      sessionStorage.setItem('registration_data', JSON.stringify({
+        userId: data.user.id,
+        email,
+        password,
+        userData
+      }));
+      
+      toast.success('רישום ראשוני בוצע בהצלחה');
+      
+      // Redirect to contract signing
+      navigate('/subscription');
+    } catch (error) {
+      console.error('Error registering:', error);
+      toast.error(error.message || 'אירעה שגיאה בתהליך הרישום');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign in after payment is confirmed
+  const completeRegistration = async (userId: string, email: string, password: string, userData: any) => {
+    try {
+      setLoading(true);
+      
+      // Sign in with the credentials
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (signInError) {
+        console.error('Error signing in after registration:', signInError);
+        throw signInError;
+      }
+      
+      // Update the user profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          phone: userData.phone,
+          birth_date: userData.birthDate,
+          street: userData.street,
+          city: userData.city,
+          postal_code: userData.postalCode,
+          country: userData.country || 'Israel'
+        })
+        .eq('id', userId);
+      
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+      }
+      
+      // Update user metadata to show registration is complete
+      await supabase.auth.updateUser({
+        data: {
+          registration_complete: true,
+          signup_step: 'completed'
+        }
+      });
+      
+      // Clear registration data from session storage
+      sessionStorage.removeItem('registration_data');
+      
+      toast.success('ההרשמה הושלמה בהצלחה!');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error completing registration:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
@@ -51,94 +169,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       navigate('/dashboard');
     } catch (error) {
       console.error('Error signing in:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signUp = async (email: string, password: string, userData: any) => {
-    try {
-      setLoading(true);
-      
-      // First, create the user without logging them in
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          data: {
-            first_name: userData.firstName,
-            last_name: userData.lastName
-          },
-          // Important: Don't set emailRedirectTo so we don't require email verification
-          emailRedirectTo: undefined
-        }
-      });
-      
-      if (error) {
-        toast.error(error.message);
-        throw error;
-      }
-      
-      if (!data.user) {
-        throw new Error('User creation failed');
-      }
-      
-      // After successful signup, sign in with the credentials
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (signInError) {
-        console.error('Error signing in after signup:', signInError);
-        throw signInError;
-      }
-      
-      // Now the user is signed in, update their profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          phone: userData.phone,
-          birth_date: userData.birthDate,
-          street: userData.street,
-          city: userData.city,
-          postal_code: userData.postalCode,
-          country: userData.country || 'Israel'
-        })
-        .eq('id', data.user.id);
-      
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-      }
-      
-      // Create subscription record with trial status
-      const trialEndsAt = new Date();
-      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
-      
-      const { error: subscriptionError } = await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: data.user.id,
-          status: 'trial',
-          plan_type: 'monthly',
-          trial_ends_at: trialEndsAt.toISOString()
-        });
-      
-      if (subscriptionError) {
-        console.error('Error creating subscription record:', subscriptionError);
-      }
-      
-      // Now set the user in state
-      setUser(data.user);
-      toast.success('נרשמת בהצלחה!');
-      
-      // Redirect to subscription page directly
-      navigate('/subscription');
-    } catch (error) {
-      console.error('Error signing up:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -197,7 +227,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     isAuthenticated: !!user,
     signIn,
-    signUp,
+    registerUser,
+    completeRegistration,
     signOut,
     updateProfile
   };

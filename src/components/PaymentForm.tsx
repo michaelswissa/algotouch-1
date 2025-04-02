@@ -1,6 +1,5 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { CreditCard, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/auth';
 
 interface PaymentFormProps {
   planId: string;
@@ -16,12 +16,21 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) => {
+  const { completeRegistration } = useAuth();
   const [cardNumber, setCardNumber] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const navigate = useNavigate();
+  const [registrationData, setRegistrationData] = useState<any>(null);
+
+  // Get registration data from session storage
+  useEffect(() => {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
+      setRegistrationData(JSON.parse(storedData));
+    }
+  }, []);
 
   const planDetails = {
     monthly: {
@@ -68,51 +77,64 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       return;
     }
     
+    if (!registrationData) {
+      toast.error('נתוני ההרשמה חסרים, אנא התחל את תהליך ההרשמה מחדש');
+      return;
+    }
+    
     try {
       setIsProcessing(true);
       
-      // Store token in subscription table
-      const { data: user } = await supabase.auth.getUser();
+      // This would use Takbull API in production
+      // For now, we're simulating a successful payment
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      if (user?.user?.id) {
-        // This would use Takbull API in production
-        // For now, we're simulating a successful payment
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const tokenData = {
-          lastFourDigits: cardNumber.slice(-4),
-          expiryMonth: expiryDate.split('/')[0],
-          expiryYear: `20${expiryDate.split('/')[1]}`,
-          cardholderName
-        };
-        
-        // Update subscription record
-        const { error } = await supabase
-          .from('subscriptions')
-          .update({
-            plan_type: planId,
-            payment_method: tokenData,
-            contract_signed: true,
-            contract_signed_at: new Date().toISOString()
-          })
-          .eq('user_id', user.user.id);
-        
-        if (error) {
-          throw error;
-        }
-        
-        // Create payment history record
-        await supabase.from('payment_history').insert({
-          user_id: user.user.id,
-          subscription_id: user.user.id, // This should be the subscription ID in a real scenario
-          amount: 0, // Free trial
-          status: 'trial_started',
-          payment_method: tokenData
+      const tokenData = {
+        lastFourDigits: cardNumber.slice(-4),
+        expiryMonth: expiryDate.split('/')[0],
+        expiryYear: `20${expiryDate.split('/')[1]}`,
+        cardholderName
+      };
+      
+      // Create subscription record for the new user
+      const trialEndsAt = new Date();
+      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
+      
+      const { error } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: registrationData.userId,
+          plan_type: planId,
+          status: 'trial',
+          trial_ends_at: trialEndsAt.toISOString(),
+          payment_method: tokenData,
+          contract_signed: true,
+          contract_signed_at: new Date().toISOString()
         });
-        
-        toast.success('התשלום נקלט בהצלחה! נרשמת לתקופת ניסיון חינם');
-        onPaymentComplete();
+      
+      if (error) {
+        throw error;
       }
+      
+      // Create payment history record
+      await supabase.from('payment_history').insert({
+        user_id: registrationData.userId,
+        subscription_id: registrationData.userId, // This should be the subscription ID in a real scenario
+        amount: 0, // Free trial
+        status: 'trial_started',
+        payment_method: tokenData
+      });
+      
+      // Complete the registration process
+      await completeRegistration(
+        registrationData.userId,
+        registrationData.email,
+        registrationData.password,
+        registrationData.userData
+      );
+      
+      toast.success('התשלום נקלט בהצלחה! נרשמת לתקופת ניסיון חינם');
+      onPaymentComplete();
     } catch (error) {
       console.error('Payment error:', error);
       toast.error('אירעה שגיאה בעיבוד התשלום. נסה שנית מאוחר יותר.');

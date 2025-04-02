@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth';
 import AuthHeader from '@/components/auth/AuthHeader';
@@ -10,13 +10,23 @@ import SignupForm from '@/components/auth/SignupForm';
 const Auth = () => {
   const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+  const location = useLocation();
 
   // Get initial tab from URL if present
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
     if (tab === 'signup') {
       setActiveTab('signup');
+    }
+  }, [location]);
+
+  // Check if there's registration data in session storage
+  useEffect(() => {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
+      // If registration is in progress, redirect to subscription page
+      window.location.href = '/subscription';
     }
   }, []);
 
@@ -41,10 +51,7 @@ const Auth = () => {
           </TabsContent>
           
           <TabsContent value="signup">
-            <SignupForm onSignupSuccess={() => {
-              // After signup, redirect to subscription page to complete payment
-              window.location.href = '/subscription';
-            }} />
+            <SignupForm />
           </TabsContent>
         </Tabs>
       </div>

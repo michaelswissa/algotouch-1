@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,6 +22,22 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
   const [isSigningInProgress, setIsSigningInProgress] = useState(false);
+  const [registrationData, setRegistrationData] = useState<any>(null);
+
+  // Get registration data from session storage
+  useEffect(() => {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
+      const data = JSON.parse(storedData);
+      setRegistrationData(data);
+      
+      // If user data is available, set fullName from it
+      if (data.userData && data.userData.firstName && data.userData.lastName) {
+        const generatedFullName = `${data.userData.firstName} ${data.userData.lastName}`;
+        setSignature(generatedFullName);
+      }
+    }
+  }, []);
 
   const planName = planId === 'annual' ? 'שנתי' : 'חודשי';
   const planPrice = planId === 'annual' ? '899' : '99';
@@ -33,6 +49,18 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
     
     try {
       setIsSigningInProgress(true);
+      
+      // Store signing information in session storage
+      if (registrationData) {
+        const updatedData = {
+          ...registrationData,
+          contractSigned: true,
+          contractSignedAt: new Date().toISOString(),
+          signature,
+          planId
+        };
+        sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+      }
       
       // This would be replaced with an actual API call to Izidoc or similar service
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulating API call
@@ -107,7 +135,7 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
               onChange={(e) => setSignature(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              הקלדת שמך המלא מהווה חתימה דיגיטלית מחייבת במקום {fullName}
+              הקלדת שמך המלא מהווה חתימה דיגיטלית מחייבת
             </p>
           </div>
         </div>

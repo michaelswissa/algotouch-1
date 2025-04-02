@@ -6,16 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-import { sendWelcomeEmail } from '@/lib/email-service';
-import { useNavigate } from 'react-router-dom';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
 }
 
 const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
-  const { signUp } = useAuth();
-  const navigate = useNavigate();
+  const { registerUser } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,27 +37,16 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
     
     try {
       setSigningUp(true);
-      await signUp(email, password, {
+      await registerUser(email, password, {
         firstName,
         lastName,
         phone
       });
       
-      // Send welcome email via our custom email service
-      const fullName = `${firstName} ${lastName}`;
-      await sendWelcomeEmail(email, fullName);
-      
-      toast.success('נרשמת בהצלחה! עכשיו נמשיך לבחירת תכנית מנוי.');
-      
-      // Proceed to subscription page directly without waiting for email verification
-      if (onSignupSuccess) {
-        onSignupSuccess();
-      } else {
-        navigate('/subscription');
-      }
+      // No need to call onSignupSuccess - navigation is handled in the registerUser function
     } catch (error) {
       console.error('Signup error:', error);
-      toast.error('אירעה שגיאה בתהליך ההרשמה. אנא נסה שוב מאוחר יותר.');
+      // Error toast is shown in the registerUser function
     } finally {
       setSigningUp(false);
     }
@@ -139,7 +125,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={signingUp}>
-            {signingUp ? 'מבצע הרשמה...' : 'הרשם'}
+            {signingUp ? 'מבצע הרשמה...' : 'המשך לחתימה על הסכם'}
           </Button>
         </CardFooter>
       </form>

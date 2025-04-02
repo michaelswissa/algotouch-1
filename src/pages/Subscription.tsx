@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -13,14 +12,32 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Subscription = () => {
   const { planId } = useParams<{ planId: string }>();
-  const { isAuthenticated, loading, user } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(planId);
   const [fullName, setFullName] = useState('');
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [registrationData, setRegistrationData] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
+      const data = JSON.parse(storedData);
+      setRegistrationData(data);
+      
+      if (data.userData && data.userData.firstName && data.userData.lastName) {
+        setFullName(`${data.userData.firstName} ${data.userData.lastName}`);
+      }
+      
+      if (data.contractSigned) {
+        setCurrentStep(3);
+        setSelectedPlan(data.planId);
+      } else {
+        setCurrentStep(2);
+      }
+    }
+    
     const checkSubscription = async () => {
       if (user?.id) {
         const { data, error } = await supabase
@@ -33,7 +50,6 @@ const Subscription = () => {
           setHasActiveSubscription(true);
         }
         
-        // Get user profile for full name
         const { data: profile } = await supabase
           .from('profiles')
           .select('first_name, last_name')
@@ -49,14 +65,12 @@ const Subscription = () => {
     if (user) {
       checkSubscription();
     }
-  }, [user]);
+  }, [user, planId]);
 
-  // Redirect to login if not authenticated
-  if (!loading && !isAuthenticated) {
-    return <Navigate to="/auth" replace />;
+  if (!loading && !isAuthenticated && !registrationData) {
+    return <Navigate to="/auth?tab=signup" replace />;
   }
   
-  // Redirect to dashboard if already has subscription
   if (!loading && hasActiveSubscription) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -64,6 +78,14 @@ const Subscription = () => {
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
     setCurrentStep(2);
+    
+    if (registrationData) {
+      const updatedData = {
+        ...registrationData,
+        planId
+      };
+      sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+    }
   };
 
   const handleContractSign = () => {
@@ -73,7 +95,6 @@ const Subscription = () => {
   const handlePaymentComplete = () => {
     setCurrentStep(4);
     
-    // Redirect to dashboard after showing success
     setTimeout(() => {
       navigate('/dashboard');
     }, 3000);
@@ -83,8 +104,8 @@ const Subscription = () => {
     <Layout className="py-8">
       <div className="max-w-5xl mx-auto px-4" dir="rtl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">הרשמה למנוי</h1>
-          <p className="text-muted-foreground">בחר תכנית, חתום על חוזה והזן פרטי תשלום לאישור</p>
+          <h1 className="text-3xl font-bold mb-2">השלמת תהליך ההרשמה</h1>
+          <p className="text-muted-foreground">יש להשלים את השלבים הבאים לקבלת גישה למערכת</p>
           
           <Steps currentStep={currentStep} className="mt-8">
             <Step title="בחירת תכנית" />
