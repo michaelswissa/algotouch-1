@@ -94,7 +94,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 onClick={handlePasswordReset}
                 disabled={resettingPassword || !email}
               >
-                {resettingPassword ? 'שולח...' : 'שכחת סיסמה?'}
+                {resettingPassword ? 'שולח...' : 'שכחת סיסמה?'.replace('?', '')}?
               </Button>
               <Label htmlFor="login-password">סיסמה</Label>
             </div>
