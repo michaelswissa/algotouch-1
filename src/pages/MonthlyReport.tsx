@@ -17,18 +17,7 @@ const MonthlyReport = () => {
   const { toast } = useToast();
   
   // Get the trading store functions to update global trades
-  const tradingStore = useTradingDataStore();
-  // Reference to track if we've already synced data to the store
-  const initialSyncRef = useRef(false);
-
-  // Ensure store is updated only when trades change locally
-  useEffect(() => {
-    if (trades.length > 0 && !initialSyncRef.current) {
-      initialSyncRef.current = true;
-      tradingStore.setGlobalTrades(trades);
-      console.log("MonthlyReport: Updated global store with", trades.length, "trades");
-    }
-  }, [trades, tradingStore]);
+  const { setGlobalTrades, clearAllData } = useTradingDataStore();
 
   const {
     selectedFile,
@@ -66,14 +55,17 @@ const MonthlyReport = () => {
         return;
       }
       
-      const tradeStats = calculateTradeStats(tradeData);
+      // First, clear any existing data in the store
+      clearAllData();
       
-      console.log("File uploaded successfully with", tradeData.length, "trades");
+      // Then calculate stats and update local state
+      const tradeStats = calculateTradeStats(tradeData);
       setTrades(tradeData);
       setStats(tradeStats);
       
-      // Reset the sync flag to allow updating the store with new data
-      initialSyncRef.current = false;
+      // Finally, update the global store for calendar use
+      console.log("Updating global trades store with", tradeData.length, "trades");
+      setGlobalTrades(tradeData);
       
       toast({
         title: "הקובץ הועלה בהצלחה",

@@ -31,14 +31,6 @@ export const useCalendar = () => {
   // State for trades data from the store
   const { tradesByDay, globalTrades, lastUpdateTimestamp, updateTradesByDay } = useTradingDataStore();
   
-  // Debug log when tradesByDay changes
-  useEffect(() => {
-    console.log("useCalendar: tradesByDay changed, now has", Object.keys(tradesByDay).length, "days");
-    if (Object.keys(tradesByDay).length > 0) {
-      console.log("Sample keys:", Object.keys(tradesByDay).slice(0, 3).join(", "));
-    }
-  }, [tradesByDay]);
-  
   // Ensure tradesByDay is updated whenever globalTrades changes
   useEffect(() => {
     if (globalTrades.length > 0) {
@@ -138,9 +130,6 @@ export const useCalendar = () => {
       setSelectedDate(newDate);
       setCurrentMonth(month);
       setViewMode('month');
-      
-      // Log when switching to month view for debugging
-      console.log(`Switching to month view: ${month}, with ${Object.keys(tradesByDay).length} days of trade data`);
     }
   };
 
