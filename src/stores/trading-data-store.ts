@@ -12,14 +12,12 @@ interface TradingDataState {
   
   // For debugging
   lastUpdateTimestamp: number;
-  clearAllData: () => void; // Added to clear all data for testing
+  clearAllData: () => void; 
 }
 
 export const useTradingDataStore = create<TradingDataState>((set, get) => ({
   globalTrades: [],
   setGlobalTrades: (trades) => {
-    console.log("Setting global trades:", trades.length);
-    
     // Process trades by day when setting global trades
     const tradesByDay: Record<string, TradeRecord[]> = {};
     
@@ -30,7 +28,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         const entryDate = new Date(entryDateString);
         
         if (isNaN(entryDate.getTime())) {
-          console.error('Invalid date:', entryDateString);
           return;
         }
         
@@ -47,16 +44,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         console.error('Error processing trade for calendar:', error, trade);
       }
     });
-    
-    console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
-    console.log('All day keys:', Object.keys(tradesByDay).join(', '));
-    
-    // Log some sample data to debug
-    if (Object.keys(tradesByDay).length > 0) {
-      const sampleKey = Object.keys(tradesByDay)[0];
-      console.log(`Sample data for ${sampleKey}:`, 
-        `${tradesByDay[sampleKey].length} trades`);
-    }
     
     // Update state with all data in one operation to prevent infinite updates
     set({ 
@@ -69,7 +56,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
   tradesByDay: {},
   updateTradesByDay: () => {
     const trades = get().globalTrades;
-    console.log("Updating tradesByDay with", trades.length, "trades");
     
     const tradesByDay: Record<string, TradeRecord[]> = {};
     
@@ -80,7 +66,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         const entryDate = new Date(entryDateString);
         
         if (isNaN(entryDate.getTime())) {
-          console.error('Invalid date:', entryDateString);
           return;
         }
         
@@ -98,16 +83,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
       }
     });
     
-    console.log('Updated tradesByDay:', Object.keys(tradesByDay).length, 'days with trades');
-    console.log('All day keys:', Object.keys(tradesByDay).join(', '));
-    
-    // Log some sample data to debug
-    if (Object.keys(tradesByDay).length > 0) {
-      const sampleKey = Object.keys(tradesByDay)[0];
-      console.log(`Sample data for ${sampleKey}:`, 
-        `${tradesByDay[sampleKey].length} trades`);
-    }
-    
     set({ 
       tradesByDay,
       lastUpdateTimestamp: Date.now()
@@ -117,7 +92,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
   lastUpdateTimestamp: 0,
   
   clearAllData: () => {
-    console.log("Clearing all trading data");
     set({
       globalTrades: [],
       tradesByDay: {},
