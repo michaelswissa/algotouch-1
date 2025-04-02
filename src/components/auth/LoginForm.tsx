@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useLocation } from 'react-router-dom';
 
 interface LoginFormProps {
   onLoginSuccess?: () => void;
@@ -18,6 +19,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const location = useLocation();
+  const state = location.state as { redirectToSubscription?: boolean };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +33,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     try {
       setLoggingIn(true);
       await signIn(email, password);
+      
+      console.log('Login successful, redirectToSubscription:', state?.redirectToSubscription);
+      
       if (onLoginSuccess) {
         onLoginSuccess();
       }

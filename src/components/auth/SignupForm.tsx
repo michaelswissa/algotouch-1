@@ -38,21 +38,31 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
     try {
       setSigningUp(true);
       
-      // Store registration data in session storage without checking for existing user
-      sessionStorage.setItem('registration_data', JSON.stringify({
+      // Store registration data in session storage for the subscription flow
+      const registrationData = {
         email,
         password,
         userData: {
           firstName,
           lastName,
           phone
-        }
-      }));
+        },
+        registrationTime: new Date().toISOString()
+      };
       
+      // Clear any existing registration data to start fresh
+      sessionStorage.removeItem('registration_data');
+      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
+      
+      console.log('Registration data saved to session storage');
       toast.success('הפרטים נשמרו בהצלחה');
       
       // Navigate to subscription page
       navigate('/subscription', { replace: true });
+      
+      if (onSignupSuccess) {
+        onSignupSuccess();
+      }
     } catch (error: any) {
       console.error('Signup validation error:', error);
       toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');

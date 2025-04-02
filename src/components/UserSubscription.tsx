@@ -1,6 +1,8 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
+import { Button } from '@/components/ui/button';
 
 // Import our components
 import SubscriptionCard from './subscription/SubscriptionCard';
@@ -11,6 +13,7 @@ import SubscriptionFooter from './subscription/SubscriptionFooter';
 import LoadingSkeleton from './subscription/LoadingSkeleton';
 
 const UserSubscription = () => {
+  const navigate = useNavigate();
   const { subscription, loading, details } = useSubscription();
 
   if (loading) {
@@ -24,7 +27,14 @@ const UserSubscription = () => {
         description="הרשם עכשיו כדי לקבל גישה מלאה למערכת"
         showSubscribeButton={true}
       >
-        <></>
+        <div className="text-center py-6">
+          <Button 
+            onClick={() => navigate('/subscription')}
+            className="mx-auto"
+          >
+            בחר תכנית מנוי
+          </Button>
+        </div>
       </SubscriptionCard>
     );
   }

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Check, ChevronRight } from 'lucide-react';
 import { Steps, Step } from '@/components/subscription/Steps';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Subscription = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -19,25 +20,39 @@ const Subscription = () => {
   const [fullName, setFullName] = useState('');
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [registrationData, setRegistrationData] = useState<any>(null);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Subscription page: Checking for registration data and subscription status');
+    
     // Check for registration data from session storage (for new sign-ups)
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
-      const data = JSON.parse(storedData);
-      setRegistrationData(data);
-      
-      if (data.userData && data.userData.firstName && data.userData.lastName) {
-        setFullName(`${data.userData.firstName} ${data.userData.lastName}`);
-      }
-      
-      if (data.contractSigned) {
-        setCurrentStep(3);
-        setSelectedPlan(data.planId);
-      } else if (data.planId) {
-        setCurrentStep(2);
-        setSelectedPlan(data.planId);
+      try {
+        const data = JSON.parse(storedData);
+        console.log('Registration data found:', { 
+          email: data.email, 
+          firstName: data.userData?.firstName,
+          registrationTime: data.registrationTime 
+        });
+        
+        setRegistrationData(data);
+        
+        if (data.userData && data.userData.firstName && data.userData.lastName) {
+          setFullName(`${data.userData.firstName} ${data.userData.lastName}`);
+        }
+        
+        if (data.contractSigned) {
+          setCurrentStep(3);
+          setSelectedPlan(data.planId);
+        } else if (data.planId) {
+          setCurrentStep(2);
+          setSelectedPlan(data.planId);
+        }
+      } catch (error) {
+        console.error('Error parsing registration data:', error);
+        toast.error('חלה שגיאה בטעינת נתוני ההרשמה');
       }
     }
     
@@ -45,6 +60,7 @@ const Subscription = () => {
     const checkSubscription = async () => {
       if (user?.id) {
         try {
+          setIsCheckingSubscription(true);
           const { data, error } = await supabase
             .from('subscriptions')
             .select('*')
@@ -52,7 +68,10 @@ const Subscription = () => {
             .single();
           
           if (data && !error) {
+            console.log('Existing subscription found:', data.status);
             setHasActiveSubscription(true);
+          } else {
+            console.log('No existing subscription found');
           }
           
           const { data: profile } = await supabase
@@ -66,22 +85,37 @@ const Subscription = () => {
           }
         } catch (error) {
           console.error("Error checking subscription:", error);
+        } finally {
+          setIsCheckingSubscription(false);
         }
+      } else {
+        setIsCheckingSubscription(false);
       }
     };
     
     if (isAuthenticated && user) {
       checkSubscription();
+    } else {
+      setIsCheckingSubscription(false);
     }
   }, [user, planId, isAuthenticated]);
 
+  // Show loading state while checking subscription
+  if (loading || isCheckingSubscription) {
+    return (
+      <Layout className="py-8" hideSidebar={true}>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin"></div>
+        </div>
+      </Layout>
+    );
+  }
+
   // If a logged-in user visits this page, check if they already have a subscription
-  if (!loading && isAuthenticated && hasActiveSubscription) {
+  if (isAuthenticated && hasActiveSubscription) {
+    console.log('User has active subscription, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
-  
-  // We don't redirect non-authenticated users anymore - we allow them to proceed
-  // with the subscription process using session storage data
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
@@ -93,6 +127,9 @@ const Subscription = () => {
         planId
       };
       sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+      console.log('Updated registration data with selected plan:', planId);
+    } else {
+      console.log('No registration data found, but continuing with plan selection:', planId);
     }
   };
 
@@ -104,6 +141,9 @@ const Subscription = () => {
         contractSignedAt: new Date().toISOString()
       };
       sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+      console.log('Contract signed, updated registration data');
+    } else {
+      console.log('Contract signed but no registration data to update');
     }
     
     setCurrentStep(3);
@@ -111,6 +151,7 @@ const Subscription = () => {
 
   const handlePaymentComplete = () => {
     setCurrentStep(4);
+    console.log('Payment completed, redirecting to dashboard shortly');
     
     setTimeout(() => {
       navigate('/dashboard', { replace: true });
