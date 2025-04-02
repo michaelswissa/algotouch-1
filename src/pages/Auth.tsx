@@ -7,6 +7,7 @@ import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from 'sonner';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -31,15 +32,32 @@ const Auth = () => {
     }
   }, [state]);
 
-  // Check if there's registration data in session storage
+  // Check if there's valid registration data in session storage
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
-      console.log("Auth: Registration data found, redirecting to subscription");
-      // If registration is in progress, redirect to subscription page
-      navigate('/subscription', { replace: true, state: { isRegistering: true } });
+      try {
+        const data = JSON.parse(storedData);
+        const registrationTime = new Date(data.registrationTime);
+        const now = new Date();
+        const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+        
+        // If registration is fresh (less than 30 minutes old) and explicitly coming from signup
+        if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
+          console.log("Auth: Valid registration data found, redirecting to subscription");
+          navigate('/subscription', { replace: true, state: { isRegistering: true } });
+        } else if (timeDiffInMinutes >= 30) {
+          // Clear stale registration data older than 30 minutes
+          console.log("Auth: Clearing stale registration data");
+          sessionStorage.removeItem('registration_data');
+          toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
+        }
+      } catch (error) {
+        console.error("Error parsing registration data:", error);
+        sessionStorage.removeItem('registration_data');
+      }
     }
-  }, [navigate]);
+  }, [navigate, location.state]);
 
   // Show loading state while auth is initializing
   if (!initialized || loading) {
