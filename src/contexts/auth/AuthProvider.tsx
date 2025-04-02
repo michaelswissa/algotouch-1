@@ -13,19 +13,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Only synchronous state updates here
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (event === 'SIGNED_OUT') {
-          setTimeout(() => {
-            navigate('/auth');
-          }, 0);
-        }
+        // Don't automatically redirect on sign out - let components handle this
+        // This helps prevent navigation loops
       }
     );
 
+    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -46,7 +46,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       toast.success('התחברת בהצלחה!');
-      navigate('/dashboard');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 100);
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
@@ -66,6 +68,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       toast.success('התנתקת בהצלחה');
+      
+      // Use setTimeout to delay navigation, preventing potential state update loops
+      setTimeout(() => {
+        navigate('/auth');
+      }, 100);
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;

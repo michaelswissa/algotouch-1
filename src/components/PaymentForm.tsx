@@ -107,6 +107,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         throw new Error('יצירת משתמש נכשלה');
       }
       
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const trialEndsAt = new Date();
       trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
       
@@ -123,6 +125,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         });
       
       if (subscriptionError) {
+        console.error('Subscription error:', subscriptionError);
         throw subscriptionError;
       }
       
@@ -152,9 +155,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       sessionStorage.removeItem('registration_data');
       
       onPaymentComplete();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payment/registration error:', error);
-      toast.error('אירעה שגיאה בתהליך ההרשמה. נסה שנית מאוחר יותר.');
+      toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה. נסה שנית מאוחר יותר.');
     } finally {
       setIsProcessing(false);
     }
