@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,7 +59,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       if (error) throw error;
       
       // Send custom email with the reset link
-      const resetLink = `${window.location.origin}/reset-password?token=${data.user?.confirmation_token}`;
+      // Fix: The resetPasswordForEmail method doesn't return a user object
+      // We'll just use the redirect URL directly
+      const resetLink = `${window.location.origin}/reset-password`;
       await sendPasswordResetEmail(email, resetLink);
       
       toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');
