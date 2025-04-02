@@ -63,6 +63,7 @@ export const CalendarPageContent = ({
         />
       )}
       
+      {/* Pass tradeDays prop to RecentActivitySection */}
       <RecentActivitySection tradeDays={tradeDays} />
       
       <EconomicCalendarSection />

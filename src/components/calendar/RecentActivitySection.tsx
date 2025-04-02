@@ -13,7 +13,11 @@ interface TradeDay {
   status: "Open" | "Active";
 }
 
-export const RecentActivitySection = () => {
+interface RecentActivitySectionProps {
+  tradeDays?: TradeDay[];
+}
+
+export const RecentActivitySection = ({ tradeDays: propTradeDays }: RecentActivitySectionProps = {}) => {
   // Get real trade data from store
   const { globalTrades } = useTradingDataStore();
   
@@ -55,10 +59,11 @@ export const RecentActivitySection = () => {
       .slice(0, 5);
   };
 
-  const tradeDays = generateTradeDays();
+  // Use provided tradeDays from props if available, otherwise generate from globalTrades
+  const tradeDaysToDisplay = propTradeDays || generateTradeDays();
 
   // If no data, show message
-  if (tradeDays.length === 0) {
+  if (tradeDaysToDisplay.length === 0) {
     return (
       <Card className="col-span-1">
         <CardHeader>
@@ -86,7 +91,7 @@ export const RecentActivitySection = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {tradeDays.map((day, index) => (
+          {tradeDaysToDisplay.map((day, index) => (
             <div key={index} className="flex items-center justify-between p-2 rounded-lg border">
               <div>
                 <div className="font-medium">{new Date(day.date).toLocaleDateString('he-IL')}</div>
