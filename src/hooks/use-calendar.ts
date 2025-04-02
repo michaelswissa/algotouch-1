@@ -38,7 +38,7 @@ export const useCalendar = () => {
       tradesByDayCount: Object.keys(tradesByDay).length,
       viewMode
     });
-  }, []);
+  }, [globalTrades.length, tradesByDay, viewMode]);
   
   // Ensure tradesByDay is updated whenever globalTrades changes
   useEffect(() => {

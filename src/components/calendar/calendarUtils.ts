@@ -57,7 +57,7 @@ export function generateCalendarDays(
       today.getMonth() === monthIndex && 
       today.getFullYear() === year;
       
-    // Now we check for real trade data
+    // Check for real trade data
     const dayKey = `${i}-current`;
     const hasTrades = tradesData && tradesData[dayKey] && tradesData[dayKey].length > 0;
     const dailyProfit = hasTrades ? tradesData[dayKey].reduce((sum, trade) => sum + (trade.Net || 0), 0) : 0;
@@ -65,7 +65,7 @@ export function generateCalendarDays(
     calendar.push({
       day: i,
       month: 'current',
-      isToday: isToday,
+      isToday,
       status: hasTrades ? (dailyProfit > 0 ? 'positive' : 'negative') : 'neutral'
     });
   }

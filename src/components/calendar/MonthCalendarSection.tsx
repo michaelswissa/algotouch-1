@@ -39,6 +39,20 @@ export const MonthCalendarSection = ({
   useEffect(() => {
     if (tradesData && Object.keys(tradesData).length > 0) {
       console.log("MonthCalendarSection: Trade data received", Object.keys(tradesData).length, "days with trades");
+      
+      // Add more detailed logging
+      const totalTrades = Object.values(tradesData).reduce((sum, trades) => sum + trades.length, 0);
+      console.log("Total trades in this month:", totalTrades);
+      
+      // Log the first few days with trade data
+      const sampleDays = Object.keys(tradesData).slice(0, 3);
+      sampleDays.forEach(day => {
+        console.log(`Day ${day} has ${tradesData[day].length} trades with profit: $${
+          tradesData[day].reduce((sum, trade) => sum + (trade.Net || 0), 0).toFixed(2)
+        }`);
+      });
+    } else {
+      console.log("MonthCalendarSection: No trade data available for this month");
     }
   }, [tradesData]);
   
