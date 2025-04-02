@@ -6,9 +6,10 @@ import { useAuth } from '@/contexts/auth';
 import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
+import { Spinner } from '@/components/ui/spinner';
 
 const Auth = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, initialized } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
 
@@ -30,8 +31,18 @@ const Auth = () => {
     }
   }, []);
 
+  // Show loading state while auth is initializing
+  if (!initialized || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   // If user is already authenticated, redirect to dashboard
-  if (isAuthenticated && !loading) {
+  if (isAuthenticated) {
+    console.log("Auth page: User is authenticated, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 

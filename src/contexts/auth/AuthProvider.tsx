@@ -10,29 +10,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Setting up auth state listener');
+    
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // Only synchronous state updates here
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, newSession) => {
+        console.log('Auth state changed:', event, newSession?.user?.email);
         
-        // Don't automatically redirect on sign out - let components handle this
-        // This helps prevent navigation loops
+        // Only synchronous state updates here to prevent loops
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
       }
     );
 
     // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        console.log('Initial session check:', existingSession?.user?.email || 'No session');
+        
+        setSession(existingSession);
+        setUser(existingSession?.user ?? null);
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
+        setInitialized(true);
+      }
+    };
 
-    return () => subscription.unsubscribe();
+    initializeAuth();
+
+    return () => {
+      console.log('Cleaning up auth listener');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -46,9 +62,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       toast.success('התחברת בהצלחה!');
+      
+      // Use setTimeout to prevent immediate navigation
+      // This helps prevent state update loops and flickering
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 100);
+        navigate('/dashboard', { replace: true });
+      }, 300);
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
@@ -69,10 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       toast.success('התנתקת בהצלחה');
       
-      // Use setTimeout to delay navigation, preventing potential state update loops
+      // Use a longer timeout for sign out to ensure all state is cleared
+      // before redirecting, preventing flash of protected content
       setTimeout(() => {
-        navigate('/auth');
-      }, 100);
+        navigate('/auth', { replace: true });
+      }, 500);
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -113,10 +133,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     loading,
     isAuthenticated: !!user,
+    initialized,
     signIn,
     signOut,
     updateProfile
   };
+
+  // Show a global loader when auth is initializing to prevent flashes of content
+  if (!initialized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-t-primary"></div>
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

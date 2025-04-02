@@ -13,23 +13,26 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requireAuth = true 
 }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Show consistent loader while auth is initializing
+  if (!initialized || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Spinner size="lg" />
       </div>
     );
   }
 
   if (requireAuth && !isAuthenticated) {
+    console.log("ProtectedRoute: User is not authenticated, redirecting to auth");
     // Redirect to login page if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
+    console.log("ProtectedRoute: User is already authenticated, redirecting to dashboard");
     // Redirect to dashboard if already authenticated (for login/register pages)
     return <Navigate to="/dashboard" replace />;
   }
