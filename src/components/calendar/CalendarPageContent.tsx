@@ -5,6 +5,13 @@ import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
 import { EconomicCalendarSection } from '@/components/calendar/EconomicCalendarSection';
 
+interface TradeDay {
+  date: string;
+  trades: number;
+  profit: number;
+  status: "Open" | "Active";
+}
+
 interface CalendarPageContentProps {
   viewMode: 'year' | 'month';
   currentMonth: string;
@@ -15,6 +22,7 @@ interface CalendarPageContentProps {
   systemCurrentYear: number;
   handleMonthSelect: (month: string) => void;
   handleBackToYear: () => void;
+  tradeDays: TradeDay[];
   tradesByDay: Record<string, any>;
 }
 
@@ -28,6 +36,7 @@ export const CalendarPageContent = ({
   systemCurrentYear,
   handleMonthSelect,
   handleBackToYear,
+  tradeDays,
   tradesByDay
 }: CalendarPageContentProps) => {
   return (
@@ -54,7 +63,7 @@ export const CalendarPageContent = ({
         />
       )}
       
-      <RecentActivitySection />
+      <RecentActivitySection tradeDays={tradeDays} />
       
       <EconomicCalendarSection />
     </div>

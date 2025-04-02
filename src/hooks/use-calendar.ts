@@ -9,6 +9,14 @@ const hebrewMonths = [
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
 ];
 
+// Define the TradeDay type
+interface TradeDay {
+  date: string;
+  trades: number;
+  profit: number;
+  status: "Open" | "Active";
+}
+
 export const useCalendar = () => {
   const { toast } = useToast();
   
@@ -47,6 +55,44 @@ export const useCalendar = () => {
       setHasShownToast(true);
     }
   }, [globalTrades, tradesByDay, toast, hasShownToast]);
+
+  // Generate trade days for the recent activity section using real data
+  const generateTradeDays = (): TradeDay[] => {
+    if (globalTrades.length === 0) {
+      return [];
+    }
+    
+    // Create real trade days from the global trades
+    const tradeMap = new Map<string, { count: number, profit: number }>();
+    
+    globalTrades.forEach(trade => {
+      const date = new Date(trade['Entry DateTime']).toISOString().split('T')[0];
+      if (!tradeMap.has(date)) {
+        tradeMap.set(date, { count: 0, profit: 0 });
+      }
+      
+      const current = tradeMap.get(date)!;
+      current.count += 1;
+      current.profit += trade.Net || 0;
+      tradeMap.set(date, current);
+    });
+    
+    // Convert map to array of TradeDay objects
+    const result: TradeDay[] = [];
+    tradeMap.forEach((value, date) => {
+      result.push({
+        date,
+        trades: value.count,
+        profit: value.profit,
+        status: value.profit >= 0 ? "Active" : "Open" // Set status based on profit
+      });
+    });
+    
+    // Sort by date descending and take the 5 most recent
+    return result
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  };
 
   // Navigate to previous month
   const prevMonth = () => {
@@ -92,11 +138,15 @@ export const useCalendar = () => {
     setViewMode('year');
   };
 
+  // Trade days data for the calendar
+  const tradeDays: TradeDay[] = generateTradeDays();
+
   return {
     viewMode,
     selectedDate,
     currentMonth,
     currentYear,
+    tradeDays,
     tradesByDay,
     lastUpdateTimestamp,
     hebrewMonths,
