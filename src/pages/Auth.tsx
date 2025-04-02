@@ -23,9 +23,6 @@ const Auth = () => {
         
         <div className="mb-6 text-center">
           <h2 className="text-xl font-semibold">ברוכים הבאים ל-AlgoTouch</h2>
-          <p className="text-muted-foreground mt-1">
-            ברוכים הבאים ל-AlgoTouch
-          </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>

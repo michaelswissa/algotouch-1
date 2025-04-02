@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,7 +93,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 onClick={handlePasswordReset}
                 disabled={resettingPassword || !email}
               >
-                {resettingPassword ? 'שולח...' : 'שכחת סיסמה?'.replace('?', '')}?
+                {resettingPassword ? 'שולח...' : '?שכחת סיסמה'}
               </Button>
               <Label htmlFor="login-password">סיסמה</Label>
             </div>
