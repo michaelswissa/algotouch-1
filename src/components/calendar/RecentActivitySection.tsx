@@ -6,24 +6,16 @@ import { ArrowDown, ArrowUp, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTradingDataStore } from '@/stores/trading-data-store';
 
-interface TradeDay {
-  date: string;
-  trades: number;
-  profit: number;
-  status: "Open" | "Active";
-}
-
 export const RecentActivitySection = () => {
   // Get real trade data from store
   const { globalTrades } = useTradingDataStore();
   
-  // Generate trade days from actual uploaded data
-  const generateTradeDays = (): TradeDay[] => {
+  // Create real trade days from the global trades
+  const generateTradeDays = () => {
     if (globalTrades.length === 0) {
       return [];
     }
     
-    // Create real trade days from the global trades
     const tradeMap = new Map<string, { count: number, profit: number }>();
     
     globalTrades.forEach(trade => {
@@ -38,14 +30,14 @@ export const RecentActivitySection = () => {
       tradeMap.set(date, current);
     });
     
-    // Convert map to array of TradeDay objects
-    const result: TradeDay[] = [];
+    // Convert map to array
+    const result = [];
     tradeMap.forEach((value, date) => {
       result.push({
         date,
         trades: value.count,
         profit: value.profit,
-        status: value.profit >= 0 ? "Active" : "Open" // Set status based on profit
+        status: value.profit >= 0 ? "Active" : "Open"
       });
     });
     

@@ -77,10 +77,6 @@ const SelectedDayTrades = ({ selectedDay, selectedDayTrades, month }: SelectedDa
                 </>
               )}
             </div>
-            <div className="flex items-center gap-1 text-sm px-2 py-1 bg-secondary/50 rounded-full">
-              <Clock size={14} className="text-muted-foreground" />
-              <span>זמן ממוצע: {Math.floor(Math.random() * 120) + 30} דקות</span>
-            </div>
           </div>
         </div>
         

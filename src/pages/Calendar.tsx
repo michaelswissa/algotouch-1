@@ -10,7 +10,6 @@ const CalendarPage = () => {
     viewMode,
     currentMonth,
     currentYear,
-    tradeDays,
     tradesByDay,
     lastUpdateTimestamp,
     hebrewMonths,
@@ -66,7 +65,6 @@ const CalendarPage = () => {
             systemCurrentYear={systemCurrentYear}
             handleMonthSelect={handleMonthSelect}
             handleBackToYear={handleBackToYear}
-            tradeDays={tradeDays}
             tradesByDay={tradesByDay}
           />
         </div>
