@@ -5,16 +5,6 @@ import { GraduationCap, BookOpen, Play, ArrowLeft, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-// Local stock market chart images for course thumbnails
-const chartImages = [
-  '/images/stock-market-1.jpg',
-  '/images/stock-market-2.jpg',
-  '/images/stock-market-3.jpg',
-  '/images/stock-market-4.jpg',
-  '/images/stock-market-5.jpg',
-  '/images/stock-market-6.jpg',
-];
-
 export interface ModuleProps {
   title: string;
   duration?: string;
@@ -47,47 +37,16 @@ const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: 
     }
   };
 
-  // Get a random chart image for this course - consistent based on title
-  const getConsistentImageIndex = (title: string) => {
-    // Simple hash function to get consistent index based on title
-    let hash = 0;
-    for (let i = 0; i < title.length; i++) {
-      hash = ((hash << 5) - hash) + title.charCodeAt(i);
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash) % chartImages.length;
-  };
-  
-  const chartImage = chartImages[getConsistentImageIndex(title)];
-
   return (
     <Card 
       className={`glass-card-2025 hover:shadow-lg transition-all duration-300 overflow-hidden
       ${isSelected ? 'ring-2 ring-primary shadow-lg' : 'hover:border-primary/30'}`} 
       dir="rtl"
     >
-      {/* Course thumbnail - visually appealing video preview */}
-      <div className="relative w-full h-48 overflow-hidden">
-        {/* Video thumbnail background - now with local chart images */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={chartImage} 
-            alt={title} 
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // Fallback to the first image if loading fails
-              const target = e.target as HTMLImageElement;
-              target.src = chartImages[0];
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/30 to-primary/10 mix-blend-overlay"></div>
-        </div>
-        
-        {/* Video overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/60 z-10"></div>
-        
+      {/* Course header - simplified without background image */}
+      <div className="relative w-full h-48 bg-primary/10 flex items-center justify-center overflow-hidden">
         {/* Video play button */}
-        <div className="absolute inset-0 flex items-center justify-center z-20">
+        <div className="flex items-center justify-center z-20">
           <div className="bg-primary/90 rounded-full p-3 shadow-lg animate-pulse-subtle transform hover:scale-110 transition-transform duration-300 cursor-pointer">
             <Play className="h-6 w-6 text-white" />
           </div>

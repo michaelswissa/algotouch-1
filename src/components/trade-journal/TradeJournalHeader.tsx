@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ScrollText, Plus, Search, FileText, FileSpreadsheet } from 'lucide-react';
+import { ScrollText, Search, FileText, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -11,10 +11,6 @@ interface TradeJournalHeaderProps {
 
 const TradeJournalHeader: React.FC<TradeJournalHeaderProps> = ({ onNewNote }) => {
   const navigate = useNavigate();
-
-  const handleNewTrade = () => {
-    navigate('/new-trade');
-  };
 
   const handleMonthlyReport = () => {
     navigate('/monthly-report');
@@ -56,15 +52,6 @@ const TradeJournalHeader: React.FC<TradeJournalHeaderProps> = ({ onNewNote }) =>
         >
           <FileSpreadsheet size={14} />
           <span>דוח חודשי</span>
-        </Button>
-        
-        <Button 
-          onClick={handleNewTrade}
-          size="sm" 
-          className="gap-2 bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-105 shadow-sm"
-        >
-          <Plus size={14} />
-          <span>עסקה חדשה</span>
         </Button>
       </div>
     </div>
