@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, ScrollText, Users, GraduationCap, Search, FileSpreadsheet, Bot, PlusCircle, Sparkles, ChevronRight, X, Newspaper } from 'lucide-react';
@@ -84,9 +85,9 @@ const Sidebar = () => {
       </nav>
       
       <div className={cn("p-4 border-t border-sidebar-border text-xs relative z-10 flex flex-col items-center justify-center", collapsed && "p-2")}>
-        {!collapsed ? <div className="w-full text-center">
-            <p className="text-sidebar-foreground/60 text-center">AlgoTouch &copy; 2025</p>
-            <p className="mt-1 text-sidebar-foreground/60 text-center">כל הזכויות שמורות</p>
+        {!collapsed ? <div className="w-full flex flex-col items-center justify-center text-center">
+            <p className="text-sidebar-foreground/60 text-center w-full">AlgoTouch &copy; 2025</p>
+            <p className="mt-1 text-sidebar-foreground/60 text-center w-full">כל הזכויות שמורות</p>
           </div> : <div className="w-full text-center text-sidebar-foreground/60">
             <span>&copy;</span>
           </div>}

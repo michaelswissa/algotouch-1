@@ -1,4 +1,3 @@
-
 @layer components {  
   /* Enhanced RTL menu specific styling */
   [dir="rtl"] .menu-icon {
@@ -286,6 +285,37 @@
   [dir="rtl"] h6,
   [dir="rtl"] p {
     text-align: right;
+  }
+
+  /* Text center enforcement for upload components and footer */
+  [dir="rtl"] .text-center {
+    text-align: center !important;
+  }
+  
+  /* Card elements in RTL with forced center alignment */
+  [dir="rtl"] .card-header-center {
+    @apply flex flex-col items-center justify-center;
+  }
+  
+  [dir="rtl"] .card-title-center {
+    @apply flex justify-center items-center gap-2 w-full text-center;
+  }
+  
+  [dir="rtl"] .upload-container {
+    @apply flex flex-col items-center justify-center w-full;
+  }
+  
+  [dir="rtl"] .upload-text {
+    @apply text-center w-full;
+  }
+  
+  /* Footer always centered */
+  [dir="rtl"] .footer-centered {
+    @apply flex flex-col items-center justify-center w-full text-center;
+  }
+  
+  [dir="rtl"] .footer-text {
+    @apply text-center w-full;
   }
 
   /* Mobile RTL adjustments */
