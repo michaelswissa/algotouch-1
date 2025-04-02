@@ -1,15 +1,18 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Calendar, CreditCard, Settings, XCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/auth';
-import { supabase } from '@/integrations/supabase/client';
 import { format, addMonths, parseISO, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { useAuth } from '@/contexts/auth';
+import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
+
+// Import our new components
+import SubscriptionCard from './subscription/SubscriptionCard';
+import SubscriptionStatus from './subscription/SubscriptionStatus';
+import BillingInfo from './subscription/BillingInfo';
+import PaymentMethodInfo from './subscription/PaymentMethodInfo';
+import SubscriptionFooter from './subscription/SubscriptionFooter';
+import LoadingSkeleton from './subscription/LoadingSkeleton';
 
 // Updated Subscription interface to match the data structure from Supabase
 interface Subscription {
@@ -25,11 +28,24 @@ interface Subscription {
   } | Json | null;
 }
 
+interface SubscriptionDetails {
+  planName: string;
+  planPrice: string;
+  statusText: string;
+  nextBillingDate: string;
+  progressValue: number;
+  daysLeft: number;
+  paymentMethod: {
+    lastFourDigits: string;
+    expiryMonth: string;
+    expiryYear: string;
+  } | null;
+}
+
 const UserSubscription = () => {
   const { user } = useAuth();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -68,7 +84,7 @@ const UserSubscription = () => {
     fetchSubscription();
   }, [user]);
 
-  const getSubscriptionDetails = () => {
+  const getSubscriptionDetails = (): SubscriptionDetails | null => {
     if (!subscription) return null;
     
     const planName = subscription.plan_type === 'annual' ? 'שנתי' : 'חודשי';
@@ -122,93 +138,55 @@ const UserSubscription = () => {
     };
   };
 
-  const details = getSubscriptionDetails();
-
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-2">
-            <div className="h-5 bg-muted rounded-md animate-pulse w-1/3"></div>
-            <div className="h-8 bg-muted rounded-md animate-pulse w-1/2"></div>
-            <div className="h-4 bg-muted rounded-md animate-pulse w-3/4 mt-4"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <LoadingSkeleton />;
   }
+
+  const details = getSubscriptionDetails();
 
   if (!subscription) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>אין לך מנוי פעיל</CardTitle>
-          <CardDescription>הרשם עכשיו כדי לקבל גישה מלאה למערכת</CardDescription>
-        </CardHeader>
-        <CardFooter>
-          <Button onClick={() => navigate('/subscription')}>הרשם עכשיו</Button>
-        </CardFooter>
-      </Card>
+      <SubscriptionCard 
+        title="אין לך מנוי פעיל" 
+        description="הרשם עכשיו כדי לקבל גישה מלאה למערכת"
+        showSubscribeButton={true}
+      >
+        <></>
+      </SubscriptionCard>
     );
   }
 
   return (
-    <Card className="overflow-hidden" dir="rtl">
-      <CardHeader className="pb-3">
-        <CardTitle>מנוי {details?.planName}</CardTitle>
-        <CardDescription>סטטוס: {details?.statusText}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {subscription.status === 'trial' && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>תקופת ניסיון</span>
-              <span className="font-medium">{details?.daysLeft} ימים נותרו</span>
-            </div>
-            <Progress value={details?.progressValue} className="h-2" />
-          </div>
+    <SubscriptionCard
+      title={`מנוי ${details?.planName}`}
+      description={`סטטוס: ${details?.statusText}`}
+    >
+      <>
+        {subscription.status === 'trial' && details && (
+          <SubscriptionStatus 
+            status={subscription.status} 
+            daysLeft={details.daysLeft} 
+            progressValue={details.progressValue} 
+          />
         )}
         
         <div className="grid grid-cols-1 gap-4 mt-4">
-          <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
-            <Calendar className="h-5 w-5 text-primary flex-shrink-0" />
-            <div>
-              <h4 className="text-sm font-medium">החיוב הבא</h4>
-              <p className="text-sm text-muted-foreground">{details?.nextBillingDate}</p>
-            </div>
-          </div>
-          
-          {details?.paymentMethod && (
-            <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
-              <CreditCard className="h-5 w-5 text-primary flex-shrink-0" />
-              <div>
-                <h4 className="text-sm font-medium">אמצעי תשלום</h4>
-                <p className="text-sm text-muted-foreground">
-                  כרטיס אשראי המסתיים ב-{details.paymentMethod.lastFourDigits} (תוקף: {details.paymentMethod.expiryMonth}/{details.paymentMethod.expiryYear.slice(-2)})
-                </p>
-              </div>
-            </div>
+          {details && (
+            <>
+              <BillingInfo 
+                nextBillingDate={details.nextBillingDate} 
+                planPrice={details.planPrice} 
+              />
+              
+              <PaymentMethodInfo 
+                paymentMethod={details.paymentMethod} 
+              />
+            </>
           )}
-          
-          <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
-            <Settings className="h-5 w-5 text-primary flex-shrink-0" />
-            <div>
-              <h4 className="text-sm font-medium">סכום החיוב</h4>
-              <p className="text-sm text-muted-foreground">₪{details?.planPrice} בתאריך {details?.nextBillingDate}</p>
-            </div>
-          </div>
         </div>
-      </CardContent>
-      <CardFooter className="border-t bg-muted/20 p-3 flex justify-between">
-        <Button variant="ghost" size="sm" className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
-          <XCircle className="h-4 w-4" />
-          ביטול מנוי
-        </Button>
-        <Button variant="outline" size="sm">
-          שינוי תכנית
-        </Button>
-      </CardFooter>
-    </Card>
+      </>
+      <SubscriptionFooter />
+    </SubscriptionCard>
   );
 };
 
