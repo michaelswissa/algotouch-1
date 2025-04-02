@@ -10,7 +10,7 @@ import TraderVueLogo from './TraderVueLogo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Sidebar = () => {

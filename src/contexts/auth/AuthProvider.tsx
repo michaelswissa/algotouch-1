@@ -70,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             first_name: userData.firstName,
             last_name: userData.lastName
           },
+          // Important: Don't set emailRedirectTo so we don't require email verification
           emailRedirectTo: undefined
         }
       });
