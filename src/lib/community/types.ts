@@ -78,3 +78,12 @@ export interface CourseProgress {
   created_at: string;
   updated_at: string;
 }
+
+// Interface for user streak data
+export interface UserStreak {
+  userId: string;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivity: string;
+  streakStartDate: string;
+}

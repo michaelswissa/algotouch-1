@@ -11,6 +11,7 @@ import { useReputationActions } from './useReputationActions';
 import { useBadgeActions } from './useBadgeActions';
 import { usePostActions } from './usePostActions';
 import { useCourseActions } from './useCourseActions';
+import { useStreakActions } from './useStreakActions';
 
 const CommunityContext = createContext<CommunityContextType | undefined>(undefined);
 
@@ -30,18 +31,24 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
   const { 
     posts, setPosts, handlePostCreated, handlePostLiked 
   } = usePostActions();
+
+  const {
+    userStreak, getUserStreak, updateUserStreak
+  } = useStreakActions(user?.id);
   
   // Function to refresh all data
   const refreshData = async () => {
     setLoading(true);
     try {
       // Load posts
-      const fetchedPosts = await handlePostCreated();
-      setPosts(fetchedPosts);
+      await handlePostCreated();
       
       if (isAuthenticated && user) {
         // Check and award daily login points
         await checkAndAwardDailyLogin();
+        
+        // Update user streak
+        await updateUserStreak();
         
         // Load user reputation
         await updateReputationData();
@@ -78,6 +85,7 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
     posts,
     loading,
     courseProgress,
+    userStreak,
     refreshData,
     handlePostCreated,
     handlePostLiked,

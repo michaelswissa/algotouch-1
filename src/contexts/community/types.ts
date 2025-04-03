@@ -4,7 +4,8 @@ import {
   UserBadge, 
   Post, 
   ReputationData,
-  CourseProgress
+  CourseProgress,
+  UserStreak
 } from '@/lib/community';
 
 export interface CommunityContextType {
@@ -22,6 +23,9 @@ export interface CommunityContextType {
 
   // Course progress data
   courseProgress: CourseProgress[];
+
+  // User streak data
+  userStreak: UserStreak | null;
 
   // Actions
   refreshData: () => Promise<void>;

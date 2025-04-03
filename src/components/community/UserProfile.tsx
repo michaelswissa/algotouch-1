@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LevelIndicator } from '@/components/ui/level-indicator';
 import UserBadges from '@/components/community/UserBadges';
 import { useCommunity } from '@/contexts/community/CommunityContext';
+import { Flame } from 'lucide-react';
 
 interface UserProfileProps {
   user: {
@@ -14,7 +15,7 @@ interface UserProfileProps {
 }
 
 export function UserProfile({ user }: UserProfileProps) {
-  const { userLevel, userPoints, userBadges, allBadges } = useCommunity();
+  const { userLevel, userPoints, userBadges, allBadges, userStreak } = useCommunity();
   
   if (!user) return null;
   
@@ -34,6 +35,16 @@ export function UserProfile({ user }: UserProfileProps) {
               className="mt-2 max-w-sm" 
             />
           </div>
+          
+          {userStreak && (
+            <div className="flex flex-col items-center justify-center bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
+              <div className="flex items-center gap-1">
+                <Flame className="h-5 w-5 text-orange-500" />
+                <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{userStreak.currentStreak}</span>
+              </div>
+              <div className="text-xs text-orange-600 dark:text-orange-300">ימים רצופים</div>
+            </div>
+          )}
         </div>
         
         <div className="mt-4">

@@ -10,10 +10,9 @@ export function usePostActions() {
     try {
       const fetchedPosts = await getCommunityPosts();
       setPosts(fetchedPosts);
-      return fetchedPosts;
+      return; // Return void instead of posts to match the type in CommunityContextType
     } catch (error) {
       console.error('Error refreshing posts data:', error);
-      return [];
     }
   };
   
