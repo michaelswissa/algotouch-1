@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,7 +24,6 @@ import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Subscription from "./pages/Subscription";
 import Index from "./pages/Index";
-import TestEmail from './pages/TestEmail';
 
 // Configure with refresh on error
 const queryClient = new QueryClient({
@@ -163,9 +163,6 @@ const App = () => {
               
               {/* Catch all route */}
               <Route path="*" element={<NotFound />} />
-              
-              {/* New route */}
-              <Route path="/test-email" element={<TestEmail />} />
             </Routes>
           </AuthProvider>
         </BrowserRouter>

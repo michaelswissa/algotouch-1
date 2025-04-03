@@ -164,39 +164,3 @@ export async function sendPasswordResetEmail(userEmail: string, resetLink: strin
     `,
   });
 }
-
-/**
- * Tests SMTP configuration by sending a test email
- */
-export async function testSmtpConnection(): Promise<{ success: boolean; details?: any; error?: string }> {
-  try {
-    console.log('Testing SMTP connection...');
-    
-    // Add a timeout to detect if the function call hangs
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timed out after 20 seconds')), 20000);
-    });
-    
-    try {
-      const functionPromise = supabase.functions.invoke('test-smtp');
-      const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
-      
-      if (error) {
-        console.error('Error testing SMTP connection:', error);
-        return { success: false, error: error.message || JSON.stringify(error) };
-      }
-      
-      console.log('SMTP connection test successful:', data);
-      return { success: true, details: data };
-    } catch (fetchError: any) {
-      console.error('Network error testing SMTP connection:', fetchError);
-      return { 
-        success: false, 
-        error: `Network error: ${fetchError.message}. The Edge Function may not be deployed or CORS issues.` 
-      };
-    }
-  } catch (error: any) {
-    console.error('Exception testing SMTP connection:', error);
-    return { success: false, error: error.message || JSON.stringify(error) };
-  }
-}

@@ -71,12 +71,5 @@ import_map = "supabase/functions/izidoc-sign/import_map.json"
 verify_jwt = true
 import_map = "supabase/functions/gmail-sender/import_map.json"
 
-[functions.test-gmail]
-verify_jwt = false
-import_map = "supabase/functions/test-gmail/import_map.json"
-
 [functions.smtp-sender]
 verify_jwt = true
-
-[functions.test-smtp]
-verify_jwt = false

@@ -123,57 +123,6 @@ async function updateSubscription(supabase: any, userId: string, planId: string,
   }
 }
 
-// פונקציה ייעודית לשליחת מייל בצורה פשוטה יותר
-async function sendEmail(to: string, subject: string, html: string, attachments?: Array<{filename: string, content: string, mimeType: string}>) {
-  console.log(`Sending email to ${to} with subject: ${subject}`);
-  
-  try {
-    // הכן את גוף הבקשה עם כל הפרטים הנדרשים
-    const emailRequest = {
-      to,
-      subject,
-      html,
-      attachmentData: attachments || []
-    };
-
-    // בחר את שיטת השליחה המועדפת - SMTP או Gmail
-    const endpoint = 'smtp-sender'; // אפשר להחליף ל־'gmail-sender' אם מעדיף שימוש ב־Gmail
-    
-    // שלח בקשה לפונקציה המתאימה
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Missing Supabase environment variables");
-    }
-    
-    console.log(`Calling ${endpoint} function at ${SUPABASE_URL}/functions/v1/${endpoint}`);
-    
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-      },
-      body: JSON.stringify(emailRequest)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Email sending failed with status ${response.status}: ${errorText}`);
-      return { success: false, error: `Failed to send email: ${errorText}` };
-    }
-    
-    const result = await response.json();
-    console.log("Email sent successfully:", result);
-    return { success: true, result };
-    
-  } catch (error) {
-    console.error("Exception sending email:", error);
-    return { success: false, error: error.message };
-  }
-}
-
 // Main handler function for the edge function
 serve(async (req) => {
   console.log("IziDoc Sign function called:", req.method, req.url);
@@ -276,7 +225,7 @@ serve(async (req) => {
     const contractBytes = encoder.encode(request.contractHtml);
     const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
     
-    // שלח מייל ללקוח
+    // Prepare email for customer
     console.log("Sending email to customer:", request.email);
     const customerEmailBody = `
       <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
@@ -294,20 +243,39 @@ serve(async (req) => {
       </div>
     `;
     
-    const customerEmailResult = await sendEmail(
-      request.email,
-      `העתק הסכם AlgoTouch - אישור חתימה`,
-      customerEmailBody,
-      [{
+    // Prepare email data for customer
+    const customerEmailData = {
+      to: request.email,
+      subject: `העתק הסכם AlgoTouch - אישור חתימה`,
+      html: customerEmailBody,
+      attachmentData: [{
         filename: `contract-algotouch-${new Date().toISOString().slice(0,10)}.html`,
         content: contractBase64,
         mimeType: "text/html"
       }]
-    );
+    };
     
-    console.log("Customer email result:", customerEmailResult);
+    // Send email to customer
+    let customerEmailResult;
+    try {
+      console.log("Sending email to customer via smtp-sender function");
+      const { data: emailData, error: emailError } = await supabase.functions.invoke('smtp-sender', {
+        body: customerEmailData
+      });
+      
+      if (emailError) {
+        console.error("Error sending customer email:", emailError);
+        customerEmailResult = { success: false, error: emailError.message };
+      } else {
+        console.log("Customer email sent successfully:", emailData);
+        customerEmailResult = { success: true, result: emailData };
+      }
+    } catch (emailError) {
+      console.error("Exception sending customer email:", emailError);
+      customerEmailResult = { success: false, error: emailError.message };
+    }
     
-    // שלח גם מייל למנהל המערכת
+    // Prepare email for admin
     console.log("Sending email to admin");
     const adminEmailBody = `
       <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
@@ -325,18 +293,37 @@ serve(async (req) => {
       </div>
     `;
     
-    const adminEmailResult = await sendEmail(
-      "support@algotouch.co.il",
-      `הסכם חדש נחתם - ${request.fullName}`,
-      adminEmailBody,
-      [{
+    // Prepare email data for admin
+    const adminEmailData = {
+      to: "support@algotouch.co.il",
+      subject: `הסכם חדש נחתם - ${request.fullName}`,
+      html: adminEmailBody,
+      attachmentData: [{
         filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
         content: contractBase64,
         mimeType: "text/html"
       }]
-    );
+    };
     
-    console.log("Admin email result:", adminEmailResult);
+    // Send email to admin
+    let adminEmailResult;
+    try {
+      console.log("Sending email to admin via smtp-sender function");
+      const { data: emailData, error: emailError } = await supabase.functions.invoke('smtp-sender', {
+        body: adminEmailData
+      });
+      
+      if (emailError) {
+        console.error("Error sending admin email:", emailError);
+        adminEmailResult = { success: false, error: emailError.message };
+      } else {
+        console.log("Admin email sent successfully:", emailData);
+        adminEmailResult = { success: true, result: emailData };
+      }
+    } catch (emailError) {
+      console.error("Exception sending admin email:", emailError);
+      adminEmailResult = { success: false, error: emailError.message };
+    }
     
     // Return the signing result
     console.log("Contract signing process completed");

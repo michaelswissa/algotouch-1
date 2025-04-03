@@ -39,7 +39,7 @@ serve(async (req) => {
     const smtp_pass = Deno.env.get("SMTP_PASSWORD");
     const smtp_from = Deno.env.get("SMTP_FROM") || "noreply@algotouch.co.il";
     
-    // Log SMTP configuration
+    // Log SMTP configuration (without sensitive details)
     console.log("SMTP Configuration:");
     console.log(`Host: ${smtp_host || "MISSING"}`);
     console.log(`Port: ${smtp_port}`);
@@ -53,7 +53,26 @@ serve(async (req) => {
       if (!smtp_user) missing.push("SMTP_USER");
       if (!smtp_pass) missing.push("SMTP_PASSWORD");
       
-      throw new Error(`SMTP not configured properly. Missing: ${missing.join(", ")}`);
+      const errorMessage = `SMTP not configured properly. Missing: ${missing.join(", ")}`;
+      console.error(errorMessage);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage,
+          details: {
+            host: smtp_host ? "✓" : "✗",
+            port: smtp_port ? "✓" : "✗",
+            user: smtp_user ? "✓" : "✗",
+            pass: smtp_pass ? "✓" : "✗",
+            from: smtp_from ? "✓" : "✗"
+          }
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
     }
     
     // Parse request body
@@ -71,7 +90,19 @@ serve(async (req) => {
       if (!emailRequest.subject) missing.push("subject");
       if (!emailRequest.html) missing.push("html");
       
-      throw new Error(`Invalid email request. Missing: ${missing.join(", ")}`);
+      const errorMessage = `Invalid email request. Missing: ${missing.join(", ")}`;
+      console.error(errorMessage);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
     }
     
     // Create SMTP client
