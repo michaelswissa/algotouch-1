@@ -70,3 +70,7 @@ import_map = "./functions/smtp-sender/import_map.json"
 [functions.gmail-sender]
 verify_jwt = true
 import_map = "./functions/gmail-sender/import_map.json"
+
+[functions.cardcom-payment]
+verify_jwt = true
+import_map = "./functions/cardcom-payment/import_map.json"
