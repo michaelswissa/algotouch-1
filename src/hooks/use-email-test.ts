@@ -18,6 +18,16 @@ export function useEmailTest() {
   const isDevelopment = window.location.hostname === 'localhost' || 
                         window.location.hostname === '127.0.0.1';
 
+  // Get the Supabase function URL (safely)
+  const getSupabaseFunctionsUrl = () => {
+    try {
+      // Get the URL in a way that doesn't access protected properties
+      return supabase.functions.invoke('test-smtp', { body: null }).url.split('/functions/')[0] || '';
+    } catch (e) {
+      return '';
+    }
+  };
+
   const resetErrors = () => {
     setResult(null);
     setConnectionStatus('unknown');
@@ -34,8 +44,8 @@ export function useEmailTest() {
       
       // Display the project info for debugging
       const projectInfo = {
-        projectUrl: supabase.functions.url?.toString(),
-        projectId: supabase.functions.url?.split('/')[2]?.split('.')[0] || 'unknown'
+        projectUrl: getSupabaseFunctionsUrl(),
+        projectId: getSupabaseFunctionsUrl().split('.')[0]?.split('/')[2] || 'unknown'
       };
       console.log('Supabase Project Info:', projectInfo);
       
@@ -99,7 +109,8 @@ export function useEmailTest() {
       resetErrors();
       
       console.log('Testing SMTP connection...');
-      console.log('Supabase Functions URL:', supabase.functions.url);
+      const functionsUrl = getSupabaseFunctionsUrl();
+      console.log('Supabase Functions URL:', functionsUrl);
       
       const { success, details, error } = await testSmtpConnection();
       
@@ -230,6 +241,6 @@ export function useEmailTest() {
     testGmailAuth,
     testSmtpEmail,
     sendTestEmail,
-    supabaseFunctionsUrl: supabase.functions.url?.toString()
+    supabaseFunctionsUrl: getSupabaseFunctionsUrl()
   };
 }
