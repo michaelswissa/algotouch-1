@@ -1,6 +1,8 @@
 
 {
   "imports": {
-    "https://deno.land/std@0.168.0/http/server.ts": "https://deno.land/std@0.168.0/http/server.ts"
+    "https://deno.land/std@0.168.0/http/server.ts": "https://deno.land/std@0.168.0/http/server.ts",
+    "https://deno.land/x/xhr@0.1.0/mod.ts": "https://deno.land/x/xhr@0.1.0/mod.ts",
+    "https://esm.sh/openai@4.20.1": "https://esm.sh/openai@4.20.1"
   }
 }
