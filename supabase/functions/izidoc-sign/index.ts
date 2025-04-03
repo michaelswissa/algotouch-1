@@ -111,13 +111,15 @@ serve(async (req) => {
       throw updateError;
     }
     
-    // Optional: Generate and store PDF (in a production environment)
-    // In a real implementation, you would generate a PDF here and store it in the storage bucket
-    
-    // Call Gmail sender edge function to send confirmation email (asynchronous)
+    // Send email notification with contract attachment
     try {
       const { data: user } = await supabase.auth.admin.getUserById(request.userId);
       if (user && user.user) {
+        // Convert HTML contract to base64 for attachment
+        const encoder = new TextEncoder();
+        const contractBytes = encoder.encode(request.contractHtml);
+        const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
+        
         const emailBody = `
           <h1>הסכם חדש נחתם</h1>
           <p>שלום,</p>
@@ -128,24 +130,43 @@ serve(async (req) => {
             <li>כתובת IP: ${ipAddress || "לא זוהה"}</li>
             <li>דפדפן: ${request.browserInfo.userAgent || "לא זוהה"}</li>
           </ul>
+          <p>מצורף חוזה חתום כקובץ HTML. אנא פתח את הקובץ בדפדפן לצפייה.</p>
           <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
         `;
 
-        await fetch(`${SUPABASE_URL}/functions/v1/gmail-sender`, {
+        console.log("Sending contract notification email to support@algotouch.co.il");
+        
+        const emailResponse = await fetch(`${SUPABASE_URL}/functions/v1/gmail-sender`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
           },
           body: JSON.stringify({
-            to: "support@algotouch.co.il", // Changed from admin@algotouch.co.il to support@algotouch.co.il
+            to: "support@algotouch.co.il",
             subject: `הסכם חדש נחתם - ${request.fullName}`,
-            html: emailBody
+            html: emailBody,
+            attachmentData: [{
+              filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
+              content: contractBase64,
+              mimeType: "text/html"
+            }]
           })
         });
+        
+        if (!emailResponse.ok) {
+          const emailError = await emailResponse.text();
+          console.error("Failed to send email notification:", emailError);
+          // Don't throw here to prevent the signing process from failing
+        } else {
+          const emailResult = await emailResponse.json();
+          console.log("Email notification sent successfully:", emailResult);
+        }
       }
     } catch (emailError) {
       console.error("Error sending notification email:", emailError);
+      // Log detailed error for debugging
+      console.error("Email error details:", JSON.stringify(emailError));
       // Don't throw error as this is not critical for the signing process
     }
     

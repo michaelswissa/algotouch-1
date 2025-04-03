@@ -85,6 +85,8 @@ async function sendEmail(accessToken: string, emailRequest: EmailRequest) {
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 
+  console.log(`Attempting to send email to ${emailRequest.to} with subject: ${emailRequest.subject}`);
+
   const response = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
     {
@@ -128,6 +130,7 @@ serve(async (req) => {
     // Verify the request is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing authorization header");
       throw new Error("Missing authorization header");
     }
     
@@ -135,8 +138,15 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !user) {
-      throw new Error("Unauthorized");
+    if (authError) {
+      console.error("Authentication error:", authError);
+      // Still proceed with the email if using service role key
+      // This allows functions like izidoc-sign to send emails
+      if (!token.includes(SUPABASE_SERVICE_ROLE_KEY)) {
+        throw new Error("Unauthorized");
+      } else {
+        console.log("Proceeding with email sending using service role key");
+      }
     }
 
     // Parse the request body
