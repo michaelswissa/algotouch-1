@@ -28,7 +28,6 @@ const UserSubscription = () => {
       <SubscriptionCard 
         title="השלם את תהליך ההרשמה" 
         description="התחלת את תהליך ההרשמה. אנא השלם את התהליך כדי לקבל גישה מלאה."
-        showSubscribeButton={true}
       >
         <div className="text-center py-6">
           <Button 
@@ -47,7 +46,6 @@ const UserSubscription = () => {
       <SubscriptionCard 
         title="אין לך מנוי פעיל" 
         description="הרשם עכשיו כדי לקבל גישה מלאה למערכת"
-        showSubscribeButton={true}
       >
         <div className="text-center py-6">
           <Button 
