@@ -1,12 +1,11 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Share2, ThumbsUp } from 'lucide-react';
-import { likePost } from '@/lib/reputation-service';
+import { likePost } from '@/lib/community';
 import { toast } from 'sonner';
-import type { Post } from '@/lib/reputation-service';
+import type { Post } from '@/lib/community';
 
 interface PostListProps {
   posts: Post[];

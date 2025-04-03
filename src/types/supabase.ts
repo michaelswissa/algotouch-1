@@ -37,14 +37,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "community_reputation_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
       community_badges: {
         Row: {
@@ -92,20 +85,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           badge_id?: string;
           earned_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "user_badges_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "user_badges_badge_id_fkey";
-            columns: ["badge_id"];
-            referencedRelation: "community_badges";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
       community_posts: {
         Row: {
@@ -138,14 +118,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "community_posts_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
       community_activities: {
         Row: {
@@ -172,14 +145,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           reference_id?: string | null;
           created_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "community_activities_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
     };
     Views: OriginalDatabase['public']['Views'];

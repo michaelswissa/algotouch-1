@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Image, Link2, Send } from 'lucide-react';
-import { registerCommunityPost } from '@/lib/reputation-service';
+import { registerCommunityPost } from '@/lib/community';
 import { toast } from 'sonner';
 
 interface NewPostFormProps {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/auth';
@@ -9,7 +10,7 @@ import {
   getUserBadges,
   getAllBadges,
   getCommunityPosts 
-} from '@/lib/reputation-service';
+} from '@/lib/community';
 import { supabase } from '@/integrations/supabase/client';
 
 // Component imports
