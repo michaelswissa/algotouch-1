@@ -8,6 +8,8 @@ interface SubscriptionContextType {
   checkUserSubscription: (userId: string) => Promise<void>;
   fullName: string;
   setFullName: (name: string) => void;
+  email: string;
+  setEmail: (email: string) => void;
   resetSubscriptionState: () => void;
 }
 
@@ -17,6 +19,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
 
   const checkUserSubscription = async (userId: string) => {
     if (!userId) return;
@@ -37,12 +40,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, email')
         .eq('id', userId)
         .single();
       
       if (profile) {
         setFullName(`${profile.first_name || ''} ${profile.last_name || ''}`);
+        if (profile.email) {
+          setEmail(profile.email);
+        }
       }
     } catch (error) {
       console.error("Error checking subscription:", error);
@@ -55,6 +61,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setHasActiveSubscription(false);
     setIsCheckingSubscription(false);
     setFullName('');
+    setEmail('');
   };
 
   return (
@@ -64,6 +71,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       checkUserSubscription,
       fullName,
       setFullName,
+      email,
+      setEmail,
       resetSubscriptionState
     }}>
       {children}

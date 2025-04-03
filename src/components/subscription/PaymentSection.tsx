@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +34,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
 
     setIsLoading(true);
     try {
-      // Determine operation type based on selected plan
       let operationType = 3; // Default: token creation only (for monthly trial)
       
       if (selectedPlan === 'annual') {
@@ -73,7 +71,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     }
   };
 
-  // Check for payment success/error in URL params when component mounts
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
@@ -87,7 +84,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     }
   }, [onPaymentComplete]);
 
-  // Handle iframe resize for better UX
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
