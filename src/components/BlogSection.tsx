@@ -66,8 +66,8 @@ const BlogSection = ({ expandedView = false }: BlogSectionProps) => {
               {postsToShow.map((post) => (
                 <Link key={post.id} to={`/blog/${post.id}`} className="block">
                   <Card className="overflow-hidden hover-scale transition-all duration-300 h-full">
-                    <div className="h-40 flex items-center justify-center bg-primary/5 overflow-hidden">
-                      <div className="absolute top-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
+                    <div className="h-40 flex items-center justify-center bg-primary/5 overflow-hidden relative">
+                      <div className="absolute top-2 right-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
                         {post.tags[0] || "כללי"}
                       </div>
                     </div>
