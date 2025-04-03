@@ -36,6 +36,120 @@ export type Database = {
         }
         Relationships: []
       }
+      community_activities: {
+        Row: {
+          activity_type: string
+          created_at: string
+          id: string
+          points_earned: number
+          reference_id: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          id?: string
+          points_earned?: number
+          reference_id?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          id?: string
+          points_earned?: number
+          reference_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      community_badges: {
+        Row: {
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          points_required: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          icon: string
+          id?: string
+          name: string
+          points_required?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points_required?: number
+        }
+        Relationships: []
+      }
+      community_posts: {
+        Row: {
+          comments: number
+          content: string
+          created_at: string
+          id: string
+          likes: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comments?: number
+          content: string
+          created_at?: string
+          id?: string
+          likes?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comments?: number
+          content?: string
+          created_at?: string
+          id?: string
+          likes?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      community_reputation: {
+        Row: {
+          created_at: string
+          id: string
+          level: number
+          points: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level?: number
+          points?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level?: number
+          points?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       contract_signatures: {
         Row: {
           address: string | null
@@ -232,6 +346,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_badges: {
+        Row: {
+          badge_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "community_badges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
