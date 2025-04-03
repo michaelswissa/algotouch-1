@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Rocket, Diamond, Crown } from 'lucide-react';
 import PlanFeaturesList from './PlanFeaturesList';
 import PlanPricing from './PlanPricing';
@@ -29,17 +30,25 @@ const PlanCard: React.FC<PlanProps> = ({
   currency,
   billingPeriod,
   description,
-  icon,
   features,
   hasTrial,
   recommended,
   onSelect,
   isSelected
 }) => {
+  // Get the appropriate icon based on plan ID
   const getPlanIcon = () => {
     if (id === 'monthly') return <Rocket className="h-6 w-6 text-primary" />;
     if (id === 'annual') return <Diamond className="h-6 w-6 text-blue-500" />;
     return <Crown className="h-6 w-6 text-amber-500" />;
+  };
+
+  // Get the badge for each plan
+  const getPlanBadge = () => {
+    if (id === 'monthly') return <Badge variant="default">חודש חינם</Badge>;
+    if (id === 'annual') return <Badge className="bg-blue-500">מומלץ</Badge>;
+    if (id === 'vip') return <Badge className="bg-amber-500">VIP</Badge>;
+    return null;
   };
 
   return (
@@ -58,6 +67,9 @@ const PlanCard: React.FC<PlanProps> = ({
           <div className="flex items-center gap-2">
             {getPlanIcon()}
             <CardTitle className="text-2xl">{name}</CardTitle>
+          </div>
+          <div>
+            {getPlanBadge()}
           </div>
         </div>
         <CardDescription className="text-base">{description}</CardDescription>

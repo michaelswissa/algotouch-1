@@ -19,7 +19,9 @@ const PlanFeature: React.FC<PlanFeatureProps> = ({
   return (
     <li className="flex gap-3">
       <div className="flex-shrink-0 w-6 h-6 mt-0.5 text-lg flex items-center justify-center">
-        {icon}
+        <span role="img" aria-label={name}>
+          {icon}
+        </span>
       </div>
       <div>
         <div className="font-medium">
