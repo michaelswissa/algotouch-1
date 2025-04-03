@@ -21,10 +21,11 @@ export function useEmailTest() {
   // Get the Supabase function URL (safely)
   const getSupabaseFunctionsUrl = () => {
     try {
-      // Create a mock URL that we can extract the base URL from
-      const projectRef = supabase.projectRef || '';
-      return `https://${projectRef}.supabase.co/functions/v1`;
+      // Create a safe URL string from available info
+      const projectId = (supabase as any).supabaseUrl?.split('https://')[1]?.split('.')[0] || '';
+      return projectId ? `https://${projectId}.supabase.co/functions/v1` : '';
     } catch (e) {
+      console.error("Error getting Supabase URL:", e);
       return '';
     }
   };

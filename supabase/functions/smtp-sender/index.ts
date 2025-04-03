@@ -68,6 +68,12 @@ serve(async (req) => {
     let emailRequest: EmailRequest;
     try {
       emailRequest = await req.json();
+      console.log("Request body parsed:", {
+        to: emailRequest.to,
+        subject: emailRequest.subject,
+        htmlLength: emailRequest.html?.length,
+        attachmentsCount: emailRequest.attachmentData?.length || 0
+      });
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
       throw new Error("Invalid JSON in request body");
@@ -117,7 +123,29 @@ serve(async (req) => {
       
       for (const attachment of emailRequest.attachmentData) {
         try {
-          const content = Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0));
+          console.log(`Processing attachment: ${attachment.filename}, mimeType: ${attachment.mimeType}`);
+          console.log(`Content length before decoding: ${attachment.content.length} characters`);
+          
+          // Handle base64 content safely
+          let content;
+          try {
+            content = Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0));
+            console.log(`Successfully decoded base64 content, size: ${content.length} bytes`);
+          } catch (decodeErr) {
+            console.error(`Error decoding base64 content for ${attachment.filename}:`, decodeErr);
+            
+            // Try alternate approach if standard atob fails
+            try {
+              // Handle potential URLSafe base64 or other variants
+              const base64 = attachment.content.replace(/-/g, '+').replace(/_/g, '/');
+              content = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+              console.log(`Successfully decoded using modified base64, size: ${content.length} bytes`);
+            } catch (secondTryErr) {
+              console.error("Second attempt to decode also failed:", secondTryErr);
+              throw new Error(`Failed to decode attachment content: ${decodeErr.message}`);
+            }
+          }
+          
           attachments.push({
             filename: attachment.filename,
             contentType: attachment.mimeType,
