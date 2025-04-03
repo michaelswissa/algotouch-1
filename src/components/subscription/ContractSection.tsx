@@ -19,7 +19,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   return (
     <div>
       <DigitalContractForm 
-        onSign={onSign} 
+        onSign={(contractData) => onSign(contractData)} 
         planId={selectedPlan} 
         fullName={fullName} 
       />
