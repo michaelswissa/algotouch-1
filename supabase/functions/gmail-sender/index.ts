@@ -13,6 +13,11 @@ interface EmailRequest {
   subject: string;
   html: string;
   text?: string;
+  attachmentData?: {
+    filename: string;
+    content: string; // Base64 encoded content
+    mimeType: string;
+  }[];
 }
 
 async function getAccessToken() {
@@ -39,14 +44,46 @@ async function getAccessToken() {
 
 async function sendEmail(accessToken: string, emailRequest: EmailRequest) {
   const sender = Deno.env.get("GMAIL_SENDER_EMAIL") || "support@algotouch.co.il";
-  const encodedMessage = btoa(
-    `From: ${sender}
-To: ${emailRequest.to}
-Subject: ${emailRequest.subject}
-Content-Type: text/html; charset=UTF-8
-
-${emailRequest.html}`
-  ).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  
+  // Prepare the email content
+  let emailContent = `From: ${sender}\r\n`;
+  emailContent += `To: ${emailRequest.to}\r\n`;
+  emailContent += `Subject: ${emailRequest.subject}\r\n`;
+  
+  // Create random boundary for multipart message
+  const boundary = `boundary-${Math.random().toString().substr(2)}`;
+  
+  if (emailRequest.attachmentData && emailRequest.attachmentData.length > 0) {
+    // Multipart email with attachment
+    emailContent += `MIME-Version: 1.0\r\n`;
+    emailContent += `Content-Type: multipart/mixed; boundary=${boundary}\r\n\r\n`;
+    
+    // HTML part
+    emailContent += `--${boundary}\r\n`;
+    emailContent += `Content-Type: text/html; charset=UTF-8\r\n\r\n`;
+    emailContent += `${emailRequest.html}\r\n\r\n`;
+    
+    // Add attachments
+    for (const attachment of emailRequest.attachmentData) {
+      emailContent += `--${boundary}\r\n`;
+      emailContent += `Content-Type: ${attachment.mimeType}\r\n`;
+      emailContent += `Content-Disposition: attachment; filename=${attachment.filename}\r\n`;
+      emailContent += `Content-Transfer-Encoding: base64\r\n\r\n`;
+      emailContent += `${attachment.content}\r\n\r\n`;
+    }
+    
+    emailContent += `--${boundary}--`;
+  } else {
+    // Simple HTML email
+    emailContent += `Content-Type: text/html; charset=UTF-8\r\n\r\n`;
+    emailContent += emailRequest.html;
+  }
+  
+  // Encode email content for the Gmail API
+  const encodedMessage = btoa(emailContent)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
   const response = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -111,7 +148,8 @@ serve(async (req) => {
     
     console.log("Processing email request:", {
       to: emailRequest.to,
-      subject: emailRequest.subject
+      subject: emailRequest.subject,
+      hasAttachments: !!emailRequest.attachmentData?.length
     });
     
     // Get Gmail access token

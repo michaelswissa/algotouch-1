@@ -11,7 +11,23 @@ interface SigningRequest {
   userId: string;
   planId: string;
   fullName: string;
+  address?: string;
+  idNumber?: string;
+  phone?: string;
+  email: string;
   signature: string;
+  contractVersion: string;
+  contractHtml: string;
+  agreedToTerms: boolean;
+  agreedToPrivacy: boolean;
+  browserInfo: {
+    userAgent: string;
+    ipAddress?: string;
+    language?: string;
+    platform?: string;
+    screenSize?: string;
+    timeZone?: string;
+  };
 }
 
 serve(async (req) => {
@@ -27,10 +43,6 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!IZIDOC_API_KEY) {
-      throw new Error("Missing Izidoc API credentials");
-    }
-
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Missing Supabase credentials");
     }
@@ -38,19 +50,48 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     // Parse the request body
-    const { userId, planId, fullName, signature } = await req.json() as SigningRequest;
+    const request: SigningRequest = await req.json();
     
-    if (!userId || !planId || !fullName || !signature) {
+    // Extract IP address from request headers if available
+    const forwarded = req.headers.get("x-forwarded-for");
+    const ipAddress = forwarded ? forwarded.split(/\s*,\s*/)[0] : req.headers.get("cf-connecting-ip") || "";
+    
+    if (!request.userId || !request.planId || !request.fullName || !request.signature || !request.email) {
       throw new Error("Missing required fields");
     }
     
-    console.log("Processing digital signature for user:", userId);
+    console.log("Processing digital signature for user:", request.userId);
     
-    // In a real implementation, we would call the Izidoc API here
-    // This is a simplified mock implementation
+    // Store the signature information in the database
+    const { data: signatureData, error: signatureError } = await supabase
+      .from("contract_signatures")
+      .insert({
+        user_id: request.userId,
+        plan_id: request.planId,
+        full_name: request.fullName,
+        address: request.address || null,
+        id_number: request.idNumber || null,
+        phone: request.phone || null,
+        email: request.email,
+        signature: request.signature,
+        ip_address: ipAddress || request.browserInfo.ipAddress || null,
+        user_agent: request.browserInfo.userAgent || null,
+        browser_info: request.browserInfo || null,
+        contract_version: request.contractVersion || "1.0",
+        contract_html: request.contractHtml,
+        agreed_to_terms: request.agreedToTerms,
+        agreed_to_privacy: request.agreedToPrivacy
+      })
+      .select("id")
+      .single();
+      
+    if (signatureError) {
+      console.error("Error storing signature:", signatureError);
+      throw signatureError;
+    }
     
-    // Generate a mock document ID and signature ID
-    const documentId = crypto.randomUUID();
+    // Generate document ID and signature ID
+    const documentId = signatureData.id;
     const signatureId = crypto.randomUUID();
     const signatureTimestamp = new Date().toISOString();
     
@@ -60,14 +101,52 @@ serve(async (req) => {
       .update({
         contract_signed: true,
         contract_signed_at: signatureTimestamp,
-        plan_type: planId,
+        plan_type: request.planId,
         updated_at: new Date().toISOString()
       })
-      .eq("user_id", userId);
+      .eq("user_id", request.userId);
       
     if (updateError) {
       console.error("Error updating subscription:", updateError);
       throw updateError;
+    }
+    
+    // Optional: Generate and store PDF (in a production environment)
+    // In a real implementation, you would generate a PDF here and store it in the storage bucket
+    
+    // Call Gmail sender edge function to send confirmation email (asynchronous)
+    try {
+      const { data: user } = await supabase.auth.admin.getUserById(request.userId);
+      if (user && user.user) {
+        const emailBody = `
+          <h1>הסכם חדש נחתם</h1>
+          <p>שלום,</p>
+          <p>המשתמש ${request.fullName} (${request.email}) חתם על הסכם לתכנית ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}.</p>
+          <p>פרטי החתימה:</p>
+          <ul>
+            <li>זמן חתימה: ${signatureTimestamp}</li>
+            <li>כתובת IP: ${ipAddress || "לא זוהה"}</li>
+            <li>דפדפן: ${request.browserInfo.userAgent || "לא זוהה"}</li>
+          </ul>
+          <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
+        `;
+
+        await fetch(`${SUPABASE_URL}/functions/v1/gmail-sender`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+          },
+          body: JSON.stringify({
+            to: "admin@algotouch.co.il", // Replace with your admin email
+            subject: `הסכם חדש נחתם - ${request.fullName}`,
+            html: emailBody
+          })
+        });
+      }
+    } catch (emailError) {
+      console.error("Error sending notification email:", emailError);
+      // Don't throw error as this is not critical for the signing process
     }
     
     // Return the signing result

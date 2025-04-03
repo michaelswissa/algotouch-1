@@ -36,6 +36,75 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_signatures: {
+        Row: {
+          address: string | null
+          agreed_to_privacy: boolean
+          agreed_to_terms: boolean
+          browser_info: Json | null
+          contract_html: string | null
+          contract_signed_at: string
+          contract_version: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          id_number: string | null
+          ip_address: string | null
+          pdf_url: string | null
+          phone: string | null
+          plan_id: string
+          signature: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          agreed_to_privacy?: boolean
+          agreed_to_terms?: boolean
+          browser_info?: Json | null
+          contract_html?: string | null
+          contract_signed_at?: string
+          contract_version: string
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          id_number?: string | null
+          ip_address?: string | null
+          pdf_url?: string | null
+          phone?: string | null
+          plan_id: string
+          signature: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          agreed_to_privacy?: boolean
+          agreed_to_terms?: boolean
+          browser_info?: Json | null
+          contract_html?: string | null
+          contract_signed_at?: string
+          contract_version?: string
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          id_number?: string | null
+          ip_address?: string | null
+          pdf_url?: string | null
+          phone?: string | null
+          plan_id?: string
+          signature?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_history: {
         Row: {
           amount: number
