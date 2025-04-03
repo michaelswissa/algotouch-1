@@ -21,8 +21,9 @@ export function useEmailTest() {
   // Get the Supabase function URL (safely)
   const getSupabaseFunctionsUrl = () => {
     try {
-      // Get the URL in a way that doesn't access protected properties
-      return supabase.functions.invoke('test-smtp', { body: null }).url.split('/functions/')[0] || '';
+      // Create a mock URL that we can extract the base URL from
+      const projectRef = supabase.projectRef || '';
+      return `https://${projectRef}.supabase.co/functions/v1`;
     } catch (e) {
       return '';
     }
