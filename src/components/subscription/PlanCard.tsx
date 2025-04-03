@@ -53,22 +53,28 @@ const PlanCard: React.FC<PlanProps> = ({
 
   return (
     <Card 
-      className={`overflow-hidden transition-all ${
-        isSelected ? 'border-primary ring-2 ring-primary/30' : ''
-      } ${id === 'annual' ? 'md:scale-105 z-10 relative border-blue-500 dark:border-blue-400' : ''}`}
+      className={`overflow-hidden transition-all duration-300 hover:shadow-lg card-rise ${
+        isSelected 
+          ? 'border-primary ring-2 ring-primary/30 animate-pulse-subtle' 
+          : 'hover:-translate-y-2'
+      } ${id === 'annual' 
+          ? 'md:scale-105 z-10 relative border-blue-500 dark:border-blue-400' 
+          : ''}`}
     >
       {id === 'annual' && (
-        <div className="absolute inset-x-0 top-0 bg-blue-500 text-white py-1 text-center text-sm font-medium">
+        <div className="absolute inset-x-0 top-0 bg-blue-500 text-white py-1 text-center text-sm font-medium rtl-fade-in">
           המסלול המומלץ
         </div>
       )}
       <CardHeader className={`pb-4 ${id === 'annual' ? 'pt-8' : ''}`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            {getPlanIcon()}
+            <div className={`${isSelected ? 'animate-pulse' : 'animate-float'}`}>
+              {getPlanIcon()}
+            </div>
             <CardTitle className="text-2xl">{name}</CardTitle>
           </div>
-          <div>
+          <div className="transition-all duration-300 hover:scale-110">
             {getPlanBadge()}
           </div>
         </div>
@@ -92,7 +98,13 @@ const PlanCard: React.FC<PlanProps> = ({
       </CardContent>
       <CardFooter className="pb-6 pt-0">
         <Button 
-          className="w-full text-base py-6" 
+          className={`w-full text-base py-6 transition-all duration-300 ${
+            isSelected 
+              ? 'scale-[1.02] button-glow' 
+              : id === 'annual' 
+                ? 'hover:scale-105 hover:shadow-md' 
+                : 'hover:bg-accent hover:text-accent-foreground'
+          }`}
           size="lg"
           variant={isSelected ? "default" : id === 'annual' ? "default" : "outline"}
           onClick={() => onSelect(id)}
