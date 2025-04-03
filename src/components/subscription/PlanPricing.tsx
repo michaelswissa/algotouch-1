@@ -15,22 +15,22 @@ const PlanPricing: React.FC<PlanPricingProps> = ({
   planId 
 }) => {
   return (
-    <div className="mt-3 flex flex-col">
-      <div className="flex items-end gap-1 mb-1">
-        <span className="text-4xl font-bold tracking-tight">{currency}{price}</span>
-        <span className="text-muted-foreground ml-1"> {billingPeriod}</span>
+    <div className="mt-2 flex flex-col">
+      <div className="flex items-end gap-1">
+        <span className="text-3xl font-bold tracking-tight">{currency}{price}</span>
+        <span className="text-muted-foreground text-sm ml-1"> {billingPeriod}</span>
       </div>
       {planId === 'monthly' && (
-        <div className="text-purple-500 dark:text-purple-400 font-medium">
+        <div className="text-purple-500 dark:text-purple-400 font-medium text-sm">
           חודש ניסיון מתנה
         </div>
       )}
       {planId === 'annual' && (
         <div className="flex items-center gap-2">
-          <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium px-2 py-0.5 rounded-md text-sm">
+          <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium px-2 py-0.5 rounded-md text-xs">
             25% הנחה
           </div>
-          <div className="text-blue-500 dark:text-blue-400 font-medium">
+          <div className="text-blue-500 dark:text-blue-400 font-medium text-xs">
             שלושה חודשים מתנה
           </div>
         </div>

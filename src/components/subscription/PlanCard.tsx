@@ -77,22 +77,22 @@ const PlanCard: React.FC<PlanProps> = ({
                   ? 'border-blue-500 ring-blue-500/30' 
                   : 'border-amber-500 ring-amber-500/30'
             }` 
-          : 'hover:-translate-y-2 border'
+          : 'hover:-translate-y-1 border'
       }`}
     >
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between mb-2">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <div className={`rounded-full p-2 ${getIconBackground()} ${isSelected ? 'animate-pulse' : 'animate-float'}`}>
+            <div className={`rounded-full p-1.5 ${getIconBackground()} ${isSelected ? 'animate-pulse' : 'animate-float'}`}>
               {getPlanIcon()}
             </div>
-            <CardTitle className="text-2xl">{name}</CardTitle>
+            <CardTitle className="text-xl">{name}</CardTitle>
           </div>
           <div className="transition-all duration-300 hover:scale-110">
             {getPlanBadge()}
           </div>
         </div>
-        <CardDescription className="text-base">{description}</CardDescription>
+        <CardDescription className="text-sm">{description}</CardDescription>
         <PlanPricing 
           price={price} 
           currency={currency} 
@@ -100,12 +100,12 @@ const PlanCard: React.FC<PlanProps> = ({
           planId={id}
         />
       </CardHeader>
-      <CardContent className="pb-6 flex-grow">
+      <CardContent className="py-2 flex-grow">
         <PlanFeaturesList features={features} planId={id} />
       </CardContent>
-      <CardFooter className="pb-6 pt-0 mt-auto">
+      <CardFooter className="pt-2 pb-4 mt-auto">
         <Button 
-          className={`w-full text-base py-6 transition-all duration-300 ${
+          className={`w-full text-base py-5 transition-all duration-300 ${
             isSelected 
               ? 'scale-[1.02] ' + (
                 id === 'monthly' 
@@ -116,7 +116,7 @@ const PlanCard: React.FC<PlanProps> = ({
               )
               : 'hover:scale-105 hover:shadow-md'
           }`}
-          size="lg"
+          size="default"
           variant={isSelected ? "default" : "outline"}
           onClick={() => onSelect(id)}
           style={{

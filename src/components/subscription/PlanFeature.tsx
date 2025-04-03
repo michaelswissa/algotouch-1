@@ -32,18 +32,18 @@ const PlanFeature: React.FC<PlanFeatureProps> = ({
   };
   
   return (
-    <li className="flex gap-3 group">
-      <div className={`flex-shrink-0 w-8 h-8 mt-0.5 rounded-full ${getIconBackground()} ${getIconColor()} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-        <span role="img" aria-label={name} className="text-base">
+    <li className="flex gap-2 group">
+      <div className={`flex-shrink-0 w-6 h-6 mt-0.5 rounded-full ${getIconBackground()} ${getIconColor()} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+        <span role="img" aria-label={name} className="text-sm">
           {icon}
         </span>
       </div>
       <div>
-        <div className="font-medium">
+        <div className="font-medium text-sm">
           {name}
         </div>
         {description && (
-          <p className="text-muted-foreground text-sm mt-0.5">{description}</p>
+          <p className="text-muted-foreground text-xs mt-0.5">{description}</p>
         )}
       </div>
     </li>
