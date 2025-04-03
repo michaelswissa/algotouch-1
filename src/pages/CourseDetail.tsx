@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ChevronRight, Play, CheckCircle2, Clock, FileText, Video, Volume2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { useCommunity } from '@/contexts/community/CommunityContext';
+import { CommunityProvider, useCommunity } from '@/contexts/community/CommunityContext';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 
@@ -152,7 +152,7 @@ const mockCourseData: Record<string, Course> = {
   }
 };
 
-const CourseDetail = () => {
+const CourseDetailContent = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [activeTab, setActiveTab] = useState('content');
   const [activeVideoId, setActiveVideoId] = useState<number | null>(1);
@@ -509,6 +509,14 @@ const CourseDetail = () => {
         )}
       </Tabs>
     </Layout>
+  );
+};
+
+const CourseDetail = () => {
+  return (
+    <CommunityProvider>
+      <CourseDetailContent />
+    </CommunityProvider>
   );
 };
 
