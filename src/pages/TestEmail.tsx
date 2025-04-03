@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Info } from "lucide-react";
 
 const TestEmail = () => {
   const [loading, setLoading] = useState(false);
@@ -16,6 +16,7 @@ const TestEmail = () => {
   const [recipient, setRecipient] = useState('support@algotouch.co.il');
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   // Check if we're running in development or production
   const isDevelopment = window.location.hostname === 'localhost' || 
@@ -46,35 +47,54 @@ const TestEmail = () => {
       setResult(null);
       setConnectionStatus('unknown');
       setErrorDetails(null);
+      setNetworkError(null);
       
       console.log('Testing Gmail API connection...');
       
+      // Display the project info for debugging
+      const projectInfo = {
+        projectUrl: supabase.functions.url?.toString(),
+        projectId: supabase.functions.url?.split('/')[2]?.split('.')[0] || 'unknown'
+      };
+      console.log('Supabase Project Info:', projectInfo);
+      
       // Add a timeout to detect if the function call hangs
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timed out after 15 seconds')), 15000);
+        setTimeout(() => reject(new Error('Request timed out after 20 seconds')), 20000);
       });
       
       // Call the test-gmail function with a timeout
-      const functionPromise = supabase.functions.invoke('test-gmail');
-      const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
-      
-      if (error) {
-        console.error('Error testing Gmail API:', error);
-        toast.error('שגיאה בבדיקת API של Gmail');
-        setConnectionStatus('error');
-        setErrorDetails(JSON.stringify({
-          message: error.message,
-          name: error.name,
-          stack: error.stack,
-          details: error
+      try {
+        const functionPromise = supabase.functions.invoke('test-gmail');
+        const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
+        
+        if (error) {
+          console.error('Error testing Gmail API:', error);
+          toast.error('שגיאה בבדיקת API של Gmail');
+          setConnectionStatus('error');
+          setErrorDetails(JSON.stringify(error, null, 2));
+          setResult({ error: error.message });
+          return;
+        }
+        
+        setConnectionStatus('success');
+        setResult(data);
+        toast.success('בדיקת API של Gmail הצליחה!');
+      } catch (fetchError: any) {
+        console.error('Fetch error testing Gmail API:', fetchError);
+        
+        // Set network error specifically
+        setNetworkError(JSON.stringify({
+          message: fetchError.message || 'Network error occurred',
+          name: fetchError.name || 'NetworkError',
+          stack: fetchError.stack,
+          details: fetchError
         }, null, 2));
-        setResult({ error: error.message });
-        return;
+        
+        toast.error('שגיאת רשת בבדיקת API של Gmail');
+        setConnectionStatus('error');
+        setResult({ error: fetchError.message });
       }
-      
-      setConnectionStatus('success');
-      setResult(data);
-      toast.success('בדיקת API של Gmail הצליחה!');
     } catch (error: any) {
       console.error('Exception testing Gmail API:', error);
       toast.error('שגיאה בבדיקת API של Gmail');
@@ -96,46 +116,57 @@ const TestEmail = () => {
       setLoading(true);
       setResult(null);
       setErrorDetails(null);
+      setNetworkError(null);
       
       console.log('Sending test email to:', recipient);
       
       // Add a timeout to detect if the function call hangs
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timed out after 15 seconds')), 15000);
+        setTimeout(() => reject(new Error('Request timed out after 20 seconds')), 20000);
       });
       
       // Call the gmail-sender function with a timeout
-      const functionPromise = supabase.functions.invoke('gmail-sender', {
-        body: {
-          to: recipient,
-          subject: 'בדיקת מייל מ-AlgoTouch',
-          html: `
-            <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
-              <h1>זהו מייל בדיקה</h1>
-              <p>הפונקציונליות של שליחת מיילים עובדת כראוי.</p>
-              <p>נשלח ב: ${new Date().toLocaleString('he-IL')}</p>
-            </div>
-          `,
-        },
-      });
-      
-      const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
-      
-      if (error) {
-        console.error('Error sending test email:', error);
-        toast.error('שגיאה בשליחת מייל בדיקה');
-        setErrorDetails(JSON.stringify({
-          message: error.message,
-          name: error.name,
-          stack: error.stack,
-          details: error
+      try {
+        const functionPromise = supabase.functions.invoke('gmail-sender', {
+          body: {
+            to: recipient,
+            subject: 'בדיקת מייל מ-AlgoTouch',
+            html: `
+              <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
+                <h1>זהו מייל בדיקה</h1>
+                <p>הפונקציונליות של שליחת מיילים עובדת כראוי.</p>
+                <p>נשלח ב: ${new Date().toLocaleString('he-IL')}</p>
+              </div>
+            `,
+          },
+        });
+        
+        const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
+        
+        if (error) {
+          console.error('Error sending test email:', error);
+          toast.error('שגיאה בשליחת מייל בדיקה');
+          setErrorDetails(JSON.stringify(error, null, 2));
+          setResult({ error: error.message });
+          return;
+        }
+        
+        setResult(data);
+        toast.success('מייל בדיקה נשלח בהצלחה!');
+      } catch (fetchError: any) {
+        console.error('Fetch error sending test email:', fetchError);
+        
+        // Set network error specifically
+        setNetworkError(JSON.stringify({
+          message: fetchError.message || 'Network error occurred',
+          name: fetchError.name || 'NetworkError',
+          stack: fetchError.stack,
+          details: fetchError
         }, null, 2));
-        setResult({ error: error.message });
-        return;
+        
+        toast.error('שגיאת רשת בשליחת מייל בדיקה');
+        setResult({ error: fetchError.message });
       }
-      
-      setResult(data);
-      toast.success('מייל בדיקה נשלח בהצלחה!');
     } catch (error: any) {
       console.error('Exception sending test email:', error);
       toast.error('שגיאה בשליחת מייל בדיקה');
@@ -167,7 +198,30 @@ const TestEmail = () => {
           </Alert>
         )}
         
-        {connectionStatus === 'error' && (
+        <Alert className="mb-6 bg-blue-500/10 border-blue-500/50 text-blue-700 dark:text-blue-400">
+          <Info className="h-4 w-4" />
+          <AlertTitle>מידע</AlertTitle>
+          <AlertDescription>
+            מידע על הפרויקט: {supabase.functions.url?.toString() || 'לא זמין'}
+          </AlertDescription>
+        </Alert>
+        
+        {networkError && (
+          <Alert className="mb-6 bg-orange-500/10 border-orange-500/50 text-orange-700 dark:text-orange-400">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>שגיאת תקשורת</AlertTitle>
+            <AlertDescription>
+              נראה שיש בעיית תקשורת עם Edge Function. ייתכן שהפונקציה טרם הופעלה או שיש בעיה בהגדרות CORS.
+              <br />
+              פרטים נוספים:
+              <pre className="bg-orange-950/10 p-2 mt-2 rounded-md overflow-auto text-xs leading-relaxed text-orange-600 dark:text-orange-400" dir="ltr">
+                {networkError}
+              </pre>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {connectionStatus === 'error' && !networkError && (
           <Alert className="mb-6 bg-red-500/10 border-red-500/50 text-red-700 dark:text-red-400">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>שגיאת התחברות</AlertTitle>
@@ -233,6 +287,25 @@ const TestEmail = () => {
               </Button>
             </CardFooter>
           </Card>
+          
+          {networkError && (
+            <Card className="border-orange-500/50 bg-orange-500/5">
+              <CardHeader>
+                <CardTitle className="text-orange-600 dark:text-orange-400">פרטי שגיאת תקשורת</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p>בדיקות שאתה יכול לבצע:</p>
+                  <ol className="list-decimal list-inside space-y-2">
+                    <li>ודא שה-Edge Function הופעלה בסופאבייס.</li>
+                    <li>בדוק שהסודות (Secrets) הוגדרו כראוי בסופאבייס.</li>
+                    <li>ודא שהגדרות ה-CORS מאפשרות גישה לאפליקציה שלך.</li>
+                    <li>נסה לגשת לפונקציה באופן ישיר דרך ה-URL שלה (עם המפתח המתאים).</li>
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           {errorDetails && (
             <Card className="border-red-500/50 bg-red-500/5">

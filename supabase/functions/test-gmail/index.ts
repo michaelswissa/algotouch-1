@@ -5,6 +5,7 @@ import { google } from "https://esm.sh/googleapis@126.0.1";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 async function getAccessToken() {
@@ -65,6 +66,9 @@ async function sendTestEmail(accessToken: string) {
   console.log(`Sending test email from ${sender} to ${testReceiver}`);
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
     const response = await fetch(
       "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
       {
@@ -74,8 +78,11 @@ async function sendTestEmail(accessToken: string) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ raw: encodedMessage }),
+        signal: controller.signal
       }
     );
+    
+    clearTimeout(timeoutId);
 
     const responseText = await response.text();
     
@@ -90,6 +97,10 @@ async function sendTestEmail(accessToken: string) {
       return { raw: responseText };
     }
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error("Request timed out after 15 seconds");
+      throw new Error("Gmail API request timed out after 15 seconds");
+    }
     console.error("Error sending test email:", error);
     throw error;
   }
@@ -100,11 +111,24 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: corsHeaders,
+      status: 204,
     });
   }
 
   try {
-    console.log("Testing Gmail API integration...");
+    console.log("--- TEST-GMAIL FUNCTION CALLED ---");
+    console.log(`Request method: ${req.method}`);
+    console.log(`Request URL: ${req.url}`);
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
+    
+    const envVars = {
+      GMAIL_CLIENT_ID: !!Deno.env.get("GMAIL_CLIENT_ID"),
+      GMAIL_CLIENT_SECRET: !!Deno.env.get("GMAIL_CLIENT_SECRET"),
+      GMAIL_REFRESH_TOKEN: !!Deno.env.get("GMAIL_REFRESH_TOKEN"),
+      GMAIL_SENDER_EMAIL: !!Deno.env.get("GMAIL_SENDER_EMAIL"),
+    };
+    
+    console.log("Environment variables present:", envVars);
     
     // Get Gmail access token
     const { token, tokenInfo } = await getAccessToken();
@@ -130,7 +154,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       error: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      fullError: JSON.stringify(error)
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
