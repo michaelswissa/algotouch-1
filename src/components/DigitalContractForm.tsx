@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -267,4 +268,136 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
             <p><strong>4.6 אספקת התוכנה</strong> – אלא אם סוכם אחרת, אספקת התוכנה תתבצע באמצעות הורדה דיגיטלית מאתר החברה או באמצעות קישור שיועבר למשתמש לאחר השלמת תהליך הרכישה והתשלום. ייתכן כי השימוש בתוכנה מצריך מפתח רישיון, קוד הפעלה או הרשמה מקוונת; במקרה כזה, תספק החברה למשתמש את פרטי הגישה או מפתחות הרישיון הדרושים, והמשתמש אחראי לשמור עליהם בסודיות (כמפורט בסעיף 3 לעיל בדבר איסור עקיפת אמצעי הגנה). החברה לא תישא באחריות לאובדן, דליפה או שימוש לרעה במפתחות הרישיון שנמסרו למשתמש.</p>
             
             <h4 className="font-bold mt-4 text-primary">5. עדכונים, שדרוגים ותמיכה</h4>
-            <p><strong>5.1 עדכוני תוכנה</strong> – החברה רשאית, לפי שיקול דעתה, לפתח ולהפיץ מעת לעת גרסאות מתוקנות או משופרות של התוכנה, לרבות תיקוני באגים, שיפורי אבטחה, עדכונים שוטפים או שדרוגים בעלי פונקציונליות חדשה (להלן
+            <p><strong>5.1 עדכוני תוכנה</strong> – החברה רשאית, לפי שיקול דעתה, לפתח ולהפיץ מעת לעת גרסאות מתוקנות או משופרות של התוכנה, לרבות תיקוני באגים, שיפורי אבטחה, עדכונים שוטפים או שדרוגים בעלי פונקציונליות חדשה.</p>
+          </div>
+          {scrolledToBottom ? (
+            <div className="absolute bottom-2 right-2 bg-green-100 text-green-800 rounded-full p-1">
+              <Check className="h-4 w-4" />
+            </div>
+          ) : (
+            <div className="absolute bottom-2 right-2 animate-bounce">
+              <ArrowDown className="h-5 w-5 text-primary" />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">פרטי החותם</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">שם מלא</Label>
+              <Input
+                id="fullName"
+                name="fullName"
+                value={userDetails.fullName}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">כתובת</Label>
+              <Input
+                id="address"
+                name="address"
+                value={userDetails.address}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="idNumber">מספר ת.ז / ח.פ</Label>
+              <Input
+                id="idNumber"
+                name="idNumber"
+                value={userDetails.idNumber}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">טלפון</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={userDetails.phone}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="email">דואר אלקטרוני</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={userDetails.email}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">חתימה דיגיטלית</h3>
+            <SignaturePad onChange={setSignature} />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-start space-x-2 space-x-reverse">
+              <Checkbox
+                id="terms"
+                checked={agreedToTerms}
+                onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="terms"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  אני מאשר/ת שקראתי את התנאים וההגבלות של ההסכם
+                </label>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-2 space-x-reverse">
+              <Checkbox
+                id="privacy"
+                checked={agreedToPrivacy}
+                onCheckedChange={(checked) => setAgreedToPrivacy(checked as boolean)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="privacy"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  אני מאשר/ת את מדיניות הפרטיות
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex flex-col sm:flex-row gap-3 justify-between">
+        <Button 
+          variant="outline" 
+          type="button"
+          className="flex items-center gap-2"
+          onClick={downloadContract}
+        >
+          <Download className="h-4 w-4" />
+          הורדת עותק מההסכם
+        </Button>
+        
+        <Button 
+          onClick={handleSign}
+          disabled={isSigningInProgress || !scrolledToBottom || !signature || !agreedToTerms || !agreedToPrivacy}
+          className="flex items-center gap-2"
+        >
+          {isSigningInProgress ? "מעבד..." : "חתום על ההסכם"}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
+
+export default DigitalContractForm;
