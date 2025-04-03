@@ -91,12 +91,21 @@ serve(async (req) => {
       console.log(`Processing ${emailRequest.attachmentData.length} attachments`);
       
       for (const attachment of emailRequest.attachmentData) {
-        attachments.push({
-          filename: attachment.filename,
-          contentType: attachment.mimeType,
-          content: Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0)),
-        });
+        try {
+          const content = Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0));
+          attachments.push({
+            filename: attachment.filename,
+            contentType: attachment.mimeType,
+            content: content,
+          });
+          console.log(`Processed attachment: ${attachment.filename}, size: ${content.length} bytes`);
+        } catch (err) {
+          console.error(`Error processing attachment ${attachment.filename}:`, err);
+          throw new Error(`Failed to process attachment ${attachment.filename}: ${err.message}`);
+        }
       }
+      
+      console.log(`Successfully processed ${attachments.length} attachments`);
     }
     
     // Prepare email options
@@ -105,27 +114,48 @@ serve(async (req) => {
       to: emailRequest.to,
       subject: emailRequest.subject,
       html: emailRequest.html,
-      text: emailRequest.text,
-      attachments,
     };
+    
+    // Add text content if specified
+    if (emailRequest.text) {
+      emailOptions.text = emailRequest.text;
+    }
+    
+    // Add attachments if any
+    if (attachments.length > 0) {
+      emailOptions.attachments = attachments;
+    }
     
     // Add reply-to if specified
     if (emailRequest.replyTo) {
       emailOptions.replyTo = emailRequest.replyTo;
     }
     
+    // Log email sending attempt
+    console.log(`Sending email with options:`, JSON.stringify({
+      from: emailOptions.from,
+      to: emailOptions.to,
+      subject: emailOptions.subject,
+      hasHtml: !!emailOptions.html,
+      hasText: !!emailOptions.text,
+      attachmentsCount: attachments.length,
+      hasReplyTo: !!emailOptions.replyTo
+    }));
+    
     // Send the email
-    await client.send(emailOptions);
+    const sendResult = await client.send(emailOptions);
+    console.log("Email sent with result:", sendResult);
     
     // Close the connection
     await client.close();
     
-    console.log("Email sent successfully");
+    console.log("Email sent successfully and connection closed");
     
     // Return success response
     return new Response(JSON.stringify({
       success: true,
-      message: "Email sent successfully"
+      message: "Email sent successfully",
+      result: sendResult
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

@@ -136,63 +136,32 @@ serve(async (req) => {
 
         console.log("Sending contract notification email to support@algotouch.co.il");
         
-        // Try using the SMTP sender first, fall back to Gmail if needed
-        try {
-          const smtpResponse = await fetch(`${SUPABASE_URL}/functions/v1/smtp-sender`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-            },
-            body: JSON.stringify({
-              to: "support@algotouch.co.il",
-              subject: `הסכם חדש נחתם - ${request.fullName}`,
-              html: emailBody,
-              attachmentData: [{
-                filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
-                content: contractBase64,
-                mimeType: "text/html"
-              }]
-            })
-          });
-          
-          if (!smtpResponse.ok) {
-            console.error("Failed to send email via SMTP, falling back to Gmail:", await smtpResponse.text());
-            throw new Error("SMTP send failed");
-          }
-          
+        // Try using the SMTP sender 
+        const smtpResponse = await fetch(`${SUPABASE_URL}/functions/v1/smtp-sender`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+          },
+          body: JSON.stringify({
+            to: "support@algotouch.co.il",
+            subject: `הסכם חדש נחתם - ${request.fullName}`,
+            html: emailBody,
+            attachmentData: [{
+              filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
+              content: contractBase64,
+              mimeType: "text/html"
+            }]
+          })
+        });
+        
+        if (!smtpResponse.ok) {
+          const errorText = await smtpResponse.text();
+          console.error("Failed to send email via SMTP:", errorText);
+          throw new Error(`SMTP send failed: ${errorText}`);
+        } else {
           const smtpResult = await smtpResponse.json();
           console.log("Email notification sent successfully via SMTP:", smtpResult);
-        } catch (smtpError) {
-          // Fall back to Gmail sender
-          console.log("Falling back to Gmail sender");
-          
-          const emailResponse = await fetch(`${SUPABASE_URL}/functions/v1/gmail-sender`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-            },
-            body: JSON.stringify({
-              to: "support@algotouch.co.il",
-              subject: `הסכם חדש נחתם - ${request.fullName}`,
-              html: emailBody,
-              attachmentData: [{
-                filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
-                content: contractBase64,
-                mimeType: "text/html"
-              }]
-            })
-          });
-          
-          if (!emailResponse.ok) {
-            const emailError = await emailResponse.text();
-            console.error("Failed to send email notification via both methods:", emailError);
-            // Don't throw here to prevent the signing process from failing
-          } else {
-            const emailResult = await emailResponse.json();
-            console.log("Email notification sent successfully via Gmail:", emailResult);
-          }
         }
       }
     } catch (emailError) {

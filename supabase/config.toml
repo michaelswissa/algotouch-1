@@ -68,43 +68,28 @@ imports = { serve = "https://deno.land/std@0.168.0/http/server.ts" }
 verify_jwt = false
 
 [functions.takbull-webhook.import_map]
-imports = { 
-  serve = "https://deno.land/std@0.168.0/http/server.ts",
-  "@supabase/supabase-js" = "https://esm.sh/@supabase/supabase-js@2.7.1"
-}
+imports = { serve = "https://deno.land/std@0.168.0/http/server.ts", "@supabase/supabase-js" = "https://esm.sh/@supabase/supabase-js@2.7.1" }
 
 [functions.izidoc-sign]
 verify_jwt = true
 
 [functions.izidoc-sign.import_map]
-imports = { 
-  serve = "https://deno.land/std@0.168.0/http/server.ts",
-  "@supabase/supabase-js" = "https://esm.sh/@supabase/supabase-js@2.7.1"
-}
+imports = { serve = "https://deno.land/std@0.168.0/http/server.ts", "@supabase/supabase-js" = "https://esm.sh/@supabase/supabase-js@2.7.1" }
 
 [functions.gmail-sender]
 verify_jwt = true
 
 [functions.gmail-sender.import_map]
-imports = {
-  serve = "https://deno.land/std@0.168.0/http/server.ts",
-  "@supabase/supabase-js" = "https://esm.sh/@supabase/supabase-js@2.7.1",
-  "googleapis" = "https://esm.sh/googleapis@126.0.1"
-}
+imports = { serve = "https://deno.land/std@0.168.0/http/server.ts", "@supabase/supabase-js" = "https://esm.sh/@supabase/supabase-js@2.7.1", "googleapis" = "https://esm.sh/googleapis@126.0.1" }
 
 [functions.test-gmail]
 verify_jwt = false
 
 [functions.test-gmail.import_map]
-imports = {
-  serve = "https://deno.land/std@0.168.0/http/server.ts",
-  "googleapis" = "https://esm.sh/googleapis@126.0.1"
-}
+imports = { serve = "https://deno.land/std@0.168.0/http/server.ts", "googleapis" = "https://esm.sh/googleapis@126.0.1" }
 
 [functions.smtp-sender]
 verify_jwt = true
 
-[functions.smtp-sender.import_map]
-imports = {
-  serve = "https://deno.land/std@0.168.0/http/server.ts"
-}
+[functions.test-smtp]
+verify_jwt = false

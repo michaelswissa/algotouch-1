@@ -135,8 +135,30 @@ const TestEmail = () => {
         setTimeout(() => reject(new Error('Request timed out after 20 seconds')), 20000);
       });
       
+      // Try the new simple test-smtp function first
+      try {
+        console.log('Using test-smtp function...');
+        const testPromise = supabase.functions.invoke('test-smtp');
+        const { data, error } = await Promise.race([testPromise, timeoutPromise]) as any;
+        
+        if (error) {
+          console.error('Error testing SMTP (test-smtp):', error);
+          throw new Error(`Test SMTP error: ${error.message || JSON.stringify(error)}`);
+        }
+        
+        console.log('SMTP test successful with test-smtp function:', data);
+        setConnectionStatus('success');
+        setResult(data);
+        toast.success('בדיקת SMTP הצליחה!');
+        return;
+      } catch (testSmtpError) {
+        console.error('Error with test-smtp function, falling back to smtp-sender:', testSmtpError);
+        // Continue with the regular smtp-sender as fallback
+      }
+      
       // Call the smtp-sender function with a minimal test
       try {
+        console.log('Falling back to smtp-sender function...');
         const functionPromise = supabase.functions.invoke('smtp-sender', {
           body: {
             to: 'support@algotouch.co.il',

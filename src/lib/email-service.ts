@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface EmailRequest {
   to: string;
@@ -19,19 +20,28 @@ interface EmailRequest {
  */
 export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
+    console.log('Sending email via SMTP:', {
+      to: emailRequest.to,
+      subject: emailRequest.subject,
+      hasAttachments: emailRequest.attachmentData && emailRequest.attachmentData.length > 0
+    });
+    
     const { data, error } = await supabase.functions.invoke('smtp-sender', {
       body: emailRequest,
     });
 
     if (error) {
       console.error('Error sending email:', error);
-      return { success: false, error: error.message };
+      toast.error('שגיאה בשליחת הודעת דואר אלקטרוני');
+      return { success: false, error: error.message || JSON.stringify(error) };
     }
 
-    return { success: true, messageId: data.messageId };
-  } catch (error) {
+    console.log('Email sent successfully:', data);
+    return { success: true, messageId: data?.messageId || 'sent' };
+  } catch (error: any) {
     console.error('Exception sending email:', error);
-    return { success: false, error: error.message };
+    toast.error('שגיאה בשליחת הודעת דואר אלקטרוני');
+    return { success: false, error: error.message || JSON.stringify(error) };
   }
 }
 
