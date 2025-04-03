@@ -30,6 +30,166 @@ interface SigningRequest {
   };
 }
 
+// Creates a Supabase client with the provided credentials
+function createSupabaseClient() {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Missing Supabase credentials");
+  }
+
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+}
+
+// Validates required fields in the signing request
+function validateRequest(request: SigningRequest) {
+  if (!request.userId || !request.planId || !request.fullName || !request.signature || !request.email) {
+    throw new Error("Missing required fields");
+  }
+}
+
+// Stores signature information in the database
+async function storeSignature(supabase: any, request: SigningRequest, ipAddress: string) {
+  const { data: signatureData, error: signatureError } = await supabase
+    .from("contract_signatures")
+    .insert({
+      user_id: request.userId,
+      plan_id: request.planId,
+      full_name: request.fullName,
+      address: request.address || null,
+      id_number: request.idNumber || null,
+      phone: request.phone || null,
+      email: request.email,
+      signature: request.signature,
+      ip_address: ipAddress || request.browserInfo.ipAddress || null,
+      user_agent: request.browserInfo.userAgent || null,
+      browser_info: request.browserInfo || null,
+      contract_version: request.contractVersion || "1.0",
+      contract_html: request.contractHtml,
+      agreed_to_terms: request.agreedToTerms,
+      agreed_to_privacy: request.agreedToPrivacy
+    })
+    .select("id")
+    .single();
+    
+  if (signatureError) {
+    console.error("Error storing signature:", signatureError);
+    throw signatureError;
+  }
+  
+  return signatureData;
+}
+
+// Updates the subscription record to mark contract as signed
+async function updateSubscription(supabase: any, userId: string, planId: string, signatureTimestamp: string) {
+  const { error: updateError } = await supabase
+    .from("subscriptions")
+    .update({
+      contract_signed: true,
+      contract_signed_at: signatureTimestamp,
+      plan_type: planId,
+      updated_at: new Date().toISOString()
+    })
+    .eq("user_id", userId);
+    
+  if (updateError) {
+    console.error("Error updating subscription:", updateError);
+    throw updateError;
+  }
+}
+
+// Prepares and sends notification email with contract attachment
+async function sendNotificationEmail(
+  supabase: any, 
+  request: SigningRequest, 
+  signatureTimestamp: string,
+  ipAddress: string
+) {
+  try {
+    const { data: user } = await supabase.auth.admin.getUserById(request.userId);
+    if (user && user.user) {
+      // Convert HTML contract to base64 for attachment
+      const encoder = new TextEncoder();
+      const contractBytes = encoder.encode(request.contractHtml);
+      const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
+      
+      const emailBody = `
+        <h1>הסכם חדש נחתם</h1>
+        <p>שלום,</p>
+        <p>המשתמש ${request.fullName} (${request.email}) חתם על הסכם לתכנית ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}.</p>
+        <p>פרטי החתימה:</p>
+        <ul>
+          <li>זמן חתימה: ${signatureTimestamp}</li>
+          <li>כתובת IP: ${ipAddress || "לא זוהה"}</li>
+          <li>דפדפן: ${request.browserInfo.userAgent || "לא זוהה"}</li>
+        </ul>
+        <p>מצורף חוזה חתום כקובץ HTML. אנא פתח את הקובץ בדפדפן לצפייה.</p>
+        <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
+      `;
+
+      console.log("Sending contract notification email to support@algotouch.co.il");
+      
+      // Send email via the SMTP sender function
+      const smtpResponse = await sendEmailViaSmtp(
+        supabase,
+        "support@algotouch.co.il",
+        `הסכם חדש נחתם - ${request.fullName}`,
+        emailBody,
+        [{
+          filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
+          content: contractBase64,
+          mimeType: "text/html"
+        }]
+      );
+      
+      return smtpResponse;
+    }
+  } catch (emailError) {
+    console.error("Error sending notification email:", emailError);
+    // Log detailed error for debugging
+    console.error("Email error details:", JSON.stringify(emailError));
+    // Don't throw error as this is not critical for the signing process
+  }
+}
+
+// Helper function to send email via SMTP
+async function sendEmailViaSmtp(
+  supabase: any,
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: Array<{filename: string, content: string, mimeType: string}>
+) {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  const smtpResponse = await fetch(`${SUPABASE_URL}/functions/v1/smtp-sender`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+    },
+    body: JSON.stringify({
+      to,
+      subject,
+      html,
+      attachmentData: attachments
+    })
+  });
+  
+  if (!smtpResponse.ok) {
+    const errorText = await smtpResponse.text();
+    console.error("Failed to send email via SMTP:", errorText);
+    throw new Error(`SMTP send failed: ${errorText}`);
+  } else {
+    const smtpResult = await smtpResponse.json();
+    console.log("Email notification sent successfully via SMTP:", smtpResult);
+    return smtpResult;
+  }
+}
+
+// Main handler function for the edge function
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -39,15 +199,8 @@ serve(async (req) => {
   }
 
   try {
-    const IZIDOC_API_KEY = Deno.env.get("IZIDOC_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Missing Supabase credentials");
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Initialize Supabase client
+    const supabase = createSupabaseClient();
     
     // Parse the request body
     const request: SigningRequest = await req.json();
@@ -56,120 +209,24 @@ serve(async (req) => {
     const forwarded = req.headers.get("x-forwarded-for");
     const ipAddress = forwarded ? forwarded.split(/\s*,\s*/)[0] : req.headers.get("cf-connecting-ip") || "";
     
-    if (!request.userId || !request.planId || !request.fullName || !request.signature || !request.email) {
-      throw new Error("Missing required fields");
-    }
+    // Validate required fields
+    validateRequest(request);
     
     console.log("Processing digital signature for user:", request.userId);
     
-    // Store the signature information in the database
-    const { data: signatureData, error: signatureError } = await supabase
-      .from("contract_signatures")
-      .insert({
-        user_id: request.userId,
-        plan_id: request.planId,
-        full_name: request.fullName,
-        address: request.address || null,
-        id_number: request.idNumber || null,
-        phone: request.phone || null,
-        email: request.email,
-        signature: request.signature,
-        ip_address: ipAddress || request.browserInfo.ipAddress || null,
-        user_agent: request.browserInfo.userAgent || null,
-        browser_info: request.browserInfo || null,
-        contract_version: request.contractVersion || "1.0",
-        contract_html: request.contractHtml,
-        agreed_to_terms: request.agreedToTerms,
-        agreed_to_privacy: request.agreedToPrivacy
-      })
-      .select("id")
-      .single();
-      
-    if (signatureError) {
-      console.error("Error storing signature:", signatureError);
-      throw signatureError;
-    }
+    // Store signature in database
+    const signatureData = await storeSignature(supabase, request, ipAddress);
     
     // Generate document ID and signature ID
     const documentId = signatureData.id;
     const signatureId = crypto.randomUUID();
     const signatureTimestamp = new Date().toISOString();
     
-    // Update the subscription record to mark contract as signed
-    const { error: updateError } = await supabase
-      .from("subscriptions")
-      .update({
-        contract_signed: true,
-        contract_signed_at: signatureTimestamp,
-        plan_type: request.planId,
-        updated_at: new Date().toISOString()
-      })
-      .eq("user_id", request.userId);
-      
-    if (updateError) {
-      console.error("Error updating subscription:", updateError);
-      throw updateError;
-    }
+    // Update subscription record
+    await updateSubscription(supabase, request.userId, request.planId, signatureTimestamp);
     
-    // Send email notification with contract attachment
-    try {
-      const { data: user } = await supabase.auth.admin.getUserById(request.userId);
-      if (user && user.user) {
-        // Convert HTML contract to base64 for attachment
-        const encoder = new TextEncoder();
-        const contractBytes = encoder.encode(request.contractHtml);
-        const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
-        
-        const emailBody = `
-          <h1>הסכם חדש נחתם</h1>
-          <p>שלום,</p>
-          <p>המשתמש ${request.fullName} (${request.email}) חתם על הסכם לתכנית ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}.</p>
-          <p>פרטי החתימה:</p>
-          <ul>
-            <li>זמן חתימה: ${signatureTimestamp}</li>
-            <li>כתובת IP: ${ipAddress || "לא זוהה"}</li>
-            <li>דפדפן: ${request.browserInfo.userAgent || "לא זוהה"}</li>
-          </ul>
-          <p>מצורף חוזה חתום כקובץ HTML. אנא פתח את הקובץ בדפדפן לצפייה.</p>
-          <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
-        `;
-
-        console.log("Sending contract notification email to support@algotouch.co.il");
-        
-        // Try using the SMTP sender 
-        const smtpResponse = await fetch(`${SUPABASE_URL}/functions/v1/smtp-sender`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-          },
-          body: JSON.stringify({
-            to: "support@algotouch.co.il",
-            subject: `הסכם חדש נחתם - ${request.fullName}`,
-            html: emailBody,
-            attachmentData: [{
-              filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
-              content: contractBase64,
-              mimeType: "text/html"
-            }]
-          })
-        });
-        
-        if (!smtpResponse.ok) {
-          const errorText = await smtpResponse.text();
-          console.error("Failed to send email via SMTP:", errorText);
-          throw new Error(`SMTP send failed: ${errorText}`);
-        } else {
-          const smtpResult = await smtpResponse.json();
-          console.log("Email notification sent successfully via SMTP:", smtpResult);
-        }
-      }
-    } catch (emailError) {
-      console.error("Error sending notification email:", emailError);
-      // Log detailed error for debugging
-      console.error("Email error details:", JSON.stringify(emailError));
-      // Don't throw error as this is not critical for the signing process
-    }
+    // Send notification email
+    await sendNotificationEmail(supabase, request, signatureTimestamp, ipAddress);
     
     // Return the signing result
     return new Response(JSON.stringify({
