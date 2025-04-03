@@ -1,3 +1,4 @@
+
 import { Database as OriginalDatabase } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -188,6 +189,40 @@ export interface ExtendedDatabase extends OriginalDatabase {
           last_watched?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      // Add user_streaks table definition
+      user_streaks: {
+        Row: {
+          id: string;
+          user_id: string;
+          current_streak: number;
+          longest_streak: number;
+          last_activity: string;
+          streak_start_date: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          current_streak?: number;
+          longest_streak?: number;
+          last_activity?: string;
+          streak_start_date?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          current_streak?: number;
+          longest_streak?: number;
+          last_activity?: string;
+          streak_start_date?: string;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
