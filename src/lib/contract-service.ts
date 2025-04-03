@@ -27,7 +27,7 @@ export async function sendContractConfirmationEmail(
       <p>שלום ${userName},</p>
       <p>אנו מאשרים כי ביום ${formattedDate} בשעה ${formattedTime} השלמת את תהליך החתימה הדיגיטלית על ההסכם עם AlgoTouch.</p>
       <p>החתימה בוצעה באופן אלקטרוני, תוך אישור מלא של כל התנאים והסעיפים המפורטים בהסכם, ונרשמה במערכת המאובטחת שלנו.</p>
-      <p>לצורך עיון במסמך המלא, ניתן להורידו בעת חתימת ההסכם.</p>
+      <p>לצורך עיון במסמך המלא, ניתן לבקש עותק מצוות התמיכה.</p>
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea;">
         <p>תודה על שיתוף הפעולה,<br/>AlgoTouch</p>
       </div>
