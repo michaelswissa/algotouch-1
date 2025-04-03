@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -58,7 +57,7 @@ const Sidebar = () => {
     name: 'הפרופיל שלי',
     icon: <UserCircle size={18} />
   }, {
-    path: '/subscription',
+    path: '/my-subscription',
     name: 'המנוי שלי',
     icon: <CreditCard size={18} />
   }];
@@ -82,11 +81,11 @@ const Sidebar = () => {
       
       <div className="absolute inset-0 bg-mesh opacity-5 pointer-events-none"></div>
       
-      <div className={cn("p-6 border-b border-sidebar-border flex justify-center relative z-10", collapsed && "p-3")}>
+      <div className={cn("p-6 border-b border-sidebar-border flex justify-center relative z-10", collapsed ? "p-3" : "p-6")}>
         <TraderVueLogo className="mb-2 hover-scale" collapsed={collapsed} />
       </div>
       
-      <div className={cn("p-4 border-b border-sidebar-border relative z-10", collapsed && "p-2")}>
+      <div className={cn("p-4 border-b border-sidebar-border relative z-10", collapsed ? "p-2" : "p-4")}>
         {!collapsed && <div className="relative mb-4">
             <Input type="text" placeholder="חיפוש" className="w-full pr-8 bg-sidebar-accent/10 border-sidebar-border/50 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300" />
             <Search className="h-4 w-4 absolute top-3 right-3 text-muted-foreground" />

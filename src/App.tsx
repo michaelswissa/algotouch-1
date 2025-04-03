@@ -23,6 +23,7 @@ import Journal from "./pages/Journal";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Subscription from "./pages/Subscription";
+import MySubscriptionPage from "./pages/MySubscriptionPage";
 import Index from "./pages/Index";
 
 // Configure with refresh on error
@@ -91,6 +92,11 @@ const App = () => {
               <Route path="/subscription" element={
                 <ProtectedRoute>
                   <Subscription />
+                </ProtectedRoute>
+              } />
+              <Route path="/my-subscription" element={
+                <ProtectedRoute>
+                  <MySubscriptionPage />
                 </ProtectedRoute>
               } />
               

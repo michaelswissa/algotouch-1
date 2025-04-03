@@ -63,9 +63,10 @@ const SubscriptionContent = () => {
   }
 
   // If a logged-in user visits this page, check if they already have a subscription
+  // Redirect to my-subscription page instead of dashboard
   if (isAuthenticated && hasActiveSubscription) {
-    console.log('User has active subscription, redirecting to dashboard');
-    return <Navigate to="/dashboard" replace />;
+    console.log('User has active subscription, redirecting to my-subscription page');
+    return <Navigate to="/my-subscription" replace />;
   }
 
   // If no registration data is found and user is not authenticated, redirect to auth
