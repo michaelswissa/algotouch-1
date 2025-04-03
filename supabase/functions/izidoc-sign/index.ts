@@ -138,7 +138,7 @@ serve(async (req) => {
             "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
           },
           body: JSON.stringify({
-            to: "admin@algotouch.co.il", // Replace with your admin email
+            to: "support@algotouch.co.il", // Changed from admin@algotouch.co.il to support@algotouch.co.il
             subject: `הסכם חדש נחתם - ${request.fullName}`,
             html: emailBody
           })

@@ -169,6 +169,11 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
     const contractContent = contractRef.current?.innerHTML;
     if (!contractContent) return;
     
+    // Get browser info for the footer
+    const browserInfo = getBrowserInfo();
+    const ipAddress = registrationData?.ipAddress || "לא זוהה";
+    const currentDate = new Date().toLocaleString('he-IL');
+    
     const blob = new Blob([`
       <html>
         <head>
@@ -178,6 +183,7 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
             body { font-family: Arial, sans-serif; direction: rtl; padding: 20px; }
             h3, h4 { margin-top: 20px; }
             .signature { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; }
+            .browser-info { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; font-size: 12px; color: #666; }
           </style>
         </head>
         <body>
@@ -192,6 +198,16 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
             <p>דואר אלקטרוני: ${userDetails.email}</p>
             ${signature ? `<img src="${signature}" alt="חתימה דיגיטלית" style="max-width: 300px; border: 1px solid #eee; margin-top: 10px;" />` : ''}
             <p>מועד החתימה: ${new Date().toLocaleString('he-IL')}</p>
+          </div>
+          <div class="browser-info">
+            <h4>מידע טכני על החתימה:</h4>
+            <p>כתובת IP: ${ipAddress}</p>
+            <p>דפדפן: ${browserInfo.userAgent}</p>
+            <p>שפת דפדפן: ${browserInfo.language}</p>
+            <p>פלטפורמה: ${browserInfo.platform}</p>
+            <p>רזולוציית מסך: ${browserInfo.screenSize}</p>
+            <p>אזור זמן: ${browserInfo.timeZone}</p>
+            <p>תאריך ושעה: ${currentDate}</p>
           </div>
         </body>
       </html>
