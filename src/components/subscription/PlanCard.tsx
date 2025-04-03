@@ -80,10 +80,10 @@ const PlanCard: React.FC<PlanProps> = ({
           : 'hover:-translate-y-1 border'
       }`}
     >
-      <CardHeader className="pb-4 pt-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={`rounded-full p-2 ${getIconBackground()} ${isSelected ? 'animate-pulse' : 'animate-float'}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <div className={`rounded-full p-1.5 ${getIconBackground()} ${isSelected ? 'animate-pulse' : 'animate-float'}`}>
               {getPlanIcon()}
             </div>
             <CardTitle className="text-xl">{name}</CardTitle>
@@ -92,7 +92,7 @@ const PlanCard: React.FC<PlanProps> = ({
             {getPlanBadge()}
           </div>
         </div>
-        <CardDescription className="text-sm mt-2">{description}</CardDescription>
+        <CardDescription className="text-sm">{description}</CardDescription>
         <PlanPricing 
           price={price} 
           currency={currency} 
@@ -100,12 +100,12 @@ const PlanCard: React.FC<PlanProps> = ({
           planId={id}
         />
       </CardHeader>
-      <CardContent className="py-4 flex-grow">
+      <CardContent className="py-2 flex-grow">
         <PlanFeaturesList features={features} planId={id} />
       </CardContent>
-      <CardFooter className="pt-4 pb-6 mt-auto">
+      <CardFooter className="pt-2 pb-4 mt-auto">
         <Button 
-          className={`w-full text-base py-6 transition-all duration-300 ${
+          className={`w-full text-base py-5 transition-all duration-300 ${
             isSelected 
               ? 'scale-[1.02] ' + (
                 id === 'monthly' 

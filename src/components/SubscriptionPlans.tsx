@@ -26,11 +26,11 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
 
   return (
     <div className="mx-auto max-w-6xl h-full flex flex-col justify-center" dir="rtl">
-      <div className="flex justify-center mb-12">
-        <h2 className="text-3xl font-bold text-center">🚀 בחר את המסלול שהכי מתאים לך</h2>
+      <div className="flex justify-center mb-8">
+        <h2 className="text-3xl font-bold">🚀 בחר את המסלול שהכי מתאים לך</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
         {plans.map((plan) => (
           <PlanCard 
             key={plan.id}
@@ -39,6 +39,10 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
             isSelected={selectedPlanId === plan.id}
           />
         ))}
+      </div>
+      
+      <div className="text-center text-sm text-muted-foreground mt-6">
+        <p>* כל התכניות (חודשי ושנתי) כוללות חודש ניסיון חינם. ניתן לבטל בכל עת ללא התחייבות.</p>
       </div>
     </div>
   );
