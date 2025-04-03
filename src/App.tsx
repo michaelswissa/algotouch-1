@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 import { AdminProvider } from '@/contexts/admin';
 import { SidebarProvider } from '@/contexts/sidebar';
+import { AuthProvider } from '@/contexts/auth';
 
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
@@ -33,12 +34,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-        <AdminProvider>
-          <SidebarProvider>
-            <RouterProvider router={router} />
-            <Toaster expand={true} position="top-center" richColors />
-          </SidebarProvider>
-        </AdminProvider>
+        <AuthProvider>
+          <AdminProvider>
+            <SidebarProvider>
+              <RouterProvider router={router} />
+              <Toaster expand={true} position="top-center" richColors />
+            </SidebarProvider>
+          </AdminProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
