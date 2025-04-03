@@ -106,6 +106,5 @@ verify_jwt = true
 
 [functions.smtp-sender.import_map]
 imports = {
-  serve = "https://deno.land/std@0.168.0/http/server.ts",
-  "denomailer" = "https://deno.land/x/denomailer@1.6.0/mod.ts"
+  serve = "https://deno.land/std@0.168.0/http/server.ts"
 }
