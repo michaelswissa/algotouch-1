@@ -3,13 +3,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, Rocket, Diamond, Crown } from 'lucide-react';
+import { Rocket, Diamond, Crown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface PlanFeature {
   name: string;
   included: boolean;
-  icon?: string;
+  icon: string;
   description?: string;
 }
 
@@ -157,12 +157,12 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
               <ul className="space-y-4 text-base">
                 {plan.features.map((feature, index) => (
                   <li key={index} className="flex gap-3">
-                    <div className="flex-shrink-0 w-5 h-5 mt-0.5">
-                      <Check className="h-5 w-5 text-green-500" />
+                    <div className="flex-shrink-0 w-6 h-6 mt-0.5 text-lg flex items-center justify-center">
+                      {feature.icon}
                     </div>
                     <div>
-                      <div className="font-medium flex items-center gap-2">
-                        {feature.name} <span className="text-lg">{feature.icon}</span>
+                      <div className="font-medium">
+                        {feature.name}
                       </div>
                       {feature.description && (
                         <p className="text-muted-foreground text-sm mt-1">{feature.description}</p>
