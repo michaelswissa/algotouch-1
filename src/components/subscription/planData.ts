@@ -28,9 +28,9 @@ export const getPlansData = (): Plan[] => {
       features: [
         // Removed the "First month free" feature
         { name: 'מדריך הפעלה ברור ומדוייק', icon: '💡', description: 'בלי למידה מורכבת, כל מה שצריך לדעת כדי להתחיל לעבוד.', included: true },
-        { name: 'עוזר אישי AI זמין 24/7', icon: '🤖', description: 'תקבל הכוונה מדויקת, תובנות חכמות ותמיכה מיידית בכל מה שקשור למסחר ושוק ההון.', included: true },
-        { name: 'בלוג מקצועי', icon: '🧠', description: 'מאמרים, סקירות עומק ועדכונים בזמן אמת שיעזרו לך לקבל החלטות טובות יותר.', included: true },
-        { name: 'קהילה סגורה', icon: '👥', description: 'מקום לשאול, ללמוד ולהישאר מעודכן עם סוחרים שחיים את השוק כמוך.', included: true },
+        { name: 'עוזר אישי AI זמין 24/7', icon: '🤖', description: 'הכוונה מדויקת, תובנות חכמות ותמיכה בזמן אמת.', included: true },
+        { name: 'בלוג מקצועי', icon: '🧠', description: 'מאמרים, סקירות עומק ועדכונים שיעזרו לך לקבל החלטות מושכלות יותר.', included: true },
+        { name: 'קהילה סגורה', icon: '👥', description: 'מקום ללמוד ולהישאר מעודכן עם סוחרים שחיים את השוק כמוך.', included: true },
         { name: 'מערכת ניתוח ביצועים', icon: '📈', description: 'זיהוי נקודות חולשה, חוזקות והזדמנויות לשיפור המסחר שלך.', included: true },
         { name: 'יומן מסחר דיגיטלי + תובנות AI', icon: '📓', description: 'מעקב אחרי ביצועים ותובנות סטטיסטיות.', included: true },
         { name: 'קורסים משלימים במתנה', icon: '🎓', description: 'היכרות עם חוזים עתידיים + שליטה מלאה במערכת TradeStation.', included: true },
