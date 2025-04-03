@@ -26,7 +26,7 @@ export const getPlansData = (): Plan[] => {
       description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
       icon: null, // Will be set in the PlanCard component
       features: [
-        { name: 'חודש ראשון חינם', icon: '🎁', description: 'קודם תראה שהכל עובד, אחר כך תשלם.', included: true },
+        // Removed the "First month free" feature
         { name: 'מדריך הפעלה ברור ומדוייק', icon: '💡', description: 'בלי למידה מורכבת, כל מה שצריך לדעת כדי להתחיל לעבוד.', included: true },
         { name: 'עוזר אישי AI זמין 24/7', icon: '🤖', description: 'תקבל הכוונה מדויקת, תובנות חכמות ותמיכה מיידית בכל מה שקשור למסחר ושוק ההון.', included: true },
         { name: 'בלוג מקצועי', icon: '🧠', description: 'מאמרים, סקירות עומק ועדכונים בזמן אמת שיעזרו לך לקבל החלטות טובות יותר.', included: true },

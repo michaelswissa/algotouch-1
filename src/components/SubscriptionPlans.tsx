@@ -28,7 +28,7 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     <div className="mx-auto max-w-5xl space-y-8" dir="rtl">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold">🚀 בחר את המסלול שהכי מתאים לך</h2>
-        <p className="text-muted-foreground">התחל עם חודש ניסיון מתנה במסלול החודשי, ללא התחייבות</p>
+        {/* Removed the free trial subtitle */}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
