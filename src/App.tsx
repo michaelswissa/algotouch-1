@@ -1,177 +1,115 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
-import { AuthProvider } from "@/contexts/auth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
-import CalendarPage from "./pages/Calendar";
-import TradeJournal from "./pages/TradeJournal";
-import MonthlyReport from "./pages/MonthlyReport";
-import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
-import Community from "./pages/Community";
-import Courses from "./pages/Courses";
-import CourseDetail from "./pages/CourseDetail";
-import AIAssistant from "./pages/AIAssistant";
-import NotFound from "./pages/NotFound";
-import NewTrade from "./pages/NewTrade";
-import Journal from "./pages/Journal";
-import Auth from "./pages/Auth";
-import Profile from "./pages/Profile";
-import Subscription from "./pages/Subscription";
-import Index from "./pages/Index";
-import TestEmail from './pages/TestEmail';
+import React from 'react';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
 
-// Configure with refresh on error
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 60 * 1000,
-    },
-  },
-});
+import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
+import Dashboard from '@/pages/Dashboard';
+import Profile from '@/pages/Profile';
+import Reports from '@/pages/Reports';
+import Trades from '@/pages/Trades';
+import NewTrade from '@/pages/NewTrade';
+import TradeJournal from '@/pages/TradeJournal';
+import MonthlyReport from '@/pages/MonthlyReport';
+import Calendar from '@/pages/Calendar';
+import AIAssistant from '@/pages/AIAssistant';
+import Community from '@/pages/Community';
+import Courses from '@/pages/Courses';
+import CourseDetail from '@/pages/CourseDetail';
+import Blog from '@/pages/Blog';
+import BlogPost from '@/pages/BlogPost';
+import NotFound from '@/pages/NotFound';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import Subscription from '@/pages/Subscription';
 
-const App = () => {
-  // Set RTL direction and dark mode at the document level
-  useEffect(() => {
-    document.documentElement.dir = "rtl";
-    document.documentElement.lang = "he";
-    document.documentElement.classList.add('dark');
-    
-    // Add transition classes to body for smoother theme transitions
-    document.body.classList.add('transition-colors', 'duration-300');
-    
-    // Fade in the whole app
-    const timer = setTimeout(() => {
-      document.body.style.opacity = "1";
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, []);
+const queryClient = new QueryClient();
 
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <Toaster />
-            <Sonner position="top-right" expand={true} closeButton toastOptions={{
-              classNames: {
-                toast: 'group p-4 backdrop-blur-md bg-secondary/90 dark:bg-card/90 shadow-xl',
-                title: 'text-base font-semibold text-foreground',
-                description: 'text-sm text-muted-foreground',
-                actionButton: 'bg-primary text-primary-foreground',
-                cancelButton: 'bg-secondary text-secondary-foreground',
-                error: '!bg-red-500/20 border-red-500/50',
-                success: '!bg-green-500/20 border-green-500/50',
-              }
-            }} />
-            <Routes>
-              {/* Root route - redirects to auth page */}
-              <Route path="/" element={<Index />} />
-              
-              {/* Public routes */}
-              <Route path="/auth" element={
-                <ProtectedRoute requireAuth={false}>
-                  <Auth />
-                </ProtectedRoute>
-              } />
-              
-              {/* Subscription routes - protected to ensure auth first */}
-              <Route path="/subscription/:planId" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
-              <Route path="/subscription" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
-              
-              {/* Protected routes - require authentication */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/calendar" element={
-                <ProtectedRoute>
-                  <CalendarPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/trade-journal" element={
-                <ProtectedRoute>
-                  <TradeJournal />
-                </ProtectedRoute>
-              } />
-              <Route path="/monthly-report" element={
-                <ProtectedRoute>
-                  <MonthlyReport />
-                </ProtectedRoute>
-              } />
-              <Route path="/journal" element={
-                <ProtectedRoute>
-                  <Journal />
-                </ProtectedRoute>
-              } />
-              <Route path="/blog" element={
-                <ProtectedRoute>
-                  <Blog />
-                </ProtectedRoute>
-              } />
-              <Route path="/blog/:id" element={
-                <ProtectedRoute>
-                  <BlogPost />
-                </ProtectedRoute>
-              } />
-              <Route path="/community" element={
-                <ProtectedRoute>
-                  <Community />
-                </ProtectedRoute>
-              } />
-              <Route path="/courses" element={
-                <ProtectedRoute>
-                  <Courses />
-                </ProtectedRoute>
-              } />
-              <Route path="/courses/:courseId" element={
-                <ProtectedRoute>
-                  <CourseDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/ai-assistant" element={
-                <ProtectedRoute>
-                  <AIAssistant />
-                </ProtectedRoute>
-              } />
-              <Route path="/new-trade" element={
-                <ProtectedRoute>
-                  <NewTrade />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              
-              {/* Catch all route */}
-              <Route path="*" element={<NotFound />} />
-              
-              {/* New route */}
-              <Route path="/test-email" element={<TestEmail />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+      <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+        <RouterProvider router={router} />
+        <Toaster expand={true} position="top-center" richColors />
+      </ThemeProvider>
     </QueryClientProvider>
   );
-};
+}
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Index />
+  },
+  {
+    path: "/auth",
+    element: <Auth />
+  },
+  {
+    path: "/dashboard",
+    element: <ProtectedRoute><Dashboard /></ProtectedRoute>
+  },
+  {
+    path: "/profile",
+    element: <ProtectedRoute><Profile /></ProtectedRoute>
+  },
+  {
+    path: "/reports",
+    element: <ProtectedRoute><Reports /></ProtectedRoute>
+  },
+  {
+    path: "/trades",
+    element: <ProtectedRoute><Trades /></ProtectedRoute>
+  },
+  {
+    path: "/trades/new",
+    element: <ProtectedRoute><NewTrade /></ProtectedRoute>
+  },
+  {
+    path: "/journal",
+    element: <ProtectedRoute><TradeJournal /></ProtectedRoute>
+  },
+  {
+    path: "/reports/monthly",
+    element: <ProtectedRoute><MonthlyReport /></ProtectedRoute>
+  },
+  {
+    path: "/calendar",
+    element: <ProtectedRoute><Calendar /></ProtectedRoute>
+  },
+  {
+    path: "/assistant",
+    element: <ProtectedRoute><AIAssistant /></ProtectedRoute>
+  },
+  {
+    path: "/community",
+    element: <ProtectedRoute><Community /></ProtectedRoute>
+  },
+  {
+    path: "/courses",
+    element: <ProtectedRoute><Courses /></ProtectedRoute>
+  },
+  {
+    path: "/courses/:id",
+    element: <ProtectedRoute><CourseDetail /></ProtectedRoute>
+  },
+  {
+    path: "/blog",
+    element: <Blog />
+  },
+  {
+    path: "/blog/:id",
+    element: <BlogPost />
+  },
+  {
+    path: "/subscription/:planId?",
+    element: <Subscription />
+  },
+  {
+    path: "*",
+    element: <NotFound />
+  }
+]);
 
 export default App;
