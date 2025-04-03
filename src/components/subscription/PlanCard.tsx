@@ -36,19 +36,34 @@ const PlanCard: React.FC<PlanProps> = ({
   onSelect,
   isSelected
 }) => {
-  // Get the appropriate icon based on plan ID with consistent color scheme
+  // Get color variables based on plan type
+  const getColor = () => {
+    if (id === 'monthly') return '#9f7aea'; // Purple for monthly
+    if (id === 'annual') return '#3b82f6'; // Blue for annual
+    return '#f59e0b'; // Amber for VIP
+  };
+  
+  // Get the appropriate icon based on plan ID with consistent styling
   const getPlanIcon = () => {
-    if (id === 'monthly') return <Rocket className="h-6 w-6 text-purple-500" />;
-    if (id === 'annual') return <Diamond className="h-6 w-6 text-blue-500" />;
-    return <Crown className="h-6 w-6 text-amber-500" />;
+    const color = getColor();
+    if (id === 'monthly') return <Rocket className="h-6 w-6" style={{ color }} />;
+    if (id === 'annual') return <Diamond className="h-6 w-6" style={{ color }} />;
+    return <Crown className="h-6 w-6" style={{ color }} />;
   };
 
   // Get the badge for each plan with consistent color scheme
   const getPlanBadge = () => {
     if (id === 'monthly') return <Badge className="bg-purple-500 hover:bg-purple-600">חודש חינם</Badge>;
-    if (id === 'annual') return <Badge className="bg-blue-500 hover:bg-blue-600">מומלץ</Badge>;
+    if (id === 'annual') return <Badge className="bg-blue-500 hover:bg-blue-600">חיסכון שנתי</Badge>;
     if (id === 'vip') return <Badge className="bg-amber-500 hover:bg-amber-600">VIP</Badge>;
     return null;
+  };
+
+  // Get background colors for icon container
+  const getIconBackground = () => {
+    if (id === 'monthly') return 'bg-purple-100 dark:bg-purple-900/20';
+    if (id === 'annual') return 'bg-blue-100 dark:bg-blue-900/20';
+    return 'bg-amber-100 dark:bg-amber-900/20';
   };
 
   return (
@@ -68,13 +83,7 @@ const PlanCard: React.FC<PlanProps> = ({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <div className={`rounded-full p-2 ${
-              id === 'monthly' 
-                ? 'bg-purple-100 dark:bg-purple-900/20' 
-                : id === 'annual' 
-                  ? 'bg-blue-100 dark:bg-blue-900/20' 
-                  : 'bg-amber-100 dark:bg-amber-900/20'
-            } ${isSelected ? 'animate-pulse' : 'animate-float'}`}>
+            <div className={`rounded-full p-2 ${getIconBackground()} ${isSelected ? 'animate-pulse' : 'animate-float'}`}>
               {getPlanIcon()}
             </div>
             <CardTitle className="text-2xl">{name}</CardTitle>

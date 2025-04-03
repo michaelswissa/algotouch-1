@@ -18,16 +18,17 @@ const PlanFeature: React.FC<PlanFeatureProps> = ({
 }) => {
   if (!included) return null;
   
-  const getIconBackground = () => {
-    if (planId === 'monthly') return 'bg-purple-50 dark:bg-purple-900/10';
-    if (planId === 'annual') return 'bg-blue-50 dark:bg-blue-900/10';
-    return 'bg-amber-50 dark:bg-amber-900/10';
-  };
-  
+  // Get color variables based on plan type
   const getIconColor = () => {
     if (planId === 'monthly') return 'text-purple-600 dark:text-purple-400';
     if (planId === 'annual') return 'text-blue-600 dark:text-blue-400';
     return 'text-amber-600 dark:text-amber-400';
+  };
+  
+  const getIconBackground = () => {
+    if (planId === 'monthly') return 'bg-purple-50 dark:bg-purple-900/10';
+    if (planId === 'annual') return 'bg-blue-50 dark:bg-blue-900/10';
+    return 'bg-amber-50 dark:bg-amber-900/10';
   };
   
   return (
