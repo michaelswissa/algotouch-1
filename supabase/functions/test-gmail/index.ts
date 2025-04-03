@@ -64,29 +64,34 @@ async function sendTestEmail(accessToken: string) {
 
   console.log(`Sending test email from ${sender} to ${testReceiver}`);
 
-  const response = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ raw: encodedMessage }),
-    }
-  );
-
-  const responseText = await response.text();
-  
-  if (!response.ok) {
-    console.error("Gmail API error:", response.status, responseText);
-    throw new Error(`Gmail API error: ${response.status} ${responseText}`);
-  }
-
   try {
-    return JSON.parse(responseText);
-  } catch (e) {
-    return { raw: responseText };
+    const response = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ raw: encodedMessage }),
+      }
+    );
+
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      console.error("Gmail API error:", response.status, responseText);
+      throw new Error(`Gmail API error: ${response.status} ${responseText}`);
+    }
+
+    try {
+      return JSON.parse(responseText);
+    } catch (e) {
+      return { raw: responseText };
+    }
+  } catch (error) {
+    console.error("Error sending test email:", error);
+    throw error;
   }
 }
 
@@ -124,7 +129,8 @@ serve(async (req) => {
     
     return new Response(JSON.stringify({ 
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      name: error.name
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
