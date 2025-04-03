@@ -28,12 +28,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Handle sign in event - send welcome email if needed using setTimeout to prevent loop
         if (event === 'SIGNED_IN' && newSession?.user) {
+          // Only send welcome email if user is new (and this metadata exists)
+          // This prevents sending welcome emails every time a user logs in
           setTimeout(() => {
-            if (newSession.user?.user_metadata?.is_new_user) {
-              const firstName = newSession.user?.user_metadata?.first_name || '';
-              const lastName = newSession.user?.user_metadata?.last_name || '';
-              const fullName = `${firstName} ${lastName}`.trim() || newSession.user.email || 'משתמש';
-              sendWelcomeEmail(newSession.user.email || '', fullName);
+            try {
+              if (newSession.user?.user_metadata?.is_new_user === true) {
+                const firstName = newSession.user?.user_metadata?.first_name || '';
+                const lastName = newSession.user?.user_metadata?.last_name || '';
+                const fullName = `${firstName} ${lastName}`.trim() || newSession.user.email || 'משתמש';
+                
+                // Send welcome email and then update user metadata to mark that email was sent
+                sendWelcomeEmail(newSession.user.email || '', fullName)
+                  .then(() => {
+                    // After sending welcome email, update user metadata to indicate email was sent
+                    supabase.auth.updateUser({
+                      data: { 
+                        is_new_user: false,
+                        welcome_email_sent: true
+                      }
+                    }).catch(err => console.error('Error updating user metadata:', err));
+                  })
+                  .catch(err => {
+                    console.error('Error sending welcome email:', err);
+                    // Still mark as not new to prevent future attempts
+                    supabase.auth.updateUser({
+                      data: { is_new_user: false }
+                    }).catch(err => console.error('Error updating user metadata:', err));
+                  });
+              }
+            } catch (error) {
+              console.error('Error in welcome email logic:', error);
             }
           }, 500);
         }

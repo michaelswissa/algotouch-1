@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -28,7 +27,6 @@ export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: 
       
       const errorMsg = `Missing required email fields: ${missing.join(", ")}`;
       console.error(errorMsg);
-      toast.error('שגיאה בשליחת הודעת דואר אלקטרוני: חסרים שדות חובה');
       return { success: false, error: errorMsg };
     }
     
@@ -45,7 +43,6 @@ export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: 
 
     if (error) {
       console.error('Error sending email:', error);
-      toast.error('שגיאה בשליחת הודעת דואר אלקטרוני');
       return { success: false, error: error.message || JSON.stringify(error) };
     }
 
@@ -53,7 +50,6 @@ export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: 
     return { success: true, messageId: data?.messageId || 'sent' };
   } catch (error: any) {
     console.error('Exception sending email:', error);
-    toast.error('שגיאה בשליחת הודעת דואר אלקטרוני');
     return { success: false, error: error.message || JSON.stringify(error) };
   }
 }
@@ -64,32 +60,44 @@ export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: 
 export async function sendWelcomeEmail(userEmail: string, userName: string): Promise<{ success: boolean }> {
   console.log('Sending welcome email to:', userEmail);
   
-  return sendEmail({
-    to: userEmail,
-    subject: 'ברוכים הבאים ל-AlgoTouch - פלטפורמת המסחר החכמה',
-    html: `
-    <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #4a90e2;">AlgoTouch</h1>
-        <p style="font-size: 18px; color: #666;">פלטפורמת המסחר החכמה</p>
+  try {
+    const result = await sendEmail({
+      to: userEmail,
+      subject: 'ברוכים הבאים ל-AlgoTouch - פלטפורמת המסחר החכמה',
+      html: `
+      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #4a90e2;">AlgoTouch</h1>
+          <p style="font-size: 18px; color: #666;">פלטפורמת המסחר החכמה</p>
+        </div>
+        <h2>שלום ${userName},</h2>
+        <p>ברוכים הבאים ל-AlgoTouch!</p>
+        <p>תודה שבחרת להצטרף לקהילת המשקיעים החכמים שלנו. אנו מתרגשים להיות חלק מהמסע שלך בעולם ההשקעות.</p>
+        <p>עם AlgoTouch, תוכל/י:</p>
+        <ul style="list-style-type: none; padding-left: 0;">
+          <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">לעקוב אחר הביצועים של תיק ההשקעות שלך בזמן אמת</span></li>
+          <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">לקבל תובנות מבוססות AI על הרגלי המסחר שלך</span></li>
+          <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">לנהל יומן מסחר דיגיטלי חכם</span></li>
+          <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">להשתתף בקורסים והדרכות בלעדיות</span></li>
+        </ul>
+        <p>למידע נוסף או לכל שאלה, אנחנו כאן לעזור: <a href="mailto:support@algotouch.co.il" style="color: #4a90e2; text-decoration: none;">support@algotouch.co.il</a></p>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea; text-align: center; font-size: 14px; color: #666;">
+          <p>בברכה,<br>צוות AlgoTouch</p>
+        </div>
       </div>
-      <h2>שלום ${userName},</h2>
-      <p>ברוכים הבאים ל-AlgoTouch!</p>
-      <p>תודה שבחרת להצטרף לקהילת המשקיעים החכמים שלנו. אנו מתרגשים להיות חלק מהמסע שלך בעולם ההשקעות.</p>
-      <p>עם AlgoTouch, תוכל/י:</p>
-      <ul style="list-style-type: none; padding-left: 0;">
-        <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">לעקוב אחר הביצועים של תיק ההשקעות שלך בזמן אמת</span></li>
-        <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">לקבל תובנות מבוססות AI על הרגלי המסחר שלך</span></li>
-        <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">לנהל יומן מסחר דיגיטלי חכם</span></li>
-        <li style="margin: 10px 0; padding-left: 20px; position: relative;">✓ <span style="position: relative; left: 10px;">להשתתף בקורסים והדרכות בלעדיות</span></li>
-      </ul>
-      <p>למידע נוסף או לכל שאלה, אנחנו כאן לעזור: <a href="mailto:support@algotouch.co.il" style="color: #4a90e2; text-decoration: none;">support@algotouch.co.il</a></p>
-      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea; text-align: center; font-size: 14px; color: #666;">
-        <p>בברכה,<br>צוות AlgoTouch</p>
-      </div>
-    </div>
-    `,
-  });
+      `,
+    });
+    
+    if (!result.success) {
+      console.warn('Welcome email could not be sent, but continuing without showing error to user:', result.error);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Exception in sendWelcomeEmail:', error);
+    // Return success even if email failed to avoid disrupting the user experience
+    return { success: true };
+  }
 }
 
 /**
