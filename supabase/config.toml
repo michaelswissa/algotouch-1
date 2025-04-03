@@ -45,15 +45,19 @@ enabled = false
 
 [functions.ai-chatbot]
 verify_jwt = true
+import_map = "supabase/functions/ai-chatbot/import_map.json"
 
 [functions.financial-news]
 verify_jwt = true
+import_map = "supabase/functions/financial-news/import_map.json"
 
 [functions.generate-insight]
 verify_jwt = true
+import_map = "supabase/functions/generate-insight/import_map.json"
 
 [functions.stock-data]
 verify_jwt = true
+import_map = "supabase/functions/stock-data/import_map.json"
 
 [functions.izidoc-sign]
 verify_jwt = true
