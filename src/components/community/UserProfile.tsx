@@ -5,10 +5,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LevelIndicator } from '@/components/ui/level-indicator';
 import UserBadges from '@/components/community/UserBadges';
 import { useCommunity } from '@/contexts/community/CommunityContext';
-import { Flame, Trophy, Award, BadgeCheck } from 'lucide-react';
+import { Flame, Trophy, Award, BadgeCheck, Calendar, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+import { he } from 'date-fns/locale';
 
 interface UserProfileProps {
   user: {
@@ -53,17 +55,32 @@ const UserLevelBadge = ({ level }: { level: number }) => {
 };
 
 // Helper component to display the user's streak
-const UserStreakDisplay = ({ streak }: { streak: { currentStreak: number } }) => {
+const UserStreakDisplay = ({ streak }: { streak: { currentStreak: number; lastActivity: string } | null }) => {
   if (!streak) return null;
   
+  const lastActivityDate = new Date(streak.lastActivity);
+  const timeAgo = formatDistanceToNow(lastActivityDate, { locale: he, addSuffix: true });
+  
   return (
-    <div className="flex flex-col items-center justify-center bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
-      <div className="flex items-center gap-1">
-        <Flame className="h-5 w-5 text-orange-500" />
-        <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{streak.currentStreak}</span>
-      </div>
-      <div className="text-xs text-orange-600 dark:text-orange-300">ימים רצופים</div>
-    </div>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex flex-col items-center justify-center bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
+            <div className="flex items-center gap-1">
+              <Flame className="h-5 w-5 text-orange-500" />
+              <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{streak.currentStreak}</span>
+            </div>
+            <div className="text-xs text-orange-600 dark:text-orange-300">ימים רצופים</div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="space-y-1">
+            <p>פעילות אחרונה: {timeAgo}</p>
+            <p className="text-xs">שמור על הרצף שלך בעזרת התחברות יומית!</p>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -72,6 +89,11 @@ export function UserProfile({ user }: UserProfileProps) {
   const { userLevel, userPoints, userBadges, allBadges, userStreak } = useCommunity();
   
   if (!user) return null;
+  
+  const formattedStreak = userStreak ? {
+    currentStreak: userStreak.currentStreak,
+    lastActivity: userStreak.lastActivity
+  } : null;
   
   return (
     <Card className="overflow-hidden">
@@ -93,11 +115,14 @@ export function UserProfile({ user }: UserProfileProps) {
             />
           </div>
           
-          {userStreak && <UserStreakDisplay streak={userStreak} />}
+          {formattedStreak && <UserStreakDisplay streak={formattedStreak} />}
         </div>
         
         <div className="mt-4">
-          <h4 className="text-sm font-medium mb-2">התגים שלך</h4>
+          <div className="flex items-center mb-2">
+            <Award className="h-4 w-4 mr-1 text-primary" />
+            <h4 className="text-sm font-medium">התגים שלך</h4>
+          </div>
           <UserBadges 
             earnedBadges={userBadges} 
             allBadges={allBadges}

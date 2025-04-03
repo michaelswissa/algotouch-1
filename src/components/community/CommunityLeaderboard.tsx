@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Medal, Trophy } from 'lucide-react';
+import { Medal, Trophy, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 interface LeaderboardUser {
   user_id: string;
@@ -17,10 +19,12 @@ interface LeaderboardUser {
 export function CommunityLeaderboard() {
   const [leaders, setLeaders] = useState<LeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     async function fetchLeaderboard() {
       try {
+        setIsLoading(true);
         // First get the reputation data
         const { data: repData, error: repError } = await supabase
           .from('community_reputation')
@@ -30,13 +34,16 @@ export function CommunityLeaderboard() {
 
         if (repError) {
           console.error('Error fetching leaderboard:', repError);
-          setIsLoading(false);
+          toast({
+            variant: "destructive",
+            title: "שגיאה בטעינת מובילי הקהילה",
+            description: "אירעה שגיאה בטעינת נתוני המובילים. נסה שוב מאוחר יותר."
+          });
           return;
         }
 
         if (!repData || repData.length === 0) {
           setLeaders([]);
-          setIsLoading(false);
           return;
         }
 
@@ -70,13 +77,18 @@ export function CommunityLeaderboard() {
         setLeaders(formattedData);
       } catch (error) {
         console.error('Exception in fetchLeaderboard:', error);
+        toast({
+          variant: "destructive",
+          title: "שגיאה בטעינת מובילי הקהילה",
+          description: "אירעה שגיאה לא צפויה. נסה שוב מאוחר יותר."
+        });
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchLeaderboard();
-  }, []);
+  }, [toast]);
 
   // Helper to get rank icon/styling
   const getRankElement = (index: number) => {
@@ -101,21 +113,28 @@ export function CommunityLeaderboard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">המובילים בקהילה</CardTitle>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          <span>המובילים בקהילה</span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
               <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="h-8 w-8 rounded-full bg-gray-200"></div>
+                <Skeleton className="h-8 w-8 rounded-full" />
                 <div className="flex-1">
-                  <div className="h-4 w-24 bg-gray-200 rounded"></div>
-                  <div className="h-3 w-16 bg-gray-100 rounded mt-1"></div>
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-16 mt-1" />
                 </div>
               </div>
             ))}
+          </div>
+        ) : leaders.length === 0 ? (
+          <div className="text-center py-4 text-sm text-muted-foreground">
+            אין מובילים עדיין. היה הראשון!
           </div>
         ) : (
           <div className="space-y-4">

@@ -3,6 +3,8 @@ import React from 'react';
 import { Award, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { format } from 'date-fns';
+import { he } from 'date-fns/locale';
 
 export interface Badge {
   id: string;
@@ -40,12 +42,12 @@ export default function UserBadges({
   }, {});
   
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('he-IL', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    try {
+      const date = new Date(dateStr);
+      return format(date, 'PP', { locale: he });
+    } catch (error) {
+      return dateStr;
+    }
   };
   
   // Display badges
