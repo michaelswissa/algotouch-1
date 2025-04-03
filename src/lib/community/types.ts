@@ -8,6 +8,9 @@ export const ACTIVITY_TYPES = {
   COMMENT_ADDED: 'COMMENT_ADDED',
   DAILY_LOGIN: 'DAILY_LOGIN',
   PROFILE_COMPLETED: 'PROFILE_COMPLETED',
+  LESSON_WATCHED: 'LESSON_WATCHED',
+  MODULE_COMPLETED: 'MODULE_COMPLETED',
+  COURSE_COMPLETED: 'COURSE_COMPLETED',
 } as const;
 
 // Define the type for activity types
@@ -20,6 +23,9 @@ export const ACTIVITY_POINTS = {
   [ACTIVITY_TYPES.COMMENT_ADDED]: 3,
   [ACTIVITY_TYPES.DAILY_LOGIN]: 2,
   [ACTIVITY_TYPES.PROFILE_COMPLETED]: 15,
+  [ACTIVITY_TYPES.LESSON_WATCHED]: 5,
+  [ACTIVITY_TYPES.MODULE_COMPLETED]: 20,
+  [ACTIVITY_TYPES.COURSE_COMPLETED]: 50,
 };
 
 // Interface for reputation data
@@ -59,4 +65,16 @@ export interface Post {
     first_name: string | null;
     last_name: string | null;
   };
+}
+
+// Interface for course progress data
+export interface CourseProgress {
+  courseId: string;
+  userId: string;
+  lessonsWatched: string[]; // Array of lesson IDs
+  modulesCompleted: string[]; // Array of module IDs
+  isCompleted: boolean;
+  lastWatched: string;
+  created_at: string;
+  updated_at: string;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ChevronRight, Play, CheckCircle2, Clock, FileText, Video, Volume2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { useCommunity } from '@/contexts/community/CommunityContext';
+import { useAuth } from '@/contexts/auth';
+import { toast } from 'sonner';
 
 interface Lesson {
   id: number;
@@ -130,7 +133,7 @@ const mockCourseData: Record<string, Course> = {
       { title: "מבוא למסחר בחוזים עתידיים", duration: "45:22" },
       { title: "חוזים עתידיים על מדדים", duration: "38:15" },
       { title: "חוזים עתידיים על סחורות", duration: "42:30" },
-      { title: "גמישות בטחונות", duration: "27:45" },
+      { title: "גמישות בטחו��ות", duration: "27:45" },
       { title: "סשנים בשוק החוזים העתידיים", duration: "33:10" },
       { title: "פקיעות ורולים", duration: "29:55" },
       { title: "יתרונות וחסרונות במסחר בחוזים", duration: "35:20" }
@@ -153,6 +156,14 @@ const CourseDetail = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [activeTab, setActiveTab] = useState('content');
   const [activeVideoId, setActiveVideoId] = useState<number | null>(1);
+  const { isAuthenticated, user } = useAuth();
+  const { 
+    recordLessonWatched, 
+    completeModule, 
+    completeCourse,
+    courseProgress,
+    userBadges
+  } = useCommunity();
   
   const courseData = courseId && mockCourseData[courseId] ? mockCourseData[courseId] : Object.values(mockCourseData)[0];
 
@@ -160,8 +171,91 @@ const CourseDetail = () => {
   const videoUrl = activeLesson?.videoUrl || courseData.activeVideo?.url;
   const videoTitle = activeLesson?.title || courseData.activeVideo?.title || '';
 
-  const handleLessonClick = (lessonId: number) => {
+  const userProgress = courseProgress.find(progress => progress.courseId === courseId);
+  
+  const calculateProgress = () => {
+    if (!userProgress || courseData.lessons.length === 0) {
+      return courseData.progress;
+    }
+    
+    const watchedCount = userProgress.lessonsWatched.length;
+    return Math.round((watchedCount / courseData.lessons.length) * 100);
+  };
+  
+  const progressPercentage = calculateProgress();
+
+  const handleLessonClick = async (lessonId: number) => {
     setActiveVideoId(lessonId);
+    
+    if (isAuthenticated && user) {
+      const lessonIdStr = lessonId.toString();
+      await recordLessonWatched(courseId || 'unknown', lessonIdStr);
+      
+      const lessonModule = findModuleForLesson(lessonId);
+      if (lessonModule) {
+        const moduleId = courseData.modules.indexOf(lessonModule).toString();
+        const allModuleLessonsWatched = checkAllModuleLessonsWatched(lessonModule);
+        
+        if (allModuleLessonsWatched) {
+          await completeModule(courseId || 'unknown', moduleId);
+          
+          const allModulesCompleted = checkAllModulesCompleted();
+          if (allModulesCompleted) {
+            await completeCourse(courseId || 'unknown');
+          }
+        }
+      }
+    } else if (!isAuthenticated) {
+      toast.info('התחבר כדי לצבור נקודות על הצפייה בשיעורים');
+    }
+  };
+  
+  const findModuleForLesson = (lessonId: number) => {
+    const lessonIndex = courseData.lessons.findIndex(lesson => lesson.id === lessonId);
+    if (lessonIndex === -1) return null;
+    
+    const moduleIndex = Math.floor(lessonIndex / (courseData.lessons.length / courseData.modules.length));
+    return courseData.modules[moduleIndex < courseData.modules.length ? moduleIndex : 0];
+  };
+  
+  const checkAllModuleLessonsWatched = (module: any) => {
+    if (!userProgress) return false;
+    
+    const moduleIndex = courseData.modules.indexOf(module);
+    const lessonsPerModule = Math.ceil(courseData.lessons.length / courseData.modules.length);
+    const startIdx = moduleIndex * lessonsPerModule;
+    const endIdx = Math.min(startIdx + lessonsPerModule, courseData.lessons.length);
+    
+    const moduleLessons = courseData.lessons.slice(startIdx, endIdx);
+    
+    return moduleLessons.every(lesson => 
+      userProgress.lessonsWatched.includes(lesson.id.toString())
+    );
+  };
+  
+  const checkAllModulesCompleted = () => {
+    if (!userProgress) return false;
+    
+    return courseData.modules.every((_, index) => 
+      userProgress.modulesCompleted.includes(index.toString())
+    );
+  };
+  
+  const hasCourseCompletionBadge = () => {
+    if (!courseId) return false;
+    
+    return userBadges.some(userBadge => 
+      userBadge.badge.name.includes(courseData.title.substring(0, 10))
+    );
+  };
+
+  const handleVideoEnded = async () => {
+    if (isAuthenticated && activeVideoId) {
+      toast.success('השיעור הושלם!', {
+        description: 'המשך לשיעור הבא כדי להמשיך ללמוד',
+        duration: 3000,
+      });
+    }
   };
 
   return (
@@ -183,18 +277,25 @@ const CourseDetail = () => {
           <div className="sm:mr-6 flex items-center gap-2">
             <span className="text-sm font-medium">התקדמות:</span>
             <div className="w-full max-w-48 flex items-center gap-2">
-              <Progress value={courseData.progress} className="h-2" />
-              <span className="text-sm text-tradervue-green">{courseData.progress}%</span>
+              <Progress value={progressPercentage} className="h-2" />
+              <span className="text-sm text-tradervue-green">{progressPercentage}%</span>
             </div>
           </div>
           
           <div className="sm:mr-auto">
             <Button className="gap-2">
               <Play className="size-4" />
-              המשך ללמוד
+              המשך ללמוד {isAuthenticated && "(+5 נקודות)"}
             </Button>
           </div>
         </div>
+        
+        {hasCourseCompletionBadge() && (
+          <div className="mt-3 bg-primary/10 text-primary px-3 py-2 rounded-md flex items-center gap-2">
+            <CheckCircle2 className="size-4" />
+            <span className="text-sm font-medium">קורס הושלם! קיבלת תעודה על השלמת הקורס</span>
+          </div>
+        )}
       </div>
       
       <div className="mb-6 bg-background/40 rounded-xl overflow-hidden shadow-lg border border-primary/10">
@@ -206,6 +307,7 @@ const CourseDetail = () => {
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
+            onEnded={handleVideoEnded}
           ></iframe>
         </div>
         <div className="p-4 flex justify-between items-center bg-card/80 backdrop-blur-sm border-t">
@@ -255,34 +357,38 @@ const CourseDetail = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {courseData.lessons.map(lesson => (
-                      <div 
-                        key={lesson.id} 
-                        className={`p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer
-                                ${activeVideoId === lesson.id ? 'border-primary bg-primary/5' : ''}`}
-                        onClick={() => handleLessonClick(lesson.id)}
-                      >
-                        <Button size="icon" variant={activeVideoId === lesson.id ? "default" : "secondary"} className="size-10 rounded-full flex-shrink-0">
-                          <Play className="size-5" />
-                        </Button>
-                        <div className="flex-grow">
-                          <h3 className="font-medium">{lesson.title}</h3>
-                          {lesson.duration && (
-                            <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                              <Clock className="size-3.5" />
-                              {lesson.duration}
-                            </div>
+                    {courseData.lessons.map(lesson => {
+                      const isWatched = userProgress?.lessonsWatched.includes(lesson.id.toString());
+                      
+                      return (
+                        <div 
+                          key={lesson.id} 
+                          className={`p-3 border rounded-lg flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer
+                                  ${activeVideoId === lesson.id ? 'border-primary bg-primary/5' : ''}`}
+                          onClick={() => handleLessonClick(lesson.id)}
+                        >
+                          <Button size="icon" variant={activeVideoId === lesson.id ? "default" : "secondary"} className="size-10 rounded-full flex-shrink-0">
+                            <Play className="size-5" />
+                          </Button>
+                          <div className="flex-grow">
+                            <h3 className="font-medium">{lesson.title}</h3>
+                            {lesson.duration && (
+                              <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                <Clock className="size-3.5" />
+                                {lesson.duration}
+                              </div>
+                            )}
+                          </div>
+                          {isWatched || lesson.completed ? (
+                            <CheckCircle2 className="size-5 text-tradervue-green flex-shrink-0" />
+                          ) : (
+                            <Button size="sm" variant="ghost" className="flex-shrink-0">
+                              המשך
+                            </Button>
                           )}
                         </div>
-                        {lesson.completed ? (
-                          <CheckCircle2 className="size-5 text-tradervue-green flex-shrink-0" />
-                        ) : (
-                          <Button size="sm" variant="ghost" className="flex-shrink-0">
-                            המשך
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -295,32 +401,41 @@ const CourseDetail = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {courseData.modules.map((module, index) => (
-                      <div key={index} className="group">
-                        <div className="flex gap-3 items-start p-2 rounded-lg hover:bg-muted/30 transition-colors">
-                          <div className="mt-0.5 size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium flex-shrink-0">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <h3 className="font-medium group-hover:text-primary transition-colors">
-                              {module.title}
-                              {module.isNew && (
-                                <span className="mr-2 bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-semibold">
-                                  חדש
-                                </span>
+                    {courseData.modules.map((module, index) => {
+                      const isCompleted = userProgress?.modulesCompleted.includes(index.toString());
+                      
+                      return (
+                        <div key={index} className="group">
+                          <div className="flex gap-3 items-start p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                            <div className={`mt-0.5 size-6 rounded-full ${isCompleted ? 'bg-green-500 text-white' : 'bg-primary/10 text-primary'} flex items-center justify-center text-xs font-medium flex-shrink-0`}>
+                              {isCompleted ? <CheckCircle2 className="size-4" /> : index + 1}
+                            </div>
+                            <div>
+                              <h3 className="font-medium group-hover:text-primary transition-colors">
+                                {module.title}
+                                {module.isNew && (
+                                  <span className="mr-2 bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-semibold">
+                                    חדש
+                                  </span>
+                                )}
+                                {isCompleted && (
+                                  <span className="mr-2 bg-green-100 text-green-600 px-1.5 py-0.5 rounded text-xs font-semibold">
+                                    הושלם
+                                  </span>
+                                )}
+                              </h3>
+                              {module.duration && (
+                                <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Clock className="size-3.5" />
+                                  {module.duration}
+                                </div>
                               )}
-                            </h3>
-                            {module.duration && (
-                              <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                                <Clock className="size-3.5" />
-                                {module.duration}
-                              </div>
-                            )}
-                            {module.details && <p className="text-sm text-muted-foreground mt-1">{module.details}</p>}
+                              {module.details && <p className="text-sm text-muted-foreground mt-1">{module.details}</p>}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>

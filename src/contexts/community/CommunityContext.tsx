@@ -13,7 +13,9 @@ import {
   Badge,
   UserBadge,
   Post,
-  ReputationData
+  ReputationData,
+  getUserCourseProgress,
+  CourseProgress
 } from '@/lib/community';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,11 +32,17 @@ interface CommunityContextType {
   posts: Post[];
   loading: boolean;
 
+  // Course progress data
+  courseProgress: CourseProgress[];
+
   // Actions
   refreshData: () => Promise<void>;
   handlePostCreated: () => Promise<void>;
   handlePostLiked: (postId: string) => Promise<void>;
   checkAndAwardDailyLogin: () => Promise<void>;
+  recordLessonWatched: (courseId: string, lessonId: string) => Promise<boolean>;
+  completeModule: (courseId: string, moduleId: string) => Promise<boolean>;
+  completeCourse: (courseId: string) => Promise<boolean>;
 }
 
 const CommunityContext = createContext<CommunityContextType | undefined>(undefined);
@@ -49,6 +57,7 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
   const [userLevel, setUserLevel] = useState(1);
   const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
   const [allBadges, setAllBadges] = useState<Badge[]>([]);
+  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
   
   // Load initial data
   useEffect(() => {
@@ -81,6 +90,10 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
         // Load all badges
         const availableBadges = await getAllBadges();
         setAllBadges(availableBadges);
+
+        // Load course progress
+        const progress = await getUserCourseProgress(user.id);
+        setCourseProgress(progress);
       }
     } catch (error) {
       console.error('Error loading community data:', error);
@@ -161,6 +174,81 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
     const updatedPosts = await getCommunityPosts();
     setPosts(updatedPosts);
   };
+
+  // Function to record a lesson watched
+  const handleLessonWatched = async (courseId: string, lessonId: string) => {
+    if (!user) return false;
+
+    try {
+      // Import dynamically to avoid circular imports
+      const { recordLessonWatched } = await import('@/lib/community/course-service');
+      const result = await recordLessonWatched(user.id, courseId, lessonId);
+      
+      if (result) {
+        toast.success('קיבלת 5 נקודות על צפייה בשיעור!', {
+          duration: 3000,
+        });
+
+        // Update user data
+        await refreshData();
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error recording lesson watched:', error);
+      return false;
+    }
+  };
+
+  // Function to complete a module
+  const handleModuleCompleted = async (courseId: string, moduleId: string) => {
+    if (!user) return false;
+    
+    try {
+      // Import dynamically to avoid circular imports
+      const { completeModule } = await import('@/lib/community/course-service');
+      const result = await completeModule(user.id, courseId, moduleId);
+      
+      if (result) {
+        toast.success('מודול הושלם! קיבלת 20 נקודות!', {
+          duration: 3000,
+        });
+
+        // Update user data
+        await refreshData();
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error completing module:', error);
+      return false;
+    }
+  };
+
+  // Function to complete a course
+  const handleCourseCompleted = async (courseId: string) => {
+    if (!user) return false;
+    
+    try {
+      // Import dynamically to avoid circular imports
+      const { completeCourse } = await import('@/lib/community/course-service');
+      const result = await completeCourse(user.id, courseId);
+      
+      if (result) {
+        toast.success('קורס הושלם! קיבלת 50 נקודות ותעודה חדשה!', {
+          duration: 4000,
+        });
+
+        // Update user data
+        await refreshData();
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error completing course:', error);
+      return false;
+    }
+  };
   
   const value = {
     userPoints,
@@ -169,10 +257,14 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
     allBadges,
     posts,
     loading,
+    courseProgress,
     refreshData,
     handlePostCreated,
     handlePostLiked,
-    checkAndAwardDailyLogin
+    checkAndAwardDailyLogin,
+    recordLessonWatched: handleLessonWatched,
+    completeModule: handleModuleCompleted,
+    completeCourse: handleCourseCompleted
   };
   
   return (
