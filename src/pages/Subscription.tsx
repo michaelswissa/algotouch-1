@@ -1,27 +1,37 @@
 
-import React, { useEffect, useState } from 'react';
-import { useParams, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useParams, Navigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
-import DigitalContractForm from '@/components/DigitalContractForm';
-import PaymentForm from '@/components/payment/PaymentForm';
 import { useAuth } from '@/contexts/auth';
-import { Button } from '@/components/ui/button';
-import { Check, ChevronRight } from 'lucide-react';
-import { Steps, Step } from '@/components/subscription/Steps';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { SubscriptionProvider, useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
+import { useRegistrationData } from '@/hooks/useRegistrationData';
+import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
+import SubscriptionSuccess from '@/components/subscription/SubscriptionSuccess';
+import ContractSection from '@/components/subscription/ContractSection';
+import PaymentSection from '@/components/subscription/PaymentSection';
 
-const Subscription = () => {
+// Inner component to use the contexts
+const SubscriptionContent = () => {
   const { planId } = useParams<{ planId: string }>();
   const { user, isAuthenticated, loading } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedPlan, setSelectedPlan] = useState<string | undefined>(planId);
-  const [fullName, setFullName] = useState('');
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [registrationData, setRegistrationData] = useState<any>(null);
-  const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
-  const navigate = useNavigate();
+  const { 
+    hasActiveSubscription, 
+    isCheckingSubscription, 
+    checkUserSubscription,
+    fullName 
+  } = useSubscriptionContext();
+  
+  const {
+    registrationData,
+    updateRegistrationData,
+    currentStep,
+    setCurrentStep,
+    selectedPlan,
+    setSelectedPlan
+  } = useRegistrationData();
+  
   const location = useLocation();
   const isRegistering = location.state?.isRegistering === true;
 
@@ -32,84 +42,23 @@ const Subscription = () => {
       planId
     });
     
-    // Check for registration data from session storage (for new sign-ups)
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        const data = JSON.parse(storedData);
-        console.log('Registration data found:', { 
-          email: data.email, 
-          firstName: data.userData?.firstName,
-          registrationTime: data.registrationTime 
-        });
-        
-        setRegistrationData(data);
-        
-        if (data.contractSigned) {
-          setCurrentStep(3);
-          setSelectedPlan(data.planId);
-        } else if (data.planId) {
-          setCurrentStep(2);
-          setSelectedPlan(data.planId);
-        }
-      } catch (error) {
-        console.error('Error parsing registration data:', error);
-        toast.error('חלה שגיאה בטעינת נתוני ההרשמה');
-      }
-    }
-    
     // For logged-in users, check subscription status
-    const checkSubscription = async () => {
-      if (user?.id) {
-        try {
-          setIsCheckingSubscription(true);
-          const { data, error } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (data && !error) {
-            console.log('Existing subscription found:', data.status);
-            setHasActiveSubscription(true);
-          } else {
-            console.log('No existing subscription found');
-          }
-          
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', user.id)
-            .single();
-          
-          if (profile) {
-            setFullName(`${profile.first_name || ''} ${profile.last_name || ''}`);
-          }
-        } catch (error) {
-          console.error("Error checking subscription:", error);
-        } finally {
-          setIsCheckingSubscription(false);
-        }
-      } else {
-        setIsCheckingSubscription(false);
-      }
-    };
-    
     if (isAuthenticated && user) {
-      checkSubscription();
-    } else {
-      setIsCheckingSubscription(false);
+      checkUserSubscription(user.id);
     }
-  }, [user, planId, isAuthenticated, isRegistering]);
+    
+    // Set initial plan from URL if available
+    if (planId && !selectedPlan) {
+      setSelectedPlan(planId);
+    }
+  }, [user, planId, isAuthenticated, isRegistering, checkUserSubscription]);
 
   // Show loading state while checking subscription
   if (loading || isCheckingSubscription) {
     return (
-      <Layout className="py-8" hideSidebar={true}>
-        <div className="flex justify-center items-center min-h-[60vh]">
-          <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin"></div>
-        </div>
-      </Layout>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin"></div>
+      </div>
     );
   }
 
@@ -126,117 +75,86 @@ const Subscription = () => {
   }
 
   const handlePlanSelect = (planId: string) => {
-    setSelectedPlan(planId);
-    setCurrentStep(2);
-    
-    if (registrationData) {
-      const updatedData = {
-        ...registrationData,
-        planId
-      };
-      sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
-      console.log('Updated registration data with selected plan:', planId);
-    } else {
-      console.log('No registration data found, but continuing with plan selection:', planId);
-    }
+    updateRegistrationData({ planId });
+    console.log('Selected plan:', planId);
   };
 
   const handleContractSign = (contractData: any) => {
     // Store the contract details in the registration data
-    if (registrationData) {
-      const updatedData = {
-        ...registrationData,
-        contractSigned: true,
-        contractSignedAt: new Date().toISOString(),
-        contractDetails: {
-          contractHtml: contractData.contractHtml,
-          signature: contractData.signature,
-          agreedToTerms: contractData.agreedToTerms,
-          agreedToPrivacy: contractData.agreedToPrivacy,
-          contractVersion: contractData.contractVersion || "1.0",
-          browserInfo: {
-            userAgent: navigator.userAgent,
-            language: navigator.language,
-            platform: navigator.platform,
-            screenSize: `${window.innerWidth}x${window.innerHeight}`,
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-          }
+    updateRegistrationData({
+      contractSigned: true,
+      contractSignedAt: new Date().toISOString(),
+      contractDetails: {
+        contractHtml: contractData.contractHtml,
+        signature: contractData.signature,
+        agreedToTerms: contractData.agreedToTerms,
+        agreedToPrivacy: contractData.agreedToPrivacy,
+        contractVersion: contractData.contractVersion || "1.0",
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          screenSize: `${window.innerWidth}x${window.innerHeight}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         }
-      };
-      sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
-      console.log('Contract signed, updated registration data with contract details');
-    } else {
-      console.log('Contract signed but no registration data to update');
-    }
+      }
+    });
     
-    setCurrentStep(3);
+    console.log('Contract signed, updated registration data with contract details');
   };
 
   const handlePaymentComplete = () => {
     setCurrentStep(4);
-    console.log('Payment completed, redirecting to dashboard shortly');
-    
-    setTimeout(() => {
-      navigate('/dashboard', { replace: true });
-    }, 3000);
+    console.log('Payment completed');
   };
 
   return (
-    <Layout className="py-8" hideSidebar={true}>
-      <div className="max-w-5xl mx-auto px-4" dir="rtl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">השלמת תהליך ההרשמה</h1>
-          <p className="text-muted-foreground">יש להשלים את השלבים הבאים לקבלת גישה למערכת</p>
-          
-          <Steps currentStep={currentStep} className="mt-8">
-            <Step title="בחירת תכנית" />
-            <Step title="חתימה על הסכם" />
-            <Step title="פרטי תשלום" />
-            <Step title="אישור" />
-          </Steps>
-        </div>
+    <div className="max-w-5xl mx-auto px-4" dir="rtl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">השלמת תהליך ההרשמה</h1>
+        <p className="text-muted-foreground">יש להשלים את השלבים הבאים לקבלת גישה למערכת</p>
         
-        {currentStep === 1 && (
-          <SubscriptionPlans onSelectPlan={handlePlanSelect} selectedPlanId={selectedPlan} />
-        )}
-        
-        {currentStep === 2 && selectedPlan && (
-          <DigitalContractForm 
-            onSign={handleContractSign} 
-            planId={selectedPlan} 
-            fullName={fullName} 
-          />
-        )}
-        
-        {currentStep === 3 && selectedPlan && (
-          <PaymentForm planId={selectedPlan} onPaymentComplete={handlePaymentComplete} />
-        )}
-        
-        {currentStep === 4 && (
-          <div className="max-w-md mx-auto bg-green-50 dark:bg-green-900/20 text-center p-8 rounded-xl border border-green-200 dark:border-green-800">
-            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-800/30 rounded-full flex items-center justify-center mb-4">
-              <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-green-800 dark:text-green-400 mb-2">
-              הרשמה הושלמה בהצלחה!
-            </h2>
-            <p className="text-green-700 dark:text-green-300 mb-6">
-              ברכות! נרשמת בהצלחה לתקופת ניסיון חינם. כעת יש לך גישה מלאה למערכת.
-            </p>
-            <Button onClick={() => navigate('/dashboard', { replace: true })} className="gap-2">
-              המשך לדף הבית <ChevronRight className="h-4 w-4 -rotate-180" />
-            </Button>
-          </div>
-        )}
-        
-        {currentStep > 1 && currentStep < 4 && (
-          <div className="mt-6 flex justify-between">
-            <Button variant="outline" onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))}>
-              חזור
-            </Button>
-          </div>
-        )}
+        <SubscriptionSteps currentStep={currentStep} />
       </div>
+      
+      {currentStep === 1 && (
+        <SubscriptionPlans 
+          onSelectPlan={handlePlanSelect} 
+          selectedPlanId={selectedPlan} 
+        />
+      )}
+      
+      {currentStep === 2 && selectedPlan && (
+        <ContractSection
+          selectedPlan={selectedPlan}
+          fullName={fullName}
+          onSign={handleContractSign}
+          onBack={() => setCurrentStep(1)}
+        />
+      )}
+      
+      {currentStep === 3 && selectedPlan && (
+        <PaymentSection
+          selectedPlan={selectedPlan}
+          onPaymentComplete={handlePaymentComplete}
+          onBack={() => setCurrentStep(2)}
+        />
+      )}
+      
+      {currentStep === 4 && (
+        <SubscriptionSuccess />
+      )}
+    </div>
+  );
+};
+
+// Wrapper component to provide context
+const Subscription = () => {
+  return (
+    <Layout className="py-8" hideSidebar={true}>
+      <SubscriptionProvider>
+        <SubscriptionContent />
+      </SubscriptionProvider>
     </Layout>
   );
 };
