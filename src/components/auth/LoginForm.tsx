@@ -32,6 +32,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     
     try {
       setLoggingIn(true);
+      console.log('Attempting sign in with:', email);
       await signIn(email, password);
       
       console.log('Login successful, redirectToSubscription:', state?.redirectToSubscription);
@@ -39,9 +40,17 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       if (onLoginSuccess) {
         onLoginSuccess();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('התחברות נכשלה. אנא בדוק את פרטי ההתחברות שלך ונסה שוב.');
+      
+      // Show specific error messages for common errors
+      if (error.message.includes('Invalid login credentials')) {
+        toast.error('פרטי התחברות שגויים. אנא בדוק את הדוא"ל והסיסמה');
+      } else if (error.message.includes('Email not confirmed')) {
+        toast.error('הדוא"ל שלך לא אומת. אנא בדוק את תיבת הדואר הנכנס שלך');
+      } else {
+        toast.error('התחברות נכשלה. אנא בדוק את פרטי ההתחברות שלך ונסה שוב.');
+      }
     } finally {
       setLoggingIn(false);
     }
@@ -55,16 +64,21 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     
     try {
       setResettingPassword(true);
+      console.log('Requesting password reset for:', email);
       
-      // Use Supabase's built-in password reset functionality with custom templates
+      // Use Supabase's built-in password reset functionality
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Password reset error:', error.message);
+        throw error;
+      }
       
+      console.log('Password reset email sent successfully');
       toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Password reset error:', error);
       toast.error('אירעה שגיאה בעת איפוס הסיסמה. אנא נסה שוב מאוחר יותר.');
     } finally {

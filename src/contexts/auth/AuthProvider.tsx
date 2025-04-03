@@ -57,10 +57,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
+        console.error('Sign in error:', error.message);
         toast.error(error.message);
         throw error;
       }
       
+      console.log('Sign in successful');
       toast.success('התחברת בהצלחה!');
       
       // Use setTimeout to prevent immediate navigation
@@ -82,10 +84,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signOut();
       
       if (error) {
+        console.error('Sign out error:', error.message);
         toast.error(error.message);
         throw error;
       }
       
+      console.log('Sign out successful');
       toast.success('התנתקת בהצלחה');
       
       // Use a longer timeout for sign out to ensure all state is cleared
@@ -115,10 +119,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', user.id);
       
       if (error) {
+        console.error('Update profile error:', error.message);
         toast.error(error.message);
         throw error;
       }
       
+      console.log('Profile updated successfully');
       toast.success('הפרופיל עודכן בהצלחה');
     } catch (error) {
       console.error('Error updating profile:', error);

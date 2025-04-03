@@ -61,6 +61,8 @@ export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: 
  * Sends a welcome email to a newly registered user
  */
 export async function sendWelcomeEmail(userEmail: string, userName: string): Promise<{ success: boolean }> {
+  console.log('Sending welcome email to:', userEmail);
+  
   return sendEmail({
     to: userEmail,
     subject: 'ברוכים הבאים ל-AlgoTouch - פלטפורמת המסחר החכמה',
@@ -93,6 +95,8 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
  * Sends a verification email for account confirmation
  */
 export async function sendVerificationEmail(userEmail: string, verificationLink: string): Promise<{ success: boolean }> {
+  console.log('Sending verification email to:', userEmail);
+  
   return sendEmail({
     to: userEmail,
     subject: 'אימות חשבון AlgoTouch - צעד אחד לפני שמתחילים',
@@ -124,13 +128,14 @@ export async function sendVerificationEmail(userEmail: string, verificationLink:
  * Sends a password reset email
  */
 export async function sendPasswordResetEmail(userEmail: string, resetLink: string): Promise<{ success: boolean }> {
+  console.log('Sending password reset email to:', userEmail);
+  
   return sendEmail({
     to: userEmail,
     subject: 'איפוס סיסמה ל-AlgoTouch',
     html: `
     <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
       <div style="text-align: center; margin-bottom: 30px; background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
-        <img src="https://algotouch.co.il/wp-content/uploads/2022/12/1White-Logo.svg" alt="AlgoTouch" style="height: 60px; margin-bottom: 10px;">
         <h1 style="color: #4a90e2; margin: 10px 0;">AlgoTouch</h1>
         <p style="font-size: 18px; color: #666; margin: 0;">פלטפורמת המסחר החכמה</p>
       </div>

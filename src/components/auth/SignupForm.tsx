@@ -35,8 +35,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       return;
     }
     
+    if (password.length < 6) {
+      toast.error('הסיסמה חייבת להכיל לפחות 6 תווים');
+      return;
+    }
+    
     try {
       setSigningUp(true);
+      console.log('Starting registration process for:', email);
       
       // Store registration data in session storage for the subscription flow
       const registrationData = {
@@ -129,6 +135,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
             />
           </div>
           <div className="space-y-2">

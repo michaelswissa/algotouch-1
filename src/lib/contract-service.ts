@@ -16,6 +16,8 @@ export async function sendContractConfirmationEmail(
   const formattedDate = dateObj.toLocaleDateString('he-IL');
   const formattedTime = dateObj.toLocaleTimeString('he-IL');
 
+  console.log('Sending contract confirmation email to:', userEmail);
+  
   return sendEmail({
     to: userEmail,
     subject: 'אישור חתימה על הסכם - AlgoTouch',
@@ -79,8 +81,14 @@ export async function processSignedContract(
 
     console.log('Contract signature saved successfully:', data);
     
-    // The confirmation email is now sent from the Edge Function
-    // We don't need to send it again from here
+    // Also send a confirmation email directly, in case the edge function fails
+    try {
+      await sendContractConfirmationEmail(email, fullName, new Date().toISOString());
+      console.log('Contract confirmation email sent directly');
+    } catch (emailError) {
+      console.error('Error sending direct confirmation email:', emailError);
+      // Don't return false here, as the contract was still saved successfully
+    }
     
     return true;
   } catch (error) {
