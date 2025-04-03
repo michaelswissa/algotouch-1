@@ -9,7 +9,10 @@ export const ACTIVITY_TYPES = {
   COMMENT_ADDED: 'comment_added',
   DAILY_LOGIN: 'daily_login',
   PROFILE_COMPLETED: 'profile_completed',
-};
+} as const;
+
+// Define the type for activity types
+export type ActivityType = keyof typeof ACTIVITY_TYPES;
 
 // Points for each activity type
 export const ACTIVITY_POINTS = {
@@ -43,17 +46,38 @@ export interface UserBadge {
   earned_at: string;
 }
 
+// Interface for post data
+export interface Post {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  likes: number;
+  comments: number;
+  created_at: string;
+  updated_at: string;
+  profiles?: {
+    first_name: string | null;
+    last_name: string | null;
+  };
+}
+
 /**
  * Initialize user reputation if they don't have it yet
  */
 export async function initUserReputation(userId: string): Promise<ReputationData | null> {
   try {
     // Check if user already has reputation
-    const { data: existingRep } = await supabase
+    const { data: existingRep, error: fetchError } = await supabase
       .from('community_reputation')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
+    
+    if (fetchError) {
+      console.error('Error fetching reputation:', fetchError);
+      return null;
+    }
     
     if (existingRep) {
       return {
@@ -91,7 +115,7 @@ export async function initUserReputation(userId: string): Promise<ReputationData
  */
 export async function awardPoints(
   userId: string, 
-  activityType: keyof typeof ACTIVITY_TYPES, 
+  activityType: ActivityType, 
   referenceId?: string
 ): Promise<boolean> {
   try {
@@ -120,13 +144,19 @@ export async function awardPoints(
       return false;
     }
     
-    // Update user's points
-    const { error: updateError } = await supabase.rpc('increment_user_points', {
-      user_id_param: userId,
-      points_to_add: pointsToAward
-    }).single();
-    
-    if (updateError) {
+    // Update user's points using RPC
+    try {
+      const { error: rpcError } = await supabase.rpc('increment_user_points', {
+        user_id_param: userId,
+        points_to_add: pointsToAward
+      });
+      
+      if (rpcError) {
+        throw rpcError;
+      }
+    } catch (rpcError) {
+      console.warn('RPC failed, using fallback method:', rpcError);
+      
       // Fallback method if RPC doesn't exist yet
       const { data: currentRep } = await supabase
         .from('community_reputation')
@@ -137,7 +167,10 @@ export async function awardPoints(
       if (currentRep) {
         const { error } = await supabase
           .from('community_reputation')
-          .update({ points: currentRep.points + pointsToAward, updated_at: new Date().toISOString() })
+          .update({ 
+            points: currentRep.points + pointsToAward, 
+            updated_at: new Date().toISOString() 
+          })
           .eq('user_id', userId);
           
         if (error) {
@@ -215,7 +248,7 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
       return [];
     }
     
-    return data || [];
+    return data as UserBadge[] || [];
   } catch (error) {
     console.error('Exception in getUserBadges:', error);
     return [];
@@ -237,7 +270,7 @@ export async function getAllBadges(): Promise<Badge[]> {
       return [];
     }
     
-    return data || [];
+    return data as Badge[] || [];
   } catch (error) {
     console.error('Exception in getAllBadges:', error);
     return [];
@@ -339,7 +372,7 @@ export async function likePost(
 /**
  * Get posts for the community page
  */
-export async function getCommunityPosts() {
+export async function getCommunityPosts(): Promise<Post[]> {
   try {
     const { data, error } = await supabase
       .from('community_posts')
@@ -363,7 +396,7 @@ export async function getCommunityPosts() {
       return [];
     }
     
-    return data || [];
+    return data as Post[] || [];
   } catch (error) {
     console.error('Exception in getCommunityPosts:', error);
     return [];

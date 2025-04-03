@@ -1,13 +1,26 @@
 
 import React from 'react';
-import { Badge as BadgeData, UserBadge } from '@/lib/reputation-service';
 import { Award, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  points_required: number;
+}
+
+export interface UserBadge {
+  id: string;
+  badge: Badge;
+  earned_at: string;
+}
+
 interface UserBadgesProps {
   earnedBadges: UserBadge[];
-  allBadges: BadgeData[];
+  allBadges: Badge[];
   className?: string;
   showLocked?: boolean;
 }
