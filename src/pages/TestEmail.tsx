@@ -8,8 +8,7 @@ import SendEmailCard from '@/components/email-test/SendEmailCard';
 import ResultCard from '@/components/email-test/ResultCard';
 import DevelopmentWarning from '@/components/email-test/DevelopmentWarning';
 import { ConnectionStatus, EmailTestResult } from '@/components/email-test/types';
-import { testSmtpConnection } from '@/lib/email-service';
-import { sendEmail } from '@/lib/email-service';
+import { testSmtpConnection, sendEmail } from '@/lib/email-service';
 
 export default function TestEmail() {
   const [smtpResult, setSmtpResult] = useState<EmailTestResult | null>(null);
@@ -45,6 +44,16 @@ export default function TestEmail() {
       setIsSending(true);
       setSendResult(null);
       
+      // Generate current timestamp in Hebrew locale
+      const timestamp = new Date().toLocaleString('he-IL', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      
       const result = await sendEmail({
         to: recipient,
         subject: 'בדיקת שליחת אימייל מ-AlgoTouch',
@@ -54,7 +63,7 @@ export default function TestEmail() {
             <p>שלום,</p>
             <p>זהו מייל בדיקה ממערכת AlgoTouch.</p>
             <p>אם קיבלת את ההודעה הזו, סימן שמערכת שליחת האימיילים עובדת כראוי.</p>
-            <p>זמן שליחה: ${new Date().toLocaleString('he-IL')}</p>
+            <p>זמן שליחה: ${timestamp}</p>
             <hr style="border: 1px solid #eaeaea; margin: 20px 0;" />
             <p style="color: #666; font-size: 12px;">הודעה זו נשלחה אוטומטית ואין צורך להשיב עליה.</p>
           </div>

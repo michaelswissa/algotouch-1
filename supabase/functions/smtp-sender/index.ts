@@ -100,7 +100,7 @@ serve(async (req) => {
     
     console.log(`Sending email to ${emailRequest.to} with subject: ${emailRequest.subject}`);
     
-    // Create an SMTP client
+    // Create an SMTP client with expanded options
     const client = new SMTPClient({
       connection: {
         hostname: smtp_host,
@@ -110,6 +110,8 @@ serve(async (req) => {
           username: smtp_user,
           password: smtp_pass,
         },
+        // Add timeout options
+        timeout: 30000, // 30 seconds connection timeout
       },
       debug: {
         logger: true,
@@ -126,24 +128,30 @@ serve(async (req) => {
           console.log(`Processing attachment: ${attachment.filename}, mimeType: ${attachment.mimeType}`);
           console.log(`Content length before decoding: ${attachment.content.length} characters`);
           
-          // Handle base64 content safely
+          // Better base64 handling
           let content;
           try {
-            content = Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0));
+            // Try handling various base64 formats
+            let base64String = attachment.content;
+            
+            // Remove potential data URL prefix
+            if (base64String.startsWith('data:')) {
+              base64String = base64String.split(',')[1];
+            }
+            
+            // Replace URL-safe characters with standard base64 chars
+            base64String = base64String.replace(/-/g, '+').replace(/_/g, '/');
+            
+            // Add padding if needed
+            while (base64String.length % 4) {
+              base64String += '=';
+            }
+            
+            content = Uint8Array.from(atob(base64String), c => c.charCodeAt(0));
             console.log(`Successfully decoded base64 content, size: ${content.length} bytes`);
           } catch (decodeErr) {
             console.error(`Error decoding base64 content for ${attachment.filename}:`, decodeErr);
-            
-            // Try alternate approach if standard atob fails
-            try {
-              // Handle potential URLSafe base64 or other variants
-              const base64 = attachment.content.replace(/-/g, '+').replace(/_/g, '/');
-              content = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-              console.log(`Successfully decoded using modified base64, size: ${content.length} bytes`);
-            } catch (secondTryErr) {
-              console.error("Second attempt to decode also failed:", secondTryErr);
-              throw new Error(`Failed to decode attachment content: ${decodeErr.message}`);
-            }
+            throw new Error(`Failed to decode attachment content: ${decodeErr.message}`);
           }
           
           attachments.push({
@@ -151,7 +159,7 @@ serve(async (req) => {
             contentType: attachment.mimeType,
             content: content,
           });
-          console.log(`Processed attachment: ${attachment.filename}, size: ${content.length} bytes`);
+          console.log(`Successfully processed attachment: ${attachment.filename}`);
         } catch (err) {
           console.error(`Error processing attachment ${attachment.filename}:`, err);
           throw new Error(`Failed to process attachment ${attachment.filename}: ${err.message}`);
@@ -185,7 +193,7 @@ serve(async (req) => {
     }
     
     // Log email sending attempt
-    console.log(`Sending email with options:`, JSON.stringify({
+    console.log(`Preparing to send email with options:`, JSON.stringify({
       from: emailOptions.from,
       to: emailOptions.to,
       subject: emailOptions.subject,
@@ -204,13 +212,27 @@ serve(async (req) => {
     while (attempt < maxAttempts) {
       attempt++;
       try {
-        console.log(`Attempt ${attempt} to send email...`);
+        console.log(`Attempt ${attempt} to connect to SMTP server...`);
+        
+        // First test the connection
+        await client.connect();
+        console.log("SMTP connection established successfully");
+        
+        console.log(`Sending email on attempt ${attempt}...`);
         sendResult = await client.send(emailOptions);
         console.log(`Email sent successfully on attempt ${attempt}:`, sendResult);
         break;
       } catch (error) {
         lastError = error;
         console.error(`Attempt ${attempt} failed:`, error);
+        
+        // Try to close the connection if it was opened
+        try {
+          await client.close();
+          console.log("SMTP connection closed after error");
+        } catch (closeError) {
+          console.error("Error closing SMTP connection:", closeError);
+        }
         
         if (attempt < maxAttempts) {
           const delay = 1000 * attempt; // Incremental backoff
