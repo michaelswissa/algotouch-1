@@ -14,11 +14,11 @@ interface EmailRequest {
 }
 
 /**
- * Sends an email using our custom Gmail API integration
+ * Sends an email using our SMTP integration
  */
 export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('gmail-sender', {
+    const { data, error } = await supabase.functions.invoke('smtp-sender', {
       body: emailRequest,
     });
 

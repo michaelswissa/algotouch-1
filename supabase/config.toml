@@ -100,3 +100,12 @@ imports = {
   serve = "https://deno.land/std@0.168.0/http/server.ts",
   "googleapis" = "https://esm.sh/googleapis@126.0.1"
 }
+
+[functions.smtp-sender]
+verify_jwt = true
+
+[functions.smtp-sender.import_map]
+imports = {
+  serve = "https://deno.land/std@0.168.0/http/server.ts",
+  "denomailer" = "https://deno.land/x/denomailer@1.6.0/mod.ts"
+}
