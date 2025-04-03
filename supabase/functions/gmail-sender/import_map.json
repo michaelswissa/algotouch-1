@@ -1,8 +1,6 @@
 
 {
   "imports": {
-    "https://deno.land/std@0.168.0/http/server.ts": "https://deno.land/std@0.168.0/http/server.ts",
-    "googleapis": "https://cdn.jsdelivr.net/npm/googleapis@126.0.1/+esm",
-    "jwt": "https://esm.sh/jsonwebtoken@9.0.2"
+    "https://deno.land/std@0.168.0/http/server.ts": "https://deno.land/std@0.168.0/http/server.ts"
   }
 }
