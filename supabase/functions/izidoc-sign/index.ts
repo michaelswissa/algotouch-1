@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -58,6 +59,75 @@ function validateRequest(request: SigningRequest) {
 async function storeSignature(supabase: any, request: SigningRequest, ipAddress: string) {
   console.log(`Storing signature for user: ${request.userId}, plan: ${request.planId}`);
   try {
+    // Store the contract HTML in storage first
+    const contractFileName = `contract_${request.userId}_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
+    const contractData = request.contractHtml;
+    
+    // Create contracts bucket if it doesn't exist
+    try {
+      const { data: bucketExists } = await supabase
+        .storage
+        .getBucket('contracts');
+      
+      if (!bucketExists) {
+        const { error: bucketError } = await supabase
+          .storage
+          .createBucket('contracts', {
+            public: false,
+            fileSizeLimit: 10485760, // 10MB
+          });
+        
+        if (bucketError) {
+          console.error("Error creating bucket:", bucketError);
+        } else {
+          console.log("Created contracts bucket successfully");
+        }
+      }
+    } catch (bucketCheckError) {
+      console.log("Bucket check error, attempting to create it:", bucketCheckError);
+      try {
+        await supabase.storage.createBucket('contracts', {
+          public: false,
+          fileSizeLimit: 10485760, // 10MB
+        });
+        console.log("Created contracts bucket successfully after error");
+      } catch (createBucketError) {
+        console.error("Failed to create contracts bucket:", createBucketError);
+      }
+    }
+
+    // Store the contract in storage
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(contractData);
+    
+    const { data: storageData, error: storageError } = await supabase
+      .storage
+      .from('contracts')
+      .upload(
+        `${request.userId}/${contractFileName}`, 
+        bytes,
+        {
+          contentType: 'text/html',
+          upsert: true
+        }
+      );
+    
+    if (storageError) {
+      console.error("Error storing contract in storage:", storageError);
+    } else {
+      console.log("Contract stored in storage successfully:", storageData.path);
+    }
+    
+    // Create a signed URL for the contract
+    const { data: urlData, error: urlError } = await supabase
+      .storage
+      .from('contracts')
+      .createSignedUrl(`${request.userId}/${contractFileName}`, 60 * 60 * 24 * 7); // 7 days expiry
+    
+    const contractUrl = urlError ? null : urlData?.signedUrl;
+    console.log("Contract signed URL:", contractUrl);
+    
+    // Now store the signature info in the database
     const { data: signatureData, error: signatureError } = await supabase
       .from("contract_signatures")
       .insert({
@@ -75,7 +145,8 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
         contract_version: request.contractVersion || "1.0",
         contract_html: request.contractHtml,
         agreed_to_terms: request.agreedToTerms,
-        agreed_to_privacy: request.agreedToPrivacy
+        agreed_to_privacy: request.agreedToPrivacy,
+        pdf_url: contractUrl
       })
       .select("id")
       .single();
@@ -115,6 +186,45 @@ async function updateSubscription(supabase: any, userId: string, planId: string,
   } catch (error) {
     console.error("Exception updating subscription:", error);
     throw new Error(`Failed to update subscription: ${error.message}`);
+  }
+}
+
+async function sendEmailDirectly(supabase: any, to: string, subject: string, htmlBody: string, attachmentData?: any) {
+  console.log(`Sending email to ${to} via smtp-sender function`);
+  
+  try {
+    const emailData = {
+      to,
+      subject,
+      html: htmlBody,
+      attachmentData
+    };
+    
+    // Try the SMTP sender function first
+    const { data: smtpData, error: smtpError } = await supabase.functions.invoke('smtp-sender', {
+      body: emailData
+    });
+    
+    if (smtpError || !smtpData?.success) {
+      console.log("SMTP sender failed, trying Gmail sender as fallback:", smtpError || smtpData);
+      
+      // Try Gmail sender as fallback
+      const { data: gmailData, error: gmailError } = await supabase.functions.invoke('gmail-sender', {
+        body: emailData
+      });
+      
+      if (gmailError) {
+        console.error("Both email senders failed:", gmailError);
+        return { success: false, error: "Both email providers failed" };
+      }
+      
+      return { success: true, provider: "gmail", result: gmailData };
+    }
+    
+    return { success: true, provider: "smtp", result: smtpData };
+  } catch (error) {
+    console.error("Error sending email:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -247,18 +357,20 @@ serve(async (req) => {
     
     let customerEmailResult;
     try {
-      console.log("Sending email to customer via smtp-sender function");
-      const { data: emailData, error: emailError } = await supabase.functions.invoke('smtp-sender', {
-        body: customerEmailData
-      });
+      console.log("Sending email to customer via direct email function");
+      customerEmailResult = await sendEmailDirectly(
+        supabase, 
+        request.email,
+        `אישור חתימה על הסכם - AlgoTouch`,
+        customerEmailBody,
+        [{
+          filename: `contract-algotouch-${new Date().toISOString().slice(0,10)}.html`,
+          content: contractBase64,
+          mimeType: "text/html"
+        }]
+      );
       
-      if (emailError) {
-        console.error("Error sending customer email:", emailError);
-        customerEmailResult = { success: false, error: emailError.message };
-      } else {
-        console.log("Customer email sent successfully:", emailData);
-        customerEmailResult = { success: true, result: emailData };
-      }
+      console.log("Customer email sending result:", customerEmailResult);
     } catch (emailError) {
       console.error("Exception sending customer email:", emailError);
       customerEmailResult = { success: false, error: emailError.message };
@@ -281,31 +393,22 @@ serve(async (req) => {
       </div>
     `;
     
-    const adminEmailData = {
-      to: "support@algotouch.co.il",
-      subject: `הסכם חדש נחתם - ${request.fullName}`,
-      html: adminEmailBody,
-      attachmentData: [{
-        filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
-        content: contractBase64,
-        mimeType: "text/html"
-      }]
-    };
-    
     let adminEmailResult;
     try {
-      console.log("Sending email to admin via smtp-sender function");
-      const { data: emailData, error: emailError } = await supabase.functions.invoke('smtp-sender', {
-        body: adminEmailData
-      });
+      console.log("Sending email to admin via direct email function");
+      adminEmailResult = await sendEmailDirectly(
+        supabase,
+        "support@algotouch.co.il",
+        `הסכם חדש נחתם - ${request.fullName}`,
+        adminEmailBody,
+        [{
+          filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
+          content: contractBase64,
+          mimeType: "text/html"
+        }]
+      );
       
-      if (emailError) {
-        console.error("Error sending admin email:", emailError);
-        adminEmailResult = { success: false, error: emailError.message };
-      } else {
-        console.log("Admin email sent successfully:", emailData);
-        adminEmailResult = { success: true, result: emailData };
-      }
+      console.log("Admin email sending result:", adminEmailResult);
     } catch (emailError) {
       console.error("Exception sending admin email:", emailError);
       adminEmailResult = { success: false, error: emailError.message };

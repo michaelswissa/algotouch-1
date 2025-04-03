@@ -39,6 +39,58 @@ export async function sendContractConfirmationEmail(
 }
 
 /**
+ * Directly calls the izidoc-sign function to process a contract
+ */
+async function callIzidocSignFunction(
+  userId: string,
+  planId: string,
+  fullName: string,
+  email: string,
+  contractData: any
+): Promise<any> {
+  try {
+    console.log('Calling izidoc-sign function directly:', {
+      userId, 
+      planId, 
+      email, 
+      hasSignature: !!contractData.signature
+    });
+    
+    const { data, error } = await supabase.functions.invoke('izidoc-sign', {
+      body: {
+        userId,
+        planId,
+        fullName,
+        email,
+        signature: contractData.signature,
+        contractHtml: contractData.contractHtml,
+        agreedToTerms: contractData.agreedToTerms,
+        agreedToPrivacy: contractData.agreedToPrivacy,
+        contractVersion: contractData.contractVersion || "1.0",
+        browserInfo: contractData.browserInfo || {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          screenSize: `${window.innerWidth}x${window.innerHeight}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      },
+    });
+
+    if (error) {
+      console.error('Error from izidoc-sign function:', error);
+      return { success: false, error };
+    }
+
+    console.log('Contract processed successfully by izidoc-sign:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Exception calling izidoc-sign function:', error);
+    return { success: false, error };
+  }
+}
+
+/**
  * Processes a signed contract, saving it to the database and sending confirmation
  */
 export async function processSignedContract(
@@ -71,43 +123,73 @@ export async function processSignedContract(
       agreedToPrivacy: contractData.agreedToPrivacy
     });
     
-    // Save the contract signature to Supabase using the Edge Function
-    const { data, error } = await supabase.functions.invoke('izidoc-sign', {
-      body: {
-        userId,
-        planId,
-        fullName,
-        email,
+    // Try the direct edge function approach first (preferred)
+    const result = await callIzidocSignFunction(userId, planId, fullName, email, contractData);
+    
+    if (result.success) {
+      // Function call was successful
+      toast.success('ההסכם נחתם ונשמר בהצלחה!');
+      return true;
+    }
+    
+    console.warn('Direct function call failed, falling back to client-side processing', result.error);
+    
+    // Save the contract signature to Supabase directly as fallback
+    const { data, error } = await supabase
+      .from('contract_signatures')
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        full_name: fullName,
+        email: email,
         signature: contractData.signature,
-        contractHtml: contractData.contractHtml,
-        agreedToTerms: contractData.agreedToTerms,
-        agreedToPrivacy: contractData.agreedToPrivacy,
-        contractVersion: contractData.contractVersion || "1.0",
-        browserInfo: contractData.browserInfo || {
+        contract_html: contractData.contractHtml,
+        agreed_to_terms: contractData.agreedToTerms,
+        agreed_to_privacy: contractData.agreedToPrivacy,
+        contract_version: contractData.contractVersion || "1.0",
+        browser_info: contractData.browserInfo || {
           userAgent: navigator.userAgent,
           language: navigator.language,
           platform: navigator.platform,
           screenSize: `${window.innerWidth}x${window.innerHeight}`,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         }
-      },
-    });
+      })
+      .select('id, created_at')
+      .single();
 
     if (error) {
-      console.error('Error saving contract signature:', error);
+      console.error('Error saving contract signature directly:', error);
       toast.error('שגיאה בשמירת החתימה');
       return false;
     }
 
     console.log('Contract signature saved successfully:', data);
     
-    // Also send a confirmation email directly, in case the edge function fails
+    // Also try to send a confirmation email directly, in case the edge function fails
     try {
       await sendContractConfirmationEmail(email, fullName, new Date().toISOString());
       console.log('Contract confirmation email sent directly');
     } catch (emailError) {
       console.error('Error sending direct confirmation email:', emailError);
       // Don't return false here, as the contract was still saved successfully
+    }
+    
+    // Try to update the subscription status as well
+    try {
+      const { error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .update({
+          contract_signed: true,
+          contract_signed_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+      
+      if (subscriptionError) {
+        console.error('Error updating subscription status:', subscriptionError);
+      }
+    } catch (subscriptionError) {
+      console.error('Exception updating subscription:', subscriptionError);
     }
     
     return true;
