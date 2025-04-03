@@ -21,33 +21,51 @@ export function CommunityLeaderboard() {
   useEffect(() => {
     async function fetchLeaderboard() {
       try {
-        const { data, error } = await supabase
+        // First get the reputation data
+        const { data: repData, error: repError } = await supabase
           .from('community_reputation')
-          .select(`
-            user_id,
-            points,
-            level,
-            profiles:user_id (
-              first_name,
-              last_name
-            )
-          `)
+          .select('user_id, points, level')
           .order('points', { ascending: false })
           .limit(5);
 
-        if (error) {
-          console.error('Error fetching leaderboard:', error);
+        if (repError) {
+          console.error('Error fetching leaderboard:', repError);
+          setIsLoading(false);
           return;
         }
 
-        // Format the data to flatten the profiles
-        const formattedData = data.map(item => ({
-          user_id: item.user_id,
-          points: item.points,
-          level: item.level,
-          first_name: item.profiles?.first_name || null,
-          last_name: item.profiles?.last_name || null
-        }));
+        if (!repData || repData.length === 0) {
+          setLeaders([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Now fetch profile data for these users
+        const userIds = repData.map(user => user.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        }
+
+        // Combine the data
+        const formattedData = repData.map(repItem => {
+          const profile = profilesData?.find(p => p.id === repItem.user_id) || { 
+            first_name: null, 
+            last_name: null 
+          };
+          
+          return {
+            user_id: repItem.user_id,
+            points: repItem.points,
+            level: repItem.level,
+            first_name: profile.first_name,
+            last_name: profile.last_name
+          };
+        });
 
         setLeaders(formattedData);
       } catch (error) {

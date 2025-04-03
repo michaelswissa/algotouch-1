@@ -6,20 +6,7 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare, Share2, ThumbsUp } from 'lucide-react';
 import { likePost } from '@/lib/reputation-service';
 import { toast } from 'sonner';
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  likes: number;
-  comments: number;
-  created_at: string;
-  user_id: string;
-  profiles?: {
-    first_name: string | null;
-    last_name: string | null;
-  };
-}
+import type { Post } from '@/lib/reputation-service';
 
 interface PostListProps {
   posts: Post[];

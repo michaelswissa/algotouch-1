@@ -95,10 +95,6 @@ enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
 
-# Use pre-defined users for development. Password for all pre-defined users is `password`.
-[auth.users]
-enabled = false
-
 # Configure Edge Functions
 [functions]
 enabled = true

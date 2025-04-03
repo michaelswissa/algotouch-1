@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/auth';
@@ -79,7 +78,7 @@ const Community = () => {
         .from('community_activities')
         .select('created_at')
         .eq('user_id', user.id)
-        .eq('activity_type', ACTIVITY_TYPES.DAILY_LOGIN)
+        .eq('activity_type', ACTIVITY_TYPES.DAILY_LOGIN.toString())
         .gte('created_at', `${today}T00:00:00`)
         .lte('created_at', `${today}T23:59:59`)
         .maybeSingle();

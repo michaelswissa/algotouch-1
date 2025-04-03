@@ -4,11 +4,11 @@ import { toast } from 'sonner';
 
 // Activity types
 export const ACTIVITY_TYPES = {
-  NEW_POST: 'new_post',
-  POST_LIKED: 'post_liked',
-  COMMENT_ADDED: 'comment_added',
-  DAILY_LOGIN: 'daily_login',
-  PROFILE_COMPLETED: 'profile_completed',
+  NEW_POST: 'NEW_POST',
+  POST_LIKED: 'POST_LIKED',
+  COMMENT_ADDED: 'COMMENT_ADDED',
+  DAILY_LOGIN: 'DAILY_LOGIN',
+  PROFILE_COMPLETED: 'PROFILE_COMPLETED',
 } as const;
 
 // Define the type for activity types
@@ -134,7 +134,7 @@ export async function awardPoints(
       .from('community_activities')
       .insert({
         user_id: userId,
-        activity_type: activityType,
+        activity_type: activityType.toString(),
         points_earned: pointsToAward,
         reference_id: referenceId || null
       });
@@ -144,20 +144,21 @@ export async function awardPoints(
       return false;
     }
     
-    // Update user's points using RPC
+    // Update user's points directly
     try {
-      const { error: rpcError } = await supabase.rpc('increment_user_points', {
+      // Try direct RPC call first if available
+      const { error } = await supabase.rpc('increment_user_points', {
         user_id_param: userId,
         points_to_add: pointsToAward
       });
       
-      if (rpcError) {
-        throw rpcError;
+      if (error) {
+        throw error;
       }
     } catch (rpcError) {
       console.warn('RPC failed, using fallback method:', rpcError);
       
-      // Fallback method if RPC doesn't exist yet
+      // Fallback method: get current points and update
       const { data: currentRep } = await supabase
         .from('community_reputation')
         .select('points')
@@ -374,29 +375,46 @@ export async function likePost(
  */
 export async function getCommunityPosts(): Promise<Post[]> {
   try {
+    // First fetch posts without profiles
     const { data, error } = await supabase
       .from('community_posts')
-      .select(`
-        id,
-        title,
-        content,
-        likes,
-        comments,
-        created_at,
-        user_id,
-        profiles:user_id (
-          first_name,
-          last_name
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching posts:', error);
       return [];
     }
+
+    // If no posts, return empty array
+    if (!data || data.length === 0) {
+      return [];
+    }
     
-    return data as Post[] || [];
+    // Now fetch profiles for all user IDs
+    const userIds = [...new Set(data.map(post => post.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIds);
+    
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    }
+    
+    // Combine posts with profiles
+    const postsWithProfiles = data.map(post => {
+      const profile = profiles?.find(p => p.id === post.user_id);
+      return {
+        ...post,
+        profiles: profile ? {
+          first_name: profile.first_name,
+          last_name: profile.last_name
+        } : undefined
+      };
+    });
+    
+    return postsWithProfiles;
   } catch (error) {
     console.error('Exception in getCommunityPosts:', error);
     return [];
