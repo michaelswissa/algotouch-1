@@ -10,8 +10,8 @@ interface PlanFeaturesListProps {
 const PlanFeaturesList: React.FC<PlanFeaturesListProps> = ({ features, planId }) => {
   return (
     <div>
-      <div className="mb-2">
-        <h4 className={`text-sm font-medium mb-2 pb-1 border-b ${
+      <div className="mb-4">
+        <h4 className={`text-sm font-medium mb-3 pb-2 border-b ${
           planId === 'monthly' 
             ? 'border-purple-200 dark:border-purple-800' 
             : planId === 'annual' 
@@ -21,7 +21,7 @@ const PlanFeaturesList: React.FC<PlanFeaturesListProps> = ({ features, planId })
           יתרונות התכנית:
         </h4>
       </div>
-      <ul className="space-y-2 text-sm">
+      <ul className="space-y-3.5 text-sm">
         {features.map((feature, index) => (
           <PlanFeature 
             key={index} 
