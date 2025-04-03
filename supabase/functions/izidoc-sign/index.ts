@@ -124,31 +124,29 @@ async function updateSubscription(supabase: any, userId: string, planId: string,
   }
 }
 
-// Send contract copy to both support and customer
-async function sendContractEmails(
+// Prepares and sends notification email with contract attachment
+async function sendNotificationEmail(
   supabase: any, 
   request: SigningRequest, 
   signatureTimestamp: string,
   ipAddress: string
 ) {
-  console.log("Sending contract emails to support and customer");
-  
-  // First send to support
-  await sendEmailToSupport(supabase, request, signatureTimestamp, ipAddress);
-  
-  // Then send to customer
-  await sendEmailToCustomer(supabase, request);
-}
-
-// Send contract notification to support
-async function sendEmailToSupport(
-  supabase: any, 
-  request: SigningRequest, 
-  signatureTimestamp: string,
-  ipAddress: string
-) {
-  console.log("Preparing to send contract notification email to support");
+  console.log("Preparing to send notification email");
   try {
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(request.userId);
+    
+    if (userError) {
+      console.error("Error fetching user data:", userError);
+      throw userError;
+    }
+    
+    if (!userData || !userData.user) {
+      console.error("User not found:", request.userId);
+      throw new Error(`User not found: ${request.userId}`);
+    }
+    
+    console.log("User found, preparing email content");
+    
     // Convert HTML contract to base64 for attachment
     const encoder = new TextEncoder();
     const contractBytes = encoder.encode(request.contractHtml);
@@ -170,7 +168,7 @@ async function sendEmailToSupport(
 
     console.log("Sending contract notification email to support@algotouch.co.il");
     
-    // Send email via the SMTP sender function
+    // Attempt to send email via the SMTP sender function
     try {
       const smtpResponse = await sendEmailViaSmtp(
         supabase,
@@ -184,78 +182,16 @@ async function sendEmailToSupport(
         }]
       );
       
-      console.log("Support email notification sent successfully");
+      console.log("Email notification sent successfully");
       return smtpResponse;
     } catch (emailSendError) {
-      console.error("Failed to send email to support:", emailSendError);
-      // Continue with the contract signing process even if email fails
+      console.error("Failed to send email:", emailSendError);
+      // Don't rethrow - continue with the contract signing process even if email fails
       return { success: false, error: emailSendError.message };
     }
   } catch (error) {
-    console.error("Error preparing support email:", error);
-    // Continue with the contract signing process even if email fails
-    return { success: false, error: error.message };
-  }
-}
-
-// Send contract copy to customer
-async function sendEmailToCustomer(
-  supabase: any, 
-  request: SigningRequest
-) {
-  console.log(`Preparing to send contract confirmation email to customer: ${request.email}`);
-  try {
-    // Convert HTML contract to base64 for attachment
-    const encoder = new TextEncoder();
-    const contractBytes = encoder.encode(request.contractHtml);
-    const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
-    
-    const planName = request.planId === 'monthly' ? 'חודשית' : 'שנתית';
-    
-    const emailBody = `
-      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h1 style="color: #4a90e2;">AlgoTouch</h1>
-          <p style="font-size: 18px; color: #666;">פלטפורמת המסחר החכמה</p>
-        </div>
-        <h2>שלום ${request.fullName},</h2>
-        <p>תודה על הצטרפותך ל-AlgoTouch!</p>
-        <p>אנו שמחים לאשר שהחוזה לתכנית ה${planName} נחתם בהצלחה.</p>
-        <p>מצורף העתק של החוזה החתום לשמירה.</p>
-        <p>אנו מאחלים לך הצלחה רבה ובטוחים שתפיק תועלת מהכלים שלנו!</p>
-        <p>לכל שאלה או בקשה, אנא פנה אלינו בכתובת: <a href="mailto:support@algotouch.co.il">support@algotouch.co.il</a></p>
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea; text-align: center; font-size: 14px; color: #666;">
-          <p>בברכה,<br>צוות AlgoTouch</p>
-        </div>
-      </div>
-    `;
-
-    console.log(`Sending contract copy to customer email: ${request.email}`);
-    
-    // Send email via the SMTP sender function
-    try {
-      const smtpResponse = await sendEmailViaSmtp(
-        supabase,
-        request.email,
-        `AlgoTouch - אישור הצטרפות והעתק הסכם חתום`,
-        emailBody,
-        [{
-          filename: `contract-algotouch-${request.planId}.html`,
-          content: contractBase64,
-          mimeType: "text/html"
-        }]
-      );
-      
-      console.log("Customer email sent successfully");
-      return smtpResponse;
-    } catch (emailSendError) {
-      console.error("Failed to send email to customer:", emailSendError);
-      // Continue with the contract signing process even if email fails
-      return { success: false, error: emailSendError.message };
-    }
-  } catch (error) {
-    console.error("Error preparing customer email:", error);
-    // Continue with the contract signing process even if email fails
+    console.error("Error preparing notification email:", error);
+    // Don't throw error as this is not critical for the signing process
     return { success: false, error: error.message };
   }
 }
@@ -268,7 +204,7 @@ async function sendEmailViaSmtp(
   html: string,
   attachments?: Array<{filename: string, content: string, mimeType: string}>
 ) {
-  console.log(`Sending email via SMTP function to: ${to}`);
+  console.log("Sending email via SMTP function");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   
@@ -298,7 +234,7 @@ async function sendEmailViaSmtp(
       throw new Error(`SMTP send failed: ${errorText}`);
     } else {
       const smtpResult = await smtpResponse.json();
-      console.log(`Email notification sent successfully to ${to}`);
+      console.log("Email notification sent successfully via SMTP");
       return smtpResult;
     }
   } catch (error) {
@@ -395,32 +331,30 @@ serve(async (req) => {
       );
     }
     
-    // Update subscription record
+    // Update subscription record and continue even if it fails
     try {
       await updateSubscription(supabase, request.userId, request.planId, signatureTimestamp);
     } catch (subscriptionError) {
-      console.error("Error updating subscription:", subscriptionError);
-      // Continue processing even if this fails
+      console.error("Error updating subscription (continuing anyway):", subscriptionError);
+      // Continue processing - we can still succeed overall if this fails
     }
     
-    // Send contract emails to both support and customer in background
+    // Send notification email but don't fail if it doesn't work
     try {
-      await sendContractEmails(supabase, request, signatureTimestamp, ipAddress);
+      await sendNotificationEmail(supabase, request, signatureTimestamp, ipAddress);
     } catch (emailError) {
-      console.error("Error sending contract emails:", emailError);
-      // Continue processing even if email sending fails
+      console.error("Error sending notification email (continuing anyway):", emailError);
+      // Continue processing - email is not critical for signing success
     }
     
-    // Return the signing result - indicating success even if emails failed
-    // as we've stored the signature data
+    // Return the signing result
     console.log("Contract signing process completed successfully");
     return new Response(
       JSON.stringify({
         success: true,
         documentId,
         signatureId,
-        signedAt: signatureTimestamp,
-        message: "Contract signed and emails sent"
+        signedAt: signatureTimestamp
       }), 
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
