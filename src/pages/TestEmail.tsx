@@ -1,112 +1,125 @@
 
-import React, { useEffect } from 'react';
-import Layout from '@/components/Layout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEmailTest } from '@/hooks/use-email-test';
-import DevelopmentWarning from '@/components/email-test/DevelopmentWarning';
-import ConnectionStatusAlerts from '@/components/email-test/ConnectionStatusAlerts';
-import ConnectionTestCard from '@/components/email-test/ConnectionTestCard';
-import SendEmailCard from '@/components/email-test/SendEmailCard';
-import NetworkErrorHelp from '@/components/email-test/NetworkErrorHelp';
-import ErrorDetailsCard from '@/components/email-test/ErrorDetailsCard';
-import ResultCard from '@/components/email-test/ResultCard';
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { ConnectionTestCard } from '@/components/email-test/ConnectionTestCard';
+import { SendEmailCard } from '@/components/email-test/SendEmailCard';
+import { ResultCard } from '@/components/email-test/ResultCard';
+import { DevelopmentWarning } from '@/components/email-test/DevelopmentWarning';
+import { ConnectionStatus, EmailTestResult } from '@/components/email-test/types';
+import { testSmtpConnection } from '@/lib/email-service';
+import { sendEmail } from '@/lib/email-service';
 
-const TestEmail = () => {
-  const {
-    loading,
-    testLoading,
-    result,
-    connectionStatus,
-    errorDetails,
-    networkError,
-    activeTab,
-    setActiveTab,
-    isDevelopment,
-    testGmailAuth,
-    testSmtpEmail,
-    sendTestEmail,
-    supabaseFunctionsUrl
-  } = useEmailTest();
-
-  useEffect(() => {
-    // Set up error handling for unhandled promise rejections
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled Promise Rejection:', event.reason);
-      // This error handling is now part of the hook
-    };
-
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
-
+export default function TestEmail() {
+  const [smtpResult, setSmtpResult] = useState<EmailTestResult | null>(null);
+  const [isSmtpTesting, setIsSmtpTesting] = useState(false);
+  const [smtpStatus, setSmtpStatus] = useState<ConnectionStatus>('unknown');
+  
+  const [sendResult, setSendResult] = useState<EmailTestResult | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  
+  // Test SMTP Connection
+  const testSmtp = async () => {
+    try {
+      setIsSmtpTesting(true);
+      setSmtpResult(null);
+      
+      const result = await testSmtpConnection();
+      setSmtpResult(result);
+      setSmtpStatus(result.success ? 'success' : 'error');
+    } catch (error: any) {
+      setSmtpResult({ 
+        success: false, 
+        error: error.message || 'Unknown error testing SMTP connection' 
+      });
+      setSmtpStatus('error');
+    } finally {
+      setIsSmtpTesting(false);
+    }
+  };
+  
+  // Send a test email
+  const sendTestEmail = async (recipient: string) => {
+    try {
+      setIsSending(true);
+      setSendResult(null);
+      
+      const result = await sendEmail({
+        to: recipient,
+        subject: 'בדיקת שליחת אימייל מ-AlgoTouch',
+        html: `
+          <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif;">
+            <h1 style="color: #4a90e2;">בדיקת מערכת</h1>
+            <p>שלום,</p>
+            <p>זהו מייל בדיקה ממערכת AlgoTouch.</p>
+            <p>אם קיבלת את ההודעה הזו, סימן שמערכת שליחת האימיילים עובדת כראוי.</p>
+            <p>זמן שליחה: ${new Date().toLocaleString('he-IL')}</p>
+            <hr style="border: 1px solid #eaeaea; margin: 20px 0;" />
+            <p style="color: #666; font-size: 12px;">הודעה זו נשלחה אוטומטית ואין צורך להשיב עליה.</p>
+          </div>
+        `
+      });
+      
+      setSendResult(result);
+    } catch (error: any) {
+      setSendResult({ 
+        success: false, 
+        error: error.message || 'Unknown error sending test email' 
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+  
   return (
-    <Layout className="py-8" hideSidebar={true}>
-      <div className="max-w-4xl mx-auto px-4" dir="rtl">
-        <h1 className="text-3xl font-bold mb-8">בדיקת שליחת דוא"ל</h1>
-        
-        {isDevelopment && <DevelopmentWarning />}
-        
-        <ConnectionStatusAlerts 
-          connectionStatus={connectionStatus}
-          networkError={networkError}
-          supabaseFunctionsUrl={supabaseFunctionsUrl}
-        />
-        
-        <Tabs defaultValue="smtp" className="mb-6" onValueChange={(value) => setActiveTab(value as 'gmail' | 'smtp')}>
-          <TabsList className="grid grid-cols-2 w-full md:w-[400px] mb-4">
-            <TabsTrigger value="smtp">SMTP (מומלץ)</TabsTrigger>
-            <TabsTrigger value="gmail">Gmail API</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="smtp">
-            <div className="grid gap-8">
-              <ConnectionTestCard
-                title="בדיקת חיבור לשירות SMTP"
-                description="בדיקה שהגדרות SMTP תקינות וניתן לשלוח מיילים"
-                onTest={testSmtpEmail}
-                isLoading={testLoading}
-                connectionStatus={connectionStatus}
-              />
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="gmail">
-            <div className="grid gap-8">
-              <ConnectionTestCard
-                title="בדיקת חיבור לשירות Gmail API"
-                description="בדיקה שההרשאות והחיבור לשירות Gmail API תקינים"
-                onTest={testGmailAuth}
-                isLoading={testLoading}
-                connectionStatus={connectionStatus}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-        
-        <SendEmailCard
-          title={`שליחת מייל בדיקה (${activeTab === 'gmail' ? 'Gmail API' : 'SMTP'})`}
-          description={`שליחת מייל בדיקה באמצעות הפונקציה ${activeTab === 'gmail' ? 'gmail-sender' : 'smtp-sender'}`}
-          onSend={sendTestEmail}
-          isLoading={loading}
-          connectionStatus={connectionStatus}
-        />
-        
-        {networkError && <NetworkErrorHelp networkError={networkError} />}
-        
-        {errorDetails && (
-          <ErrorDetailsCard
-            title="פרטי השגיאה"
-            errorDetails={errorDetails}
-          />
-        )}
-        
-        <ResultCard result={result} />
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>בדיקת מערכת האימייל</CardTitle>
+            <CardDescription>
+              כלי זה מאפשר לבדוק את תקינות הגדרות האימייל ולשלוח אימיילים לבדיקה
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DevelopmentWarning />
+            
+            {/* Test SMTP connection */}
+            <ConnectionTestCard
+              title="בדיקת הגדרות SMTP"
+              description="בדוק האם הגדרות ה-SMTP תקינות ומאפשרות שליחת דואר אלקטרוני"
+              onTest={testSmtp}
+              isLoading={isSmtpTesting}
+              connectionStatus={smtpStatus}
+            />
+            
+            <Separator className="my-6" />
+            
+            {/* Send test email */}
+            <SendEmailCard
+              title="שלח אימייל בדיקה"
+              description="שלח הודעת בדיקה כדי לוודא שהמערכת עובדת כראוי"
+              onSend={sendTestEmail}
+              isLoading={isSending}
+              connectionStatus={smtpStatus}
+            />
+            
+            {/* Display results */}
+            {(smtpResult || sendResult) && (
+              <div className="mt-6 space-y-6">
+                {smtpResult && (
+                  <ResultCard result={smtpResult} />
+                )}
+                
+                {sendResult && (
+                  <ResultCard result={sendResult} />
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </Layout>
+    </div>
   );
-};
-
-export default TestEmail;
+}

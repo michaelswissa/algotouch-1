@@ -166,9 +166,24 @@ async function sendNotificationEmail(
       <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
     `;
 
+    // גם שלח מייל ללקוח
+    const customerEmailBody = `
+      <h1>תודה שחתמת על ההסכם</h1>
+      <p>שלום ${request.fullName},</p>
+      <p>תודה שחתמת על הסכם ההצטרפות לשירות AlgoTouch.</p>
+      <p>פרטי החתימה:</p>
+      <ul>
+        <li>זמן חתימה: ${signatureTimestamp}</li>
+        <li>תכנית: ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}</li>
+      </ul>
+      <p>מצורף העתק של החוזה החתום.</p>
+      <p>לכל שאלה, ניתן לפנות אלינו ב-support@algotouch.co.il</p>
+      <p>בברכה,<br>צוות AlgoTouch</p>
+    `;
+
     console.log("Sending contract notification email to support@algotouch.co.il");
     
-    // Attempt to send email via the SMTP sender function
+    // Attempt to send email to support
     try {
       const smtpResponse = await sendEmailViaSmtp(
         supabase,
@@ -176,14 +191,33 @@ async function sendNotificationEmail(
         `הסכם חדש נחתם - ${request.fullName}`,
         emailBody,
         [{
-          filename: `contract-${request.fullName}-${signatureTimestamp}.html`,
+          filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
           content: contractBase64,
           mimeType: "text/html"
         }]
       );
       
-      console.log("Email notification sent successfully");
-      return smtpResponse;
+      console.log("Support email notification sent successfully");
+      
+      // Also send to customer
+      const customerResponse = await sendEmailViaSmtp(
+        supabase,
+        request.email, // שליחה ללקוח
+        `העתק הסכם AlgoTouch - אישור חתימה`,
+        customerEmailBody,
+        [{
+          filename: `contract-algotouch-${new Date().toISOString().slice(0,10)}.html`,
+          content: contractBase64,
+          mimeType: "text/html"
+        }]
+      );
+      
+      console.log("Customer email notification sent successfully");
+      
+      return { 
+        support: smtpResponse, 
+        customer: customerResponse 
+      };
     } catch (emailSendError) {
       console.error("Failed to send email:", emailSendError);
       // Don't rethrow - continue with the contract signing process even if email fails
@@ -214,6 +248,7 @@ async function sendEmailViaSmtp(
   }
   
   try {
+    // בקריאה לפונקציית SMTP sender
     const smtpResponse = await fetch(`${SUPABASE_URL}/functions/v1/smtp-sender`, {
       method: "POST",
       headers: {
@@ -228,13 +263,14 @@ async function sendEmailViaSmtp(
       })
     });
     
+    // בדיקת התשובה
     if (!smtpResponse.ok) {
       const errorText = await smtpResponse.text();
       console.error("Failed to send email via SMTP:", errorText);
       throw new Error(`SMTP send failed: ${errorText}`);
     } else {
       const smtpResult = await smtpResponse.json();
-      console.log("Email notification sent successfully via SMTP");
+      console.log("Email notification sent successfully via SMTP:", smtpResult);
       return smtpResult;
     }
   } catch (error) {
@@ -340,11 +376,14 @@ serve(async (req) => {
     }
     
     // Send notification email but don't fail if it doesn't work
+    let emailResult;
     try {
-      await sendNotificationEmail(supabase, request, signatureTimestamp, ipAddress);
+      emailResult = await sendNotificationEmail(supabase, request, signatureTimestamp, ipAddress);
+      console.log("Email notification results:", emailResult);
     } catch (emailError) {
       console.error("Error sending notification email (continuing anyway):", emailError);
       // Continue processing - email is not critical for signing success
+      emailResult = { error: emailError.message };
     }
     
     // Return the signing result
@@ -354,7 +393,9 @@ serve(async (req) => {
         success: true,
         documentId,
         signatureId,
-        signedAt: signatureTimestamp
+        signedAt: signatureTimestamp,
+        emailSent: emailResult?.success !== false,
+        emailDetails: emailResult
       }), 
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
