@@ -24,7 +24,7 @@ import { APP_VERSION } from "@/config";
 import { useSidebar } from "@/contexts/sidebar";
 
 export default function Sidebar() {
-  const { signOut } = useAuth();
+  const { logout } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const { isSidebarOpen } = useSidebar();
@@ -146,7 +146,7 @@ export default function Sidebar() {
                 <span>פרופיל</span>
               </NavLink>
             </Button>
-            <Button variant="ghost" className="w-full justify-start" onClick={signOut}>
+            <Button variant="ghost" className="w-full justify-start" onClick={logout}>
               <LogOut className="h-4 w-4 ml-2" />
               <span>התנתק</span>
             </Button>
