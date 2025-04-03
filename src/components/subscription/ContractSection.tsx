@@ -16,10 +16,15 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onSign, 
   onBack 
 }) => {
+  // Create a wrapper function that will call onSign with the contractData
+  const handleSign = (contractData: any) => {
+    onSign(contractData);
+  };
+
   return (
     <div>
       <DigitalContractForm 
-        onSign={onSign} 
+        onSign={handleSign} 
         planId={selectedPlan} 
         fullName={fullName} 
       />
