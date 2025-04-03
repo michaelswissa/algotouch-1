@@ -201,7 +201,11 @@ const Subscription = () => {
         )}
         
         {currentStep === 2 && selectedPlan && (
-          <DigitalContractForm onSign={handleContractSign} planId={selectedPlan} fullName={fullName} />
+          <DigitalContractForm 
+            onSign={handleContractSign} 
+            planId={selectedPlan} 
+            fullName={fullName} 
+          />
         )}
         
         {currentStep === 3 && selectedPlan && (
