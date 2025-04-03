@@ -38,7 +38,7 @@ serve(async (req) => {
     const smtp_port = parseInt(Deno.env.get("SMTP_PORT") || "587");
     const smtp_user = Deno.env.get("SMTP_USER");
     const smtp_pass = Deno.env.get("SMTP_PASSWORD");
-    const smtp_from = Deno.env.get("SMTP_FROM") || "noreply@algotouch.co.il";
+    const smtp_from = Deno.env.get("SMTP_FROM") || smtp_user;
     
     // Validate configuration
     const missingVars = [];

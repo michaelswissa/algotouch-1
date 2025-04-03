@@ -46,6 +46,7 @@ export function useEmailTest() {
       
       // Call the test-gmail function with a timeout
       try {
+        console.log('Invoking test-gmail function...');
         const functionPromise = supabase.functions.invoke('test-gmail');
         const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
         
@@ -98,6 +99,7 @@ export function useEmailTest() {
       resetErrors();
       
       console.log('Testing SMTP connection...');
+      console.log('Supabase Functions URL:', supabase.functions.url);
       
       const { success, details, error } = await testSmtpConnection();
       
@@ -106,7 +108,7 @@ export function useEmailTest() {
         toast.error('שגיאה בבדיקת SMTP');
         setConnectionStatus('error');
         
-        if (error && error.includes('network')) {
+        if (error && error.includes('Network error')) {
           setNetworkError(JSON.stringify({
             message: error,
             name: 'NetworkError',
@@ -194,7 +196,7 @@ export function useEmailTest() {
           message: fetchError.message || 'Network error occurred',
           name: fetchError.name || 'NetworkError',
           stack: fetchError.stack,
-          details: fetchError
+          details: 'The Edge Function may not be deployed properly or CORS issues'
         }, null, 2));
         
         toast.error('שגיאת רשת בשליחת מייל בדיקה');
