@@ -105,25 +105,25 @@ const PlanCard: React.FC<PlanProps> = ({
                     ? 'shadow-[0_0_15px_rgba(59,130,246,0.5)]' 
                     : 'shadow-[0_0_15px_rgba(245,158,11,0.5)]'
               )
-              : id === 'annual' 
-                ? 'hover:scale-105 hover:shadow-md' 
-                : 'hover:bg-accent hover:text-accent-foreground'
+              : 'hover:scale-105 hover:shadow-md'
           }`}
           size="lg"
-          variant={isSelected ? "default" : id === 'annual' ? "default" : "outline"}
+          variant={isSelected ? "default" : "outline"}
           onClick={() => onSelect(id)}
           style={{
-            backgroundColor: isSelected || id === 'annual' 
+            backgroundColor: isSelected 
               ? id === 'monthly' 
                 ? 'var(--purple-color, #9f7aea)' 
                 : id === 'annual' 
                   ? 'var(--blue-color, #3b82f6)' 
                   : 'var(--amber-color, #f59e0b)'
               : '',
-            borderColor: id !== 'annual' && !isSelected 
+            borderColor: !isSelected 
               ? id === 'monthly' 
                 ? 'var(--purple-color, #9f7aea)' 
-                : 'var(--amber-color, #f59e0b)'
+                : id === 'annual'
+                  ? 'var(--blue-color, #3b82f6)'
+                  : 'var(--amber-color, #f59e0b)'
               : ''
           }}
         >
