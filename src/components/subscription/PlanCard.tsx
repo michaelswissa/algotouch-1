@@ -63,7 +63,7 @@ const PlanCard: React.FC<PlanProps> = ({
                   : 'border-amber-500 ring-amber-500/30'
             }` 
           : 'hover:-translate-y-2 border'
-      } ${id === 'annual' ? 'md:scale-105 z-10 relative' : ''}`}
+      }`}
     >
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between mb-2">
