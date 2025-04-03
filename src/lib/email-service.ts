@@ -6,6 +6,7 @@ interface EmailRequest {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
   attachmentData?: {
     filename: string;
     content: string; // Base64 encoded content

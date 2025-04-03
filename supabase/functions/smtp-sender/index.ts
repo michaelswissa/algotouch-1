@@ -13,6 +13,7 @@ interface EmailRequest {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
   attachmentData?: {
     filename: string;
     content: string; // Base64 encoded content
@@ -98,15 +99,23 @@ serve(async (req) => {
       }
     }
     
-    // Send the email
-    await client.send({
+    // Prepare email options
+    const emailOptions: any = {
       from: smtp_from,
       to: emailRequest.to,
       subject: emailRequest.subject,
       html: emailRequest.html,
       text: emailRequest.text,
       attachments,
-    });
+    };
+    
+    // Add reply-to if specified
+    if (emailRequest.replyTo) {
+      emailOptions.replyTo = emailRequest.replyTo;
+    }
+    
+    // Send the email
+    await client.send(emailOptions);
     
     // Close the connection
     await client.close();
