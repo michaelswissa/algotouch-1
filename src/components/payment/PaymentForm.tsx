@@ -59,7 +59,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       
       const result = await registerUser({
         registrationData,
-        tokenData
+        tokenData,
+        contractDetails: registrationData.contractDetails || null
       });
       
       if (!result.success) {

@@ -4,7 +4,7 @@ import { useParams, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import Layout from '@/components/Layout';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
 import DigitalContractForm from '@/components/DigitalContractForm';
-import PaymentForm from '@/components/PaymentForm';
+import PaymentForm from '@/components/payment/PaymentForm';
 import { useAuth } from '@/contexts/auth';
 import { Button } from '@/components/ui/button';
 import { Check, ChevronRight } from 'lucide-react';
@@ -44,10 +44,6 @@ const Subscription = () => {
         });
         
         setRegistrationData(data);
-        
-        if (data.userData && data.userData.firstName && data.userData.lastName) {
-          setFullName(`${data.userData.firstName} ${data.userData.lastName}`);
-        }
         
         if (data.contractSigned) {
           setCurrentStep(3);
@@ -145,15 +141,30 @@ const Subscription = () => {
     }
   };
 
-  const handleContractSign = () => {
+  const handleContractSign = (contractData: any) => {
+    // Store the contract details in the registration data
     if (registrationData) {
       const updatedData = {
         ...registrationData,
         contractSigned: true,
-        contractSignedAt: new Date().toISOString()
+        contractSignedAt: new Date().toISOString(),
+        contractDetails: {
+          contractHtml: contractData.contractHtml,
+          signature: contractData.signature,
+          agreedToTerms: contractData.agreedToTerms,
+          agreedToPrivacy: contractData.agreedToPrivacy,
+          contractVersion: contractData.contractVersion || "1.0",
+          browserInfo: {
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            platform: navigator.platform,
+            screenSize: `${window.innerWidth}x${window.innerHeight}`,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          }
+        }
       };
       sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
-      console.log('Contract signed, updated registration data');
+      console.log('Contract signed, updated registration data with contract details');
     } else {
       console.log('Contract signed but no registration data to update');
     }
