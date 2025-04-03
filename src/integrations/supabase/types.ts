@@ -219,6 +219,42 @@ export type Database = {
         }
         Relationships: []
       }
+      course_progress: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          is_completed: boolean | null
+          last_watched: string | null
+          lessons_watched: string[] | null
+          modules_completed: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          last_watched?: string | null
+          lessons_watched?: string[] | null
+          modules_completed?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          last_watched?: string | null
+          lessons_watched?: string[] | null
+          modules_completed?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_history: {
         Row: {
           amount: number

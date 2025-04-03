@@ -1,4 +1,3 @@
-
 import { Database as OriginalDatabase } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -153,6 +152,42 @@ export interface ExtendedDatabase extends OriginalDatabase {
           points_earned?: number;
           reference_id?: string | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      course_progress: {
+        Row: {
+          id: string;
+          user_id: string;
+          course_id: string;
+          lessons_watched: string[] | null;
+          modules_completed: string[] | null;
+          is_completed: boolean | null;
+          last_watched: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          course_id: string;
+          lessons_watched?: string[] | null;
+          modules_completed?: string[] | null;
+          is_completed?: boolean | null;
+          last_watched?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          course_id?: string;
+          lessons_watched?: string[] | null;
+          modules_completed?: string[] | null;
+          is_completed?: boolean | null;
+          last_watched?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
         };
         Relationships: [];
       };
