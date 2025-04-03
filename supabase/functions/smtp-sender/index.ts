@@ -21,6 +21,11 @@ interface EmailRequest {
   }[];
 }
 
+function validateEmail(email: string): boolean {
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return regex.test(email);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -40,7 +45,7 @@ serve(async (req) => {
     const smtp_port = parseInt(Deno.env.get("SMTP_PORT") || "587");
     const smtp_user = Deno.env.get("SMTP_USER");
     const smtp_pass = Deno.env.get("SMTP_PASSWORD");
-    const smtp_from = Deno.env.get("SMTP_FROM") || "support@algotouch.co.il";
+    const smtp_from = Deno.env.get("SMTP_FROM") || "noreply@algotouch.co.il";
     
     // Check if all required SMTP credentials are provided
     if (!smtp_host || !smtp_user || !smtp_pass) {
@@ -60,11 +65,31 @@ serve(async (req) => {
     console.log(`- From: ${smtp_from}`);
     
     // Parse the request body
-    const emailRequest: EmailRequest = await req.json();
+    let emailRequest: EmailRequest;
+    try {
+      emailRequest = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error("Invalid JSON in request body");
+    }
     
+    // Validate email request
     if (!emailRequest.to || !emailRequest.subject || !emailRequest.html) {
       console.error("Missing required email fields");
-      throw new Error("Missing required email fields (to, subject, or html)");
+      const missing = [];
+      if (!emailRequest.to) missing.push("to");
+      if (!emailRequest.subject) missing.push("subject");
+      if (!emailRequest.html) missing.push("html");
+      throw new Error(`Missing required email fields: ${missing.join(", ")}`);
+    }
+    
+    // Validate email addresses
+    if (!validateEmail(emailRequest.to)) {
+      throw new Error(`Invalid recipient email address: ${emailRequest.to}`);
+    }
+    
+    if (emailRequest.replyTo && !validateEmail(emailRequest.replyTo)) {
+      throw new Error(`Invalid reply-to email address: ${emailRequest.replyTo}`);
     }
     
     console.log(`Sending email to ${emailRequest.to} with subject: ${emailRequest.subject}`);
@@ -142,14 +167,43 @@ serve(async (req) => {
       hasReplyTo: !!emailOptions.replyTo
     }));
     
-    // Send the email
-    const sendResult = await client.send(emailOptions);
-    console.log("Email sent with result:", sendResult);
+    // Use retry logic for sending
+    let sendResult;
+    let attempt = 0;
+    const maxAttempts = 3;
+    let lastError;
     
-    // Close the connection
-    await client.close();
+    while (attempt < maxAttempts) {
+      attempt++;
+      try {
+        console.log(`Attempt ${attempt} to send email...`);
+        sendResult = await client.send(emailOptions);
+        console.log(`Email sent successfully on attempt ${attempt}:`, sendResult);
+        break;
+      } catch (error) {
+        lastError = error;
+        console.error(`Attempt ${attempt} failed:`, error);
+        
+        if (attempt < maxAttempts) {
+          const delay = 1000 * attempt; // Incremental backoff
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
     
-    console.log("Email sent successfully and connection closed");
+    // Try to close the connection regardless of outcome
+    try {
+      await client.close();
+      console.log("SMTP connection closed");
+    } catch (closeError) {
+      console.error("Error closing SMTP connection:", closeError);
+    }
+    
+    // Check if all attempts failed
+    if (!sendResult && lastError) {
+      throw lastError;
+    }
     
     // Return success response
     return new Response(JSON.stringify({
@@ -166,7 +220,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       error: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      details: "Check SMTP configuration and ensure email addresses are valid."
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

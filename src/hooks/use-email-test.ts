@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ConnectionStatus, EmailTestResult } from '@/components/email-test/types';
+import { testSmtpConnection } from '@/lib/email-service';
 
 export function useEmailTest() {
   const [loading, setLoading] = useState(false);
@@ -98,79 +99,33 @@ export function useEmailTest() {
       
       console.log('Testing SMTP connection...');
       
-      // Display the project info for debugging
-      const projectInfo = {
-        projectUrl: supabase.functions.url?.toString(),
-        projectId: supabase.functions.url?.split('/')[2]?.split('.')[0] || 'unknown'
-      };
-      console.log('Supabase Project Info:', projectInfo);
+      const { success, details, error } = await testSmtpConnection();
       
-      // Add a timeout to detect if the function call hangs
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timed out after 20 seconds')), 20000);
-      });
-      
-      // Try the new simple test-smtp function first
-      try {
-        console.log('Using test-smtp function...');
-        const testPromise = supabase.functions.invoke('test-smtp');
-        const { data, error } = await Promise.race([testPromise, timeoutPromise]) as any;
-        
-        if (error) {
-          console.error('Error testing SMTP (test-smtp):', error);
-          throw new Error(`Test SMTP error: ${error.message || JSON.stringify(error)}`);
-        }
-        
-        console.log('SMTP test successful with test-smtp function:', data);
-        setConnectionStatus('success');
-        setResult(data);
-        toast.success('בדיקת SMTP הצליחה!');
-        return;
-      } catch (testSmtpError) {
-        console.error('Error with test-smtp function, falling back to smtp-sender:', testSmtpError);
-        // Continue with the regular smtp-sender as fallback
-      }
-      
-      // Call the smtp-sender function with a minimal test
-      try {
-        console.log('Falling back to smtp-sender function...');
-        const functionPromise = supabase.functions.invoke('smtp-sender', {
-          body: {
-            to: 'support@algotouch.co.il',
-            subject: 'SMTP Test Connection',
-            html: `<div>SMTP test email sent at ${new Date().toLocaleString()}</div>`
-          }
-        });
-        
-        const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
-        
-        if (error) {
-          console.error('Error testing SMTP connection:', error);
-          toast.error('שגיאה בבדיקת SMTP');
-          setConnectionStatus('error');
-          setErrorDetails(JSON.stringify(error, null, 2));
-          setResult({ error: error.message });
-          return;
-        }
-        
-        setConnectionStatus('success');
-        setResult(data);
-        toast.success('בדיקת SMTP הצליחה!');
-      } catch (fetchError: any) {
-        console.error('Fetch error testing SMTP:', fetchError);
-        
-        // Set network error specifically
-        setNetworkError(JSON.stringify({
-          message: fetchError.message || 'Network error occurred',
-          name: fetchError.name || 'NetworkError',
-          stack: fetchError.stack,
-          details: fetchError
-        }, null, 2));
-        
-        toast.error('שגיאת רשת בבדיקת SMTP');
+      if (!success || error) {
+        console.error('Error testing SMTP connection:', error);
+        toast.error('שגיאה בבדיקת SMTP');
         setConnectionStatus('error');
-        setResult({ error: fetchError.message });
+        
+        if (error && error.includes('network')) {
+          setNetworkError(JSON.stringify({
+            message: error,
+            name: 'NetworkError',
+            details: 'The Edge Function may not be deployed or CORS issues'
+          }, null, 2));
+        } else {
+          setErrorDetails(JSON.stringify({
+            message: error,
+            details: details
+          }, null, 2));
+        }
+        
+        setResult({ error });
+        return;
       }
+      
+      setConnectionStatus('success');
+      setResult(details);
+      toast.success('בדיקת SMTP הצליחה!');
     } catch (error: any) {
       console.error('Exception testing SMTP:', error);
       toast.error('שגיאה בבדיקת SMTP');

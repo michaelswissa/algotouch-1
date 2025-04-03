@@ -20,6 +20,18 @@ interface EmailRequest {
  */
 export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
+    if (!emailRequest.to || !emailRequest.subject || !emailRequest.html) {
+      const missing = [];
+      if (!emailRequest.to) missing.push("to");
+      if (!emailRequest.subject) missing.push("subject");
+      if (!emailRequest.html) missing.push("html");
+      
+      const errorMsg = `Missing required email fields: ${missing.join(", ")}`;
+      console.error(errorMsg);
+      toast.error('שגיאה בשליחת הודעת דואר אלקטרוני: חסרים שדות חובה');
+      return { success: false, error: errorMsg };
+    }
+    
     console.log('Sending email via SMTP:', {
       to: emailRequest.to,
       subject: emailRequest.subject,
@@ -151,4 +163,26 @@ export async function sendPasswordResetEmail(userEmail: string, resetLink: strin
     </div>
     `,
   });
+}
+
+/**
+ * Tests SMTP configuration by sending a test email
+ */
+export async function testSmtpConnection(): Promise<{ success: boolean; details?: any; error?: string }> {
+  try {
+    console.log('Testing SMTP connection...');
+    
+    const { data, error } = await supabase.functions.invoke('test-smtp');
+    
+    if (error) {
+      console.error('Error testing SMTP connection:', error);
+      return { success: false, error: error.message || JSON.stringify(error) };
+    }
+    
+    console.log('SMTP connection test successful:', data);
+    return { success: true, details: data };
+  } catch (error: any) {
+    console.error('Exception testing SMTP connection:', error);
+    return { success: false, error: error.message || JSON.stringify(error) };
+  }
 }

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle, Info } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Terminal } from "lucide-react";
 import { ConnectionStatus } from './types';
 
 interface ConnectionStatusAlertsProps {
@@ -18,10 +18,16 @@ const ConnectionStatusAlerts: React.FC<ConnectionStatusAlertsProps> = ({
   return (
     <>
       <Alert className="mb-6 bg-blue-500/10 border-blue-500/50 text-blue-700 dark:text-blue-400">
-        <Info className="h-4 w-4" />
-        <AlertTitle>מידע</AlertTitle>
+        <Terminal className="h-4 w-4" />
+        <AlertTitle>פרטי הפרויקט</AlertTitle>
         <AlertDescription>
-          מידע על הפרויקט: {supabaseFunctionsUrl || 'לא זמין'}
+          <div className="mt-1">
+            <p className="font-medium">כתובת Edge Functions: </p>
+            <code className="bg-blue-950/10 px-2 py-0.5 rounded text-sm">{supabaseFunctionsUrl || 'לא זמין'}</code>
+          </div>
+          <div className="mt-2 text-sm opacity-80">
+            אם אתה משתמש במערכת בסביבת פיתוח, ודא שהסודות (Secrets) הוגדרו כראוי בסופאבייס, ושהפונקציות (Edge Functions) הופעלו.
+          </div>
         </AlertDescription>
       </Alert>
       
@@ -31,8 +37,6 @@ const ConnectionStatusAlerts: React.FC<ConnectionStatusAlertsProps> = ({
           <AlertTitle>שגיאת תקשורת</AlertTitle>
           <AlertDescription>
             נראה שיש בעיית תקשורת עם Edge Function. ייתכן שהפונקציה טרם הופעלה או שיש בעיה בהגדרות CORS.
-            <br />
-            פרטים נוספים:
             <pre className="bg-orange-950/10 p-2 mt-2 rounded-md overflow-auto text-xs leading-relaxed text-orange-600 dark:text-orange-400" dir="ltr">
               {networkError}
             </pre>
@@ -45,7 +49,17 @@ const ConnectionStatusAlerts: React.FC<ConnectionStatusAlertsProps> = ({
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>שגיאת התחברות</AlertTitle>
           <AlertDescription>
-            נכשל בהתחברות לשירות שליחת מיילים. וודא שהפונקציה הופעלה וההגדרות תקינות.
+            <div>נכשל בהתחברות לשירות שליחת מיילים. וודא שהפונקציה הופעלה וההגדרות תקינות.</div>
+            <div className="mt-2 text-sm">
+              <p>יש לוודא שהסודות הבאים קיימים בסופאבייס:</p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5">
+                <li><code>SMTP_HOST</code></li>
+                <li><code>SMTP_PORT</code></li>
+                <li><code>SMTP_USER</code></li>
+                <li><code>SMTP_PASSWORD</code></li>
+                <li><code>SMTP_FROM</code></li>
+              </ul>
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -55,7 +69,7 @@ const ConnectionStatusAlerts: React.FC<ConnectionStatusAlertsProps> = ({
           <CheckCircle className="h-4 w-4" />
           <AlertTitle>חיבור מוצלח</AlertTitle>
           <AlertDescription>
-            התחברות לשירות שליחת מיילים הצליחה בהצלחה!
+            התחברות לשירות שליחת מיילים הצליחה! המערכת מוכנה לשליחת מיילים.
           </AlertDescription>
         </Alert>
       )}
