@@ -77,6 +77,7 @@ const SubscriptionContent = () => {
 
   const handlePlanSelect = (planId: string) => {
     updateRegistrationData({ planId });
+    setCurrentStep(2);
     console.log('Selected plan:', planId);
   };
 
@@ -122,7 +123,8 @@ const SubscriptionContent = () => {
       }
     }
     
-    console.log('Contract signed, updated registration data with contract details');
+    setCurrentStep(3);
+    console.log('Contract signed, moving to payment step');
   };
 
   const handlePaymentComplete = () => {
