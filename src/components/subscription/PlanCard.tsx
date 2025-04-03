@@ -53,12 +53,12 @@ const PlanCard: React.FC<PlanProps> = ({
 
   return (
     <Card 
-      className={`overflow-hidden transition-all duration-300 hover:shadow-lg card-rise ${
+      className={`overflow-hidden transition-all duration-300 hover:shadow-lg card-rise h-full ${
         isSelected 
           ? 'border-primary ring-2 ring-primary/30 animate-pulse-subtle' 
           : 'hover:-translate-y-2'
       } ${id === 'annual' 
-          ? 'md:scale-105 z-10 relative border-blue-500 dark:border-blue-400' 
+          ? 'md:scale-105 z-10 relative' 
           : ''}`}
     >
       {id === 'annual' && (
@@ -88,13 +88,6 @@ const PlanCard: React.FC<PlanProps> = ({
       </CardHeader>
       <CardContent className="pb-6">
         <PlanFeaturesList features={features} planId={id} />
-        <div className="mt-6 pt-4 border-t text-sm text-muted-foreground">
-          <strong className="font-medium">למי זה מתאים?</strong> {id === 'monthly' 
-            ? 'לסוחרים שרוצים חופש וגמישות מלאה, ללא התחייבות ארוכת טווח.' 
-            : id === 'annual' 
-              ? 'לסוחרים שרוצים ליהנות מהנחה משמעותית ולשמור על רצף שימוש בלי לדאוג לחיובים חודשיים.' 
-              : 'למי שרוצה את הרמה הגבוהה ביותר של תמיכה, ידע ויכולות, ולסוחרים שרוצים לפתח קריירה בתחום.'}
-        </div>
       </CardContent>
       <CardFooter className="pb-6 pt-0">
         <Button 

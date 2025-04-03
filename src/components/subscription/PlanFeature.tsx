@@ -17,8 +17,8 @@ const PlanFeature: React.FC<PlanFeatureProps> = ({
   if (!included) return null;
   
   return (
-    <li className="flex gap-3">
-      <div className="flex-shrink-0 w-6 h-6 mt-0.5 text-lg flex items-center justify-center">
+    <li className="flex gap-3 group">
+      <div className="flex-shrink-0 w-6 h-6 mt-0.5 text-lg flex items-center justify-center group-hover:scale-110 transition-transform">
         <span role="img" aria-label={name}>
           {icon}
         </span>
@@ -28,7 +28,7 @@ const PlanFeature: React.FC<PlanFeatureProps> = ({
           {name}
         </div>
         {description && (
-          <p className="text-muted-foreground text-sm mt-1">{description}</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{description}</p>
         )}
       </div>
     </li>
