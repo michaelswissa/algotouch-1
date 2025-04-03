@@ -3,6 +3,7 @@ export interface SubscriptionPlan {
   name: string;
   price: number;
   description: string;
+  currency?: string;
 }
 
 export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
@@ -10,12 +11,20 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
     monthly: {
       name: 'חודשי',
       price: 99,
+      currency: '$',
       description: 'חיוב חודשי לאחר חודש ניסיון',
     },
     annual: {
       name: 'שנתי',
       price: 899,
+      currency: '$',
       description: 'חיוב שנתי לאחר חודש ניסיון',
+    },
+    vip: {
+      name: 'VIP',
+      price: 3499,
+      currency: '$',
+      description: 'גישה לכל החיים בתשלום חד פעמי',
     },
   };
 };

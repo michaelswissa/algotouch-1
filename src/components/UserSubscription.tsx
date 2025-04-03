@@ -80,7 +80,8 @@ const UserSubscription = () => {
             <>
               <BillingInfo 
                 nextBillingDate={details.nextBillingDate} 
-                planPrice={details.planPrice} 
+                planPrice={details.planPrice}
+                currency="$"
               />
               
               <PaymentMethodInfo 
