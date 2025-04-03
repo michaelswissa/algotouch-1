@@ -19,8 +19,6 @@ serve(async (req) => {
 
   try {
     console.log("--- TEST-SMTP FUNCTION CALLED ---");
-    console.log(`Request method: ${req.method}`);
-    console.log(`Request URL: ${req.url}`);
     
     // Get SMTP configuration from environment variables
     const smtp_host = Deno.env.get("SMTP_HOST");
@@ -29,11 +27,11 @@ serve(async (req) => {
     const smtp_pass = Deno.env.get("SMTP_PASSWORD");
     const smtp_from = Deno.env.get("SMTP_FROM") || "noreply@algotouch.co.il";
     
-    // Dump configuration (exclude password)
+    // Log configuration (but not password)
     console.log("SMTP Configuration:");
-    console.log(`Host: ${smtp_host}`);
+    console.log(`Host: ${smtp_host || "missing"}`);
     console.log(`Port: ${smtp_port}`);
-    console.log(`User: ${smtp_user}`);
+    console.log(`User: ${smtp_user || "missing"}`);
     console.log(`From: ${smtp_from}`);
     
     // Check for required env variables
@@ -58,42 +56,33 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400, // Return a 400 status for configuration issues
+          status: 400,
         }
       );
     }
     
-    // Create an SMTP client
-    console.log("Creating SMTP client with the following configuration:");
-    console.log(`Host: ${smtp_host}, Port: ${smtp_port}, User: ${smtp_user}, TLS: true`);
-    
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtp_host,
-        port: smtp_port,
-        tls: true,
-        auth: {
-          username: smtp_user,
-          password: smtp_pass,
-        },
-        // Add timeout options
-        timeout: 30000, // 30 seconds
-      },
-      // Enable debug logging
-      debug: {
-        logger: true,
-      },
-    });
-
-    console.log("SMTP client created, attempting connection test...");
-    
     try {
-      // Basic connection test - Just connects and closes
-      console.log("Attempting to connect to SMTP server...");
+      // Create a simplified SMTP client with fewer options
+      console.log("Creating SMTP client");
+      const client = new SMTPClient({
+        connection: {
+          hostname: smtp_host,
+          port: smtp_port,
+          tls: true,
+          auth: {
+            username: smtp_user,
+            password: smtp_pass,
+          },
+          timeout: 30000, // 30 seconds
+        },
+        debug: { logger: true }
+      });
+
+      // Test connection
+      console.log("Testing SMTP connection...");
       await client.connect();
       console.log("SMTP connection successful!");
       await client.close();
-      console.log("SMTP connection closed properly");
       
       return new Response(
         JSON.stringify({
@@ -111,23 +100,18 @@ serve(async (req) => {
           status: 200,
         }
       );
-    } catch (connError) {
-      console.error("SMTP connection test failed:", connError);
-      console.error("Error details:", JSON.stringify({
-        message: connError.message,
-        name: connError.name,
-        stack: connError.stack,
-        code: connError.code
-      }));
+    } catch (error) {
+      console.error("SMTP connection error:", error.message);
       
-      // Provide detailed error information
       return new Response(
         JSON.stringify({
           success: false,
-          error: `SMTP connection failed: ${connError.message}`,
-          errorType: connError.name,
-          errorCode: connError.code,
-          details: "Check your SMTP settings, especially host, port, and credentials",
+          error: `SMTP connection failed: ${error.message}`,
+          errorDetails: {
+            type: error.name,
+            code: error.code,
+            stack: error.stack
+          },
           config: {
             host: smtp_host,
             port: smtp_port,
@@ -137,34 +121,18 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400, // Return a 400 status for SMTP connection issues
+          status: 400,
         }
       );
-    } finally {
-      try {
-        await client.close();
-      } catch (e) {
-        // Ignore close errors
-        console.log("Note: SMTP connection may already be closed");
-      }
     }
   } catch (error) {
-    console.error("Error testing SMTP:", error);
-    console.error("Error details:", JSON.stringify({
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      code: error.code
-    }));
+    console.error("Error processing request:", error);
     
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message,
-        errorType: error.name,
-        stack: error.stack,
-        code: error.code,
-        message: "There was an unexpected error processing your request"
+        stack: error.stack
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

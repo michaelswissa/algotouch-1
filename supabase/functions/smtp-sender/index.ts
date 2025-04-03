@@ -13,17 +13,11 @@ interface EmailRequest {
   subject: string;
   html: string;
   text?: string;
-  replyTo?: string;
   attachmentData?: {
     filename: string;
     content: string; // Base64 encoded content
     mimeType: string;
   }[];
-}
-
-function validateEmail(email: string): boolean {
-  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return regex.test(email);
 }
 
 serve(async (req) => {
@@ -36,9 +30,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("--- SMTP-SENDER FUNCTION CALLED ---");
-    console.log(`Request method: ${req.method}`);
-    console.log(`Request URL: ${req.url}`);
+    console.log("--- SMTP SENDER FUNCTION CALLED ---");
     
     // Get SMTP configuration from environment variables
     const smtp_host = Deno.env.get("SMTP_HOST");
@@ -47,60 +39,43 @@ serve(async (req) => {
     const smtp_pass = Deno.env.get("SMTP_PASSWORD");
     const smtp_from = Deno.env.get("SMTP_FROM") || "noreply@algotouch.co.il";
     
-    // Check if all required SMTP credentials are provided
+    // Log SMTP configuration
+    console.log("SMTP Configuration:");
+    console.log(`Host: ${smtp_host || "MISSING"}`);
+    console.log(`Port: ${smtp_port}`);
+    console.log(`User: ${smtp_user || "MISSING"}`);
+    console.log(`From: ${smtp_from}`);
+    
+    // Check if SMTP is properly configured
     if (!smtp_host || !smtp_user || !smtp_pass) {
-      console.error("Missing SMTP credentials");
       const missing = [];
       if (!smtp_host) missing.push("SMTP_HOST");
       if (!smtp_user) missing.push("SMTP_USER");
       if (!smtp_pass) missing.push("SMTP_PASSWORD");
       
-      throw new Error(`Missing SMTP credentials: ${missing.join(", ")}`);
+      throw new Error(`SMTP not configured properly. Missing: ${missing.join(", ")}`);
     }
     
-    console.log("SMTP configuration found:");
-    console.log(`- Host: ${smtp_host}`);
-    console.log(`- Port: ${smtp_port}`);
-    console.log(`- User: ${smtp_user}`);
-    console.log(`- From: ${smtp_from}`);
-    
-    // Parse the request body
-    let emailRequest: EmailRequest;
-    try {
-      emailRequest = await req.json();
-      console.log("Request body parsed:", {
-        to: emailRequest.to,
-        subject: emailRequest.subject,
-        htmlLength: emailRequest.html?.length,
-        attachmentsCount: emailRequest.attachmentData?.length || 0
-      });
-    } catch (parseError) {
-      console.error("Error parsing request body:", parseError);
-      throw new Error("Invalid JSON in request body");
-    }
+    // Parse request body
+    const emailRequest: EmailRequest = await req.json();
+    console.log("Email request received:", {
+      to: emailRequest.to,
+      subject: emailRequest.subject,
+      hasAttachments: !!emailRequest.attachmentData?.length
+    });
     
     // Validate email request
     if (!emailRequest.to || !emailRequest.subject || !emailRequest.html) {
-      console.error("Missing required email fields");
       const missing = [];
       if (!emailRequest.to) missing.push("to");
       if (!emailRequest.subject) missing.push("subject");
       if (!emailRequest.html) missing.push("html");
-      throw new Error(`Missing required email fields: ${missing.join(", ")}`);
+      
+      throw new Error(`Invalid email request. Missing: ${missing.join(", ")}`);
     }
     
-    // Validate email addresses
-    if (!validateEmail(emailRequest.to)) {
-      throw new Error(`Invalid recipient email address: ${emailRequest.to}`);
-    }
-    
-    if (emailRequest.replyTo && !validateEmail(emailRequest.replyTo)) {
-      throw new Error(`Invalid reply-to email address: ${emailRequest.replyTo}`);
-    }
-    
-    console.log(`Sending email to ${emailRequest.to} with subject: ${emailRequest.subject}`);
-    
-    // Create an SMTP client with expanded options
+    // Create SMTP client
+    console.log("Creating SMTP client");
     const client = new SMTPClient({
       connection: {
         hostname: smtp_host,
@@ -110,171 +85,79 @@ serve(async (req) => {
           username: smtp_user,
           password: smtp_pass,
         },
-        // Add timeout options
-        timeout: 30000, // 30 seconds connection timeout
+        timeout: 30000, // 30 seconds
       },
-      debug: {
-        logger: true,
-      },
+      debug: { logger: true }
     });
-
-    // Prepare attachments if any
-    const attachments = [];
-    if (emailRequest.attachmentData && emailRequest.attachmentData.length > 0) {
-      console.log(`Processing ${emailRequest.attachmentData.length} attachments`);
-      
-      for (const attachment of emailRequest.attachmentData) {
-        try {
-          console.log(`Processing attachment: ${attachment.filename}, mimeType: ${attachment.mimeType}`);
-          console.log(`Content length before decoding: ${attachment.content.length} characters`);
-          
-          // Better base64 handling
-          let content;
-          try {
-            // Try handling various base64 formats
-            let base64String = attachment.content;
-            
-            // Remove potential data URL prefix
-            if (base64String.startsWith('data:')) {
-              base64String = base64String.split(',')[1];
-            }
-            
-            // Replace URL-safe characters with standard base64 chars
-            base64String = base64String.replace(/-/g, '+').replace(/_/g, '/');
-            
-            // Add padding if needed
-            while (base64String.length % 4) {
-              base64String += '=';
-            }
-            
-            content = Uint8Array.from(atob(base64String), c => c.charCodeAt(0));
-            console.log(`Successfully decoded base64 content, size: ${content.length} bytes`);
-          } catch (decodeErr) {
-            console.error(`Error decoding base64 content for ${attachment.filename}:`, decodeErr);
-            throw new Error(`Failed to decode attachment content: ${decodeErr.message}`);
-          }
-          
-          attachments.push({
-            filename: attachment.filename,
-            contentType: attachment.mimeType,
-            content: content,
-          });
-          console.log(`Successfully processed attachment: ${attachment.filename}`);
-        } catch (err) {
-          console.error(`Error processing attachment ${attachment.filename}:`, err);
-          throw new Error(`Failed to process attachment ${attachment.filename}: ${err.message}`);
-        }
-      }
-      
-      console.log(`Successfully processed ${attachments.length} attachments`);
-    }
     
-    // Prepare email options
-    const emailOptions: any = {
+    // Prepare email
+    const email: any = {
       from: smtp_from,
       to: emailRequest.to,
       subject: emailRequest.subject,
       html: emailRequest.html,
+      content: emailRequest.text
     };
     
-    // Add text content if specified
-    if (emailRequest.text) {
-      emailOptions.text = emailRequest.text;
+    // Add attachments if they exist
+    if (emailRequest.attachmentData && emailRequest.attachmentData.length > 0) {
+      console.log(`Processing ${emailRequest.attachmentData.length} attachments`);
+      
+      email.attachments = emailRequest.attachmentData.map(attachment => ({
+        filename: attachment.filename,
+        content: Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0)),
+        contentType: attachment.mimeType,
+      }));
     }
     
-    // Add attachments if any
-    if (attachments.length > 0) {
-      emailOptions.attachments = attachments;
-    }
+    // Connect to SMTP server
+    console.log("Connecting to SMTP server");
+    await client.connect();
     
-    // Add reply-to if specified
-    if (emailRequest.replyTo) {
-      emailOptions.replyTo = emailRequest.replyTo;
-    }
-    
-    // Log email sending attempt
-    console.log(`Preparing to send email with options:`, JSON.stringify({
-      from: emailOptions.from,
-      to: emailOptions.to,
-      subject: emailOptions.subject,
-      hasHtml: !!emailOptions.html,
-      hasText: !!emailOptions.text,
-      attachmentsCount: attachments.length,
-      hasReplyTo: !!emailOptions.replyTo
-    }));
-    
-    // Use retry logic for sending
-    let sendResult;
-    let attempt = 0;
-    const maxAttempts = 3;
-    let lastError;
-    
-    while (attempt < maxAttempts) {
-      attempt++;
+    try {
+      // Send email
+      console.log("Sending email");
+      const info = await client.send(email);
+      console.log("Email sent successfully:", info);
+      
+      // Return success response
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messageId: info.messageId,
+          sent: true
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    } finally {
+      // Always close the connection
       try {
-        console.log(`Attempt ${attempt} to connect to SMTP server...`);
-        
-        // First test the connection
-        await client.connect();
-        console.log("SMTP connection established successfully");
-        
-        console.log(`Sending email on attempt ${attempt}...`);
-        sendResult = await client.send(emailOptions);
-        console.log(`Email sent successfully on attempt ${attempt}:`, sendResult);
-        break;
-      } catch (error) {
-        lastError = error;
-        console.error(`Attempt ${attempt} failed:`, error);
-        
-        // Try to close the connection if it was opened
-        try {
-          await client.close();
-          console.log("SMTP connection closed after error");
-        } catch (closeError) {
-          console.error("Error closing SMTP connection:", closeError);
-        }
-        
-        if (attempt < maxAttempts) {
-          const delay = 1000 * attempt; // Incremental backoff
-          console.log(`Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        await client.close();
+        console.log("SMTP connection closed");
+      } catch (closeError) {
+        console.warn("Error closing SMTP connection:", closeError);
       }
     }
-    
-    // Try to close the connection regardless of outcome
-    try {
-      await client.close();
-      console.log("SMTP connection closed");
-    } catch (closeError) {
-      console.error("Error closing SMTP connection:", closeError);
-    }
-    
-    // Check if all attempts failed
-    if (!sendResult && lastError) {
-      throw lastError;
-    }
-    
-    // Return success response
-    return new Response(JSON.stringify({
-      success: true,
-      message: "Email sent successfully",
-      result: sendResult
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
   } catch (error) {
     console.error("Error sending email:", error);
     
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      stack: error.stack,
-      name: error.name,
-      details: "Check SMTP configuration and ensure email addresses are valid."
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        stack: error.stack,
+        details: {
+          name: error.name,
+          code: error.code
+        }
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
   }
 });

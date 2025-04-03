@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -40,7 +41,6 @@ function createSupabaseClient() {
     throw new Error("Missing Supabase credentials");
   }
 
-  console.log(`Supabase URL: ${SUPABASE_URL}`);
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
@@ -123,158 +123,54 @@ async function updateSubscription(supabase: any, userId: string, planId: string,
   }
 }
 
-// Prepares and sends notification email with contract attachment
-async function sendNotificationEmail(
-  supabase: any, 
-  request: SigningRequest, 
-  signatureTimestamp: string,
-  ipAddress: string
-) {
-  console.log("Preparing to send notification email");
-  try {
-    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(request.userId);
-    
-    if (userError) {
-      console.error("Error fetching user data:", userError);
-      throw userError;
-    }
-    
-    if (!userData || !userData.user) {
-      console.error("User not found:", request.userId);
-      throw new Error(`User not found: ${request.userId}`);
-    }
-    
-    console.log("User found, preparing email content");
-    
-    // Convert HTML contract to base64 for attachment
-    const encoder = new TextEncoder();
-    const contractBytes = encoder.encode(request.contractHtml);
-    const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
-    
-    const emailBody = `
-      <h1>הסכם חדש נחתם</h1>
-      <p>שלום,</p>
-      <p>המשתמש ${request.fullName} (${request.email}) חתם על הסכם לתכנית ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}.</p>
-      <p>פרטי החתימה:</p>
-      <ul>
-        <li>זמן חתימה: ${signatureTimestamp}</li>
-        <li>כתובת IP: ${ipAddress || "לא זוהה"}</li>
-        <li>דפדפן: ${request.browserInfo.userAgent || "לא זוהה"}</li>
-      </ul>
-      <p>מצורף חוזה חתום כקובץ HTML. אנא פתח את הקובץ בדפדפן לצפייה.</p>
-      <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
-    `;
-
-    // גם שלח מייל ללקוח
-    const customerEmailBody = `
-      <h1>תודה שחתמת על ההסכם</h1>
-      <p>שלום ${request.fullName},</p>
-      <p>תודה שחתמת על הסכם ההצטרפות לשירות AlgoTouch.</p>
-      <p>פרטי החתימה:</p>
-      <ul>
-        <li>זמן חתימה: ${signatureTimestamp}</li>
-        <li>תכנית: ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}</li>
-      </ul>
-      <p>מצורף העתק של החוזה החתום.</p>
-      <p>לכל שאלה, ניתן לפנות אלינו ב-support@algotouch.co.il</p>
-      <p>בברכה,<br>צוות AlgoTouch</p>
-    `;
-
-    console.log("Sending contract notification email to support@algotouch.co.il");
-    
-    // Attempt to send email to support
-    try {
-      const smtpResponse = await sendEmailViaSmtp(
-        supabase,
-        "support@algotouch.co.il",
-        `הסכם חדש נחתם - ${request.fullName}`,
-        emailBody,
-        [{
-          filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
-          content: contractBase64,
-          mimeType: "text/html"
-        }]
-      );
-      
-      console.log("Support email notification sent successfully");
-      
-      // Also send to customer
-      const customerResponse = await sendEmailViaSmtp(
-        supabase,
-        request.email, // שליחה ללקוח
-        `העתק הסכם AlgoTouch - אישור חתימה`,
-        customerEmailBody,
-        [{
-          filename: `contract-algotouch-${new Date().toISOString().slice(0,10)}.html`,
-          content: contractBase64,
-          mimeType: "text/html"
-        }]
-      );
-      
-      console.log("Customer email notification sent successfully");
-      
-      return { 
-        support: smtpResponse, 
-        customer: customerResponse 
-      };
-    } catch (emailSendError) {
-      console.error("Failed to send email:", emailSendError);
-      // Don't rethrow - continue with the contract signing process even if email fails
-      return { success: false, error: emailSendError.message };
-    }
-  } catch (error) {
-    console.error("Error preparing notification email:", error);
-    // Don't throw error as this is not critical for the signing process
-    return { success: false, error: error.message };
-  }
-}
-
-// Helper function to send email via SMTP
-async function sendEmailViaSmtp(
-  supabase: any,
-  to: string,
-  subject: string,
-  html: string,
-  attachments?: Array<{filename: string, content: string, mimeType: string}>
-) {
-  console.log("Sending email via SMTP function");
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("Missing Supabase credentials for email sending");
-    throw new Error("Missing Supabase credentials for email sending");
-  }
+// פונקציה ייעודית לשליחת מייל בצורה פשוטה יותר
+async function sendEmail(to: string, subject: string, html: string, attachments?: Array<{filename: string, content: string, mimeType: string}>) {
+  console.log(`Sending email to ${to} with subject: ${subject}`);
   
   try {
-    // בקריאה לפונקציית SMTP sender
-    const smtpResponse = await fetch(`${SUPABASE_URL}/functions/v1/smtp-sender`, {
-      method: "POST",
+    // הכן את גוף הבקשה עם כל הפרטים הנדרשים
+    const emailRequest = {
+      to,
+      subject,
+      html,
+      attachmentData: attachments || []
+    };
+
+    // בחר את שיטת השליחה המועדפת - SMTP או Gmail
+    const endpoint = 'smtp-sender'; // אפשר להחליף ל־'gmail-sender' אם מעדיף שימוש ב־Gmail
+    
+    // שלח בקשה לפונקציה המתאימה
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Missing Supabase environment variables");
+    }
+    
+    console.log(`Calling ${endpoint} function at ${SUPABASE_URL}/functions/v1/${endpoint}`);
+    
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
       },
-      body: JSON.stringify({
-        to,
-        subject,
-        html,
-        attachmentData: attachments
-      })
+      body: JSON.stringify(emailRequest)
     });
     
-    // בדיקת התשובה
-    if (!smtpResponse.ok) {
-      const errorText = await smtpResponse.text();
-      console.error("Failed to send email via SMTP:", errorText);
-      throw new Error(`SMTP send failed: ${errorText}`);
-    } else {
-      const smtpResult = await smtpResponse.json();
-      console.log("Email notification sent successfully via SMTP:", smtpResult);
-      return smtpResult;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Email sending failed with status ${response.status}: ${errorText}`);
+      return { success: false, error: `Failed to send email: ${errorText}` };
     }
+    
+    const result = await response.json();
+    console.log("Email sent successfully:", result);
+    return { success: true, result };
+    
   } catch (error) {
-    console.error("Exception sending email via SMTP:", error);
-    throw new Error(`Failed to send email: ${error.message}`);
+    console.error("Exception sending email:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -369,32 +265,89 @@ serve(async (req) => {
     // Update subscription record and continue even if it fails
     try {
       await updateSubscription(supabase, request.userId, request.planId, signatureTimestamp);
+      console.log("Subscription updated successfully");
     } catch (subscriptionError) {
       console.error("Error updating subscription (continuing anyway):", subscriptionError);
       // Continue processing - we can still succeed overall if this fails
     }
     
-    // Send notification email but don't fail if it doesn't work
-    let emailResult;
-    try {
-      emailResult = await sendNotificationEmail(supabase, request, signatureTimestamp, ipAddress);
-      console.log("Email notification results:", emailResult);
-    } catch (emailError) {
-      console.error("Error sending notification email (continuing anyway):", emailError);
-      // Continue processing - email is not critical for signing success
-      emailResult = { error: emailError.message };
-    }
+    // Convert HTML contract to base64 for attachment
+    const encoder = new TextEncoder();
+    const contractBytes = encoder.encode(request.contractHtml);
+    const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
+    
+    // שלח מייל ללקוח
+    console.log("Sending email to customer:", request.email);
+    const customerEmailBody = `
+      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
+        <h1>תודה שחתמת על ההסכם</h1>
+        <p>שלום ${request.fullName},</p>
+        <p>תודה שחתמת על הסכם ההצטרפות לשירות AlgoTouch.</p>
+        <p>פרטי החתימה:</p>
+        <ul>
+          <li>זמן חתימה: ${signatureTimestamp}</li>
+          <li>תכנית: ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}</li>
+        </ul>
+        <p>מצורף העתק של החוזה החתום.</p>
+        <p>לכל שאלה, ניתן לפנות אלינו ב-support@algotouch.co.il</p>
+        <p>בברכה,<br>צוות AlgoTouch</p>
+      </div>
+    `;
+    
+    const customerEmailResult = await sendEmail(
+      request.email,
+      `העתק הסכם AlgoTouch - אישור חתימה`,
+      customerEmailBody,
+      [{
+        filename: `contract-algotouch-${new Date().toISOString().slice(0,10)}.html`,
+        content: contractBase64,
+        mimeType: "text/html"
+      }]
+    );
+    
+    console.log("Customer email result:", customerEmailResult);
+    
+    // שלח גם מייל למנהל המערכת
+    console.log("Sending email to admin");
+    const adminEmailBody = `
+      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
+        <h1>הסכם חדש נחתם</h1>
+        <p>שלום,</p>
+        <p>המשתמש ${request.fullName} (${request.email}) חתם על הסכם לתכנית ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}.</p>
+        <p>פרטי החתימה:</p>
+        <ul>
+          <li>זמן חתימה: ${signatureTimestamp}</li>
+          <li>כתובת IP: ${ipAddress || "לא זוהה"}</li>
+          <li>דפדפן: ${request.browserInfo.userAgent || "לא זוהה"}</li>
+        </ul>
+        <p>מצורף חוזה חתום כקובץ HTML. אנא פתח את הקובץ בדפדפן לצפייה.</p>
+        <p>זהו מייל אוטומטי, אין צורך להשיב עליו.</p>
+      </div>
+    `;
+    
+    const adminEmailResult = await sendEmail(
+      "support@algotouch.co.il",
+      `הסכם חדש נחתם - ${request.fullName}`,
+      adminEmailBody,
+      [{
+        filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
+        content: contractBase64,
+        mimeType: "text/html"
+      }]
+    );
+    
+    console.log("Admin email result:", adminEmailResult);
     
     // Return the signing result
-    console.log("Contract signing process completed successfully");
+    console.log("Contract signing process completed");
     return new Response(
       JSON.stringify({
         success: true,
         documentId,
         signatureId,
         signedAt: signatureTimestamp,
-        emailSent: emailResult?.success !== false,
-        emailDetails: emailResult
+        emailToCustomer: customerEmailResult,
+        emailToAdmin: adminEmailResult
       }), 
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
