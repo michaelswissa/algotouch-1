@@ -26,8 +26,17 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     
+    // Set canvas size to match the displayed size to prevent scaling issues
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
     const context = canvas.getContext('2d');
     if (!context) return;
+    
+    // Scale the context to account for the device pixel ratio
+    context.scale(dpr, dpr);
     
     context.lineWidth = 2;
     context.lineCap = 'round';
@@ -50,53 +59,48 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
     }
   }, [value]);
 
+  const getCoordinates = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    if ('touches' in event) {
+      // Touch event
+      return {
+        x: (event.touches[0].clientX - rect.left),
+        y: (event.touches[0].clientY - rect.top)
+      };
+    } else {
+      // Mouse event
+      return {
+        x: (event.clientX - rect.left),
+        y: (event.clientY - rect.top)
+      };
+    }
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!ctx) return;
+    if (!ctx || !canvasRef.current) return;
     
     setIsDrawing(true);
     setHasSignature(true);
     
-    // Get position depending on event type
-    let clientX, clientY;
-    
-    if ('touches' in e) {
-      // Touch event
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      // Mouse event
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-    
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const coords = getCoordinates(e, canvasRef.current);
     
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo(coords.x, coords.y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !ctx) return;
-    
-    // Get position depending on event type
-    let clientX, clientY;
+    if (!isDrawing || !ctx || !canvasRef.current) return;
     
     if ('touches' in e) {
-      // Touch event
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
       e.preventDefault(); // Prevent scrolling when drawing
-    } else {
-      // Mouse event
-      clientX = e.clientX;
-      clientY = e.clientY;
     }
     
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const coords = getCoordinates(e, canvasRef.current);
     
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
   };
 
@@ -124,11 +128,9 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
 
   return (
     <div className="flex flex-col space-y-2">
-      <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900">
+      <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900" style={{ width, height }}>
         <canvas
           ref={canvasRef}
-          width={width}
-          height={height}
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={endDrawing}
