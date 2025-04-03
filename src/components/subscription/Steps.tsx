@@ -1,82 +1,72 @@
 
 import React from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Check, Circle } from 'lucide-react';
 
 interface StepsProps {
   currentStep: number;
-  children: React.ReactNode;
   className?: string;
+  children: React.ReactNode;
 }
-
-export const Steps: React.FC<StepsProps> = ({ currentStep, children, className }) => {
-  const steps = React.Children.toArray(children);
-  
-  return (
-    <div className={cn('w-full', className)}>
-      <div className="flex items-center justify-center">
-        {steps.map((step, index) => (
-          <React.Fragment key={index}>
-            {/* Step */}
-            {React.cloneElement(step as React.ReactElement, {
-              stepNumber: index + 1,
-              isActive: currentStep === index + 1,
-              isCompleted: currentStep > index + 1
-            })}
-            
-            {/* Line between steps */}
-            {index < steps.length - 1 && (
-              <div 
-                className={cn(
-                  'h-[2px] flex-1 transition-colors mx-3',
-                  currentStep > index + 1 ? 'bg-primary' : 'bg-border'
-                )}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 interface StepProps {
   title: string;
-  stepNumber?: number;
-  isActive?: boolean;
-  isCompleted?: boolean;
 }
 
-export const Step: React.FC<StepProps> = ({ 
-  title, 
-  stepNumber, 
-  isActive, 
-  isCompleted 
-}) => {
+export const Steps = ({ currentStep, className, children }: StepsProps) => {
+  // Convert children to array and count them
+  const childrenArray = React.Children.toArray(children);
+  const totalSteps = childrenArray.length;
+  
   return (
-    <div className="flex flex-col items-center">
-      <div 
-        className={cn(
-          'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
-          isActive ? 'border-2 border-primary bg-primary/10 text-primary' : 
-            isCompleted ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-        )}
-      >
-        {isCompleted ? (
-          <Check className="h-5 w-5" />
-        ) : (
-          <span>{stepNumber}</span>
-        )}
+    <div className={cn("w-full", className)}>
+      <div className="flex items-center justify-between">
+        {childrenArray.map((child, index) => {
+          const stepNumber = index + 1;
+          const isActive = stepNumber === currentStep;
+          const isCompleted = stepNumber < currentStep;
+          
+          // Create a new element with the needed props
+          // Don't pass any data attributes to the Fragment
+          return (
+            <React.Fragment key={index}>
+              <div className="flex flex-col items-center">
+                <div 
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-center font-medium",
+                    isActive && "border-primary bg-primary text-primary-foreground",
+                    isCompleted && "border-primary bg-primary text-primary-foreground",
+                    !isActive && !isCompleted && "border-muted-foreground text-muted-foreground"
+                  )}
+                >
+                  {isCompleted ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    stepNumber
+                  )}
+                </div>
+                <div className="mt-2 text-center text-xs">
+                  {React.isValidElement(child) && child.props.title}
+                </div>
+              </div>
+              
+              {stepNumber < totalSteps && (
+                <div 
+                  className={cn(
+                    "h-0.5 w-full max-w-14",
+                    isCompleted ? "bg-primary" : "bg-muted"
+                  )}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
-      <span 
-        className={cn(
-          'text-sm mt-2 transition-colors text-center',
-          isActive ? 'text-primary font-medium' : 
-            isCompleted ? 'text-foreground' : 'text-muted-foreground'
-        )}
-      >
-        {title}
-      </span>
     </div>
   );
 };
+
+export const Step = ({ title }: StepProps) => {
+  return null; // This component is just a placeholder for the steps structure
+};
+
