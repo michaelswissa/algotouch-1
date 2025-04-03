@@ -90,4 +90,3 @@ verify_jwt = true
 
 [functions.test-smtp]
 verify_jwt = false
-
