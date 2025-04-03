@@ -7,18 +7,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Image, Link2, Send } from 'lucide-react';
 import { registerCommunityPost } from '@/lib/community';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/auth';
+import { useCommunity } from '@/contexts/community/CommunityContext';
 
 interface NewPostFormProps {
   user: {
     id: string;
     email?: string;
   } | null;
-  isAuthenticated: boolean;
-  loading: boolean;
-  onPostCreated: () => Promise<void>;
 }
 
-export function NewPostForm({ user, isAuthenticated, loading, onPostCreated }: NewPostFormProps) {
+export function NewPostForm({ user }: NewPostFormProps) {
+  const { isAuthenticated } = useAuth();
+  const { loading, handlePostCreated } = useCommunity();
   const [newPostContent, setNewPostContent] = useState('');
   
   const handleCreatePost = async () => {
@@ -41,7 +42,7 @@ export function NewPostForm({ user, isAuthenticated, loading, onPostCreated }: N
       
       if (postId) {
         setNewPostContent('');
-        await onPostCreated();
+        await handlePostCreated();
         toast.success('הפוסט פורסם בהצלחה!');
       }
     } catch (error) {

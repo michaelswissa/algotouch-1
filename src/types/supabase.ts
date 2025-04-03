@@ -1,3 +1,4 @@
+
 import { Database as OriginalDatabase } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -85,7 +86,15 @@ export interface ExtendedDatabase extends OriginalDatabase {
           badge_id?: string;
           earned_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "user_badges_badge_id_fkey";
+            columns: ["badge_id"];
+            isOneToOne: false;
+            referencedRelation: "community_badges";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       community_posts: {
         Row: {

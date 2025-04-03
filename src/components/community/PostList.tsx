@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -5,17 +6,13 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare, Share2, ThumbsUp } from 'lucide-react';
 import { likePost } from '@/lib/community';
 import { toast } from 'sonner';
-import type { Post } from '@/lib/community';
+import { useAuth } from '@/contexts/auth';
+import { useCommunity } from '@/contexts/community/CommunityContext';
 
-interface PostListProps {
-  posts: Post[];
-  loading: boolean;
-  isAuthenticated: boolean;
-  userId?: string;
-  onPostLiked: (postId: string) => Promise<void>;
-}
+export function PostList() {
+  const { isAuthenticated, user } = useAuth();
+  const { posts, loading, handlePostLiked } = useCommunity();
 
-export function PostList({ posts, loading, isAuthenticated, userId, onPostLiked }: PostListProps) {
   // Helper function to format post time
   const formatPostTime = (timeString: string) => {
     const postTime = new Date(timeString);
@@ -33,7 +30,7 @@ export function PostList({ posts, loading, isAuthenticated, userId, onPostLiked 
   };
   
   // Helper function to format user name
-  const formatUserName = (post: Post) => {
+  const formatUserName = (post: any) => {
     if (post.profiles?.first_name || post.profiles?.last_name) {
       return `${post.profiles.first_name || ''} ${post.profiles.last_name || ''}`.trim();
     }
@@ -41,17 +38,17 @@ export function PostList({ posts, loading, isAuthenticated, userId, onPostLiked 
   };
   
   // Function to handle liking a post
-  const handleLikePost = async (postId: string) => {
+  const handleLikePostClick = async (postId: string) => {
     if (!isAuthenticated) {
       toast.error('יש להתחבר כדי לבצע פעולה זו');
       return;
     }
     
     try {
-      const success = await likePost(postId, userId!);
+      const success = await likePost(postId, user!.id);
       
       if (success) {
-        await onPostLiked(postId);
+        await handlePostLiked(postId);
         toast.success('הוספת לייק לפוסט!');
       }
     } catch (error) {
@@ -129,7 +126,7 @@ export function PostList({ posts, loading, isAuthenticated, userId, onPostLiked 
                     variant="ghost" 
                     size="sm" 
                     className="flex items-center gap-1"
-                    onClick={() => handleLikePost(post.id)}
+                    onClick={() => handleLikePostClick(post.id)}
                     disabled={loading || !isAuthenticated}
                   >
                     <ThumbsUp size={16} /> {post.likes}

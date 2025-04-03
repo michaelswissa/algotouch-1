@@ -14,7 +14,8 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
       .select(`
         id,
         earned_at,
-        badge:badge_id (
+        badge_id,
+        badge:community_badges(
           id,
           name,
           description,
@@ -29,7 +30,16 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
       return [];
     }
     
-    return (data as UserBadge[]) || [];
+    // Transform the data to match our UserBadge type
+    const formattedData = data?.map(item => {
+      return {
+        id: item.id,
+        earned_at: item.earned_at,
+        badge: item.badge as Badge
+      } as UserBadge;
+    }) || [];
+    
+    return formattedData;
   } catch (error) {
     console.error('Exception in getUserBadges:', error);
     return [];

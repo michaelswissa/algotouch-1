@@ -4,19 +4,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LevelIndicator } from '@/components/ui/level-indicator';
 import UserBadges from '@/components/community/UserBadges';
+import { useCommunity } from '@/contexts/community/CommunityContext';
 
 interface UserProfileProps {
   user: {
     id: string;
     email?: string;
   } | null;
-  userLevel: number;
-  userPoints: number;
-  userBadges: any[];
-  allBadges: any[];
 }
 
-export function UserProfile({ user, userLevel, userPoints, userBadges, allBadges }: UserProfileProps) {
+export function UserProfile({ user }: UserProfileProps) {
+  const { userLevel, userPoints, userBadges, allBadges } = useCommunity();
+  
   if (!user) return null;
   
   return (
