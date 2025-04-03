@@ -12,13 +12,13 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
       name: 'חודשי',
       price: 99,
       currency: '$',
-      description: 'חיוב חודשי לאחר חודש ניסיון',
+      description: 'חודש ניסיון מתנה | ללא התחייבות',
     },
     annual: {
       name: 'שנתי',
       price: 899,
       currency: '$',
-      description: 'חיוב שנתי לאחר חודש ניסיון',
+      description: '25% הנחה | שלושה חודשים מתנה',
     },
     vip: {
       name: 'VIP',

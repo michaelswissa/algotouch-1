@@ -6,9 +6,16 @@ interface PlanSummaryProps {
   price: number;
   description: string;
   currency?: string;
+  hasTrial?: boolean;
 }
 
-const PlanSummary: React.FC<PlanSummaryProps> = ({ planName, price, description, currency = '$' }) => {
+const PlanSummary: React.FC<PlanSummaryProps> = ({ 
+  planName, 
+  price, 
+  description, 
+  currency = '$',
+  hasTrial = false
+}) => {
   return (
     <div className="flex justify-between items-center bg-muted/40 p-3 rounded-lg">
       <div>
@@ -17,7 +24,9 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({ planName, price, description,
       </div>
       <div className="text-right">
         <span className="text-2xl font-bold">{currency}{price}</span>
-        <p className="text-xs text-muted-foreground">לאחר חודש ניסיון חינם</p>
+        {hasTrial && (
+          <p className="text-xs text-muted-foreground">לאחר חודש ניסיון חינם</p>
+        )}
       </div>
     </div>
   );

@@ -61,6 +61,8 @@ const UserSubscription = () => {
     );
   }
 
+  const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
+
   return (
     <SubscriptionCard
       title={`מנוי ${details?.planName}`}
