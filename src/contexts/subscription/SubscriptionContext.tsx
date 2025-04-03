@@ -40,15 +40,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, last_name, email')
+        .select('first_name, last_name')
         .eq('id', userId)
         .single();
       
       if (profile) {
         setFullName(`${profile.first_name || ''} ${profile.last_name || ''}`);
-        if (profile.email) {
-          setEmail(profile.email);
-        }
+      }
+
+      // Get user email from auth.users
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user?.email) {
+        setEmail(user.user.email);
       }
     } catch (error) {
       console.error("Error checking subscription:", error);
