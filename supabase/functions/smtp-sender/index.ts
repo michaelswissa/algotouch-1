@@ -43,7 +43,7 @@ serve(async (req) => {
     console.log("SMTP Configuration:");
     console.log(`Host: ${smtp_host || "MISSING"}`);
     console.log(`Port: ${smtp_port}`);
-    console.log(`User: ${smtp_user || "MISSING"}`);
+    console.log(`User: ${smtp_user ? "Provided" : "MISSING"}`);
     console.log(`From: ${smtp_from}`);
     
     // Check if SMTP is properly configured
@@ -76,7 +76,24 @@ serve(async (req) => {
     }
     
     // Parse request body
-    const emailRequest: EmailRequest = await req.json();
+    let emailRequest: EmailRequest;
+    try {
+      emailRequest = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid JSON request body",
+          details: parseError.message
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+    
     console.log("Email request received:", {
       to: emailRequest.to,
       subject: emailRequest.subject,
@@ -107,19 +124,36 @@ serve(async (req) => {
     
     // Create SMTP client
     console.log("Creating SMTP client");
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtp_host,
-        port: smtp_port,
-        tls: true,
-        auth: {
-          username: smtp_user,
-          password: smtp_pass,
+    let client: SMTPClient;
+    
+    try {
+      client = new SMTPClient({
+        connection: {
+          hostname: smtp_host,
+          port: smtp_port,
+          tls: true,
+          auth: {
+            username: smtp_user,
+            password: smtp_pass,
+          },
+          timeout: 30000, // 30 seconds
         },
-        timeout: 30000, // 30 seconds
-      },
-      debug: { logger: true }
-    });
+        debug: { logger: true }
+      });
+    } catch (clientError) {
+      console.error("Error creating SMTP client:", clientError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to create SMTP client",
+          details: clientError.message
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    }
     
     // Prepare email
     const email: any = {
@@ -134,19 +168,33 @@ serve(async (req) => {
     if (emailRequest.attachmentData && emailRequest.attachmentData.length > 0) {
       console.log(`Processing ${emailRequest.attachmentData.length} attachments`);
       
-      email.attachments = emailRequest.attachmentData.map(attachment => ({
-        filename: attachment.filename,
-        content: Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0)),
-        contentType: attachment.mimeType,
-      }));
+      try {
+        email.attachments = emailRequest.attachmentData.map(attachment => ({
+          filename: attachment.filename,
+          content: Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0)),
+          contentType: attachment.mimeType,
+        }));
+      } catch (attachmentError) {
+        console.error("Error processing attachments:", attachmentError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Failed to process email attachments",
+            details: attachmentError.message
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
+      }
     }
     
-    // Connect to SMTP server
-    console.log("Connecting to SMTP server");
-    await client.connect();
-    
+    // Connect to SMTP server and send email
     try {
-      // Send email
+      console.log("Connecting to SMTP server");
+      await client.connect();
+      
       console.log("Sending email");
       const info = await client.send(email);
       console.log("Email sent successfully:", info);
@@ -163,6 +211,22 @@ serve(async (req) => {
           status: 200,
         }
       );
+    } catch (sendError) {
+      console.error("Error sending email:", sendError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to send email",
+          details: {
+            message: sendError.message,
+            code: sendError.code
+          }
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
     } finally {
       // Always close the connection
       try {
@@ -173,15 +237,16 @@ serve(async (req) => {
       }
     }
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("Unhandled error in SMTP sender function:", error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
-        stack: error.stack,
+        error: "Unhandled error in SMTP sender function",
         details: {
+          message: error.message,
           name: error.name,
+          stack: error.stack,
           code: error.code
         }
       }),

@@ -101,6 +101,7 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
     
     try {
       setIsSigningInProgress(true);
+      console.log("Preparing contract data for signing...");
       
       // Store signing information in session storage for continued registration flow
       if (registrationData) {
@@ -138,8 +139,24 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
         browserInfo: getBrowserInfo()
       };
       
+      console.log("Calling onSign with contract data", {
+        fullName: contractData.fullName,
+        hasSignature: Boolean(contractData.signature),
+        hasContractHtml: Boolean(contractData.contractHtml),
+        contractVersion: contractData.contractVersion,
+      });
+      
       // Call the onSign callback with the contract data
-      onSign(contractData);
+      if (typeof onSign === 'function') {
+        onSign(contractData);
+      } else {
+        console.error("onSign is not a function", onSign);
+        toast({
+          title: "שגיאה בתהליך החתימה",
+          description: "אירעה שגיאה בעת ביצוע החתימה. אנא נסה שנית",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Error signing contract:', error);
       toast({

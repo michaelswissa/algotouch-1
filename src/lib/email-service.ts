@@ -38,6 +38,7 @@ export async function sendEmail(emailRequest: EmailRequest): Promise<{ success: 
       hasAttachments: emailRequest.attachmentData && emailRequest.attachmentData.length > 0
     });
     
+    // Call the smtp-sender edge function
     const { data, error } = await supabase.functions.invoke('smtp-sender', {
       body: emailRequest,
     });

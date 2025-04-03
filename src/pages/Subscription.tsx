@@ -76,12 +76,19 @@ const SubscriptionContent = () => {
   }
 
   const handlePlanSelect = (planId: string) => {
+    console.log('Selected plan in handlePlanSelect:', planId);
     updateRegistrationData({ planId });
+    setSelectedPlan(planId);
     setCurrentStep(2);
-    console.log('Selected plan:', planId);
   };
 
   const handleContractSign = async (contractData: any) => {
+    console.log('Contract signed, data received:', {
+      hasSignature: Boolean(contractData?.signature),
+      hasHTML: Boolean(contractData?.contractHtml),
+      fullName: contractData?.fullName
+    });
+    
     // Store the contract details in the registration data
     updateRegistrationData({
       contractSigned: true,
@@ -92,7 +99,7 @@ const SubscriptionContent = () => {
         agreedToTerms: contractData.agreedToTerms,
         agreedToPrivacy: contractData.agreedToPrivacy,
         contractVersion: contractData.contractVersion || "1.0",
-        browserInfo: {
+        browserInfo: contractData.browserInfo || {
           userAgent: navigator.userAgent,
           language: navigator.language,
           platform: navigator.platform,
@@ -105,8 +112,15 @@ const SubscriptionContent = () => {
     // If the user is authenticated, process the contract in the backend
     if (isAuthenticated && user) {
       const userData = registrationData?.userData || {};
-      const userEmail = user.email || registrationData?.email || '';
-      const userFullName = fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+      const userEmail = user.email || contractData.email || registrationData?.email || '';
+      const userFullName = fullName || contractData.fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+      
+      console.log('Processing contract with data:', {
+        userId: user.id,
+        planId: selectedPlan,
+        fullName: userFullName,
+        email: userEmail
+      });
       
       if (userEmail && selectedPlan) {
         const success = await processSignedContract(
@@ -120,11 +134,15 @@ const SubscriptionContent = () => {
         if (success) {
           toast.success('ההסכם נחתם בהצלחה!');
         }
+      } else {
+        console.error('Missing required data for contract processing', { userEmail, selectedPlan });
+        toast.error('חסרים נתונים לעיבוד ההסכם');
       }
+    } else {
+      console.log('User not authenticated, storing contract data for later processing');
     }
     
     setCurrentStep(3);
-    console.log('Contract signed, moving to payment step');
   };
 
   const handlePaymentComplete = () => {
@@ -151,7 +169,9 @@ const SubscriptionContent = () => {
       {currentStep === 2 && selectedPlan && (
         <ContractSection
           selectedPlan={selectedPlan}
-          fullName={fullName}
+          fullName={fullName || (registrationData?.userData?.firstName && registrationData?.userData?.lastName 
+            ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}` 
+            : '')}
           onSign={handleContractSign}
           onBack={() => setCurrentStep(1)}
         />

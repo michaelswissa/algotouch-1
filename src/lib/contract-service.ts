@@ -51,6 +51,14 @@ export async function processSignedContract(
   try {
     console.log('Processing signed contract for user:', { userId, planId, email });
     
+    // Improved logging to debug contract data
+    console.log('Contract data signature length:', contractData.signature?.length || 0);
+    console.log('Contract data contains HTML:', Boolean(contractData.contractHtml));
+    console.log('Contract user agreement:', {
+      agreedToTerms: contractData.agreedToTerms,
+      agreedToPrivacy: contractData.agreedToPrivacy
+    });
+    
     // Save the contract signature to Supabase using the Edge Function
     const { data, error } = await supabase.functions.invoke('izidoc-sign', {
       body: {
@@ -63,7 +71,7 @@ export async function processSignedContract(
         agreedToTerms: contractData.agreedToTerms,
         agreedToPrivacy: contractData.agreedToPrivacy,
         contractVersion: contractData.contractVersion || "1.0",
-        browserInfo: {
+        browserInfo: contractData.browserInfo || {
           userAgent: navigator.userAgent,
           language: navigator.language,
           platform: navigator.platform,
