@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -30,7 +29,6 @@ interface SigningRequest {
   };
 }
 
-// Creates a Supabase client with the provided credentials
 function createSupabaseClient() {
   console.log("Creating Supabase client");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -44,7 +42,6 @@ function createSupabaseClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
-// Validates required fields in the signing request
 function validateRequest(request: SigningRequest) {
   console.log("Validating request fields");
   const requiredFields = ['userId', 'planId', 'fullName', 'signature', 'email'];
@@ -58,7 +55,6 @@ function validateRequest(request: SigningRequest) {
   console.log("Request validation successful");
 }
 
-// Stores signature information in the database
 async function storeSignature(supabase: any, request: SigningRequest, ipAddress: string) {
   console.log(`Storing signature for user: ${request.userId}, plan: ${request.planId}`);
   try {
@@ -97,7 +93,6 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
   }
 }
 
-// Updates the subscription record to mark contract as signed
 async function updateSubscription(supabase: any, userId: string, planId: string, signatureTimestamp: string) {
   console.log(`Updating subscription for user: ${userId}, plan: ${planId}`);
   try {
@@ -123,11 +118,9 @@ async function updateSubscription(supabase: any, userId: string, planId: string,
   }
 }
 
-// Main handler function for the edge function
 serve(async (req) => {
   console.log("IziDoc Sign function called:", req.method, req.url);
   
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     console.log("Handling CORS preflight request");
     return new Response(null, {
@@ -136,7 +129,6 @@ serve(async (req) => {
   }
 
   try {
-    // Parse the request body first to check if it's valid JSON
     let request: SigningRequest;
     try {
       request = await req.json();
@@ -152,7 +144,6 @@ serve(async (req) => {
       );
     }
     
-    // Initialize Supabase client
     let supabase;
     try {
       supabase = createSupabaseClient();
@@ -167,12 +158,10 @@ serve(async (req) => {
       );
     }
     
-    // Extract IP address from request headers if available
     const forwarded = req.headers.get("x-forwarded-for");
     const ipAddress = forwarded ? forwarded.split(/\s*,\s*/)[0] : req.headers.get("cf-connecting-ip") || "";
     console.log("Client IP address:", ipAddress);
     
-    // Validate required fields with clear error handling
     try {
       validateRequest(request);
     } catch (validationError) {
@@ -188,13 +177,10 @@ serve(async (req) => {
     
     console.log("Processing digital signature for user:", request.userId);
     
-    // Process signature and contract
     let documentId, signatureId, signatureTimestamp;
     try {
-      // Store signature in database
       const signatureData = await storeSignature(supabase, request, ipAddress);
       
-      // Generate document ID and signature ID
       documentId = signatureData.id;
       signatureId = crypto.randomUUID();
       signatureTimestamp = new Date().toISOString();
@@ -211,42 +197,46 @@ serve(async (req) => {
       );
     }
     
-    // Update subscription record and continue even if it fails
     try {
       await updateSubscription(supabase, request.userId, request.planId, signatureTimestamp);
       console.log("Subscription updated successfully");
     } catch (subscriptionError) {
       console.error("Error updating subscription (continuing anyway):", subscriptionError);
-      // Continue processing - we can still succeed overall if this fails
     }
     
-    // Convert HTML contract to base64 for attachment
     const encoder = new TextEncoder();
     const contractBytes = encoder.encode(request.contractHtml);
     const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
     
-    // Prepare email for customer
-    console.log("Sending email to customer:", request.email);
+    const dateObj = new Date(signatureTimestamp);
+    const options = { 
+      year: 'numeric', 
+      month: 'numeric', 
+      day: 'numeric', 
+      hour: 'numeric', 
+      minute: 'numeric'
+    };
+    const formattedDateTime = new Intl.DateTimeFormat('he-IL', options).format(dateObj);
+    
+    console.log("Sending simplified confirmation email to customer:", request.email);
     const customerEmailBody = `
-      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
-        <h1>תודה שחתמת על ההסכם</h1>
+      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #4a90e2;">AlgoTouch</h1>
+        </div>
         <p>שלום ${request.fullName},</p>
-        <p>תודה שחתמת על הסכם ההצטרפות לשירות AlgoTouch.</p>
-        <p>פרטי החתימה:</p>
-        <ul>
-          <li>זמן חתימה: ${signatureTimestamp}</li>
-          <li>תכנית: ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}</li>
-        </ul>
-        <p>מצורף העתק של החוזה החתום.</p>
-        <p>לכל שאלה, ניתן לפנות אלינו ב-support@algotouch.co.il</p>
-        <p>בברכה,<br>צוות AlgoTouch</p>
+        <p>אנו מאשרים כי ביום ${formattedDateTime.split(',')[0]} בשעה ${formattedDateTime.split(',')[1]} השלמת את תהליך החתימה הדיגיטלית על ההסכם עם AlgoTouch.</p>
+        <p>החתימה בוצעה באופן אלקטרוני, תוך אישור מלא של כל התנאים והסעיפים המפורטים בהסכם, ונרשמה במערכת המאובטחת שלנו.</p>
+        <p>לצורך עיון במסמך המלא, ניתן להורידו בעת חתימת ההסכם.</p>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea;">
+          <p>תודה על שיתוף הפעולה,<br>AlgoTouch</p>
+        </div>
       </div>
     `;
     
-    // Prepare email data for customer
     const customerEmailData = {
       to: request.email,
-      subject: `העתק הסכם AlgoTouch - אישור חתימה`,
+      subject: `אישור חתימה על הסכם - AlgoTouch`,
       html: customerEmailBody,
       attachmentData: [{
         filename: `contract-algotouch-${new Date().toISOString().slice(0,10)}.html`,
@@ -255,7 +245,6 @@ serve(async (req) => {
       }]
     };
     
-    // Send email to customer
     let customerEmailResult;
     try {
       console.log("Sending email to customer via smtp-sender function");
@@ -275,10 +264,9 @@ serve(async (req) => {
       customerEmailResult = { success: false, error: emailError.message };
     }
     
-    // Prepare email for admin
     console.log("Sending email to admin");
     const adminEmailBody = `
-      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333;">
+      <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
         <h1>הסכם חדש נחתם</h1>
         <p>שלום,</p>
         <p>המשתמש ${request.fullName} (${request.email}) חתם על הסכם לתכנית ${request.planId === 'monthly' ? 'חודשית' : 'שנתית'}.</p>
@@ -293,7 +281,6 @@ serve(async (req) => {
       </div>
     `;
     
-    // Prepare email data for admin
     const adminEmailData = {
       to: "support@algotouch.co.il",
       subject: `הסכם חדש נחתם - ${request.fullName}`,
@@ -305,7 +292,6 @@ serve(async (req) => {
       }]
     };
     
-    // Send email to admin
     let adminEmailResult;
     try {
       console.log("Sending email to admin via smtp-sender function");
@@ -325,7 +311,6 @@ serve(async (req) => {
       adminEmailResult = { success: false, error: emailError.message };
     }
     
-    // Return the signing result
     console.log("Contract signing process completed");
     return new Response(
       JSON.stringify({
@@ -342,9 +327,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    // Catch-all for any other errors
     console.error("Unhandled error processing digital signature:", error);
-    
     return new Response(
       JSON.stringify({ 
         error: error.message,

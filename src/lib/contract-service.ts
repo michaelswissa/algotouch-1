@@ -1,0 +1,91 @@
+
+import { sendEmail } from '@/lib/email-service';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+/**
+ * Sends a contract confirmation email to the user
+ */
+export async function sendContractConfirmationEmail(
+  userEmail: string, 
+  userName: string, 
+  signedAt: string
+): Promise<{ success: boolean }> {
+  // Format the date and time
+  const dateObj = new Date(signedAt);
+  const formattedDate = dateObj.toLocaleDateString('he-IL');
+  const formattedTime = dateObj.toLocaleTimeString('he-IL');
+
+  return sendEmail({
+    to: userEmail,
+    subject: 'אישור חתימה על הסכם - AlgoTouch',
+    html: `
+    <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #4a90e2;">AlgoTouch</h1>
+      </div>
+      <p>שלום ${userName},</p>
+      <p>אנו מאשרים כי ביום ${formattedDate} בשעה ${formattedTime} השלמת את תהליך החתימה הדיגיטלית על ההסכם עם AlgoTouch.</p>
+      <p>החתימה בוצעה באופן אלקטרוני, תוך אישור מלא של כל התנאים והסעיפים המפורטים בהסכם, ונרשמה במערכת המאובטחת שלנו.</p>
+      <p>לצורך עיון במסמך המלא, ניתן להורידו בעת חתימת ההסכם.</p>
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea;">
+        <p>תודה על שיתוף הפעולה,<br/>AlgoTouch</p>
+      </div>
+    </div>
+    `,
+  });
+}
+
+/**
+ * Processes a signed contract, saving it to the database and sending confirmation
+ */
+export async function processSignedContract(
+  userId: string,
+  planId: string,
+  fullName: string,
+  email: string,
+  contractData: any
+): Promise<boolean> {
+  try {
+    console.log('Processing signed contract for user:', { userId, planId, email });
+    
+    // Save the contract signature to Supabase using the Edge Function
+    const { data, error } = await supabase.functions.invoke('izidoc-sign', {
+      body: {
+        userId,
+        planId,
+        fullName,
+        email,
+        signature: contractData.signature,
+        contractHtml: contractData.contractHtml,
+        agreedToTerms: contractData.agreedToTerms,
+        agreedToPrivacy: contractData.agreedToPrivacy,
+        contractVersion: contractData.contractVersion || "1.0",
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          screenSize: `${window.innerWidth}x${window.innerHeight}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      },
+    });
+
+    if (error) {
+      console.error('Error saving contract signature:', error);
+      toast.error('שגיאה בשמירת החתימה');
+      return false;
+    }
+
+    console.log('Contract signature saved successfully:', data);
+    
+    // The confirmation email is now sent from the Edge Function
+    // We don't need to send it again from here
+    
+    return true;
+  } catch (error) {
+    console.error('Exception processing contract signature:', error);
+    toast.error('שגיאה בעיבוד החתימה');
+    return false;
+  }
+}

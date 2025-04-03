@@ -11,6 +11,7 @@ import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
 import SubscriptionSuccess from '@/components/subscription/SubscriptionSuccess';
 import ContractSection from '@/components/subscription/ContractSection';
 import PaymentSection from '@/components/subscription/PaymentSection';
+import { processSignedContract } from '@/lib/contract-service';
 
 // Inner component to use the contexts
 const SubscriptionContent = () => {
@@ -79,7 +80,7 @@ const SubscriptionContent = () => {
     console.log('Selected plan:', planId);
   };
 
-  const handleContractSign = (contractData: any) => {
+  const handleContractSign = async (contractData: any) => {
     // Store the contract details in the registration data
     updateRegistrationData({
       contractSigned: true,
@@ -99,6 +100,27 @@ const SubscriptionContent = () => {
         }
       }
     });
+    
+    // If the user is authenticated, process the contract in the backend
+    if (isAuthenticated && user) {
+      const userData = registrationData?.userData || {};
+      const userEmail = user.email || registrationData?.email || '';
+      const userFullName = fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+      
+      if (userEmail && selectedPlan) {
+        const success = await processSignedContract(
+          user.id,
+          selectedPlan,
+          userFullName,
+          userEmail,
+          contractData
+        );
+        
+        if (success) {
+          toast.success('ההסכם נחתם בהצלחה!');
+        }
+      }
+    }
     
     console.log('Contract signed, updated registration data with contract details');
   };
