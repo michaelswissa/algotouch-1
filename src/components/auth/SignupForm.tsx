@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/auth';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
@@ -13,6 +14,7 @@ interface SignupFormProps {
 
 const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,10 +46,18 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
+      // Use auth context to sign up
+      await signUp({
+        email,
+        password,
+        firstName,
+        lastName,
+        phone
+      });
+      
       // Store registration data in session storage for the subscription flow
       const registrationData = {
         email,
-        password,
         userData: {
           firstName,
           lastName,

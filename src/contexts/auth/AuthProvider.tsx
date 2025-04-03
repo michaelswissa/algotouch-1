@@ -5,6 +5,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContext } from './AuthContext';
+import { sendWelcomeEmail } from '@/lib/email-service';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -24,6 +25,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Only synchronous state updates here to prevent loops
         setSession(newSession);
         setUser(newSession?.user ?? null);
+        
+        // Handle sign in event - send welcome email if needed using setTimeout to prevent loop
+        if (event === 'SIGNED_IN' && newSession?.user) {
+          setTimeout(() => {
+            if (newSession.user?.user_metadata?.is_new_user) {
+              const firstName = newSession.user?.user_metadata?.first_name || '';
+              const lastName = newSession.user?.user_metadata?.last_name || '';
+              const fullName = `${firstName} ${lastName}`.trim() || newSession.user.email || 'משתמש';
+              sendWelcomeEmail(newSession.user.email || '', fullName);
+            }
+          }, 500);
+        }
       }
     );
 
@@ -72,6 +85,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, 300);
     } catch (error) {
       console.error('Error signing in:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUp = async (userData: {
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string,
+    phone?: string
+  }) => {
+    try {
+      setLoading(true);
+      
+      const { email, password, firstName, lastName, phone } = userData;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone,
+            is_new_user: true
+          },
+          emailRedirectTo: `${window.location.origin}/auth?verification=success`
+        }
+      });
+      
+      if (error) {
+        console.error('Sign up error:', error.message);
+        toast.error(error.message);
+        throw error;
+      }
+      
+      console.log('Sign up successful, user:', data.user);
+      
+      // We'll send welcome email after the confirmation (in onAuthStateChange)
+      toast.success('נרשמת בהצלחה! נא לאמת את כתובת הדוא"ל');
+      
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Error signing up:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -134,6 +193,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        console.error('Password reset error:', error.message);
+        toast.error(error.message);
+        throw error;
+      }
+      
+      console.log('Password reset email sent successfully');
+      toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');
+      return true;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     session,
     user,
@@ -141,8 +225,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: !!user,
     initialized,
     signIn,
+    signUp,
     signOut,
-    updateProfile
+    updateProfile,
+    resetPassword
   };
 
   // Show a global loader when auth is initializing to prevent flashes of content

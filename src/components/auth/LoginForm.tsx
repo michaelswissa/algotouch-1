@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useLocation } from 'react-router-dom';
 
 interface LoginFormProps {
@@ -14,7 +13,7 @@ interface LoginFormProps {
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
-  const { signIn } = useAuth();
+  const { signIn, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
@@ -66,15 +65,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       setResettingPassword(true);
       console.log('Requesting password reset for:', email);
       
-      // Use Supabase's built-in password reset functionality
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      
-      if (error) {
-        console.error('Password reset error:', error.message);
-        throw error;
-      }
+      // Use the AuthContext resetPassword method
+      await resetPassword(email);
       
       console.log('Password reset email sent successfully');
       toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');

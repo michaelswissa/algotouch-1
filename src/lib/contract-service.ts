@@ -51,6 +51,18 @@ export async function processSignedContract(
   try {
     console.log('Processing signed contract for user:', { userId, planId, email });
     
+    // Improved validation of inputs
+    if (!userId || !planId || !email || !contractData) {
+      console.error('Missing required parameters for processSignedContract:', { 
+        hasUserId: Boolean(userId), 
+        hasPlanId: Boolean(planId), 
+        hasEmail: Boolean(email),
+        hasContractData: Boolean(contractData)
+      });
+      toast.error('חסרים פרטים הכרחיים לעיבוד החוזה');
+      return false;
+    }
+    
     // Improved logging to debug contract data
     console.log('Contract data signature length:', contractData.signature?.length || 0);
     console.log('Contract data contains HTML:', Boolean(contractData.contractHtml));

@@ -16,10 +16,16 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onSign, 
   onBack 
 }) => {
+  // Function to handle contract signing
+  const handleSignContract = (contractData: any) => {
+    console.log('Contract signed, forwarding data to parent component');
+    onSign(contractData);
+  };
+
   return (
     <div>
       <DigitalContractForm 
-        onSign={onSign}
+        onSign={handleSignContract}
         planId={selectedPlan} 
         fullName={fullName} 
       />

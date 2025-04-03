@@ -55,21 +55,14 @@ verify_jwt = true
 [functions.stock-data]
 verify_jwt = true
 
-[functions.takbull-payment]
-verify_jwt = true
-import_map = "supabase/functions/takbull-payment/import_map.json"
-
-[functions.takbull-webhook]
-verify_jwt = false
-import_map = "supabase/functions/takbull-webhook/import_map.json"
-
 [functions.izidoc-sign]
 verify_jwt = true
 import_map = "supabase/functions/izidoc-sign/import_map.json"
 
+[functions.smtp-sender]
+verify_jwt = true
+import_map = "supabase/functions/smtp-sender/import_map.json"
+
 [functions.gmail-sender]
 verify_jwt = true
 import_map = "supabase/functions/gmail-sender/import_map.json"
-
-[functions.smtp-sender]
-verify_jwt = true
