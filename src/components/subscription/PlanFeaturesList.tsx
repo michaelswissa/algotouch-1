@@ -11,7 +11,15 @@ const PlanFeaturesList: React.FC<PlanFeaturesListProps> = ({ features, planId })
   return (
     <div>
       <div className="mb-3">
-        <h4 className="text-lg font-bold mb-3">מה כלול בתכנית:</h4>
+        <h4 className={`text-lg font-medium mb-3 pb-2 border-b ${
+          planId === 'monthly' 
+            ? 'border-purple-200 dark:border-purple-800' 
+            : planId === 'annual' 
+              ? 'border-blue-200 dark:border-blue-800' 
+              : 'border-amber-200 dark:border-amber-800'
+        }`}>
+          יתרונות התכנית:
+        </h4>
       </div>
       <ul className="space-y-3 text-base">
         {features.map((feature, index) => (
@@ -21,6 +29,7 @@ const PlanFeaturesList: React.FC<PlanFeaturesListProps> = ({ features, planId })
             icon={feature.icon} 
             description={feature.description} 
             included={feature.included} 
+            planId={planId}
           />
         ))}
       </ul>
