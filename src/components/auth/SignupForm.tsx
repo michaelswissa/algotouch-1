@@ -24,21 +24,44 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const [phone, setPhone] = useState('');
   const [signingUp, setSigningUp] = useState(false);
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateForm = () => {
+    // Email validation with regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('כתובת אימייל לא תקינה');
+      return false;
+    }
     
-    if (!email || !password || !firstName || !lastName) {
-      toast.error('אנא מלא את כל שדות החובה');
-      return;
+    // Password validation
+    if (password.length < 6) {
+      toast.error('הסיסמה חייבת להכיל לפחות 6 תווים');
+      return false;
     }
     
     if (password !== passwordConfirm) {
       toast.error('הסיסמאות אינן תואמות');
-      return;
+      return false;
     }
     
-    if (password.length < 6) {
-      toast.error('הסיסמה חייבת להכיל לפחות 6 תווים');
+    // Name validation
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error('שם פרטי ושם משפחה הם שדות חובה');
+      return false;
+    }
+    
+    // Phone validation (if provided) - must be only digits and optional +
+    if (phone.trim() && !/^(\+)?[0-9]+$/.test(phone)) {
+      toast.error('מספר טלפון לא תקין. יש להזין רק ספרות');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
       return;
     }
     
@@ -61,7 +84,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         userData: {
           firstName,
           lastName,
-          phone
+          phone: phone.trim() // Ensure clean phone data
         },
         registrationTime: new Date().toISOString()
       };
@@ -134,6 +157,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               id="phone" 
               type="tel" 
               value={phone}
+              placeholder="05X-XXXXXXX"
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>

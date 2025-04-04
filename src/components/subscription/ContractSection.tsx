@@ -4,6 +4,8 @@ import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
+import { useAuth } from '@/contexts/auth';
+import { toast } from 'sonner';
 
 interface ContractSectionProps {
   selectedPlan: string;
@@ -20,8 +22,16 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onSign, 
   onBack 
 }) => {
+  const { user, isAuthenticated } = useAuth();
+  
   // Function to handle contract signing
   const handleSignContract = (contractData: any) => {
+    if (!isAuthenticated && !sessionStorage.getItem('registration_data')) {
+      // This is a fallback check - should not typically happen with proper flow
+      toast.error('אנא התחבר למערכת כדי לחתום על ההסכם');
+      return;
+    }
+    
     console.log('Contract signed, forwarding data to parent component');
     onSign(contractData);
   };
