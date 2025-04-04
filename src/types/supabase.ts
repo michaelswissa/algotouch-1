@@ -1,4 +1,3 @@
-
 import { Database as OriginalDatabase } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -11,6 +10,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
       payment_history: OriginalDatabase['public']['Tables']['payment_history'];
       profiles: OriginalDatabase['public']['Tables']['profiles'];
       subscriptions: OriginalDatabase['public']['Tables']['subscriptions'];
+      payment_tokens: OriginalDatabase['public']['Tables']['payment_tokens'];
       
       // Add our new community tables
       community_reputation: {
@@ -192,7 +192,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
         };
         Relationships: [];
       };
-      // Add user_streaks table definition
       user_streaks: {
         Row: {
           id: string;

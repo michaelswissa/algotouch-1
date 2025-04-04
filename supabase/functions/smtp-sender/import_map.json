@@ -1,6 +1,7 @@
 
 {
   "imports": {
-    "std/": "https://deno.land/std@0.168.0/"
+    "std/": "https://deno.land/std@0.168.0/",
+    "nodemailer": "npm:nodemailer@6.9.3"
   }
 }
