@@ -20,10 +20,11 @@
     width: 100%;
     max-width: 400px;
     transform-style: preserve-3d;
-    transition: transform 0.6s;
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     cursor: pointer;
     position: relative;
     height: 100%;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
 }
 
 .creditcard .front,
@@ -35,8 +36,9 @@
     -webkit-font-smoothing: antialiased;
     color: #47525d;
     height: 100%;
-    border-radius: 14px;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
 }
 
 .creditcard .back {
@@ -58,6 +60,7 @@
 .ccsingle img {
     width: 60px;
     max-height: 40px;
+    filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .ccicon {
@@ -72,7 +75,7 @@
 /* CHANGEABLE CARD ELEMENTS */
 .creditcard .lightcolor,
 .creditcard .darkcolor {
-    transition: fill .5s;
+    transition: fill .6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .creditcard .lightblue {
@@ -140,7 +143,7 @@
 }
 
 .creditcard .grey {
-    fill: #bdbdbd;
+    fill: #9e9e9e;
 }
 
 .creditcard .greydark {
@@ -158,7 +161,7 @@
 }
 
 .st4 {
-    font-size: 26px;
+    font-size: 27px;
     letter-spacing: 2px;
 }
 
@@ -169,6 +172,7 @@
 
 .st6 {
     font-size: 16px;
+    letter-spacing: 1px;
 }
 
 .st7 {
@@ -181,7 +185,8 @@
 }
 
 .st9 {
-    font-size: 17px;
+    font-size: 19px;
+    letter-spacing: 1px;
 }
 
 .st10 {
@@ -242,7 +247,7 @@
 }
 
 .st12back {
-    font-family: 'Arial', sans-serif;
+    font-family: 'Source Code Pro', monospace, Arial, sans-serif;
 }
 
 .st13back {
@@ -255,7 +260,7 @@
     top: 20px;
     right: 20px;
     width: 60px;
-    height: 30px;
+    height: 40px;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
@@ -265,23 +270,70 @@
 /* Responsive styles */
 @media screen and (max-width: 768px) {
     .container {
-        height: 48vw;
+        height: 54vw;
     }
     .st4 {
-        font-size: 22px;
+        font-size: 24px;
+    }
+    .st6 {
+        font-size: 14px;
+    }
+    .st9 {
+        font-size: 17px;
     }
 }
 
 @media screen and (max-width: 480px) {
     .container {
-        height: 70vw;
+        height: 64vw;
         padding: 10px;
     }
     .st4 {
-        font-size: 18px;
+        font-size: 20px;
+    }
+    .st6 {
+        font-size: 12px;
+    }
+    .st9 {
+        font-size: 14px;
     }
     .cardLogo {
         width: 50px;
         height: 25px;
     }
 }
+
+/* Add a elegant shine effect */
+.creditcard::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    transform: rotate(25deg);
+    transition: 0.8s;
+    opacity: 0;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.creditcard:hover::after {
+    left: 100%;
+    opacity: 1;
+}
+
+/* Add support for RTL text direction */
+[dir="rtl"] .creditcard .front,
+[dir="rtl"] .creditcard .back {
+    direction: ltr; /* Keep SVG internals as LTR */
+}
+
+/* Add source code pro font for credit card numbers */
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;600&display=swap');

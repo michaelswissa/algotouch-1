@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import styles from '@/styles/CreditCardAnimation.module.css';
 import { CreditCard as CreditCardIcon } from 'lucide-react';
 
 // Custom SVG components for card types
 const VisaLogo = () => (
-  <svg className="text-white h-8 w-auto" viewBox="0 0 750 471" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg className="h-8 w-auto" viewBox="0 0 750 471" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M278.2,334.3h-55.7l34.8-203.2h55.7L278.2,334.3z" fill="white"/>
     <path d="M524.3,142.1c-11-4.3-28.5-8.9-50.2-8.9c-55.3,0-94.2,27.8-94.5,67.8c-0.3,29.5,27.8,46,49,55.8
       c21.8,10.1,29.1,16.5,29,25.5c-0.1,13.8-17.4,20.1-33.5,20.1c-22.4,0-34.3-3.1-52.6-10.8l-7.2-3.3l-7.9,46c13.1,5.7,37.4,10.7,62.6,11
@@ -21,70 +20,20 @@ const VisaLogo = () => (
 );
 
 const MastercardLogo = () => (
-  <svg className="text-white h-8 w-auto" viewBox="0 0 750 471" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M434.9,235.5c0,99.1-80.4,179.5-179.5,179.5s-179.5-80.4-179.5-179.5s80.4-179.5,179.5-179.5
-      S434.9,136.3,434.9,235.5" fill="#D9222A"/>
-    <path d="M495.5,235.5c0,99.1-80.4,179.5-179.5,179.5c-39.3,0-75.5-12.6-105-34c45.3-33,74.7-86.5,74.7-146.5
-      c0-60-29.4-113.5-74.7-146.5c29.5-21.4,65.7-34,105-34C415.1,56,495.5,136.3,495.5,235.5z" fill="#EE9F2D"/>
+  <svg className="h-8 w-auto" viewBox="0 0 750 471" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="255.4" cy="235.5" r="179.5" fill="#D9222A"/>
+    <circle cx="495.5" cy="235.5" r="179.5" fill="#EE9F2D"/>
+    <path d="M375.4,135c33.6,27.1,55.1,68.9,55.1,115.6c0,46.6-21.5,88.4-55.1,115.6c-33.6-27.1-55.1-68.9-55.1-115.6 C320.3,203.9,341.8,162.1,375.4,135z" fill="#D9222A" opacity="0.8"/>
     <path d="M651.9,335.5c0-3.3,2.7-6,6-6s6,2.7,6,6s-2.7,6-6,6S651.9,338.8,651.9,335.5z M663.4,335.5
       c0-3-2.2-5.5-5.4-5.5c-3.2,0-5.4,2.5-5.4,5.5s2.2,5.5,5.4,5.5C661.1,341,663.4,338.5,663.4,335.5z M658.9,338.7h-1.1v-6.5
       c0.4-0.1,1-0.2,1.8-0.2c1,0,1.4,0.2,1.8,0.4c0.3,0.2,0.6,0.6,0.6,1.1c0,0.6-0.5,1-1.1,1.2v0.1c0.5,0.2,0.8,0.6,1,1.3
       c0.2,0.8,0.3,1.1,0.4,1.3h-1.2c-0.2-0.2-0.3-0.6-0.4-1.2c-0.1-0.5-0.5-0.8-1.2-0.8h-0.5V338.7z M659,335.8h0.5
       c0.7,0,1.3-0.2,1.3-0.8c0-0.5-0.4-0.8-1.2-0.8c-0.3,0-0.5,0-0.6,0.1V335.8z" fill="#000000"/>
-    <path d="M332.6,321.1v-3.6c-0.1-1.3,0.8-2,2-2c0.8-0.1,1.7,0.5,1.9,1.3c0.8-0.8,1.7-1.3,2.8-1.3
-      c1.1,0,2.2,0.7,2.2,2.3v3.4h-1.3v-3.2c0-1-0.4-1.4-1.3-1.4c-0.8,0-1.4,0.5-1.8,1.1c0,0.2,0,0.4,0,0.5v3h-1.3v-3.2
-      c0-1-0.5-1.4-1.3-1.4c-0.8,0-1.4,0.5-1.8,1.1v3.5H332.6" fill="#000000"/>
-    <path d="M347.2,315.7c1.3,0,2.2,0.3,3,0.9l-0.6,0.8c-0.6-0.4-1.4-0.7-2.2-0.7c-1.7,0-2.9,1.2-2.9,3.6
-      c0,2.3,1.2,3.6,2.8,3.6c1,0,1.9-0.4,2.4-0.8l0.6,0.8c-0.8,0.7-1.9,1-3.1,1c-2.5,0-4.2-1.8-4.2-4.7
-      C343,317.6,344.7,315.7,347.2,315.7" fill="#000000"/>
-    <path d="M355.5,315.7c2.4,0,4,1.9,4,4.6c0,2.7-1.6,4.6-4,4.6s-4-1.9-4-4.6C351.5,317.6,353.1,315.7,355.5,315.7
-       M355.5,323.9c1.4,0,2.6-1.2,2.6-3.6c0-2.4-1.2-3.6-2.6-3.6c-1.4,0-2.6,1.2-2.6,3.6C352.9,322.7,354.1,323.9,355.5,323.9"
-      fill="#000000"/>
-    <path d="M362.5,316.3v-2.1h1.3v2.1h1.7v1h-1.7v4.3c0,0.7,0.3,1.1,0.9,1.1c0.2,0,0.5-0.1,0.8-0.2l0.3,0.9
-      c-0.4,0.2-0.8,0.3-1.4,0.3c-1.5,0-1.9-1-1.9-2.1v-4.3h-1v-1H362.5" fill="#000000"/>
-    <path d="M366.9,312.4h1.3v3.1c0.6-0.5,1.4-0.9,2.3-0.9c1.8,0,2.8,1.2,2.8,3v3.4H372v-3.2c0-1.4-0.7-2.1-1.9-2.1
-      c-1,0-1.8,0.5-2.3,1.1v4.2h-1.3V312.4" fill="#000000"/>
-    <path d="M376.9,318.7c0-2.7,1.9-3.1,3.4-3.1c0.6,0,1.2,0.1,1.8,0.2v-0.2c0-1-0.6-1.9-2.1-1.9
-      c-0.8,0-1.6,0.2-2.2,0.6l-0.4-0.9c0.8-0.4,1.8-0.7,2.8-0.7c2.1,0,3.2,1.3,3.2,3v4.6c0,0.3,0.1,0.8,0.2,0.8h-1.2
-      c-0.1-0.2-0.1-0.5-0.1-0.8c-0.6,0.6-1.5,1-2.4,1C377.9,321.1,376.9,320.1,376.9,318.7 M382,319.3v-2.5c-0.4-0.1-1.1-0.2-1.8-0.2
-      c-1.1,0-2.1,0.4-2.1,1.9c0,1.1,0.7,1.6,1.7,1.6C380.7,320.2,381.5,319.8,382,319.3" fill="#000000"/>
-    <path d="M388.9,315.7c2.4,0,3.4,1.8,3.4,4.2c0,0.2,0,0.4,0,0.6h-5.7c0.1,1.9,1.2,2.7,2.7,2.7c0.8,0,1.6-0.3,2.1-0.7
-      l0.5,0.8c-0.7,0.5-1.7,0.8-2.8,0.8c-2.3,0-3.9-1.6-3.9-4.3C385.3,317.6,386.8,315.7,388.9,315.7 M386.8,319.5h4.4
-      c0-1.4-0.6-2.8-2.3-2.8C387.6,316.7,386.8,318,386.8,319.5" fill="#000000"/>
-    <path d="M394.9,312.4h1.3v8.6h-1.3V312.4z" fill="#000000"/>
-    <path d="M401.8,315.7c2.4,0,3.4,1.8,3.4,4.2c0,0.2,0,0.4,0,0.6h-5.7c0.1,1.9,1.2,2.7,2.7,2.7c0.8,0,1.6-0.3,2.1-0.7
-      l0.5,0.8c-0.7,0.5-1.7,0.8-2.8,0.8c-2.3,0-3.9-1.6-3.9-4.3C398.2,317.6,399.6,315.7,401.8,315.7 M399.6,319.5h4.4
-      c0-1.4-0.6-2.8-2.3-2.8C400.5,316.7,399.6,318,399.6,319.5" fill="#000000"/>
-    <path d="M407.7,315.8h1.3v1.4c0.5-0.8,1.3-1.6,2.5-1.6c1.5,0,2.4,0.8,2.4,2.6v2.8h-1.3v-2.7c0-1.3-0.7-1.7-1.6-1.7
-      c-1,0-1.8,0.7-2.1,1.4v3h-1.3V315.8" fill="#000000"/>
-    <path d="M418.9,320.2c0.9,0,1.7-0.7,1.7-1.9v-0.2c-0.4,0-0.7,0-1.1,0c-1.1,0-1.9,0.4-1.9,1.2
-      C417.6,319.9,418.2,320.2,418.9,320.2 M418.7,321.1c-1.2,0-2.4-0.6-2.4-1.9c0-1.4,1.4-2,2.9-2c0.4,0,0.8,0,1.3,0.1v-0.1
-      c0-1-0.7-1.5-1.8-1.5c-0.7,0-1.3,0.2-1.8,0.5l-0.4-0.9c0.7-0.4,1.5-0.6,2.3-0.6c1.8,0,3,0.9,3,2.8v2.3c0,0.6,0,1,0.1,1.4h-1.2
-      c-0.1-0.3-0.1-0.6-0.1-0.9C420.3,320.8,419.5,321.1,418.7,321.1" fill="#000000"/>
-    <path d="M424.2,315.8h1.3v1.2c0.5-0.7,1.3-1.4,2.4-1.4c1.1,0,1.8,0.5,2.2,1.4c0.6-0.8,1.5-1.4,2.6-1.4
-      c1.6,0,2.5,1,2.5,3v2.4h-1.3v-2.3c0-1.4-0.5-2.1-1.6-2.1c-0.9,0-1.6,0.6-2,1.2c0,0.2,0,0.4,0,0.6v2.6h-1.3v-2.3
-      c0-1.4-0.5-2.1-1.6-2.1c-0.9,0-1.6,0.6-2,1.3v3.1h-1.3V315.8" fill="#000000"/>
-    <path d="M437.9,318.4c0-2,1.4-2.7,3.2-2.7c0.6,0,1.1,0.1,1.5,0.2v-0.3c0-1-0.6-1.4-1.7-1.4c-0.8,0-1.5,0.2-2,0.5
-      l-0.4-0.9c0.7-0.4,1.6-0.6,2.5-0.6c1.9,0,2.9,1,2.9,2.6v3.3c0,0.6,0,1,0.1,1.4h-1.2c-0.1-0.3-0.1-0.6-0.1-0.9
-      c-0.5,0.6-1.2,1.1-2.3,1.1C439,320.5,437.9,319.8,437.9,318.4 M442.6,319v-2.2c-0.3-0.1-0.8-0.2-1.5-0.2c-1.1,0-1.9,0.5-1.9,1.5
-      c0,0.9,0.6,1.4,1.5,1.4C441.5,319.6,442.1,319.4,442.6,319" fill="#000000"/>
-    <path d="M447,315.8h1.3v1.2c0.6-0.8,1.4-1.4,2.5-1.4c1.7,0,2.6,1.1,2.6,2.9v2.6h-1.3v-2.5c0-1.2-0.5-2-1.7-2
-      c-1,0-1.7,0.7-2.1,1.3v3.2H447V315.8" fill="#000000"/>
-    <path d="M455.4,319.2c0-1.6,1.3-2.4,4.1-2.7c0-0.9-0.4-1.6-1.5-1.6c-0.8,0-1.5,0.4-2,0.7l-0.5-0.8
-      c0.7-0.5,1.7-0.9,2.7-0.9c1.9,0,2.7,1.2,2.7,3v2.4c0,0.6,0,1.1,0.1,1.6h-1.2c-0.1-0.4-0.1-0.7-0.1-1.1c-0.5,0.7-1.3,1.2-2.4,1.2
-      C456.3,321.1,455.4,320.4,455.4,319.2 M459.5,319.6v-2.2c-1.9,0.2-2.8,0.8-2.8,1.8c0,0.8,0.5,1.2,1.3,1.2
-      C458.6,320.3,459.1,320,459.5,319.6" fill="#000000"/>
-    <path d="M304.4,270.7c0-26.2,16.4-48.5,39.4-57.2c-9.6-7.5-21.7-12.1-34.8-12.1c-31.4,0-56.8,25.4-56.8,56.8
-      c0,31.4,25.4,56.8,56.8,56.8c13.1,0,25.2-4.5,34.8-12.1C320.8,319.2,304.4,296.9,304.4,270.7" fill="#000000"/>
-    <path d="M340.4,213.5c-13.1,0-25.2,4.5-34.8,12.1c22.9,8.7,39.4,31,39.4,57.2c0,26.2-16.4,48.5-39.4,57.2
-      c9.6,7.5,21.7,12.1,34.8,12.1c31.4,0,56.8-25.4,56.8-56.8C397.2,238.9,371.8,213.5,340.4,213.5" fill="#000000"/>
-    <path d="M327.8,270.7c0-26.2-16.4-48.5-39.4-57.2c-22.9,8.7-39.4,31-39.4,57.2c0,26.2,16.4,48.5,39.4,57.2
-      C311.4,319.2,327.8,296.9,327.8,270.7" fill="#000000"/>
   </svg>
 );
 
 const AmexLogo = () => (
-  <svg className="text-white h-8 w-auto" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+  <svg className="h-8 w-auto" viewBox="0 0 750 471" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M0,41h750v390H0V41z" fill="#2557D6"/>
     <path 
       d="M327.9,243l-11.6-29.4l-11.4,29.4H327.9z M524.1,280.1h26l-29.4-71.5h-21.5l-29.1,71.5h26l5.5-14.4h18.1 L524.1,280.1z M395.8,208.6l17.3,41.8h-18.3L395.8,208.6z M402.5,280.1h24.8l3.4-9.4h29.2l3.7,9.4h26.7l-27.5-71.5h-25.9 L402.5,280.1z M614.9,208.6l14.1,41.8h-15.7L614.9,208.6z M620.7,280.1h28.3l5.5-15h21.1l5.8,15h26.7l-27.5-71.5h-32.4 L620.7,280.1z M191.9,280.1h30.6v-18.1h33.3v-14.9h-33.3v-9h40v-16.5h-70.7V280.1z M321.9,280.1h30.6v-18.1h33.3v-14.9h-33.3v-9 h40v-16.5h-70.7V280.1z M487.8,208.6v13.8h28.7v58h24.7v-58h28.8v-13.8H487.8z M674.4,208.6v13.8h28.7v58h24.7v-58h28.8v-13.8 H674.4z M148,221.2c8.3,0,13.1,4.3,13.1,11.2c0,7-4.8,11.2-13.1,11.2h-30.6v-22.4H148z M98.5,280.1h19v-19.5h29.5 c17.7,0,31.3-9.9,31.3-29.1c0-19.1-12.5-29.9-30.2-29.9H98.5V280.1z" 
@@ -94,15 +43,24 @@ const AmexLogo = () => (
 );
 
 const DiscoverLogo = () => (
-  <svg className="text-white h-8 w-auto" viewBox="0 0 780 501" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#4D4D4D" d="M55,0L55,0h671c30,0,54,24,54,55v391c0,30-24,55-54,55H55c-30,0-55-24-55-55V55C0,25,24,0,55,0z"/>
-    <path fill="#F47216" d="M415,286c42,0,76-34,76-75s-34-75-76-75s-76,34-76,75S373,286,415,286z"/>
-    <rect x="507.8" y="143.2" fill="#FFFFFF" width="24.6" height="114.4"/>
-    <path fill="#FFFFFF" d="M585,195c-9-7-13-11-13-18c0-9,8-16,19-16c6,0,11,2,16,7l2,1l15-20l-1-1c-9-8-20-12-31-12   c-26,0-45,18-45,41c0,17,8,29,24,41c3,2,7,5,10,8c12,9,15,15,15,24c0,10-8,16-21,16c-9,0-18-3-26-10l-2-2l-17,19l1,1   c11,10,26,16,42,16c30,0,49-17,49-45C623,222,609,212,585,195z"/>
-    <path fill="#FFFFFF" d="M662,118c-31,0-56,25-56,56c0,32,25,57,56,57s56-25,56-57C718,143,693,118,662,118z M662,209   c-19,0-35-16-35-35c0-19,16-35,35-35s35,16,35,35C697,193,682,209,662,209z"/>
-    <path fill="#FFFFFF" d="M214,258h45l28-65c0,0,0,1,1,2c0,1,0,2,0,3c1,3,1,11,1,11v48h45V144h-45l-28,65c0,0,0-1-1-2   c0-1,0-2,0-3c-1-3-1-11-1-11v-48h-45V258z"/>
-    <path fill="#FFFFFF" d="M455,209c0-33-25-59-58-59c-35,0-59,24-59,59c0,34,25,58,59,58C429,267,455,242,455,209z M398,242   c-18,0-32-14-32-33c0-18,14-33,32-33c17,0,30,15,30,33C428,228,415,242,398,242z"/>
-    <path fill="#F47216" d="M140,152c8,0,14,4,19,10l2,2l20-20l-1-1c-11-11-24-16-40-16c-34,0-59,24-59,59c0,34,25,58,59,58   c16,0,29-5,41-17l1-1l-20-20l-2,2c-5,6-12,9-19,9c-18,0-32-14-32-33C107,166,122,152,140,152z"/>
+  <svg className="h-8 w-auto" viewBox="0 0 780 501" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M55,0H725c30,0,55,25,55,55v391c0,30-25,55-55,55H55c-30,0-55-25-55-55V55C0,25,25,0,55,0z" fill="#4D4D4D"/>
+    <path d="M415,211c0,41.4-33.6,75-75,75s-75-33.6-75-75s33.6-75,75-75S415,169.6,415,211z" fill="#F47216"/>
+    <path fill="#FFFFFF" d="M220,233.8h-14.9v-35.6H220V233.8z M459.6,233.8h-14V182h14V233.8z M483.1,233.8h-15.5l-19.6-33v33h-15
+      v-51.7h16.2l18.8,32.1v-32.1h15V233.8z M349.3,207.1c0,8.9-5.8,14-15.4,14c-9.5,0-15.4-5.1-15.4-14v-25.2h15v24
+      c0,2,1,3.4,2.3,3.4s2.3-1.4,2.3-3.4v-24h11.2V207.1z M444.6,207.6c4.7,0,7.9,0.9,11.2,3.4l5.6-10.1c-5.2-4.2-11.7-5.4-17-5.4
+      c-13.6,0-23.1,9.4-23.1,21.5c0,11.9,9.2,21.5,23.4,21.5c5.7,0,12.4-1.4,17-5.1l-5.3-10.4c-3.6,2.2-7.2,3.3-11.6,3.3
+      c-6.1,0-10.6-4.3-10.6-9.4C434.2,211.7,438.6,207.6,444.6,207.6z M645.6,195.3h-15.8v8.3h14V214h-14v9.5h16v10.3h-31v-51.7h31
+      V195.3z M220,195.3h-14.9v8.3h13.8V214h-13.8v19.7h-15v-51.7h30V195.3z M680.9,233.8h-31v-51.7h15v39.1h16V233.8z M568.6,221.2
+      h-16.9l-2,12.6h-15.4l12.1-51.7h17.6l12.1,51.7h-5.2L568.6,221.2z M560.3,184l-5.2,27.1h10.3L560.3,184z M645.1,142.1
+      c56.9,0,103,46.1,103,103s-46.1,103-103,103s-103-46.1-103-103S588.2,142.1,645.1,142.1z M512.1,233.8h-15v-51.7h15V233.8z
+       M512.1,167.7h-15v-15.6h15V167.7z M412.9,210.1c0,19.2-9.5,24.9-25,24.9c-15.3,0-24.9-7.7-24.9-24.9v-28.1h15.1v27.1
+      c0,9.3,2.9,14.2,10.1,14.2c7,0,9.8-5,9.8-14.2v-27.1h15V210.1z M245.6,211c0,14.4-9.7,23.5-25.3,23.5c-6.7,0-13.2-1.5-18.8-4.5
+      v-22.9c3.3,3.8,11.1,7.7,16.8,7.7c5.2,0,8.4-2.1,8.4-5.5c0-10.2-25.6-9.2-25.6-27.1c0-13.6,9.4-22.3,24.6-22.3
+      c5.3,0,10.7,1.2,15.7,3.7v22.2c-4.1-4.3-10.3-6.9-15-6.9c-4.7,0-7.3,2-7.3,5.4C219.2,194.5,245.6,192.8,245.6,211z M143.1,235.5
+      c-5.6,0-10.8-1.2-15.7-3.5v-22.2c5.9,5.1,11.2,6.5,14.6,6.5c4.4,0,6.9-1.7,6.9-4.4c0-2.8-2.5-4.5-6.7-6.4l-5.1-2.2
+      c-7.1-3.2-12.6-9.7-12.6-19.1c0-12.7,9.8-22.3,25.1-22.3c5.1,0,10.1,1.3,15.1,3.5v21.8c-5-4.9-10.2-6.4-13.5-6.4
+      c-3.8,0-6.4,1.6-6.4,4c0,2.3,2.1,3.8,6.1,5.5l7.6,3.3c8.8,3.9,11.7,10.6,11.7,18.6C170.4,225.5,160.9,235.5,143.1,235.5z"/>
   </svg>
 );
 
@@ -123,22 +81,29 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [cardType, setCardType] = useState('');
+  const [preloadClass, setPreloadClass] = useState(styles.preload);
+  
+  // Remove preload class after initial render to enable animations
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPreloadClass('');
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   // Automatically flip card when focusing on CVV and flip back when focusing other fields
-  useEffect(() => {
-    if (cvv && !isFlipped) {
-      setIsFlipped(true);
-    }
-  }, [cvv, isFlipped]);
-  
-  // Notify parent component when card is flipped
   useEffect(() => {
     if (onFlip) {
       onFlip(isFlipped);
     }
   }, [isFlipped, onFlip]);
   
-  // Detect card type from number and update
+  useEffect(() => {
+    setIsFlipped(Boolean(cvv));
+  }, [cvv]);
+  
+  // Detect card type from number
   useEffect(() => {
     const detectedType = detectCardType(cardNumber);
     if (detectedType !== cardType) {
@@ -178,21 +143,39 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
     
     // Format based on card type (AMEX uses 4-6-5 format, others use 4-4-4-4)
     if (cardType === 'amex') {
-      for (let i = 0; i < cleanNumber.length; i++) {
-        if (i === 4 || i === 10) formattedNumber += ' ';
-        formattedNumber += cleanNumber[i];
+      // Mask all but last 5 digits
+      const masked = cleanNumber.slice(0, -5).replace(/\d/g, '•');
+      const visible = cleanNumber.slice(-5);
+      
+      // Format with proper spacing
+      if (cleanNumber.length <= 4) {
+        formattedNumber = cleanNumber;
+      } else if (cleanNumber.length <= 10) {
+        formattedNumber = cleanNumber.slice(0, 4) + ' ' + cleanNumber.slice(4);
+      } else {
+        formattedNumber = cleanNumber.slice(0, 4) + ' ' + cleanNumber.slice(4, 10) + ' ' + cleanNumber.slice(10);
+      }
+      
+      // If not fully entered, pad with dots
+      if (cleanNumber.length < 15) {
+        formattedNumber = formattedNumber.padEnd(17, '•');
       }
     } else {
+      // Other card types use 4-4-4-4 format
+      // Mask all but last 4 digits
+      const masked = cleanNumber.slice(0, -4).replace(/\d/g, '•');
+      const visible = cleanNumber.slice(-4);
+      
+      // Format with proper spacing
       for (let i = 0; i < cleanNumber.length; i++) {
         if (i > 0 && i % 4 === 0) formattedNumber += ' ';
         formattedNumber += cleanNumber[i];
       }
-    }
-    
-    // Pad with X's if needed
-    const totalLen = cardType === 'amex' ? 17 : 19; // Including spaces
-    if (formattedNumber.length < totalLen) {
-      formattedNumber = formattedNumber.padEnd(totalLen, 'X').replace(/X/g, '•');
+      
+      // If not fully entered, pad with dots
+      if (cleanNumber.length < 16) {
+        formattedNumber = formattedNumber.padEnd(19, '•');
+      }
     }
     
     return formattedNumber;
@@ -213,7 +196,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
       case 'mastercard': return 'red';
       case 'amex': return 'green';
       case 'discover': return 'purple';
-      default: return 'grey';
+      default: return 'cyan'; // More premium default color
     }
   };
   
@@ -236,7 +219,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   const colorClass = getCardColorClass();
   
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${preloadClass}`}>
       <div 
         className={`${styles.creditcard} ${isFlipped ? styles.flipped : ''}`} 
         onClick={flipCard}
@@ -258,15 +241,15 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 <path className={`${styles.darkcolor} ${styles[colorClass + 'dark']}`} d="M750,431V193.2c-217.6-57.5-556.4-13.5-750,24.9V431c0,22.1,17.9,40,40,40h670C732.1,471,750,453.1,750,431z" />
               </g>
               <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={`${styles.st2} ${styles.st3} ${styles.st4}`}>{formatCardNumber()}</text>
-              <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={`${styles.st2} ${styles.st5} ${styles.st6}`}>{formatName()}</text>
-              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>שם בעל הכרטיס</text>
-              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>תוקף</text>
+              <text transform="matrix(1 0 0 1 54.1064 400.5723)" id="svgname" className={`${styles.st2} ${styles.st5} ${styles.st6}`}>{formatName()}</text>
+              <text transform="matrix(1 0 0 1 54.1074 370.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>שם בעל הכרטיס</text>
+              <text transform="matrix(1 0 0 1 479.7754 370.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>תוקף</text>
               <text transform="matrix(1 0 0 1 65.1054 241.5)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>מספר כרטיס</text>
               <g>
-                <text transform="matrix(1 0 0 1 574.4219 433.8095)" id="svgexpire" className={`${styles.st2} ${styles.st5} ${styles.st9}`}>{formatExpiry()}</text>
-                <text transform="matrix(1 0 0 1 479.3848 417.0097)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>VALID</text>
-                <text transform="matrix(1 0 0 1 479.3848 435.6762)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>THRU</text>
-                <polygon className={styles.st2} points="554.5,421 540.4,414.2 540.4,427.9" />
+                <text transform="matrix(1 0 0 1 574.4219 400.1095)" id="svgexpire" className={`${styles.st2} ${styles.st5} ${styles.st9}`}>{formatExpiry()}</text>
+                <text transform="matrix(1 0 0 1 479.3848 380.0097)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>VALID</text>
+                <text transform="matrix(1 0 0 1 479.3848 395.6762)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>THRU</text>
+                <polygon className={styles.st2} points="554.5,390 540.4,384.2 540.4,396.9" />
               </g>
               <g id="cchip">
                 <g>
@@ -306,7 +289,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
         </div>
         <div className={styles.back}>
           <svg version="1.1" id="cardback" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
-              x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve">
+              x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve" width="100%" height="100%">
             <g id="Front">
               <line className={styles.st0} x1="35.3" y1="10.4" x2="36.7" y2="11" />
             </g>

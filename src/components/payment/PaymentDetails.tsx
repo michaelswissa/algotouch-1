@@ -38,8 +38,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       const isAmex = /^3[47]/.test(value);
       
       if (isAmex) {
-        // Format as XXXX XXXXXX XXXXX for AMEX
-        value = value.match(/.{1,4}|.{1,6}|.+/g)?.join(' ') || value;
+        // Format as XXXX XXXXXX XXXXX for AMEX (4-6-5 format)
+        if (value.length > 4 && value.length <= 10) {
+          value = value.slice(0, 4) + ' ' + value.slice(4);
+        } else if (value.length > 10) {
+          value = value.slice(0, 4) + ' ' + value.slice(4, 10) + ' ' + value.slice(10);
+        }
         value = value.substring(0, 17); // AMEX has 15 digits plus 2 spaces
       } else {
         // Format as XXXX XXXX XXXX XXXX for other cards
@@ -56,6 +60,16 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     let value = e.target.value.replace(/\D/g, '');
     
     if (value.length > 0) {
+      // First digit can only be 0 or 1
+      if (value.length === 1 && parseInt(value) > 1) {
+        value = '0' + value;
+      }
+      
+      // Second digit for months can't be > 2 if first digit is 1
+      if (value.length === 2 && value[0] === '1' && parseInt(value[1]) > 2) {
+        value = '1' + '2';
+      }
+      
       // Format MM/YY
       if (value.length > 2) {
         value = value.substring(0, 2) + '/' + value.substring(2, 4);
