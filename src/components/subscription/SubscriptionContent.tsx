@@ -39,8 +39,7 @@ const SubscriptionContent = () => {
     console.log('Subscription page: Checking for registration data and subscription status', {
       isAuthenticated,
       isRegistering,
-      planId,
-      registrationData: !!registrationData
+      planId
     });
     
     // For logged-in users, check subscription status
@@ -71,7 +70,6 @@ const SubscriptionContent = () => {
   }
 
   // If no registration data is found and user is not authenticated, redirect to auth
-  // But only if not coming from the registration process
   if (!isAuthenticated && !registrationData && !isRegistering) {
     console.log('No registration data found and user is not authenticated, redirecting to auth');
     return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
@@ -88,8 +86,7 @@ const SubscriptionContent = () => {
     console.log('Contract signed, data received:', {
       hasSignature: Boolean(contractData?.signature),
       hasHTML: Boolean(contractData?.contractHtml),
-      fullName: contractData?.fullName,
-      isAuthenticated
+      fullName: contractData?.fullName
     });
     
     // Store the contract details in the registration data
@@ -175,7 +172,6 @@ const SubscriptionContent = () => {
           fullName={fullName || (registrationData?.userData?.firstName && registrationData?.userData?.lastName 
             ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}` 
             : '')}
-          email={email || registrationData?.email}
           onSign={handleContractSign}
           onBack={() => setCurrentStep(1)}
         />

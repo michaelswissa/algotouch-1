@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,17 +10,13 @@ interface EnhancedSignaturePadProps {
   value?: string;
   height?: number;
   width?: number;
-  maxWidth?: number;
-  responsiveWidth?: boolean;
 }
 
 const EnhancedSignaturePad: React.FC<EnhancedSignaturePadProps> = ({ 
   onChange,
   value,
-  height = 150,
-  width = 400,
-  maxWidth = 500,
-  responsiveWidth = true
+  height = 200,
+  width = 500
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -176,17 +173,10 @@ const EnhancedSignaturePad: React.FC<EnhancedSignaturePadProps> = ({
     onChange('');
   };
 
-  // Apply maxWidth constraint if provided
-  const containerStyle = {
-    width: responsiveWidth ? '100%' : width,
-    maxWidth: maxWidth,
-    height
-  };
-
   return (
     <Card className="border shadow-sm">
       <CardContent className="p-4">
-        <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900" style={containerStyle}>
+        <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900" style={{ width: '100%', height }}>
           <canvas
             ref={canvasRef}
             onMouseDown={startDrawing}
@@ -208,7 +198,7 @@ const EnhancedSignaturePad: React.FC<EnhancedSignaturePadProps> = ({
             onClick={clearSignature}
             disabled={!hasSignature}
           >
-            <RotateCcw className="h-4 w-4 ml-2" />
+            <RotateCcw className="h-4 w-4 mr-2" />
             נקה חתימה
           </Button>
         </div>

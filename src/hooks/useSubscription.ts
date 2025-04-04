@@ -7,7 +7,7 @@ import { he } from 'date-fns/locale';
 import { Json } from '@/integrations/supabase/types';
 
 // Interface for Subscription from Supabase
-export interface Subscription {
+interface Subscription {
   id: string;
   plan_type: string;
   status: string;
@@ -40,7 +40,6 @@ export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -67,7 +66,6 @@ export const useSubscription = () => {
               payment_method: data.payment_method
             };
             setSubscription(formattedSubscription);
-            setSelectedPlan(data.plan_type);
             
             // Process the subscription details
             const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
@@ -140,5 +138,5 @@ export const useSubscription = () => {
     };
   };
 
-  return { subscription, loading, details, selectedPlan };
+  return { subscription, loading, details };
 };

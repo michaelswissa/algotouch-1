@@ -4,8 +4,6 @@ import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
-import { useAuth } from '@/contexts/auth';
-import { toast } from 'sonner';
 
 interface ContractSectionProps {
   selectedPlan: string;
@@ -22,8 +20,6 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onSign, 
   onBack 
 }) => {
-  const { isAuthenticated } = useAuth();
-  
   // Function to handle contract signing
   const handleSignContract = (contractData: any) => {
     console.log('Contract signed, forwarding data to parent component');
@@ -31,7 +27,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6">
       <Card className="bg-muted/30">
         <CardHeader className="pb-3">
           <div className="flex items-center space-x-1 space-x-reverse rtl">

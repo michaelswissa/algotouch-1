@@ -15,22 +15,22 @@ const ContractDisplay: React.FC<ContractDisplayProps> = ({ contractText }) => {
       <CardContent className="p-0">
         <ScrollArea className="h-[400px] w-full rounded-md">
           <div 
-            className="p-6 text-sm rtl" 
+            className="p-6 text-sm rtl space-y-4" 
             ref={contractRef}
             dir="rtl"
           >
             {contractText.split('\n').map((paragraph, index) => {
               // Handle section headers (numbered sections)
-              if (/^\d+\./.test(paragraph.trim()) && !/^\d+\.\d+/.test(paragraph.trim())) {
-                return <h3 key={index} className="text-lg font-bold mt-6 mb-3">{paragraph}</h3>;
+              if (/^\d+\./.test(paragraph.trim())) {
+                return <h3 key={index} className="text-lg font-bold mt-6 mb-2">{paragraph}</h3>;
               } 
               // Handle subsections (like 1.1, 2.3 etc)
               else if (/^\d+\.\d+/.test(paragraph.trim())) {
-                return <h4 key={index} className="text-base font-semibold mt-4 mb-2">{paragraph}</h4>;
+                return <h4 key={index} className="text-base font-semibold mt-4 mb-1">{paragraph}</h4>;
               } 
               // Regular paragraph
               else if (paragraph.trim()) {
-                return <p key={index} className="mb-3 leading-relaxed text-sm">{paragraph}</p>;
+                return <p key={index} className="mb-2">{paragraph}</p>;
               }
               // Empty line for spacing
               return <div key={index} className="h-2"></div>;
