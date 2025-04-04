@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 
 interface PlanSummaryProps {
   planName: string;
-  price: number;
+  price: string | number;  // Updated to accept both string and number
   description: string;
   hasTrial?: boolean;
 }
@@ -15,11 +15,14 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
   description,
   hasTrial = false
 }) => {
+  // Format price for display
+  const formattedPrice = typeof price === 'number' ? `$${price}` : price;
+  
   return (
     <div className="flex flex-col items-center text-center">
       <h3 className="text-xl font-bold mb-1">מנוי {planName}</h3>
       <div className="flex items-baseline mb-2">
-        <span className="text-2xl font-bold">${price}</span>
+        <span className="text-2xl font-bold">{formattedPrice}</span>
         {planName === 'חודשי' && <span className="text-muted-foreground text-sm mr-1">/ לחודש</span>}
         {planName === 'שנתי' && <span className="text-muted-foreground text-sm mr-1">/ לשנה</span>}
       </div>

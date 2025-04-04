@@ -1,6 +1,15 @@
 
 import { clearNumber } from './stringUtils';
 
+// Export the TokenData interface for use in other files
+export interface TokenData {
+  cardLast4: string;
+  cardType: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+}
+
 export const getCreditCardType = (cardNumber: string): string => {
   // Regular expressions for different card types
   const patterns = {
@@ -66,23 +75,23 @@ export const getSubscriptionPlans = () => {
   return {
     monthly: {
       name: "חודשי",
-      price: "$99",
+      price: 99,  // Changed to number
       description: "מנוי חודשי עם חודש ראשון חינם",
     },
     annual: {
       name: "שנתי",
-      price: "$899",
+      price: 899,  // Changed to number
       description: "מנוי שנתי בהנחה של 25% מהמחיר החודשי",
     },
     vip: {
       name: "VIP",
-      price: "$3,499",
+      price: 3499,  // Changed to number
       description: "מנוי לכל החיים עם גישה לכל התכנים",
     },
   };
 };
 
-export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string) => {
+export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
   // Just prepare a token payload structure - no actual token processing here
   // In a real app, this would integrate with a payment processor's API
   const [month, year] = expiryDate.split('/');

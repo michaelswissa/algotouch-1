@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import styles from '@/styles/CreditCardAnimation.module.css';
 import { getCreditCardType } from './utils/paymentHelpers';
@@ -9,6 +8,7 @@ interface CreditCardDisplayProps {
   expiryDate: string;
   cvv: string;
   onFlip?: (isFlipped: boolean) => void;
+  isFlipped?: boolean;
   className?: string;
   premium?: boolean;
 }
@@ -19,21 +19,22 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   expiryDate,
   cvv,
   onFlip,
+  isFlipped: externalIsFlipped,
   className = '',
   premium = false
 }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [internalIsFlipped, setInternalIsFlipped] = useState(false);
   const [cardType, setCardType] = useState('');
   const [cardColor, setCardColor] = useState({ mainColor: 'lightblue', darkColor: 'lightbluedark' });
   const [isAnimating, setIsAnimating] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  const isFlipped = externalIsFlipped !== undefined ? externalIsFlipped : internalIsFlipped;
+
   useEffect(() => {
-    // Determine card type based on number prefix
     const type = getCreditCardType(cardNumber.replace(/\s/g, ''));
     setCardType(type);
     
-    // Set colors based on card type or premium status
     if (premium) {
       setCardColor({ mainColor: 'gradient-gold', darkColor: 'gradient-gold' });
     } else {
@@ -63,17 +64,18 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
     if (isAnimating) return;
     
     setIsAnimating(true);
-    setIsFlipped(!isFlipped);
     
-    if (onFlip) onFlip(!isFlipped);
+    if (externalIsFlipped !== undefined && onFlip) {
+      onFlip(!externalIsFlipped);
+    } else {
+      setInternalIsFlipped(!internalIsFlipped);
+    }
     
-    // Reset animation state after animation completes
     setTimeout(() => {
       setIsAnimating(false);
     }, 800);
   };
 
-  // Format displayed card number with proper spacing and masking
   const formatCardNumber = (num: string) => {
     if (!num) return '•••• •••• •••• ••••';
     
@@ -81,16 +83,13 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
     const cardNumberLength = isAmex ? 15 : 16;
     const formatted = num.replace(/\s/g, '').padEnd(cardNumberLength, '•');
     
-    // Hide middle digits for better security
     let masked = '';
     if (isAmex) {
-      // Format: XXXX XXXXXX XXXXX (4-6-5)
       const start = formatted.slice(0, 4);
       const middle = '••••••';
       const end = formatted.slice(-5);
       masked = `${start} ${middle} ${end}`;
     } else {
-      // Format: XXXX XXXX XXXX XXXX
       const groups = [];
       for (let i = 0; i < 16; i += 4) {
         let group = formatted.slice(i, i + 4);
@@ -119,11 +118,9 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
         onClick={handleCardFlip}
         ref={cardRef}
       >
-        {/* Front of card */}
         <div className={styles.front}>
           <svg version="1.1" id="cardfront" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
             x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve">
-            {/* Define gradients */}
             <defs>
               <linearGradient id="gradient-blue" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#03A9F4" />
@@ -269,7 +266,6 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
           </svg>
         </div>
         
-        {/* Back of card */}
         <div className={styles.back}>
           <svg version="1.1" id="cardback" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
             x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve">

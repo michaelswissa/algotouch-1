@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,7 +40,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' ? planDetails.annual : planDetails.monthly;
   
-  // Set isFlipped state when user focuses on CVV field
   const handleCvvFocus = () => setIsFlipped(true);
   const handleCvvBlur = () => setIsFlipped(false);
 
