@@ -1,93 +1,116 @@
 
-export interface SubscriptionPlan {
-  name: string;
-  price: number;
-  description: string;
-  currency?: string;
-}
+import { clearNumber } from './stringUtils';
 
-export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
-  return {
-    monthly: {
-      name: 'חודשי',
-      price: 99,
-      currency: '$',
-      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
-    },
-    annual: {
-      name: 'שנתי',
-      price: 899,
-      currency: '$',
-      description: '25% הנחה | שלושה חודשים מתנה',
-    },
-    vip: {
-      name: 'VIP',
-      price: 3499,
-      currency: '$',
-      description: 'גישה לכל החיים בתשלום חד פעמי',
-    },
-  };
-};
-
-// Updated to include index signature to make it compatible with Json type
-export interface TokenData {
-  lastFourDigits: string;
-  expiryMonth: string;
-  expiryYear: string;
-  cardholderName: string;
-  [key: string]: string | number | boolean | null | TokenData[]; // Adding index signature for Json compatibility
-}
-
-export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
-  return {
-    lastFourDigits: cardNumber.slice(-4),
-    expiryMonth: expiryDate.split('/')[0],
-    expiryYear: `20${expiryDate.split('/')[1]}`,
-    cardholderName
-  };
-};
-
-// Function to determine credit card type based on number prefix
 export const getCreditCardType = (cardNumber: string): string => {
-  // Remove all non-digit characters
-  const cleanNumber = cardNumber.replace(/\D/g, '');
-  
-  // Card type patterns
+  // Regular expressions for different card types
   const patterns = {
     visa: /^4/,
     mastercard: /^(5[1-5]|2[2-7])/,
     amex: /^3[47]/,
     discover: /^(6011|65|64[4-9]|622)/,
-    diners: /^(36|38|30[0-5])/
+    diners: /^(30[0-5]|36|38)/,
+    jcb: /^35/,
+    unionpay: /^(62|88)/,
   };
-  
-  // Check each pattern
-  if (patterns.visa.test(cleanNumber)) return 'visa';
-  if (patterns.mastercard.test(cleanNumber)) return 'mastercard';
-  if (patterns.amex.test(cleanNumber)) return 'amex';
-  if (patterns.discover.test(cleanNumber)) return 'discover';
-  if (patterns.diners.test(cleanNumber)) return 'diners';
-  
-  // Default
-  return '';
+
+  // Find matching card type
+  for (const type in patterns) {
+    if (patterns[type as keyof typeof patterns].test(cardNumber)) {
+      return type;
+    }
+  }
+
+  return 'unknown';
 };
 
-// Function to validate credit card number using Luhn algorithm
-export const isValidCardNumber = (cardNumber: string): boolean => {
-  const cleanNumber = cardNumber.replace(/\D/g, '');
+export const formatCreditCardNumber = (value: string): string => {
+  if (!value) return '';
+
+  const cardNumber = clearNumber(value);
+  const cardType = getCreditCardType(cardNumber);
+
+  // Format differently for Amex (4-6-5 format)
+  if (cardType === 'amex') {
+    const groups = [
+      cardNumber.substring(0, 4),
+      cardNumber.substring(4, 10),
+      cardNumber.substring(10, 15),
+    ];
+    return groups.filter(Boolean).join(' ');
+  } 
+
+  // Default format (4-4-4-4)
+  const parts = [];
+  for (let i = 0; i < cardNumber.length; i += 4) {
+    parts.push(cardNumber.substring(i, i + 4));
+  }
+  return parts.join(' ').trim();
+};
+
+export const formatExpirationDate = (value: string): string => {
+  const clearValue = clearNumber(value);
   
-  // Check if the number is valid length
-  if (cleanNumber.length < 13 || cleanNumber.length > 19) {
-    return false;
+  if (clearValue.length >= 3) {
+    return `${clearValue.slice(0, 2)}/${clearValue.slice(2, 4)}`;
   }
   
-  // Luhn algorithm
+  return clearValue;
+};
+
+export const formatCVV = (value: string): string => {
+  const clearValue = clearNumber(value);
+  return clearValue.slice(0, 4);
+};
+
+export const getSubscriptionPlans = () => {
+  return {
+    monthly: {
+      name: "חודשי",
+      price: "$99",
+      description: "מנוי חודשי עם חודש ראשון חינם",
+    },
+    annual: {
+      name: "שנתי",
+      price: "$899",
+      description: "מנוי שנתי בהנחה של 25% מהמחיר החודשי",
+    },
+    vip: {
+      name: "VIP",
+      price: "$3,499",
+      description: "מנוי לכל החיים עם גישה לכל התכנים",
+    },
+  };
+};
+
+export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string) => {
+  // Just prepare a token payload structure - no actual token processing here
+  // In a real app, this would integrate with a payment processor's API
+  const [month, year] = expiryDate.split('/');
+  
+  return {
+    cardLast4: cardNumber.replace(/\s/g, '').slice(-4),
+    cardType: getCreditCardType(cardNumber.replace(/\s/g, '')),
+    expiryMonth: month,
+    expiryYear: `20${year}`,
+    cardholderName,
+  };
+};
+
+// Helper function to validate credit card
+export const validateCreditCard = (cardNumber: string): boolean => {
+  // Remove spaces and non-digits
+  const value = cardNumber.replace(/\D/g, '');
+  
+  // Check if empty or less than 13 digits
+  if (!value || value.length < 13) return false;
+  
+  // Luhn algorithm (mod 10)
   let sum = 0;
   let shouldDouble = false;
   
   // Loop from right to left
-  for (let i = cleanNumber.length - 1; i >= 0; i--) {
-    let digit = parseInt(cleanNumber.charAt(i));
+  for (let i = value.length - 1; i >= 0; i--) {
+    let digit = parseInt(value.charAt(i), 10);
     
     if (shouldDouble) {
       digit *= 2;
@@ -99,36 +122,4 @@ export const isValidCardNumber = (cardNumber: string): boolean => {
   }
   
   return sum % 10 === 0;
-};
-
-// Function to validate expiry date
-export const isValidExpiryDate = (expiryDate: string): boolean => {
-  const regex = /^(0[1-9]|1[0-2])\/([0-9]{2})$/;
-  
-  if (!regex.test(expiryDate)) {
-    return false;
-  }
-  
-  const [month, year] = expiryDate.split('/');
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear() % 100;
-  const currentMonth = currentDate.getMonth() + 1;
-  
-  const expiryYear = parseInt(year, 10);
-  const expiryMonth = parseInt(month, 10);
-  
-  // Check if the card is expired
-  return (expiryYear > currentYear) || 
-         (expiryYear === currentYear && expiryMonth >= currentMonth);
-};
-
-// Function to validate CVV
-export const isValidCVV = (cvv: string, cardType: string): boolean => {
-  const cleanCVV = cvv.replace(/\D/g, '');
-  
-  if (cardType === 'amex') {
-    return cleanCVV.length === 4;
-  }
-  
-  return cleanCVV.length === 3;
 };

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from '@/styles/CreditCardAnimation.module.css';
 import { getCreditCardType } from './utils/paymentHelpers';
 
@@ -10,6 +10,7 @@ interface CreditCardDisplayProps {
   cvv: string;
   onFlip?: (isFlipped: boolean) => void;
   className?: string;
+  premium?: boolean;
 }
 
 const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
@@ -18,42 +19,58 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   expiryDate,
   cvv,
   onFlip,
-  className = ''
+  className = '',
+  premium = false
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [cardType, setCardType] = useState('');
   const [cardColor, setCardColor] = useState({ mainColor: 'lightblue', darkColor: 'lightbluedark' });
+  const [isAnimating, setIsAnimating] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Determine card type based on number prefix
     const type = getCreditCardType(cardNumber.replace(/\s/g, ''));
     setCardType(type);
     
-    // Set colors based on card type
-    switch (type) {
-      case 'visa':
-        setCardColor({ mainColor: 'blue', darkColor: 'lightbluedark' });
-        break;
-      case 'mastercard':
-        setCardColor({ mainColor: 'red', darkColor: 'reddark' });
-        break;
-      case 'amex':
-        setCardColor({ mainColor: 'green', darkColor: 'greendark' });
-        break;
-      case 'discover':
-        setCardColor({ mainColor: 'orange', darkColor: 'orangedark' });
-        break;
-      case 'diners':
-        setCardColor({ mainColor: 'purple', darkColor: 'purpledark' });
-        break;
-      default:
-        setCardColor({ mainColor: 'cyan', darkColor: 'cyandark' });
+    // Set colors based on card type or premium status
+    if (premium) {
+      setCardColor({ mainColor: 'gradient-gold', darkColor: 'gradient-gold' });
+    } else {
+      switch (type) {
+        case 'visa':
+          setCardColor({ mainColor: 'blue', darkColor: 'lightbluedark' });
+          break;
+        case 'mastercard':
+          setCardColor({ mainColor: 'red', darkColor: 'reddark' });
+          break;
+        case 'amex':
+          setCardColor({ mainColor: 'green', darkColor: 'greendark' });
+          break;
+        case 'discover':
+          setCardColor({ mainColor: 'orange', darkColor: 'orangedark' });
+          break;
+        case 'diners':
+          setCardColor({ mainColor: 'purple', darkColor: 'purpledark' });
+          break;
+        default:
+          setCardColor({ mainColor: 'gradient-blue', darkColor: 'cyan' });
+      }
     }
-  }, [cardNumber]);
+  }, [cardNumber, premium]);
 
   const handleCardFlip = () => {
+    if (isAnimating) return;
+    
+    setIsAnimating(true);
     setIsFlipped(!isFlipped);
+    
     if (onFlip) onFlip(!isFlipped);
+    
+    // Reset animation state after animation completes
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, 800);
   };
 
   // Format displayed card number with proper spacing and masking
@@ -88,17 +105,45 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
     return masked;
   };
 
+  const getCardClass = () => {
+    let cardClass = styles.creditcard;
+    if (isFlipped) cardClass += ` ${styles.flipped}`;
+    if (premium) cardClass += ` ${styles['premium-card']}`;
+    return cardClass;
+  };
+
   return (
     <div className={`${styles.container} ${className}`}>
       <div 
-        className={`${styles.creditcard} ${isFlipped ? styles.flipped : ''} preload`}
+        className={getCardClass()}
         onClick={handleCardFlip}
-        onAnimationEnd={() => document.querySelector('.preload')?.classList.remove('preload')}
+        ref={cardRef}
       >
         {/* Front of card */}
         <div className={styles.front}>
           <svg version="1.1" id="cardfront" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
             x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve">
+            {/* Define gradients */}
+            <defs>
+              <linearGradient id="gradient-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#03A9F4" />
+                <stop offset="100%" stopColor="#0288D1" />
+              </linearGradient>
+              <linearGradient id="gradient-purple" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ab47bc" />
+                <stop offset="100%" stopColor="#7b1fa2" />
+              </linearGradient>
+              <linearGradient id="gradient-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#bf953f" />
+                <stop offset="50%" stopColor="#fcf6ba" />
+                <stop offset="100%" stopColor="#b38728" />
+              </linearGradient>
+              <linearGradient id="gradient-gold-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#b38728" />
+                <stop offset="100%" stopColor="#8e6b0d" />
+              </linearGradient>
+            </defs>
+            
             <g id="Front">
               <g id="CardBackground">
                 <g id="Page-1_1_">
@@ -109,7 +154,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 </g>
                 <path className={`${styles.darkcolor} ${styles[cardColor.darkColor]}`} d="M750,431V193.2c-217.6-57.5-556.4-13.5-750,24.9V431c0,22.1,17.9,40,40,40h670C732.1,471,750,453.1,750,431z" />
               </g>
-              <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={`${styles.st2} ${styles.st3} ${styles.st4}`}>
+              <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={`${styles.st2} ${styles.st3} ${styles.st4} ${styles['embossed-text']}`}>
                 {formatCardNumber(cardNumber)}
               </text>
               <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={`${styles.st2} ${styles.st5} ${styles.st6}`}>
@@ -126,7 +171,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 <text transform="matrix(1 0 0 1 479.3848 435.6762)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>THRU</text>
                 <polygon className={styles.st2} points="554.5,421 540.4,414.2 540.4,427.9 		" />
               </g>
-              <g id="cchip">
+              <g id="cchip" className={styles.ccchip}>
                 <g>
                   <path className={styles.st2} d="M168.1,143.6H82.9c-10.2,0-18.5-8.3-18.5-18.5V74.9c0-10.2,8.3-18.5,18.5-18.5h85.3
                   c10.2,0,18.5,8.3,18.5,18.5v50.2C186.6,135.3,178.3,143.6,168.1,143.6z" />
