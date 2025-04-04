@@ -23,7 +23,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   };
 
   return (
-    <div>
+    <div className="space-y-6">
       <DigitalContractForm 
         onSign={handleSignContract}
         planId={selectedPlan} 
