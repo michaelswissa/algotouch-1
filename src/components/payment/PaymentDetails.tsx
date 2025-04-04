@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import CreditCardDisplay from '@/components/payment/CreditCardDisplay';
 
 interface PaymentDetailsProps {
@@ -27,6 +26,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   setCvv
 }) => {
   const [isCvvFocused, setIsCvvFocused] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
   
   // Format card number with spaces
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,69 +96,65 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       
       {/* Credit Card Form */}
       <div className="space-y-4">
-        <FormItem>
-          <FormLabel>מספר כרטיס</FormLabel>
-          <FormControl>
-            <Input
-              placeholder="0000 0000 0000 0000"
-              value={cardNumber}
-              onChange={handleCardNumberChange}
-              maxLength={19}
-              className="text-lg text-right"
-              autoComplete="cc-number"
-              onFocus={() => setIsCvvFocused(false)}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
+        <div className="space-y-2">
+          <Label htmlFor="card-number">מספר כרטיס</Label>
+          <Input
+            id="card-number"
+            placeholder="0000 0000 0000 0000"
+            value={cardNumber}
+            onChange={handleCardNumberChange}
+            maxLength={19}
+            className="text-lg text-right"
+            autoComplete="cc-number"
+            onFocus={() => setIsCvvFocused(false)}
+          />
+          {errors.cardNumber && <p className="text-sm text-red-500">{errors.cardNumber}</p>}
+        </div>
         
-        <FormItem>
-          <FormLabel>שם בעל הכרטיס</FormLabel>
-          <FormControl>
-            <Input
-              placeholder="שם מלא כפי שמופיע על הכרטיס"
-              value={cardholderName}
-              onChange={handleCardholderNameChange}
-              className="text-right"
-              autoComplete="cc-name"
-              onFocus={() => setIsCvvFocused(false)}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
+        <div className="space-y-2">
+          <Label htmlFor="cardholder-name">שם בעל הכרטיס</Label>
+          <Input
+            id="cardholder-name"
+            placeholder="שם מלא כפי שמופיע על הכרטיס"
+            value={cardholderName}
+            onChange={handleCardholderNameChange}
+            className="text-right"
+            autoComplete="cc-name"
+            onFocus={() => setIsCvvFocused(false)}
+          />
+          {errors.cardholderName && <p className="text-sm text-red-500">{errors.cardholderName}</p>}
+        </div>
         
         <div className="grid grid-cols-2 gap-4">
-          <FormItem className="space-y-2">
-            <FormLabel>תוקף</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="MM/YY"
-                value={expiryDate}
-                onChange={handleExpiryDateChange}
-                maxLength={5}
-                className="text-right"
-                autoComplete="cc-exp"
-                onFocus={() => setIsCvvFocused(false)}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
+          <div className="space-y-2">
+            <Label htmlFor="expiry-date">תוקף</Label>
+            <Input
+              id="expiry-date"
+              placeholder="MM/YY"
+              value={expiryDate}
+              onChange={handleExpiryDateChange}
+              maxLength={5}
+              className="text-right"
+              autoComplete="cc-exp"
+              onFocus={() => setIsCvvFocused(false)}
+            />
+            {errors.expiryDate && <p className="text-sm text-red-500">{errors.expiryDate}</p>}
+          </div>
           
-          <FormItem className="space-y-2">
-            <FormLabel>קוד אבטחה (CVV)</FormLabel>
-            <FormControl>
-              <Input
-                placeholder={cardNumber.startsWith('3') ? '4 ספרות' : '3 ספרות'}
-                value={cvv}
-                onChange={handleCvvChange}
-                maxLength={cardNumber.startsWith('3') ? 4 : 3}
-                className="text-right"
-                autoComplete="cc-csc"
-                onFocus={() => setIsCvvFocused(true)}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
+          <div className="space-y-2">
+            <Label htmlFor="cvv">קוד אבטחה (CVV)</Label>
+            <Input
+              id="cvv"
+              placeholder={cardNumber.startsWith('3') ? '4 ספרות' : '3 ספרות'}
+              value={cvv}
+              onChange={handleCvvChange}
+              maxLength={cardNumber.startsWith('3') ? 4 : 3}
+              className="text-right"
+              autoComplete="cc-csc"
+              onFocus={() => setIsCvvFocused(true)}
+            />
+            {errors.cvv && <p className="text-sm text-red-500">{errors.cvv}</p>}
+          </div>
         </div>
       </div>
     </div>
