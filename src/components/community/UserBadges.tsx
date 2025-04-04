@@ -46,8 +46,15 @@ export default function UserBadges({
       const date = new Date(dateStr);
       return format(date, 'PP', { locale: he });
     } catch (error) {
+      console.error('Error formatting date:', error, dateStr);
       return dateStr;
     }
+  };
+  
+  // Get the correct icon component based on the badge icon string
+  const getBadgeIcon = (iconName: string) => {
+    // For now we're just using Award, but this can be expanded to support more icons
+    return <Award className="w-8 h-8" />;
   };
   
   // Display badges
@@ -77,12 +84,11 @@ export default function UserBadges({
                         <Lock className="w-4 h-4 text-muted-foreground" />
                       </div>
                     )}
-                    <Award 
-                      className={cn(
-                        "w-8 h-8",
-                        isEarned ? "text-primary" : "text-muted-foreground opacity-40"
-                      )} 
-                    />
+                    <div className={cn(
+                      isEarned ? "text-primary" : "text-muted-foreground opacity-40"
+                    )}>
+                      {getBadgeIcon(badge.icon)}
+                    </div>
                   </div>
                   <div className="text-xs mt-1 font-medium text-center line-clamp-1">
                     {badge.name}
