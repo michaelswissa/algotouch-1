@@ -57,20 +57,20 @@
     z-index: 2;
 }
 
-.ccsingle svg,
-.ccsingle img {
-    width: 60px;
-    max-height: 40px;
-    filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
+/* Card Logos */
+.cardLogo {
+    position: absolute;
+    right: 20px;
+    top: 40px;
+    width: 70px;
+    height: 50px;
+    z-index: 3;
 }
 
-.ccicon {
-    height: 38px;
-    position: absolute;
-    right: 6px;
-    top: calc(50% - 17px);
-    width: 60px;
-    z-index: 2;
+.logoSvg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.3));
 }
 
 /* CHANGEABLE CARD ELEMENTS */
@@ -162,6 +162,10 @@
 
 .creditcard .gradient-gold {
     fill: url(#gradient-gold);
+}
+
+.creditcard .gradient-gold-dark {
+    fill: url(#gradient-gold-dark);
 }
 
 /* FRONT OF CARD */
@@ -268,17 +272,28 @@
     font-size: 16px;
 }
 
-/* Card types */
-.cardLogo {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 60px;
-    height: 40px;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    transition: all 0.3s ease;
+/* Enhanced Text Effects */
+.embossed-text {
+    text-shadow: 
+        -1px -1px 0 rgba(255, 255, 255, 0.2),
+        1px 1px 0 rgba(0, 0, 0, 0.4);
+    letter-spacing: 2px;
+}
+
+.embossed-name {
+    text-shadow: 
+        -0.5px -0.5px 0 rgba(255, 255, 255, 0.2),
+        0.5px 0.5px 0 rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+}
+
+/* Card Chip Enhanced Effects */
+.ccchip {
+    animation: pulse 3s infinite;
+}
+
+.ccchip path:first-child {
+    fill: linear-gradient(135deg, #f8e08e, #d1ae45) !important;
 }
 
 /* Enhanced Card Animations */
@@ -349,8 +364,53 @@
     }
 }
 
-.ccchip {
-    animation: pulse 3s infinite;
+/* Premium Card Styles */
+.premium-card .lightcolor {
+    fill: url(#gradient-gold) !important;
+}
+
+.premium-card .darkcolor {
+    fill: url(#gradient-gold-dark) !important;
+}
+
+.premium-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 60%);
+    z-index: 1;
+    pointer-events: none;
+    border-radius: 16px;
+}
+
+/* Hologram effect */
+.premium-card .front::before {
+    content: "";
+    position: absolute;
+    bottom: 20px;
+    right: 90px;
+    width: 50px;
+    height: 40px;
+    background: linear-gradient(135deg, 
+        rgba(255,255,255,0.1) 0%, 
+        rgba(255,255,255,0.5) 25%, 
+        rgba(255,255,255,0.1) 50%,
+        rgba(255,255,255,0.5) 75%,
+        rgba(255,255,255,0.1) 100%);
+    background-size: 200% 200%;
+    animation: hologram 5s linear infinite;
+    border-radius: 7px;
+    z-index: 3;
+    pointer-events: none;
+}
+
+@keyframes hologram {
+    0% { background-position: 0% 0%; opacity: 0.7; }
+    50% { background-position: 100% 100%; opacity: 1; }
+    100% { background-position: 0% 0%; opacity: 0.7; }
 }
 
 /* Responsive styles */
@@ -385,7 +445,9 @@
     }
     .cardLogo {
         width: 50px;
-        height: 25px;
+        height: 35px;
+        top: 30px;
+        right: 15px;
     }
 }
 
@@ -397,35 +459,6 @@
 
 /* Add source code pro font for credit card numbers */
 @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;600&display=swap');
-
-/* Luxury/Premium card effects */
-.premium-card {
-    background: linear-gradient(135deg, #24272b, #2c3137);
-}
-
-.premium-card .lightcolor {
-    fill: url(#gradient-gold) !important;
-}
-
-.premium-card .darkcolor {
-    fill: url(#gradient-gold-dark) !important;
-}
-
-.gold-card {
-    background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7);
-}
-
-.platinum-card {
-    background: linear-gradient(135deg, #b8babb, #e2e2e2, #b8babb);
-}
-
-/* 3D Emboss Effect for Card Numbers */
-.embossed-text {
-    text-shadow: 
-        -1px -1px 0 rgba(255, 255, 255, 0.2),
-        1px 1px 0 rgba(0, 0, 0, 0.4);
-    letter-spacing: 2px;
-}
 
 /* Enhanced 3D Flip Animation */
 @keyframes smooth-flip {
