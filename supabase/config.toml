@@ -101,8 +101,30 @@ enabled = true
 # Port to use for Edge Functions.
 port = 54326
 
+# Individual function configurations follow
 [functions.increment-user-points]
 verify_jwt = true
 
 [functions.add-db-functions]
+verify_jwt = true
+
+[functions.izidoc-sign]
+verify_jwt = true
+
+[functions.ai-chatbot]
+verify_jwt = true
+
+[functions.smtp-sender]
+verify_jwt = true
+
+[functions.gmail-sender]
+verify_jwt = true
+
+[functions.financial-news]
+verify_jwt = true
+
+[functions.generate-insight]
+verify_jwt = true
+
+[functions.cardcom-payment]
 verify_jwt = true

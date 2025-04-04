@@ -21,23 +21,24 @@ export async function logContractActivity(
       console.warn('Could not get IP address:', ipError);
     }
 
+    // Log to the contract_signatures table instead until we create contract_activity_logs
     const { error } = await supabase
-      .from('contract_activity_logs')
-      .insert({
-        user_id: userId,
-        plan_id: planId,
-        action_type: action,
-        ip_address: ipAddress,
-        user_agent: navigator.userAgent,
-        metadata: {
+      .from('contract_signatures')
+      .update({
+        browser_info: {
           ...metadata,
+          action_type: action,
+          ip_address: ipAddress,
+          user_agent: navigator.userAgent,
           language: navigator.language,
           platform: navigator.platform,
           screenSize: `${window.innerWidth}x${window.innerHeight}`,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          date: new Date().toISOString()
+          log_date: new Date().toISOString()
         }
-      });
+      })
+      .eq('user_id', userId)
+      .eq('plan_id', planId);
 
     if (error) {
       console.error('Error logging contract activity:', error);
