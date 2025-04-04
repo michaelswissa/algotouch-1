@@ -124,7 +124,14 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [cardType, setCardType] = useState('');
   
-  // Flip card when focusing on CVV
+  // Automatically flip card when focusing on CVV and flip back when focusing other fields
+  useEffect(() => {
+    if (cvv && !isFlipped) {
+      setIsFlipped(true);
+    }
+  }, [cvv, isFlipped]);
+  
+  // Notify parent component when card is flipped
   useEffect(() => {
     if (onFlip) {
       onFlip(isFlipped);
@@ -250,15 +257,15 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 </g>
                 <path className={`${styles.darkcolor} ${styles[colorClass + 'dark']}`} d="M750,431V193.2c-217.6-57.5-556.4-13.5-750,24.9V431c0,22.1,17.9,40,40,40h670C732.1,471,750,453.1,750,431z" />
               </g>
-              <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={styles.st2 + ' ' + styles.st3 + ' ' + styles.st4}>{formatCardNumber()}</text>
-              <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={styles.st2 + ' ' + styles.st5 + ' ' + styles.st6}>{formatName()}</text>
-              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>שם בעל הכרטיס</text>
-              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>תוקף</text>
-              <text transform="matrix(1 0 0 1 65.1054 241.5)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>מספר כרטיס</text>
+              <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={`${styles.st2} ${styles.st3} ${styles.st4}`}>{formatCardNumber()}</text>
+              <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={`${styles.st2} ${styles.st5} ${styles.st6}`}>{formatName()}</text>
+              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>שם בעל הכרטיס</text>
+              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>תוקף</text>
+              <text transform="matrix(1 0 0 1 65.1054 241.5)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>מספר כרטיס</text>
               <g>
-                <text transform="matrix(1 0 0 1 574.4219 433.8095)" id="svgexpire" className={styles.st2 + ' ' + styles.st5 + ' ' + styles.st9}>{formatExpiry()}</text>
-                <text transform="matrix(1 0 0 1 479.3848 417.0097)" className={styles.st2 + ' ' + styles.st10 + ' ' + styles.st11}>VALID</text>
-                <text transform="matrix(1 0 0 1 479.3848 435.6762)" className={styles.st2 + ' ' + styles.st10 + ' ' + styles.st11}>THRU</text>
+                <text transform="matrix(1 0 0 1 574.4219 433.8095)" id="svgexpire" className={`${styles.st2} ${styles.st5} ${styles.st9}`}>{formatExpiry()}</text>
+                <text transform="matrix(1 0 0 1 479.3848 417.0097)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>VALID</text>
+                <text transform="matrix(1 0 0 1 479.3848 435.6762)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>THRU</text>
                 <polygon className={styles.st2} points="554.5,421 540.4,414.2 540.4,427.9" />
               </g>
               <g id="cchip">
@@ -318,13 +325,13 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 <rect x="42.9" y="224.5" className={styles.st4back} width="664.1" height="10.5" />
                 <path className={styles.st5back} d="M701.1,184.6H618h-8h-10v64.5h10h8h83.1c3.3,0,6-2.7,6-6v-52.5C707.1,187.3,704.4,184.6,701.1,184.6z" />
               </g>
-              <text transform="matrix(1 0 0 1 621.999 227.2734)" id="svgsecurity" className={styles.st6back + ' ' + styles.st7back}>{cvv}</text>
+              <text transform="matrix(1 0 0 1 621.999 227.2734)" id="svgsecurity" className={`${styles.st6back} ${styles.st7back}`}>{cvv}</text>
               <g className={styles.st8back}>
-                <text transform="matrix(1 0 0 1 518.083 280.0879)" className={styles.st9back + ' ' + styles.st6back + ' ' + styles.st10back}>קוד אבטחה</text>
+                <text transform="matrix(1 0 0 1 518.083 280.0879)" className={`${styles.st9back} ${styles.st6back} ${styles.st10back}`}>קוד אבטחה</text>
               </g>
               <rect x="58.1" y="378.6" className={styles.st11back} width="375.5" height="13.5" />
               <rect x="58.1" y="405.6" className={styles.st11back} width="421.7" height="13.5" />
-              <text transform="matrix(1 0 0 1 59.5073 228.6099)" id="svgnameback" className={styles.st12back + ' ' + styles.st13back}>{formatName()}</text>
+              <text transform="matrix(1 0 0 1 59.5073 228.6099)" id="svgnameback" className={`${styles.st12back} ${styles.st13back}`}>{formatName()}</text>
             </g>
           </svg>
         </div>
@@ -334,4 +341,3 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
 };
 
 export default CreditCardDisplay;
-

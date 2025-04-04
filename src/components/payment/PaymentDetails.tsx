@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import CreditCardDisplay from './CreditCardDisplay';
-import styles from '@/styles/CreditCardAnimation.module.css';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import CreditCardDisplay from '@/components/payment/CreditCardDisplay';
 
 interface PaymentDetailsProps {
   cardNumber: string;
@@ -26,116 +26,139 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   cvv,
   setCvv
 }) => {
-  const [isCardFlipped, setIsCardFlipped] = useState(false);
-  const [preloadClass, setPreloadClass] = useState(true);
-
-  // Remove preload class after component mounts to enable animations
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPreloadClass(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Format card number with spaces after every 4 digits
-  const formatCardNumber = (value: string) => {
-    // Remove non-digit characters
-    const digits = value.replace(/\D/g, '');
+  const [isCvvFocused, setIsCvvFocused] = useState(false);
+  
+  // Format card number with spaces
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
     
-    // Format with spaces after every 4 digits
-    const parts = [];
-    for (let i = 0; i < digits.length; i += 4) {
-      parts.push(digits.substring(i, i + 4));
+    // Format with spaces
+    if (value.length > 0) {
+      // Check if it's AMEX (starts with 34 or 37)
+      const isAmex = /^3[47]/.test(value);
+      
+      if (isAmex) {
+        // Format as XXXX XXXXXX XXXXX for AMEX
+        value = value.match(/.{1,4}|.{1,6}|.+/g)?.join(' ') || value;
+        value = value.substring(0, 17); // AMEX has 15 digits plus 2 spaces
+      } else {
+        // Format as XXXX XXXX XXXX XXXX for other cards
+        value = value.match(/.{1,4}/g)?.join(' ') || value;
+        value = value.substring(0, 19); // Other cards have 16 digits plus 3 spaces
+      }
     }
     
-    // Join with spaces and limit to 19 chars (16 digits + 3 spaces)
-    return parts.join(' ').substring(0, 19);
+    setCardNumber(value);
   };
 
   // Format expiry date as MM/YY
-  const formatExpiryDate = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length > 2) {
-      return `${digits.substring(0, 2)}/${digits.substring(2, 4)}`;
+  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length > 0) {
+      // Format MM/YY
+      if (value.length > 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2, 4);
+      }
+      
+      // Limit to MM/YY format (5 chars)
+      value = value.substring(0, 5);
     }
-    return digits;
+    
+    setExpiryDate(value);
   };
 
-  // Handle CVV focus to flip card
-  const handleCvvFocus = () => {
-    setIsCardFlipped(true);
+  // Validate CVV format
+  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    // AMEX has 4-digit CVV, others have 3-digit
+    const isAmex = /^3[47]/.test(cardNumber);
+    const maxLength = isAmex ? 4 : 3;
+    setCvv(value.substring(0, maxLength));
   };
 
-  // Handle CVV blur to flip card back
-  const handleCvvBlur = () => {
-    setIsCardFlipped(false);
-  };
-
-  // Update card flip state
-  const handleCardFlip = (flipped: boolean) => {
-    setIsCardFlipped(flipped);
+  const handleCardholderNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCardholderName(e.target.value.toUpperCase());
   };
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div className={`${preloadClass ? styles.preload : ''}`}>
+      {/* Credit Card Display */}
+      <div className="mb-6">
         <CreditCardDisplay 
           cardNumber={cardNumber}
           cardholderName={cardholderName}
           expiryDate={expiryDate}
           cvv={cvv}
-          onFlip={handleCardFlip}
+          onFlip={setIsCvvFocused}
         />
       </div>
       
+      {/* Credit Card Form */}
       <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="card-number">מספר כרטיס</Label>
-          <Input 
-            id="card-number" 
-            dir="ltr"
-            placeholder="1234 5678 9012 3456" 
-            value={cardNumber}
-            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-            maxLength={19}
-          />
-        </div>
+        <FormItem>
+          <FormLabel>מספר כרטיס</FormLabel>
+          <FormControl>
+            <Input
+              placeholder="0000 0000 0000 0000"
+              value={cardNumber}
+              onChange={handleCardNumberChange}
+              maxLength={19}
+              className="text-lg text-right"
+              autoComplete="cc-number"
+              onFocus={() => setIsCvvFocused(false)}
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
         
-        <div className="space-y-2">
-          <Label htmlFor="cardholder-name">שם בעל הכרטיס</Label>
-          <Input 
-            id="cardholder-name" 
-            placeholder="ישראל ישראלי" 
-            value={cardholderName}
-            onChange={(e) => setCardholderName(e.target.value)}
-          />
-        </div>
+        <FormItem>
+          <FormLabel>שם בעל הכרטיס</FormLabel>
+          <FormControl>
+            <Input
+              placeholder="שם מלא כפי שמופיע על הכרטיס"
+              value={cardholderName}
+              onChange={handleCardholderNameChange}
+              className="text-right"
+              autoComplete="cc-name"
+              onFocus={() => setIsCvvFocused(false)}
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
         
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="expiry-date">תוקף</Label>
-            <Input 
-              id="expiry-date" 
-              dir="ltr"
-              placeholder="MM/YY" 
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
-              maxLength={5}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cvv">CVV</Label>
-            <Input 
-              id="cvv" 
-              dir="ltr"
-              placeholder="123" 
-              value={cvv}
-              onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 4))}
-              maxLength={4}
-              onFocus={handleCvvFocus}
-              onBlur={handleCvvBlur}
-            />
-          </div>
+          <FormItem className="space-y-2">
+            <FormLabel>תוקף</FormLabel>
+            <FormControl>
+              <Input
+                placeholder="MM/YY"
+                value={expiryDate}
+                onChange={handleExpiryDateChange}
+                maxLength={5}
+                className="text-right"
+                autoComplete="cc-exp"
+                onFocus={() => setIsCvvFocused(false)}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+          
+          <FormItem className="space-y-2">
+            <FormLabel>קוד אבטחה (CVV)</FormLabel>
+            <FormControl>
+              <Input
+                placeholder={cardNumber.startsWith('3') ? '4 ספרות' : '3 ספרות'}
+                value={cvv}
+                onChange={handleCvvChange}
+                maxLength={cardNumber.startsWith('3') ? 4 : 3}
+                className="text-right"
+                autoComplete="cc-csc"
+                onFocus={() => setIsCvvFocused(true)}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
         </div>
       </div>
     </div>
