@@ -29,7 +29,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [isCardFlipped, setIsCardFlipped] = useState(false);
   const [preloadClass, setPreloadClass] = useState(true);
 
-  // Remove preload class after component mounts
+  // Remove preload class after component mounts to enable animations
   useEffect(() => {
     const timer = setTimeout(() => {
       setPreloadClass(false);
@@ -37,12 +37,22 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
+  // Format card number with spaces after every 4 digits
   const formatCardNumber = (value: string) => {
+    // Remove non-digit characters
     const digits = value.replace(/\D/g, '');
-    const formatted = digits.match(/.{1,4}/g)?.join(' ') || digits;
-    return formatted.substring(0, 19); // Limit to 16 digits + spaces
+    
+    // Format with spaces after every 4 digits
+    const parts = [];
+    for (let i = 0; i < digits.length; i += 4) {
+      parts.push(digits.substring(i, i + 4));
+    }
+    
+    // Join with spaces and limit to 19 chars (16 digits + 3 spaces)
+    return parts.join(' ').substring(0, 19);
   };
 
+  // Format expiry date as MM/YY
   const formatExpiryDate = (value: string) => {
     const digits = value.replace(/\D/g, '');
     if (digits.length > 2) {
@@ -51,14 +61,17 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     return digits;
   };
 
+  // Handle CVV focus to flip card
   const handleCvvFocus = () => {
     setIsCardFlipped(true);
   };
 
+  // Handle CVV blur to flip card back
   const handleCvvBlur = () => {
     setIsCardFlipped(false);
   };
 
+  // Update card flip state
   const handleCardFlip = (flipped: boolean) => {
     setIsCardFlipped(flipped);
   };

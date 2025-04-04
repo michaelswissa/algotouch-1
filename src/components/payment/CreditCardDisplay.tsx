@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styles from '@/styles/CreditCardAnimation.module.css';
+import { CreditCard as CreditCardIcon, Visa, Mastercard } from 'lucide-react';
 
 interface CreditCardDisplayProps {
   cardNumber: string;
@@ -20,52 +21,75 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [cardType, setCardType] = useState('');
   
-  useEffect(() => {
-    // Remove preload class after component mounts to enable animations
-    const timer = setTimeout(() => {
-      const container = document.querySelector(`.${styles.container}`);
-      if (container) {
-        container.classList.remove(styles.preload);
-      }
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
+  // Flip card when focusing on CVV
   useEffect(() => {
     if (onFlip) {
       onFlip(isFlipped);
     }
   }, [isFlipped, onFlip]);
   
+  // Detect card type from number and update
   useEffect(() => {
-    // Detect card type from number
-    setCardType(detectCardType(cardNumber));
-  }, [cardNumber]);
+    const detectedType = detectCardType(cardNumber);
+    if (detectedType !== cardType) {
+      setCardType(detectedType);
+    }
+  }, [cardNumber, cardType]);
   
   const flipCard = () => {
     setIsFlipped(!isFlipped);
   };
   
-  const detectCardType = (number: string) => {
-    const firstDigit = number.replace(/\D/g, '').substring(0, 1);
-    if (number.replace(/\s/g, '') === '') return '';
+  const detectCardType = (number: string): string => {
+    const cleanNumber = number.replace(/\D/g, '');
+    if (cleanNumber === '') return '';
     
-    if (/^4/.test(firstDigit)) return 'visa';
-    if (/^5/.test(firstDigit)) return 'mastercard';
-    if (/^3/.test(firstDigit)) return 'amex';
-    if (/^6/.test(firstDigit)) return 'discover';
-    return 'visa'; // default
+    // Basic regex patterns for card type detection
+    const visaPattern = /^4/;
+    const mastercardPattern = /^5[1-5]/;
+    const amexPattern = /^3[47]/;
+    const discoverPattern = /^6(?:011|5)/;
+    
+    if (visaPattern.test(cleanNumber)) return 'visa';
+    if (mastercardPattern.test(cleanNumber)) return 'mastercard';
+    if (amexPattern.test(cleanNumber)) return 'amex';
+    if (discoverPattern.test(cleanNumber)) return 'discover';
+    
+    return 'unknown';
   };
   
-  // Format display values
+  // Format display values with proper spacing and masking
   const formatCardNumber = () => {
     if (!cardNumber) return 'XXXX XXXX XXXX XXXX';
-    return cardNumber;
+    
+    // Display with proper format
+    const cleanNumber = cardNumber.replace(/\s+/g, '');
+    let formattedNumber = '';
+    
+    // Format based on card type (AMEX uses 4-6-5 format, others use 4-4-4-4)
+    if (cardType === 'amex') {
+      for (let i = 0; i < cleanNumber.length; i++) {
+        if (i === 4 || i === 10) formattedNumber += ' ';
+        formattedNumber += cleanNumber[i];
+      }
+    } else {
+      for (let i = 0; i < cleanNumber.length; i++) {
+        if (i > 0 && i % 4 === 0) formattedNumber += ' ';
+        formattedNumber += cleanNumber[i];
+      }
+    }
+    
+    // Pad with X's if needed
+    const totalLen = cardType === 'amex' ? 17 : 19; // Including spaces
+    if (formattedNumber.length < totalLen) {
+      formattedNumber = formattedNumber.padEnd(totalLen, 'X').replace(/X/g, '•');
+    }
+    
+    return formattedNumber;
   };
   
   const formatName = () => {
-    return cardholderName || 'FULL NAME';
+    return cardholderName || 'YOUR NAME HERE';
   };
   
   const formatExpiry = () => {
@@ -75,11 +99,23 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   // Get color classes based on card type
   const getCardColorClass = () => {
     switch (cardType) {
-      case 'visa': return 'lime';
+      case 'visa': return 'lightblue';
       case 'mastercard': return 'red';
       case 'amex': return 'green';
       case 'discover': return 'purple';
       default: return 'grey';
+    }
+  };
+  
+  // Render card logo based on type
+  const renderCardLogo = () => {
+    switch (cardType) {
+      case 'visa':
+        return <Visa className="text-white h-8 w-auto" />;
+      case 'mastercard':
+        return <Mastercard className="text-white h-8 w-auto" />;
+      default:
+        return <CreditCardIcon className="text-white h-8 w-auto" />;
     }
   };
   
@@ -92,7 +128,9 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
         onClick={flipCard}
       >
         <div className={styles.front}>
-          <div id="ccsingle" className={styles.ccsingle}></div>
+          <div className={styles.ccsingle}>
+            {renderCardLogo()}
+          </div>
           <svg version="1.1" id="cardfront" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
               x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve">
             <g id="Front">
@@ -107,9 +145,9 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
               </g>
               <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={styles.st2 + ' ' + styles.st3 + ' ' + styles.st4}>{formatCardNumber()}</text>
               <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={styles.st2 + ' ' + styles.st5 + ' ' + styles.st6}>{formatName()}</text>
-              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>cardholder name</text>
-              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>expiration</text>
-              <text transform="matrix(1 0 0 1 65.1054 241.5)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>card number</text>
+              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>שם בעל הכרטיס</text>
+              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>תוקף</text>
+              <text transform="matrix(1 0 0 1 65.1054 241.5)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>מספר כרטיס</text>
               <g>
                 <text transform="matrix(1 0 0 1 574.4219 433.8095)" id="svgexpire" className={styles.st2 + ' ' + styles.st5 + ' ' + styles.st9}>{formatExpiry()}</text>
                 <text transform="matrix(1 0 0 1 479.3848 417.0097)" className={styles.st2 + ' ' + styles.st10 + ' ' + styles.st11}>VALID</text>
@@ -167,19 +205,19 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
               </g>
               <rect y="61.6" className={styles.st2} width="750" height="78" />
               <g>
-                <path className={styles.st3} d="M701.1,249.1H48.9c-3.3,0-6-2.7-6-6v-52.5c0-3.3,2.7-6,6-6h652.1c3.3,0,6,2.7,6,6v52.5
+                <path className={styles.st3back} d="M701.1,249.1H48.9c-3.3,0-6-2.7-6-6v-52.5c0-3.3,2.7-6,6-6h652.1c3.3,0,6,2.7,6,6v52.5
                 C707.1,246.4,704.4,249.1,701.1,249.1z" />
-                <rect x="42.9" y="198.6" className={styles.st4} width="664.1" height="10.5" />
-                <rect x="42.9" y="224.5" className={styles.st4} width="664.1" height="10.5" />
-                <path className={styles.st5} d="M701.1,184.6H618h-8h-10v64.5h10h8h83.1c3.3,0,6-2.7,6-6v-52.5C707.1,187.3,704.4,184.6,701.1,184.6z" />
+                <rect x="42.9" y="198.6" className={styles.st4back} width="664.1" height="10.5" />
+                <rect x="42.9" y="224.5" className={styles.st4back} width="664.1" height="10.5" />
+                <path className={styles.st5back} d="M701.1,184.6H618h-8h-10v64.5h10h8h83.1c3.3,0,6-2.7,6-6v-52.5C707.1,187.3,704.4,184.6,701.1,184.6z" />
               </g>
-              <text transform="matrix(1 0 0 1 621.999 227.2734)" id="svgsecurity" className={styles.st6 + ' ' + styles.st7}>{cvv}</text>
-              <g className={styles.st8}>
-                <text transform="matrix(1 0 0 1 518.083 280.0879)" className={styles.st9 + ' ' + styles.st6 + ' ' + styles.st10}>security code</text>
+              <text transform="matrix(1 0 0 1 621.999 227.2734)" id="svgsecurity" className={styles.st6back + ' ' + styles.st7back}>{cvv}</text>
+              <g className={styles.st8back}>
+                <text transform="matrix(1 0 0 1 518.083 280.0879)" className={styles.st9back + ' ' + styles.st6back + ' ' + styles.st10back}>קוד אבטחה</text>
               </g>
-              <rect x="58.1" y="378.6" className={styles.st11} width="375.5" height="13.5" />
-              <rect x="58.1" y="405.6" className={styles.st11} width="421.7" height="13.5" />
-              <text transform="matrix(1 0 0 1 59.5073 228.6099)" id="svgnameback" className={styles.st12 + ' ' + styles.st13}>{formatName()}</text>
+              <rect x="58.1" y="378.6" className={styles.st11back} width="375.5" height="13.5" />
+              <rect x="58.1" y="405.6" className={styles.st11back} width="421.7" height="13.5" />
+              <text transform="matrix(1 0 0 1 59.5073 228.6099)" id="svgnameback" className={styles.st12back + ' ' + styles.st13back}>{formatName()}</text>
             </g>
           </svg>
         </div>
