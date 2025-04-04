@@ -96,7 +96,7 @@ enable_signup = true
 enable_confirmations = false
 
 # Configure Edge Functions
-[edge_functions]
+[functions]
 enabled = true
 # Port to use for Edge Functions.
 port = 54326
