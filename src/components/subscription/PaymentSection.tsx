@@ -1,25 +1,43 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/contexts/auth';
 import CardcomPaymentProcessor from '@/components/payment/CardcomPaymentProcessor';
 import { useRegistrationData } from '@/hooks/useRegistrationData';
 
-const PaymentSection = () => {
+interface PaymentSectionProps {
+  selectedPlan: string;
+  onPaymentComplete?: () => void;
+  onBack?: () => void;
+}
+
+const PaymentSection: React.FC<PaymentSectionProps> = ({ 
+  selectedPlan,
+  onPaymentComplete,
+  onBack 
+}) => {
   const { user } = useAuth();
-  const { selectedPlan } = useSubscription();
   const { registrationData } = useRegistrationData();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Get price from selected plan
-  const price = selectedPlan?.price || 299;
-  const planName = selectedPlan?.title || 'תכנית חודשית';
-  const planId = selectedPlan?.id || 'monthly';
+  // Get price based on selected plan
+  let price = 299;
+  let planName = 'תכנית חודשית';
+  
+  if (selectedPlan === 'annual') {
+    price = 899;
+    planName = 'תכנית שנתית';
+  } else if (selectedPlan === 'vip') {
+    price = 1499;
+    planName = 'תכנית VIP';
+  }
 
   // Handle payment success
   const handlePaymentSuccess = () => {
     setIsLoading(false);
+    if (onPaymentComplete) {
+      onPaymentComplete();
+    }
     // Navigate is handled by the redirect URL from Cardcom
   };
 
@@ -55,7 +73,7 @@ const PaymentSection = () => {
           </div>
 
           <CardcomPaymentProcessor
-            planId={planId}
+            planId={selectedPlan}
             amount={price}
             planName={planName}
             fullName={fullName}

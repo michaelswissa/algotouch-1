@@ -1,150 +1,180 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
+// CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Create a Supabase client
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-serve(async (req: Request) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  // Check if Supabase credentials are available
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("Missing Supabase credentials");
-    return new Response(
-      JSON.stringify({ error: "Server configuration incomplete" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    return new Response(null, {
+      headers: corsHeaders,
+    });
   }
 
   try {
-    // Parse URL to get query parameters
+    // Parse the URL to get the query params from Cardcom
     const url = new URL(req.url);
-    const userId = url.searchParams.get("userId");
-    const planId = url.searchParams.get("planId");
+    const params = url.searchParams;
     
-    // Get cardcom parameters
-    const cardcomStatus = url.searchParams.get("ResponseCode") || "";
-    const transactionId = url.searchParams.get("InternalDealNumber") || "";
-    const cardLastDigits = url.searchParams.get("CardSuffix") || "";
-    const cardExpiration = url.searchParams.get("CardExpiration") || "";
-    const amount = url.searchParams.get("SumToBill") || "0";
+    console.log("Cardcom callback received with params:", Object.fromEntries(params));
     
-    console.log(`Received payment callback for user ${userId}, plan ${planId}, status: ${cardcomStatus}`);
-
-    // If missing required parameters, return error
-    if (!userId || !planId) {
-      console.error("Missing required parameters in callback");
-      return new Response(
-        JSON.stringify({ error: "Missing required parameters" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+    // Key parameters from Cardcom
+    const dealStatus = params.get("dealStatus");
+    const lowProfileId = params.get("lowProfileId");
+    const orderId = params.get("OrderId");
+    const uniqueClientId = params.get("uniqueClientId"); // Usually user ID
+    const planId = params.get("internalDealNumber"); // We can pass this in the payment request
+    
+    if (!dealStatus) {
+      throw new Error("No deal status provided in callback");
     }
-
-    // Initialize Supabase client
+    
+    // Set up Supabase client (using service role token to bypass RLS)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Missing Supabase credentials");
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // If payment was successful (0 is success code from Cardcom)
-    if (cardcomStatus === "0") {
-      // Record the payment in payment_history
-      const { error: paymentError } = await supabase
-        .from("payment_history")
-        .insert({
-          user_id: userId,
-          subscription_id: userId, // Using user_id temporarily, could be updated later
-          amount: parseFloat(amount),
-          currency: "ILS",
-          status: "completed",
-          payment_method: {
-            type: "credit_card",
-            provider: "cardcom",
-            transaction_id: transactionId,
-            card_last_digits: cardLastDigits,
-            card_expiration: cardExpiration
-          }
-        });
-
-      if (paymentError) {
-        console.error("Error recording payment:", paymentError);
+    // Log all request parameters for debugging
+    console.log("Processing payment callback:", {
+      dealStatus,
+      lowProfileId,
+      orderId,
+      uniqueClientId,
+      planId
+    });
+    
+    // Process the payment status
+    if (dealStatus === "0" || dealStatus === "2") { // Approved or Suspended for approval
+      console.log("Payment successful, updating subscription");
+      
+      if (!uniqueClientId) {
+        throw new Error("No user ID provided in successful payment callback");
       }
-
-      // Update user subscription
-      const { error: subscriptionError } = await supabase
-        .from("subscriptions")
-        .upsert({
-          user_id: userId,
-          plan_type: planId,
-          status: "active",
-          payment_method: {
-            type: "credit_card",
-            provider: "cardcom",
-            card_last_digits: cardLastDigits,
-            card_expiration: cardExpiration
-          },
-          // Set subscription period end to 30 days from now for monthly plans or 365 days for yearly
-          current_period_ends_at: new Date(
-            Date.now() + (planId.includes("monthly") ? 30 : 365) * 24 * 60 * 60 * 1000
-          ).toISOString()
-        });
-
-      if (subscriptionError) {
-        console.error("Error updating subscription:", subscriptionError);
-      }
-
-      return new Response(
-        JSON.stringify({ success: true, message: "Payment processed successfully" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    } else {
-      // Record failed payment
+      
+      // Store payment in history
       await supabase
         .from("payment_history")
         .insert({
-          user_id: userId,
-          subscription_id: userId,
-          amount: parseFloat(amount),
+          user_id: uniqueClientId,
+          subscription_id: uniqueClientId, // Same as user_id by design
+          amount: params.get("sumToBill") || 0,
           currency: "ILS",
-          status: "failed",
+          status: "completed",
           payment_method: {
-            type: "credit_card",
-            provider: "cardcom",
-            error_code: cardcomStatus
+            cardcom_id: lowProfileId,
+            last_digits: params.get("last4d") || "",
+            cardtype_name: params.get("cardTypeName") || "",
+            transaction_id: params.get("tranId") || ""
           }
         });
-
-      return new Response(
-        JSON.stringify({ success: false, message: "Payment failed" }),
-        {
-          status: 200, // Still return 200 to acknowledge receipt
-          headers: { "Content-Type": "application/json", ...corsHeaders },
+      
+      // Update subscription status
+      const now = new Date();
+      let periodEndsAt = null;
+      let trialEndsAt = null;
+      
+      // Set up subscription period based on plan
+      if (planId === "monthly") {
+        trialEndsAt = new Date(now);
+        trialEndsAt.setDate(trialEndsAt.getDate() + 30); // 30-day trial
+      } else if (planId === "annual") {
+        periodEndsAt = new Date(now);
+        periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+      } else {
+        // Default to 1 month for any other plan type
+        periodEndsAt = new Date(now);
+        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+      }
+      
+      // Update the subscription in database
+      await supabase
+        .from("subscriptions")
+        .upsert({
+          user_id: uniqueClientId,
+          plan_type: planId || "monthly",
+          status: planId === "monthly" ? "trial" : "active",
+          trial_ends_at: trialEndsAt?.toISOString() || null,
+          current_period_ends_at: periodEndsAt?.toISOString() || null,
+          payment_method: {
+            provider: "cardcom",
+            low_profile_id: lowProfileId,
+            last_digits: params.get("last4d") || "",
+            cardtype_name: params.get("cardTypeName") || "",
+            transaction_id: params.get("tranId") || ""
+          },
+          updated_at: now.toISOString()
+        });
+      
+      console.log("Subscription updated successfully");
+      
+      // Redirect to success page
+      const successUrl = params.get("SuccessRedirectUrl") || 
+        `${Deno.env.get("SITE_URL") || "https://app.algotouch.co.il"}/subscription/success?orderId=${orderId}`;
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          "Location": successUrl
         }
-      );
+      });
+    } else {
+      console.log("Payment failed with status:", dealStatus);
+      
+      // For failed payments, just log the error
+      if (uniqueClientId) {
+        await supabase
+          .from("payment_history")
+          .insert({
+            user_id: uniqueClientId,
+            subscription_id: uniqueClientId,
+            amount: params.get("sumToBill") || 0,
+            currency: "ILS",
+            status: "failed",
+            payment_method: {
+              error_code: dealStatus,
+              error_message: params.get("ErrorText") || "Unknown error",
+              transaction_id: params.get("tranId") || ""
+            }
+          });
+      }
+      
+      // Redirect to failure page
+      const failureUrl = params.get("ErrorRedirectUrl") || 
+        `${Deno.env.get("SITE_URL") || "https://app.algotouch.co.il"}/subscription/failure?error=${encodeURIComponent(params.get("ErrorText") || "Unknown error")}`;
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          "Location": failureUrl
+        }
+      });
     }
   } catch (error) {
-    console.error("Exception in payment callback:", error);
+    console.error("Error processing payment callback:", error);
+    
     return new Response(
-      JSON.stringify({ error: error.message || "Unknown error occurred" }),
+      JSON.stringify({ 
+        error: "Failed to process payment callback",
+        details: error.message 
+      }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
       }
     );
   }
