@@ -40,7 +40,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const formatCardNumber = (value: string) => {
     const digits = value.replace(/\D/g, '');
     const formatted = digits.match(/.{1,4}/g)?.join(' ') || digits;
-    return formatted;
+    return formatted.substring(0, 19); // Limit to 16 digits + spaces
   };
 
   const formatExpiryDate = (value: string) => {
@@ -64,7 +64,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div className={`${preloadClass ? styles.preload : ''}`}>
         <CreditCardDisplay 
           cardNumber={cardNumber}
@@ -80,6 +80,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <Label htmlFor="card-number">מספר כרטיס</Label>
           <Input 
             id="card-number" 
+            dir="ltr"
             placeholder="1234 5678 9012 3456" 
             value={cardNumber}
             onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
@@ -102,6 +103,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             <Label htmlFor="expiry-date">תוקף</Label>
             <Input 
               id="expiry-date" 
+              dir="ltr"
               placeholder="MM/YY" 
               value={expiryDate}
               onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
@@ -112,9 +114,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             <Label htmlFor="cvv">CVV</Label>
             <Input 
               id="cvv" 
+              dir="ltr"
               placeholder="123" 
               value={cvv}
-              onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 4))}
               maxLength={4}
               onFocus={handleCvvFocus}
               onBlur={handleCvvBlur}

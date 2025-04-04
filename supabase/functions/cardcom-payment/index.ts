@@ -44,12 +44,16 @@ serve(async (req) => {
     if (path === 'create-payment') {
       const { planId, userId, fullName, email, operationType, successRedirectUrl, errorRedirectUrl } = await req.json();
       
-      // Implement Cardcom payment creation logic here
-      // This is a placeholder - in production, you would make an API call to Cardcom
-
-      // For this example, we're creating a simulated payment URL
+      console.log('Creating payment session for:', { planId, userId, email });
+      
+      // In a real implementation, you would make an API call to Cardcom
+      // Here, for demonstration purposes, we'll create a simulated payment URL
+      
       const baseUrl = req.headers.get('origin') || 'http://localhost:3000';
       const paymentUrl = `${baseUrl}/subscription?step=4&success=true&plan=${planId}`;
+      
+      // Log the created payment session for debugging
+      console.log('Created payment URL:', paymentUrl);
       
       return new Response(
         JSON.stringify({
@@ -72,6 +76,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    console.error('Error processing request:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

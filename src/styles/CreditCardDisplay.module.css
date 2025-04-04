@@ -141,112 +141,108 @@
 }
 
 /* FRONT OF CARD */
-#svgname {
-  text-transform: uppercase;
-}
-
-#cardfront .st2 {
+.st2 {
   fill: #FFFFFF;
 }
 
-#cardfront .st3 {
-  font-family: monospace;
+.st3 {
+  font-family: 'Arial', sans-serif;
   font-weight: 600;
 }
 
-#cardfront .st4 {
-  font-size: 54.7817px;
+.st4 {
+  font-size: 33px;
 }
 
-#cardfront .st5 {
-  font-family: monospace;
+.st5 {
+  font-family: 'Arial', sans-serif;
   font-weight: 400;
 }
 
-#cardfront .st6 {
-  font-size: 33.1112px;
+.st6 {
+  font-size: 16px;
 }
 
-#cardfront .st7 {
+.st7 {
   opacity: 0.6;
   fill: #FFFFFF;
 }
 
-#cardfront .st8 {
-  font-size: 24px;
+.st8 {
+  font-size: 16px;
 }
 
-#cardfront .st9 {
-  font-size: 36.5498px;
+.st9 {
+  font-size: 17px;
 }
 
-#cardfront .st10 {
-  font-family: monospace;
+.st10 {
+  font-family: 'Arial', sans-serif;
   font-weight: 300;
 }
 
-#cardfront .st11 {
-  font-size: 16.1716px;
+.st11 {
+  font-size: 13px;
 }
 
-#cardfront .st12 {
+.st12 {
   fill: #4C4C4C;
 }
 
 /* BACK OF CARD */
-#cardback .st0 {
+.st0 {
   fill: none;
   stroke: #0F0F0F;
   stroke-miterlimit: 10;
 }
 
-#cardback .st2 {
-  fill: #111111;
-}
-
-#cardback .st3 {
-  fill: #F2F2F2;
-}
-
-#cardback .st4 {
-  fill: #D8D2DB;
-}
-
-#cardback .st5 {
-  fill: #C4C4C4;
-}
-
-#cardback .st6 {
-  font-family: monospace;
-  font-weight: 400;
-}
-
-#cardback .st7 {
-  font-size: 27px;
-}
-
-#cardback .st8 {
-  opacity: 0.6;
-}
-
-#cardback .st9 {
+.st2 {
   fill: #FFFFFF;
 }
 
-#cardback .st10 {
-  font-size: 24px;
+.st3 {
+  fill: #111111;
 }
 
-#cardback .st11 {
+.st4 {
+  fill: #F2F2F2;
+}
+
+.st5 {
+  fill: #C4C4C4;
+}
+
+.st6 {
+  font-family: 'Arial', sans-serif;
+  font-weight: 400;
+}
+
+.st7 {
+  font-size: 27px;
+}
+
+.st8 {
+  opacity: 0.6;
+}
+
+.st9 {
+  fill: #FFFFFF;
+}
+
+.st10 {
+  font-size: 14px;
+}
+
+.st11 {
   fill: #EAEAEA;
 }
 
-#cardback .st12 {
-  font-family: cursive;
+.st12 {
+  font-family: 'Arial', sans-serif;
 }
 
-#cardback .st13 {
-  font-size: 37.769px;
+.st13 {
+  font-size: 16px;
 }
 
 @media screen and (max-width: 768px) {

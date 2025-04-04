@@ -44,7 +44,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
     context.strokeStyle = '#000000';
     setCtx(context);
     
-    // Clear canvas
+    // Clear canvas and set background
     context.fillStyle = '#f8f8f8';
     context.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -128,7 +128,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
 
   return (
     <div className="flex flex-col space-y-2">
-      <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900" style={{ width, height }}>
+      <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900 w-full" style={{ width, height }}>
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
@@ -138,7 +138,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
           onTouchStart={startDrawing}
           onTouchMove={draw}
           onTouchEnd={endDrawing}
-          className="touch-none w-full h-full"
+          className="touch-none w-full h-full cursor-crosshair"
         />
       </div>
       <div className="flex justify-end">

@@ -23,22 +23,47 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [signingUp, setSigningUp] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  const validateInputs = () => {
+    const newErrors: {[key: string]: string} = {};
+    
+    // בדיקת שדות חובה
+    if (!firstName.trim()) newErrors.firstName = 'שדה חובה';
+    if (!lastName.trim()) newErrors.lastName = 'שדה חובה';
+    
+    // בדיקת תקינות מייל
+    if (!email.trim()) {
+      newErrors.email = 'שדה חובה';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'כתובת מייל לא תקינה';
+    }
+    
+    // בדיקת תקינות סיסמה
+    if (!password) {
+      newErrors.password = 'שדה חובה';
+    } else if (password.length < 6) {
+      newErrors.password = 'הסיסמה חייבת להכיל לפחות 6 תווים';
+    }
+    
+    // בדיקת התאמת סיסמאות
+    if (password !== passwordConfirm) {
+      newErrors.passwordConfirm = 'הסיסמאות אינן תואמות';
+    }
+    
+    // בדיקת תקינות מספר טלפון (אם הוזן)
+    if (phone.trim() && !/^0[2-9]\d{7,8}$/.test(phone)) {
+      newErrors.phone = 'מספר טלפון לא תקין';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !firstName || !lastName) {
-      toast.error('אנא מלא את כל שדות החובה');
-      return;
-    }
-    
-    if (password !== passwordConfirm) {
-      toast.error('הסיסמאות אינן תואמות');
-      return;
-    }
-    
-    if (password.length < 6) {
-      toast.error('הסיסמה חייבת להכיל לפחות 6 תווים');
+    if (!validateInputs()) {
       return;
     }
     
@@ -103,8 +128,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
                 type="text" 
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
+                className={errors.lastName ? "border-red-500" : ""}
                 required
               />
+              {errors.lastName && <p className="text-xs text-red-500">{errors.lastName}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="first-name">שם פרטי</Label>
@@ -113,8 +140,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
                 type="text" 
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
+                className={errors.firstName ? "border-red-500" : ""}
                 required
               />
+              {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
             </div>
           </div>
           <div className="space-y-2">
@@ -125,8 +154,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               placeholder="name@example.com" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className={errors.email ? "border-red-500" : ""}
               required
             />
+            {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">טלפון</Label>
@@ -135,7 +166,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               type="tel" 
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              placeholder="05XXXXXXXX"
+              className={errors.phone ? "border-red-500" : ""}
             />
+            {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="signup-password">סיסמה</Label>
@@ -146,7 +180,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              className={errors.password ? "border-red-500" : ""}
             />
+            {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password-confirm">אימות סיסמה</Label>
@@ -156,7 +192,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
               required
+              className={errors.passwordConfirm ? "border-red-500" : ""}
             />
+            {errors.passwordConfirm && <p className="text-xs text-red-500">{errors.passwordConfirm}</p>}
           </div>
         </CardContent>
         <CardFooter>
