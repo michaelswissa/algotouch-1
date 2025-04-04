@@ -53,6 +53,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
     
     setCardNumber(value);
+    validateCardNumber(value);
   };
 
   // Format expiry date as MM/YY
@@ -80,6 +81,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
     
     setExpiryDate(value);
+    validateExpiryDate(value);
   };
 
   // Validate CVV format
@@ -89,16 +91,97 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     const isAmex = /^3[47]/.test(cardNumber);
     const maxLength = isAmex ? 4 : 3;
     setCvv(value.substring(0, maxLength));
+    validateCvv(value, isAmex);
   };
 
   const handleCardholderNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCardholderName(e.target.value.toUpperCase());
+    const value = e.target.value.toUpperCase();
+    setCardholderName(value);
+    validateCardholderName(value);
+  };
+
+  // Validation functions
+  const validateCardNumber = (value: string) => {
+    const cleanValue = value.replace(/\s/g, '');
+    const newErrors = { ...errors };
+    
+    if (cleanValue.length === 0) {
+      newErrors.cardNumber = 'נדרש מספר כרטיס';
+    } else if (!/^3[47][0-9]{13}$|^[4-6][0-9]{15}$/.test(cleanValue)) {
+      if (cleanValue.length < 15) {
+        newErrors.cardNumber = 'מספר כרטיס לא מלא';
+      } else {
+        newErrors.cardNumber = 'מספר כרטיס לא תקין';
+      }
+    } else {
+      delete newErrors.cardNumber;
+    }
+    
+    setErrors(newErrors);
+  };
+
+  const validateCardholderName = (value: string) => {
+    const newErrors = { ...errors };
+    
+    if (!value) {
+      newErrors.cardholderName = 'נדרש שם בעל הכרטיס';
+    } else if (value.length < 3) {
+      newErrors.cardholderName = 'שם קצר מדי';
+    } else {
+      delete newErrors.cardholderName;
+    }
+    
+    setErrors(newErrors);
+  };
+
+  const validateExpiryDate = (value: string) => {
+    const newErrors = { ...errors };
+    
+    if (!value) {
+      newErrors.expiryDate = 'נדרש תאריך תפוגה';
+    } else if (value.length < 5) {
+      newErrors.expiryDate = 'תאריך לא מלא';
+    } else {
+      // Check if date is valid
+      const parts = value.split('/');
+      const month = parseInt(parts[0]);
+      const year = parseInt('20' + parts[1]);
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      
+      if (month < 1 || month > 12) {
+        newErrors.expiryDate = 'חודש לא תקין';
+      } else if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        newErrors.expiryDate = 'כרטיס פג תוקף';
+      } else {
+        delete newErrors.expiryDate;
+      }
+    }
+    
+    setErrors(newErrors);
+  };
+
+  const validateCvv = (value: string, isAmex: boolean) => {
+    const newErrors = { ...errors };
+    const expectedLength = isAmex ? 4 : 3;
+    
+    if (!value) {
+      newErrors.cvv = 'נדרש קוד אבטחה';
+    } else if (value.length < expectedLength) {
+      newErrors.cvv = `קוד חייב להיות ${expectedLength} ספרות`;
+    } else {
+      delete newErrors.cvv;
+    }
+    
+    setErrors(newErrors);
   };
 
   return (
     <div className="space-y-6" dir="rtl">
       {/* Credit Card Display */}
-      <div className="mb-6">
+      <div className="mb-8">
         <CreditCardDisplay 
           cardNumber={cardNumber}
           cardholderName={cardholderName}
@@ -118,7 +201,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             value={cardNumber}
             onChange={handleCardNumberChange}
             maxLength={19}
-            className="text-lg text-right"
+            className="text-lg text-right font-mono"
             autoComplete="cc-number"
             onFocus={() => setIsCvvFocused(false)}
           />
@@ -148,7 +231,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
               value={expiryDate}
               onChange={handleExpiryDateChange}
               maxLength={5}
-              className="text-right"
+              className="text-right font-mono"
               autoComplete="cc-exp"
               onFocus={() => setIsCvvFocused(false)}
             />
@@ -163,7 +246,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
               value={cvv}
               onChange={handleCvvChange}
               maxLength={cardNumber.startsWith('3') ? 4 : 3}
-              className="text-right"
+              className="text-right font-mono"
               autoComplete="cc-csc"
               onFocus={() => setIsCvvFocused(true)}
             />
