@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,10 +16,10 @@ interface EnhancedSignaturePadProps {
 const EnhancedSignaturePad: React.FC<EnhancedSignaturePadProps> = ({ 
   onChange,
   value,
-  height = 200,
-  width = 500,
-  maxWidth,
-  responsiveWidth = false
+  height = 150,
+  width = 400,
+  maxWidth = 500,
+  responsiveWidth = true
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -209,7 +208,7 @@ const EnhancedSignaturePad: React.FC<EnhancedSignaturePadProps> = ({
             onClick={clearSignature}
             disabled={!hasSignature}
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
+            <RotateCcw className="h-4 w-4 ml-2" />
             נקה חתימה
           </Button>
         </div>

@@ -22,16 +22,10 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onSign, 
   onBack 
 }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   
   // Function to handle contract signing
   const handleSignContract = (contractData: any) => {
-    if (!isAuthenticated && !sessionStorage.getItem('registration_data')) {
-      // This is a fallback check - should not typically happen with proper flow
-      toast.error('אנא התחבר למערכת כדי לחתום על ההסכם');
-      return;
-    }
-    
     console.log('Contract signed, forwarding data to parent component');
     onSign(contractData);
   };

@@ -30,7 +30,7 @@ const ContractDisplay: React.FC<ContractDisplayProps> = ({ contractText }) => {
               } 
               // Regular paragraph
               else if (paragraph.trim()) {
-                return <p key={index} className="mb-3 leading-relaxed text-base">{paragraph}</p>;
+                return <p key={index} className="mb-3 leading-relaxed text-sm">{paragraph}</p>;
               }
               // Empty line for spacing
               return <div key={index} className="h-2"></div>;

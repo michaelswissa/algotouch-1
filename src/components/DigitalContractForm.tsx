@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -222,9 +223,9 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
           <EnhancedSignaturePad
             value={signature}
             onChange={setSignature}
-            height={200}
+            height={150}
             responsiveWidth={true}
-            maxWidth={600}
+            maxWidth={500}
           />
           
           <ContractAgreement
