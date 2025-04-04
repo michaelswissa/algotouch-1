@@ -13,13 +13,13 @@ export interface TokenData {
 export const getCreditCardType = (cardNumber: string): string => {
   // Regular expressions for different card types
   const patterns = {
-    visa: /^4/,
-    mastercard: /^(5[1-5]|2[2-7])/,
-    amex: /^3[47]/,
-    discover: /^(6011|65|64[4-9]|622)/,
-    diners: /^(30[0-5]|36|38)/,
-    jcb: /^35/,
-    unionpay: /^(62|88)/,
+    visa: /^4\d{0,15}/,
+    mastercard: /^(5[1-5]|2[2-7])\d{0,14}/,
+    amex: /^3[47]\d{0,13}/,
+    discover: /^(6011|65|64[4-9]|622)\d{0,12}/,
+    diners: /^(30[0-5]|36|38)\d{0,12}/,
+    jcb: /^35\d{0,14}/,
+    unionpay: /^(62|88)\d{0,17}/,
   };
 
   // Find matching card type

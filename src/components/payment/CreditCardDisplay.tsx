@@ -41,7 +41,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
     } else {
       switch (type) {
         case 'visa':
-          setCardColor({ mainColor: 'blue', darkColor: 'lightbluedark' });
+          setCardColor({ mainColor: 'lightblue', darkColor: 'lightbluedark' });
           break;
         case 'mastercard':
           setCardColor({ mainColor: 'red', darkColor: 'reddark' });
@@ -105,10 +105,29 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
     return masked;
   };
 
+  const getBrandClass = () => {
+    switch (cardType) {
+      case 'visa':
+        return 'visa-card';
+      case 'mastercard':
+        return 'mastercard-card';
+      case 'amex':
+        return 'amex-card';
+      case 'discover':
+        return 'discover-card';
+      default:
+        return '';
+    }
+  };
+
   const getCardClass = () => {
     let cardClass = styles.creditcard;
     if (isFlipped) cardClass += ` ${styles.flipped}`;
     if (premium) cardClass += ` ${styles['premium-card']}`;
+    
+    const brandClass = getBrandClass();
+    if (brandClass) cardClass += ` ${styles[brandClass]}`;
+    
     return cardClass;
   };
 
@@ -120,6 +139,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
         ref={cardRef}
       >
         <div className={styles.front}>
+          <div className={styles['metal-effect']}></div>
           <svg version="1.1" id="cardfront" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
             x="0px" y="0px" viewBox="0 0 750 471" xmlSpace="preserve">
             <defs>
@@ -226,7 +246,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
               {/* Card Brand Logo */}
               <g id="cardLogo" className={styles.cardLogo}>
                 {cardType === 'visa' && (
-                  <svg className={styles.logoSvg} viewBox="0 0 750 471">
+                  <svg className={styles.logoSvg} viewBox="0 0 750 471" aria-label="Visa Card">
                     <path d="M278.1,334.2c-9.6,4.7-25,8.3-44,8.3c-48.2,0-82-24.2-82-70.9c0-42.5,32.1-74.5,83.8-74.5c16.7,0,31.1,3.4,38.9,7.2
                       l-6.5,22.2c-6.8-3.4-17.4-6.5-31.8-6.5c-32.9,0-54.5,20.9-54.5,50.9c0,30.5,20.7,50.2,53.6,50.2c12.8,0,25.8-2.6,33.9-6.8
                       L278.1,334.2z" fill="#ffffff"/>
@@ -237,7 +257,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                   </svg>
                 )}
                 {cardType === 'mastercard' && (
-                  <svg className={styles.logoSvg} viewBox="0 0 750 471">
+                  <svg className={styles.logoSvg} viewBox="0 0 750 471" aria-label="Mastercard">
                     <path d="M364.4,358c-73.9,0-133.8-59.9-133.8-133.8c0-73.9,59.9-133.8,133.8-133.8
                       c24.1,0,46.8,6.4,66.3,17.5c-29.2-22.8-65.9-36.4-105.8-36.4c-94.7,0-171.5,76.8-171.5,171.5
                       s76.8,171.5,171.5,171.5c48.3,0,92-20,123.4-52.3C428.2,346.4,397.6,358,364.4,358z" fill="#D9222A"/>
@@ -262,7 +282,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                   </svg>
                 )}
                 {cardType === 'amex' && (
-                  <svg className={styles.logoSvg} viewBox="0 0 750 471">
+                  <svg className={styles.logoSvg} viewBox="0 0 750 471" aria-label="American Express">
                     <path d="M47.5,236.8v-32.9h37.6l4.2,4.9l4.4-4.9h131.9v7l2.7-7h31.4v7l2.6-7h32v7.6
                        l5.3-7.6h67.1v32.9h-67.9l-4.7-7.1v7.1h-39.5l-2.6-6.7h-7.1l-2.5,6.7h-62.7c-3.4,0-8-0.8-11.4-3.4l-0.5-0.4l-0.5,0.4
                        c-3.4,2.6-8,3.4-11.4,3.4H47.5z M384.8,236.8l-11.9-11.9l-11.8,11.9h-70.3v-32.9h71.6l11.3,11.5l11.4-11.5h33.3
@@ -300,7 +320,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                   </svg>
                 )}
                 {cardType === 'discover' && (
-                  <svg className={styles.logoSvg} viewBox="0 0 780 500">
+                  <svg className={styles.logoSvg} viewBox="0 0 780 500" aria-label="Discover Card">
                     <path fill="#fff" d="M409.4,197.5c31.2,0,56.5-25.4,56.5-56.6c0-31.2-25.4-56.5-56.5-56.5c-31.2,0-56.5,25.4-56.5,56.5
                       C352.9,172.2,378.2,197.5,409.4,197.5z"/>
                     <path fill="#F47216" d="M321.2,120.4c-4.5-1.2-9.4-1.9-14.1-1.9c-30,0-51.9,20.2-51.9,49.1c0,29.1,22.9,49.2,53.7,49.2
@@ -338,7 +358,7 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                   </svg>
                 )}
                 {cardType === 'diners' && (
-                  <svg className={styles.logoSvg} viewBox="0 0 780 500">
+                  <svg className={styles.logoSvg} viewBox="0 0 780 500" aria-label="Diners Club">
                     <path fill="#0079BE" d="M600,350H180V150h420V350z"/>
                     <path fill="#FFFFFF" d="M348.8,350.1v-0.5c82.2-33.8,137.9-113,137.9-206c0-93-55.7-172.2-137.9-206v-0.1h-18
                       c-92.7,0-168.4,92.8-168.4,206.1c0,113.3,75.6,206,168.4,206.1H348.8L348.8,350.1z"/>
@@ -349,6 +369,13 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                     <path fill="#FFFFFF" d="M309.2,339.6v-32.1c-22.7-0.1-42.9-9.2-57.3-23.9c-14.4-14.7-23.5-35-23.5-44.2
                       c0-9.2,9-29.6,23.5-44.2c14.4-14.7,34.6-23.9,57.3-24v-32.1c-47.8,1-85.7,27.4-85.7,100.3C223.6,312.2,261.5,338.5,309.2,339.6z"
                       />
+                  </svg>
+                )}
+                {(!cardType || cardType === 'unknown') && (
+                  <svg className={styles.logoSvg} viewBox="0 0 750 471" aria-label="Credit Card">
+                    <path fill="#FFFFFF" d="M40,0h670c22.1,0,40,17.9,40,40v391c0,22.1-17.9,40-40,40H40c-22.1,0-40-17.9-40-40V40C0,17.9,17.9,0,40,0z" />
+                    <path fill="#FFFFFF" opacity="0.5" d="M40,20c-11,0-20,9-20,20v391c0,11,9,20,20,20h670c11,0,20-9,20-20V40c0-11-9-20-20-20H40z" />
+                    <path fill="#FFFFFF" d="M750,431V193.2c-217.6-57.5-556.4-13.5-750,24.9V431c0,22.1,17.9,40,40,40h670C732.1,471,750,453.1,750,431z" opacity="0.35" />
                   </svg>
                 )}
               </g>

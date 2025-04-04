@@ -132,6 +132,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
                     maxLength={4}
                     dir="ltr"
                     autoComplete="cc-csc"
+                    aria-label="Security code (CVV)"
                   />
                 </FormControl>
                 <FormMessage />
