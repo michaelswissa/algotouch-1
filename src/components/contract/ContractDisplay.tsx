@@ -21,7 +21,7 @@ const ContractDisplay: React.FC<ContractDisplayProps> = ({ contractText }) => {
           >
             {contractText.split('\n').map((paragraph, index) => {
               // Handle section headers (numbered sections)
-              if (/^\d+\./.test(paragraph.trim())) {
+              if (/^\d+\./.test(paragraph.trim()) && !/^\d+\.\d+/.test(paragraph.trim())) {
                 return <h3 key={index} className="text-lg font-bold mt-6 mb-3">{paragraph}</h3>;
               } 
               // Handle subsections (like 1.1, 2.3 etc)
@@ -30,7 +30,7 @@ const ContractDisplay: React.FC<ContractDisplayProps> = ({ contractText }) => {
               } 
               // Regular paragraph
               else if (paragraph.trim()) {
-                return <p key={index} className="mb-3 leading-relaxed">{paragraph}</p>;
+                return <p key={index} className="mb-3 leading-relaxed text-base">{paragraph}</p>;
               }
               // Empty line for spacing
               return <div key={index} className="h-2"></div>;

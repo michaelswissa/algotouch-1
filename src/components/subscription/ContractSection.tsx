@@ -37,7 +37,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <Card className="bg-muted/30">
         <CardHeader className="pb-3">
           <div className="flex items-center space-x-1 space-x-reverse rtl">

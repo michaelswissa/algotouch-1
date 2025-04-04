@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +32,6 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
   const [contractVersion] = useState('1.0');
 
   useEffect(() => {
-    // Load the contract text
     const loadContractText = async () => {
       try {
         const planType = planId === 'monthly' ? 'monthly' : 'annual';
@@ -66,7 +64,6 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
       return;
     }
 
-    // Create HTML version of the contract for storage/display
     const contractHtml = generateContractHtml(
       contractText,
       fullName,
@@ -75,7 +72,6 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
       new Date().toISOString()
     );
 
-    // Browser information for legal purposes
     const browserInfo = {
       userAgent: navigator.userAgent,
       language: navigator.language,
@@ -84,7 +80,6 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     };
 
-    // Data to be sent to the parent component
     const contractData = {
       contractHtml,
       signature,
@@ -109,7 +104,6 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
     sig: string,
     timestamp: string
   ): string => {
-    // Format the date in Hebrew
     const dateObj = new Date(timestamp);
     const hebrewDate = new Intl.DateTimeFormat('he-IL', {
       year: 'numeric',
@@ -119,21 +113,17 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
       minute: 'numeric'
     }).format(dateObj);
 
-    // Convert the contract text to HTML
     const htmlParagraphs = text
       .split('\n')
       .map(paragraph => {
         if (!paragraph.trim()) return '<div class="my-2"></div>';
         
-        // Handle section headers (numbered sections)
         if (/^\d+\./.test(paragraph.trim())) {
           return `<h3 class="text-lg font-bold mt-6 mb-3">${paragraph}</h3>`;
         } 
-        // Handle subsections (like 1.1, 2.3 etc)
         else if (/^\d+\.\d+/.test(paragraph.trim())) {
           return `<h4 class="text-base font-semibold mt-4 mb-2">${paragraph}</h4>`;
         } 
-        // Regular paragraph
         return `<p class="mb-3 leading-relaxed">${paragraph}</p>`;
       })
       .join('');
@@ -207,10 +197,6 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
     `;
   };
 
-  const clearSignature = () => {
-    setSignature('');
-  };
-
   return (
     <div className="space-y-6">
       <ContractDisplay contractText={contractText} />
@@ -233,22 +219,13 @@ const DigitalContractForm: React.FC<DigitalContractFormProps> = ({
           <Separator className="my-6" />
           
           <h3 className="text-lg font-semibold mb-4">חתימה דיגיטלית</h3>
-          <div className="mb-4 border rounded-md p-1">
-            <EnhancedSignaturePad
-              value={signature}
-              onChange={setSignature}
-              width={400}
-              height={200}
-              maxWidth={600}
-              responsiveWidth={true}
-            />
-          </div>
-          
-          <div className="flex justify-end mb-6">
-            <Button variant="outline" size="sm" onClick={clearSignature}>
-              נקה חתימה
-            </Button>
-          </div>
+          <EnhancedSignaturePad
+            value={signature}
+            onChange={setSignature}
+            height={200}
+            responsiveWidth={true}
+            maxWidth={600}
+          />
           
           <ContractAgreement
             agreedToTerms={agreedToTerms}
