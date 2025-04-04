@@ -75,17 +75,17 @@ export const getSubscriptionPlans = () => {
   return {
     monthly: {
       name: "חודשי",
-      price: 99,  // Changed to number
+      price: 99,  // Using number type for price
       description: "מנוי חודשי עם חודש ראשון חינם",
     },
     annual: {
       name: "שנתי",
-      price: 899,  // Changed to number
+      price: 899,  // Using number type for price
       description: "מנוי שנתי בהנחה של 25% מהמחיר החודשי",
     },
     vip: {
       name: "VIP",
-      price: 3499,  // Changed to number
+      price: 3499,  // Using number type for price
       description: "מנוי לכל החיים עם גישה לכל התכנים",
     },
   };
