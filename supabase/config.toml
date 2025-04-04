@@ -101,7 +101,7 @@ enabled = true
 # Port to use for Edge Functions.
 port = 54326
 
-# Individual function configurations follow
+# Individual function configurations
 [functions.increment-user-points]
 verify_jwt = true
 
