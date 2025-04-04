@@ -24,9 +24,7 @@
     cursor: pointer;
     position: relative;
     height: 100%;
-    border-radius: 16px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
 }
 
 .creditcard .front,
@@ -36,13 +34,11 @@
     max-width: 400px;
     backface-visibility: hidden;
     -webkit-font-smoothing: antialiased;
-    color: #fff;
+    color: #47525d;
     height: 100%;
     border-radius: 16px;
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
     overflow: hidden;
-    background-size: cover;
-    background-position: center;
 }
 
 .creditcard .back {
@@ -55,230 +51,220 @@
 
 .ccsingle {
     position: absolute;
-    right: 20px;
+    right: 15px;
     top: 20px;
     z-index: 2;
 }
 
 .ccsingle svg,
 .ccsingle img {
-    width: 70px;
-    max-height: 50px;
+    width: 60px;
+    max-height: 40px;
     filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .ccicon {
     height: 38px;
     position: absolute;
-    right: 20px;
-    top: 20px;
+    right: 6px;
+    top: calc(50% - 17px);
     width: 60px;
     z-index: 2;
 }
 
-/* Card background patterns */
-.cardPattern {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0.15;
-    mix-blend-mode: overlay;
-    background-size: cover;
+/* CHANGEABLE CARD ELEMENTS */
+.creditcard .lightcolor,
+.creditcard .darkcolor {
+    transition: fill .6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.cardGradient {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-size: 150% 150%;
-    background-position: center;
-    z-index: 0;
+.creditcard .lightblue {
+    fill: #03A9F4;
 }
 
-/* Modern card designs */
-.cardBlue {
-    background: linear-gradient(125deg, #0a2e63 0%, #1562c7 45%, #0043b8 100%);
+.creditcard .lightbluedark {
+    fill: #0288D1;
 }
 
-.cardPurple {
-    background: linear-gradient(125deg, #43097c 0%, #7b1fa2 45%, #6a1b9a 100%);
+.creditcard .red {
+    fill: #ef5350;
 }
 
-.cardDark {
-    background: linear-gradient(125deg, #111827 0%, #1f2937 45%, #374151 100%);
+.creditcard .reddark {
+    fill: #d32f2f;
 }
 
-.cardGreen {
-    background: linear-gradient(125deg, #064e3b 0%, #047857 45%, #059669 100%);
+.creditcard .purple {
+    fill: #ab47bc;
 }
 
-.cardRed {
-    background: linear-gradient(125deg, #7f1d1d 0%, #b91c1c 45%, #dc2626 100%);
+.creditcard .purpledark {
+    fill: #7b1fa2;
 }
 
-.cardGold {
-    background: linear-gradient(125deg, #78350f 0%, #b45309 45%, #d97706 100%);
+.creditcard .cyan {
+    fill: #26c6da;
 }
 
-.cardCustomImage {
-    background-image: url('/lovable-uploads/f1d6477c-2100-4767-81b2-0f2241da8676.png');
-    background-size: cover;
-    background-position: center;
+.creditcard .cyandark {
+    fill: #0097a7;
 }
 
-/* Card info elements */
-.cardContent {
-    position: relative;
-    z-index: 1;
-    height: 100%;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 20px;
+.creditcard .green {
+    fill: #66bb6a;
 }
 
-.cardChip {
-    width: 45px;
-    height: 35px;
-    background: linear-gradient(135deg, #cbb67c 0%, #f8e6a0 50%, #d5c089 100%);
-    border-radius: 6px;
-    margin-bottom: 25px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+.creditcard .greendark {
+    fill: #388e3c;
 }
 
-.chipLines {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-evenly;
+.creditcard .lime {
+    fill: #d4e157;
 }
 
-.chipLine {
-    height: 3px;
-    width: 100%;
-    background: rgba(0, 0, 0, 0.1);
+.creditcard .limedark {
+    fill: #afb42b;
 }
 
-.chipContact {
-    position: absolute;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(208, 189, 143, 0.55);
-    top: 3px;
-    right: 3px;
+.creditcard .yellow {
+    fill: #ffeb3b;
 }
 
-.cardNumber {
-    font-family: 'Source Code Pro', monospace;
-    font-size: 22px;
+.creditcard .yellowdark {
+    fill: #f9a825;
+}
+
+.creditcard .orange {
+    fill: #ff9800;
+}
+
+.creditcard .orangedark {
+    fill: #ef6c00;
+}
+
+.creditcard .grey {
+    fill: #9e9e9e;
+}
+
+.creditcard .greydark {
+    fill: #616161;
+}
+
+/* FRONT OF CARD */
+.st2 {
+    fill: #FFFFFF;
+}
+
+.st3 {
+    font-family: 'Source Code Pro', monospace, Arial, sans-serif;
     font-weight: 600;
+}
+
+.st4 {
+    font-size: 27px;
     letter-spacing: 2px;
-    margin-bottom: 15px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    padding: 5px 0;
-    display: flex;
-    justify-content: space-between;
 }
 
-.cardInfo {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
+.st5 {
+    font-family: 'Source Code Pro', monospace, Arial, sans-serif;
+    font-weight: 400;
 }
 
-.cardholderInfo {
-    display: flex;
-    flex-direction: column;
-}
-
-.cardholderLabel {
-    font-size: 10px;
-    text-transform: uppercase;
-    opacity: 0.7;
-    margin-bottom: 5px;
-    letter-spacing: 1px;
-}
-
-.cardholderName {
+.st6 {
     font-size: 16px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-.cardExpiryBox {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(5px);
-    padding: 5px 15px;
-    border-radius: 5px;
-    min-width: 80px;
-    text-align: center;
-}
-
-.expiryLabel {
-    font-size: 8px;
-    text-transform: uppercase;
-    opacity: 0.8;
     letter-spacing: 1px;
 }
 
-.expiryValue {
+.st7 {
+    opacity: 0.6;
+    fill: #FFFFFF;
+}
+
+.st8 {
+    font-size: 13px;
+}
+
+.st9 {
+    font-size: 19px;
+    letter-spacing: 1px;
+}
+
+.st10 {
+    font-family: 'Source Code Pro', monospace, Arial, sans-serif;
+    font-weight: 300;
+}
+
+.st11 {
+    font-size: 12px;
+}
+
+.st12 {
+    fill: #4C4C4C;
+}
+
+/* BACK OF CARD */
+.st0 {
+    fill: none;
+    stroke: #0F0F0F;
+    stroke-miterlimit: 10;
+}
+
+.st3back {
+    fill: #111111;
+}
+
+.st4back {
+    fill: #F2F2F2;
+}
+
+.st5back {
+    fill: #C4C4C4;
+}
+
+.st6back {
+    font-family: 'Source Code Pro', monospace, Arial, sans-serif;
+    font-weight: 400;
+}
+
+.st7back {
+    font-size: 27px;
+}
+
+.st8back {
+    opacity: 0.6;
+}
+
+.st9back {
+    fill: #FFFFFF;
+}
+
+.st10back {
     font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 1px;
 }
 
-/* Back of card */
-.cardStripe {
-    background: #000;
-    height: 50px;
-    width: 100%;
-    margin: 25px 0;
-    position: relative;
+.st11back {
+    fill: #EAEAEA;
 }
 
-.cardCvv {
-    position: relative;
-    top: 10px;
-    background: #fff;
-    color: #111;
-    height: 40px;
-    width: 80%;
-    padding: 5px 15px;
-    margin-left: auto;
-    margin-right: 20px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    font-family: 'Source Code Pro', monospace;
-    font-size: 18px;
+.st12back {
+    font-family: 'Source Code Pro', monospace, Arial, sans-serif;
 }
 
-.cardCvvLabel {
+.st13back {
+    font-size: 16px;
+}
+
+/* Card types */
+.cardLogo {
     position: absolute;
+    top: 20px;
     right: 20px;
-    top: 125px;
-    color: #fff;
-    text-transform: uppercase;
-    font-size: 10px;
-    letter-spacing: 1px;
-    opacity: 0.8;
+    width: 60px;
+    height: 40px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    transition: all 0.3s ease;
 }
 
 /* Responsive styles */
@@ -286,11 +272,14 @@
     .container {
         height: 54vw;
     }
-    .cardNumber {
-        font-size: 18px;
+    .st4 {
+        font-size: 24px;
     }
-    .cardholderName {
+    .st6 {
         font-size: 14px;
+    }
+    .st9 {
+        font-size: 17px;
     }
 }
 
@@ -299,14 +288,17 @@
         height: 64vw;
         padding: 10px;
     }
-    .cardNumber {
-        font-size: 16px;
+    .st4 {
+        font-size: 20px;
     }
-    .cardholderName {
+    .st6 {
         font-size: 12px;
     }
-    .cardChip {
-        width: 35px;
+    .st9 {
+        font-size: 14px;
+    }
+    .cardLogo {
+        width: 50px;
         height: 25px;
     }
 }
@@ -328,7 +320,7 @@
     transform: rotate(25deg);
     transition: 0.8s;
     opacity: 0;
-    z-index: 10;
+    z-index: 3;
     pointer-events: none;
 }
 

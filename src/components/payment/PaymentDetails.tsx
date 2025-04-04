@@ -98,7 +98,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   return (
     <div className="space-y-6" dir="rtl">
       {/* Credit Card Display */}
-      <div className="mb-8">
+      <div className="mb-6">
         <CreditCardDisplay 
           cardNumber={cardNumber}
           cardholderName={cardholderName}
