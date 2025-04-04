@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import styles from '@/styles/CreditCardDisplay.module.css';
+import styles from '@/styles/CreditCardAnimation.module.css';
 
 interface CreditCardDisplayProps {
   cardNumber: string;
@@ -18,65 +18,73 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
   onFlip
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
-
+  const [cardType, setCardType] = useState('');
+  
+  useEffect(() => {
+    // Remove preload class after component mounts to enable animations
+    const timer = setTimeout(() => {
+      const container = document.querySelector(`.${styles.container}`);
+      if (container) {
+        container.classList.remove(styles.preload);
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   useEffect(() => {
     if (onFlip) {
       onFlip(isFlipped);
     }
   }, [isFlipped, onFlip]);
-
+  
+  useEffect(() => {
+    // Detect card type from number
+    setCardType(detectCardType(cardNumber));
+  }, [cardNumber]);
+  
   const flipCard = () => {
     setIsFlipped(!isFlipped);
   };
-
-  // Format card number with spaces for display
-  const formatDisplayCardNumber = (value: string) => {
-    const val = value.replace(/\s/g, '');
-    if (val === '') return 'XXXX XXXX XXXX XXXX';
-    const regex = /^3[47]/; // Check if it's American Express
-    const isAmex = regex.test(val);
-    
-    if (isAmex) {
-      return val.substring(0, 4) + ' ' + val.substring(4, 10) + ' ' + val.substring(10, 15);
-    } else {
-      return val.substring(0, 4) + ' ' + val.substring(4, 8) + ' ' + val.substring(8, 12) + ' ' + val.substring(12, 16);
-    }
-  };
-
-  // Additional functions for card visualization
-  const getCardType = (number: string) => {
-    const firstDigits = number.replace(/\D/g, '').substring(0, 2);
+  
+  const detectCardType = (number: string) => {
+    const firstDigit = number.replace(/\D/g, '').substring(0, 1);
     if (number.replace(/\s/g, '') === '') return '';
-
-    if (/^4/.test(firstDigits)) return 'visa';
-    if (/^(5[1-5])/.test(firstDigits)) return 'mastercard';
-    if (/^3[47]/.test(firstDigits)) return 'amex';
-    if (/^6(?:011|5)/.test(firstDigits)) return 'discover';
-    if (/^(?:2131|1800|35)/.test(firstDigits)) return 'jcb';
-    if (/^3(?:0[0-5]|[68])/.test(firstDigits)) return 'diners';
+    
+    if (/^4/.test(firstDigit)) return 'visa';
+    if (/^5/.test(firstDigit)) return 'mastercard';
+    if (/^3/.test(firstDigit)) return 'amex';
+    if (/^6/.test(firstDigit)) return 'discover';
     return 'visa'; // default
   };
-
-  const cardType = getCardType(cardNumber);
-  const displayNumber = formatDisplayCardNumber(cardNumber);
-  const displayName = cardholderName || 'שם בעל הכרטיס';
-  const displayExpiry = expiryDate || 'MM/YY';
-
-  // Get color class based on card type
+  
+  // Format display values
+  const formatCardNumber = () => {
+    if (!cardNumber) return 'XXXX XXXX XXXX XXXX';
+    return cardNumber;
+  };
+  
+  const formatName = () => {
+    return cardholderName || 'FULL NAME';
+  };
+  
+  const formatExpiry = () => {
+    return expiryDate || 'MM/YY';
+  };
+  
+  // Get color classes based on card type
   const getCardColorClass = () => {
     switch (cardType) {
       case 'visa': return 'lime';
-      case 'mastercard': return 'lightblue';
+      case 'mastercard': return 'red';
       case 'amex': return 'green';
       case 'discover': return 'purple';
-      case 'jcb': return 'red';
-      case 'diners': return 'orange';
       default: return 'grey';
     }
   };
-
+  
   const colorClass = getCardColorClass();
-
+  
   return (
     <div className={styles.container}>
       <div 
@@ -97,16 +105,16 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 </g>
                 <path className={`${styles.darkcolor} ${styles[colorClass + 'dark']}`} d="M750,431V193.2c-217.6-57.5-556.4-13.5-750,24.9V431c0,22.1,17.9,40,40,40h670C732.1,471,750,453.1,750,431z" />
               </g>
-              <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={`${styles.st2} ${styles.st3} ${styles.st4}`}>{displayNumber}</text>
-              <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={`${styles.st2} ${styles.st5} ${styles.st6}`}>{displayName}</text>
-              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>שם בעל הכרטיס</text>
-              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>תוקף</text>
-              <text transform="matrix(1 0 0 1 65.1054 241.5)" className={`${styles.st7} ${styles.st5} ${styles.st8}`}>מספר כרטיס</text>
+              <text transform="matrix(1 0 0 1 60.106 295.0121)" id="svgnumber" className={styles.st2 + ' ' + styles.st3 + ' ' + styles.st4}>{formatCardNumber()}</text>
+              <text transform="matrix(1 0 0 1 54.1064 428.1723)" id="svgname" className={styles.st2 + ' ' + styles.st5 + ' ' + styles.st6}>{formatName()}</text>
+              <text transform="matrix(1 0 0 1 54.1074 389.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>cardholder name</text>
+              <text transform="matrix(1 0 0 1 479.7754 388.8793)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>expiration</text>
+              <text transform="matrix(1 0 0 1 65.1054 241.5)" className={styles.st7 + ' ' + styles.st5 + ' ' + styles.st8}>card number</text>
               <g>
-                <text transform="matrix(1 0 0 1 574.4219 433.8095)" id="svgexpire" className={`${styles.st2} ${styles.st5} ${styles.st9}`}>{displayExpiry}</text>
-                <text transform="matrix(1 0 0 1 479.3848 417.0097)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>VALID</text>
-                <text transform="matrix(1 0 0 1 479.3848 435.6762)" className={`${styles.st2} ${styles.st10} ${styles.st11}`}>THRU</text>
-                <polygon className={styles.st2} points="554.5,421 540.4,414.2 540.4,427.9 		" />
+                <text transform="matrix(1 0 0 1 574.4219 433.8095)" id="svgexpire" className={styles.st2 + ' ' + styles.st5 + ' ' + styles.st9}>{formatExpiry()}</text>
+                <text transform="matrix(1 0 0 1 479.3848 417.0097)" className={styles.st2 + ' ' + styles.st10 + ' ' + styles.st11}>VALID</text>
+                <text transform="matrix(1 0 0 1 479.3848 435.6762)" className={styles.st2 + ' ' + styles.st10 + ' ' + styles.st11}>THRU</text>
+                <polygon className={styles.st2} points="554.5,421 540.4,414.2 540.4,427.9" />
               </g>
               <g id="cchip">
                 <g>
@@ -142,8 +150,6 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 </g>
               </g>
             </g>
-            <g id="Back">
-            </g>
           </svg>
         </div>
         <div className={styles.back}>
@@ -167,13 +173,13 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
                 <rect x="42.9" y="224.5" className={styles.st4} width="664.1" height="10.5" />
                 <path className={styles.st5} d="M701.1,184.6H618h-8h-10v64.5h10h8h83.1c3.3,0,6-2.7,6-6v-52.5C707.1,187.3,704.4,184.6,701.1,184.6z" />
               </g>
-              <text transform="matrix(1 0 0 1 621.999 227.2734)" id="svgsecurity" className={`${styles.st6} ${styles.st7}`}>{cvv}</text>
+              <text transform="matrix(1 0 0 1 621.999 227.2734)" id="svgsecurity" className={styles.st6 + ' ' + styles.st7}>{cvv}</text>
               <g className={styles.st8}>
-                <text transform="matrix(1 0 0 1 518.083 280.0879)" className={`${styles.st9} ${styles.st6} ${styles.st10}`}>קוד אבטחה</text>
+                <text transform="matrix(1 0 0 1 518.083 280.0879)" className={styles.st9 + ' ' + styles.st6 + ' ' + styles.st10}>security code</text>
               </g>
               <rect x="58.1" y="378.6" className={styles.st11} width="375.5" height="13.5" />
               <rect x="58.1" y="405.6" className={styles.st11} width="421.7" height="13.5" />
-              <text transform="matrix(1 0 0 1 59.5073 228.6099)" id="svgnameback" className={`${styles.st12} ${styles.st13}`}>{displayName}</text>
+              <text transform="matrix(1 0 0 1 59.5073 228.6099)" id="svgnameback" className={styles.st12 + ' ' + styles.st13}>{formatName()}</text>
             </g>
           </svg>
         </div>
