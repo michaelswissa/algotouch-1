@@ -106,3 +106,9 @@ verify_jwt = true
 
 [functions.add-db-functions]
 verify_jwt = true
+
+[functions.izidoc-sign]
+verify_jwt = true
+
+[functions.smtp-sender]
+verify_jwt = true

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,8 @@ import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 import SecurityNote from './SecurityNote';
 import { getSubscriptionPlans, createTokenData } from './utils/paymentHelpers';
-import { registerUser } from './RegisterUser';
+import { registerUser } from '@/services/registration/registerUser';
+import { TokenData, RegistrationData } from '@/types/payment';
 
 interface PaymentFormProps {
   planId: string;
@@ -27,12 +27,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [registrationData, setRegistrationData] = useState<any>(null);
+  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
 
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
-      setRegistrationData(JSON.parse(storedData));
+      try {
+        setRegistrationData(JSON.parse(storedData));
+      } catch (e) {
+        console.error("Error parsing registration data:", e);
+        toast.error("שגיאה בטעינת נתוני הרשמה");
+      }
     }
   }, []);
 
@@ -68,7 +73,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
           throw result.error;
         }
         
-        toast.success('התשלום נקלט בהצלחה! נרשמת לתקופת ניסיון חינם');
+        toast.success('התשלום ��קלט בהצלחה! נרשמת לתקופת ניסיון חינם');
         sessionStorage.removeItem('registration_data');
         onPaymentComplete();
       } 
@@ -130,7 +135,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     // In a production system, this would be handled by a PCI-compliant provider
     
     // Instead, we'll create a placeholder token and record the payment
-    const tokenData = {
+    const tokenData: TokenData = {
       lastFourDigits: paymentData.cardNumber.slice(-4),
       expiryMonth: paymentData.expiryMonth,
       expiryYear: paymentData.expiryYear,
