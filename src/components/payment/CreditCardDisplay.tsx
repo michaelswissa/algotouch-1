@@ -131,14 +131,13 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
           </div>
           
           <div className={styles.cardholderDetails}>
-            <div className={styles.cardholderName}>
-              <div className={styles.cardholderLabel}>CARD HOLDER</div>
-              <div className={styles.cardholderValue}>{cardholderName || 'YOUR NAME'}</div>
+            <div className={styles.expiryDate}>
+              <div className={styles.expiryLabel}>MM/YY</div>
+              <div className={styles.expiryValue}>{expiryDate || 'MM/YY'}</div>
             </div>
             
-            <div className={styles.expiryDate}>
-              <div className={styles.expiryLabel}>VALID THRU</div>
-              <div className={styles.expiryValue}>{expiryDate || 'MM/YY'}</div>
+            <div className={styles.cardholderName}>
+              <div className={styles.cardholderValue}>{cardholderName || 'YOUR NAME'}</div>
             </div>
           </div>
         </div>
