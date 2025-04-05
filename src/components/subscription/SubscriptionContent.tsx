@@ -1,8 +1,9 @@
 
-import React, { useEffect } from 'react';
-import { useParams, Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useRegistrationData } from '@/hooks/useRegistrationData';
 import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
@@ -11,9 +12,11 @@ import ContractSection from '@/components/subscription/ContractSection';
 import PaymentSection from '@/components/subscription/PaymentSection';
 import { processSignedContract } from '@/lib/contracts/contract-service';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
+import { RegistrationData } from '@/types/payment';
 
 const SubscriptionContent = () => {
   const { planId } = useParams<{ planId: string }>();
+  const navigate = useNavigate();
   const { user, isAuthenticated, loading } = useAuth();
   const { 
     hasActiveSubscription, 
@@ -34,7 +37,77 @@ const SubscriptionContent = () => {
   
   const location = useLocation();
   const isRegistering = location.state?.isRegistering === true;
+  const [restoringSession, setRestoringSession] = useState(false);
 
+  // Process URL parameters and restore any needed state
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const step = params.get('step');
+    const success = params.get('success') === 'true';
+    const error = params.get('error') === 'true';
+    const planParam = params.get('plan');
+    const regId = params.get('regId');
+    
+    // Set selected plan from URL if available
+    if (planParam && !selectedPlan) {
+      setSelectedPlan(planParam);
+    }
+    
+    if (error) {
+      toast.error('התשלום נכשל, אנא נסה שנית');
+    } 
+    
+    // Handle registration data restoration if we have a registration ID
+    if (regId) {
+      setRestoringSession(true);
+      
+      // Try to restore registration data from the temporary storage
+      supabase.functions.invoke('cardcom-payment/get-registration-data', {
+        body: { registrationId: regId }
+      })
+      .then(({ data, error }) => {
+        if (error || !data?.success) {
+          console.error('Error restoring registration data:', error || 'No data returned');
+          toast.error('שגיאה בשחזור פרטי ההרשמה, אנא נסה שוב');
+          return;
+        }
+        
+        // Restore registration data
+        if (data.registrationData) {
+          console.log('Restoring registration data from server');
+          updateRegistrationData(data.registrationData);
+          
+          // If payment was successful, proceed with registration
+          if (success) {
+            processRestoredRegistration(data.registrationData);
+          }
+        }
+      })
+      .catch(err => {
+        console.error('Exception retrieving registration data:', err);
+        toast.error('שגיאה בשחזור פרטי ההרשמה');
+      })
+      .finally(() => {
+        setRestoringSession(false);
+      });
+      
+      // Remove the regId parameter from URL for cleanliness
+      params.delete('regId');
+      navigate({ search: params.toString() }, { replace: true });
+    }
+    // Handle direct success without registration ID (already logged in user)
+    else if (success && step === '4') {
+      setCurrentStep(4);
+      toast.success('התשלום התקבל בהצלחה!');
+      
+      // If the user is authenticated, refresh their subscription
+      if (isAuthenticated && user) {
+        checkUserSubscription(user.id);
+      }
+    }
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check subscription status for authenticated users
   useEffect(() => {
     console.log('Subscription page: Checking for registration data and subscription status', {
       isAuthenticated,
@@ -51,10 +124,55 @@ const SubscriptionContent = () => {
     if (planId && !selectedPlan) {
       setSelectedPlan(planId);
     }
-  }, [user, planId, isAuthenticated, isRegistering, checkUserSubscription]);
+  }, [user, planId, isAuthenticated, isRegistering, checkUserSubscription]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Show loading state while checking subscription
-  if (loading || isCheckingSubscription) {
+  // Process a restored registration after successful payment
+  const processRestoredRegistration = async (regData: RegistrationData) => {
+    console.log('Processing restored registration after payment');
+    
+    try {
+      // Use token data from the registration to create user and subscription
+      const result = await registerUser({
+        registrationData: regData,
+        tokenData: {
+          lastFourDigits: '****', // We don't have the actual card data anymore
+          expiryMonth: '**',
+          expiryYear: '****',
+          cardholderName: `${regData.userData.firstName || ''} ${regData.userData.lastName || ''}`.trim(),
+          simulated: true
+        },
+        contractDetails: regData.contractDetails || null
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'שגיאה לא ידועה בהשלמת ההרשמה');
+      }
+      
+      // Sign in the new user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: regData.email,
+        password: regData.password
+      });
+      
+      if (signInError) {
+        console.error('Error signing in after registration:', signInError);
+        // Continue anyway as the user was created
+      }
+      
+      // Clear session storage
+      sessionStorage.removeItem('registration_data');
+      
+      // Set to success step
+      setCurrentStep(4);
+      toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
+    } catch (error: any) {
+      console.error('Error processing restored registration:', error);
+      toast.error(error.message || 'אירעה שגיאה בהשלמת תהליך ההרשמה');
+    }
+  };
+
+  // Show loading state while checking subscription or restoring session
+  if (loading || isCheckingSubscription || restoringSession) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin"></div>
@@ -70,7 +188,8 @@ const SubscriptionContent = () => {
   }
 
   // If no registration data is found and user is not authenticated, redirect to auth
-  if (!isAuthenticated && !registrationData && !isRegistering) {
+  // Skip this check if we're restoring session or if plan is specified directly
+  if (!isAuthenticated && !registrationData && !isRegistering && !planId && !restoringSession) {
     console.log('No registration data found and user is not authenticated, redirecting to auth');
     return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
   }

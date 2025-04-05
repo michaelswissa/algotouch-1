@@ -40,17 +40,76 @@ serve(async (req) => {
       }
     );
 
+    // Get user from token if available
+    let user = null;
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+      try {
+        const { data } = await supabaseClient.auth.getUser();
+        user = data.user;
+        console.log('Authenticated user:', user?.email);
+      } catch (authError) {
+        console.error('Auth error:', authError);
+        // Continue without user - might be registration flow
+      }
+    }
+
     // Create payment session with Cardcom
     if (path === 'create-payment') {
-      const { planId, userId, fullName, email, operationType, successRedirectUrl, errorRedirectUrl } = await req.json();
+      const { 
+        planId, 
+        userId, 
+        fullName, 
+        email, 
+        operationType, 
+        successRedirectUrl, 
+        errorRedirectUrl,
+        registrationData 
+      } = await req.json();
       
-      console.log('Creating payment session for:', { planId, userId, email });
+      console.log('Creating payment session for:', { 
+        planId, 
+        userId: userId || (user?.id || 'anonymous'), 
+        email: email || user?.email || 'anonymous',
+        hasRegistrationData: !!registrationData
+      });
+      
+      // Store registration data temporarily if provided
+      // This allows us to recreate it after redirect
+      let tempRegistrationId = null;
+      if (registrationData) {
+        try {
+          // Generate a unique ID for this registration attempt
+          tempRegistrationId = crypto.randomUUID();
+          
+          // Store in a temporary table with short expiration
+          const { error: tempError } = await supabaseClient
+            .from('temp_registration_data')
+            .insert({
+              id: tempRegistrationId,
+              registration_data: registrationData,
+              expires_at: new Date(Date.now() + 30 * 60000).toISOString() // 30 min expiry
+            });
+            
+          if (tempError) {
+            console.error('Error storing temp registration:', tempError);
+            // Fall back to session storage approach if this fails
+            tempRegistrationId = null;
+          } else {
+            console.log('Stored temp registration data with ID:', tempRegistrationId);
+          }
+        } catch (storageError) {
+          console.error('Error in temp registration storage:', storageError);
+          tempRegistrationId = null;
+        }
+      }
       
       // In a real implementation, you would make an API call to Cardcom
       // Here, for demonstration purposes, we'll create a simulated payment URL
       
       const baseUrl = req.headers.get('origin') || 'http://localhost:3000';
-      const paymentUrl = `${baseUrl}/subscription?step=4&success=true&plan=${planId}`;
+      const regParam = tempRegistrationId ? `&regId=${tempRegistrationId}` : '';
+      const paymentUrl = `${baseUrl}/subscription?step=4&success=true&plan=${planId}${regParam}`;
       
       // Log the created payment session for debugging
       console.log('Created payment URL:', paymentUrl);
@@ -58,7 +117,59 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          url: paymentUrl
+          url: paymentUrl,
+          tempRegistrationId
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+    
+    // Retrieve stored registration data
+    if (path === 'get-registration-data') {
+      const { registrationId } = await req.json();
+      
+      if (!registrationId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing registration ID' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          }
+        );
+      }
+      
+      console.log('Retrieving registration data for ID:', registrationId);
+      
+      const { data, error } = await supabaseClient
+        .from('temp_registration_data')
+        .select('registration_data')
+        .eq('id', registrationId)
+        .single();
+        
+      if (error || !data) {
+        console.error('Error retrieving temp registration:', error);
+        return new Response(
+          JSON.stringify({ error: 'Registration data not found or expired' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
+      
+      // Delete the temporary data after retrieval
+      await supabaseClient
+        .from('temp_registration_data')
+        .delete()
+        .eq('id', registrationId);
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          registrationData: data.registration_data 
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -34,6 +34,12 @@ export const registerUser = async ({
       throw new Error('חסרים פרטי משתמש');
     }
 
+    console.log('Starting user registration:', {
+      email: registrationData.email,
+      firstName: registrationData.userData.firstName,
+      planId: registrationData.planId
+    });
+
     // Create the user account
     const { data: userData, error: userError } = await supabase.auth.signUp({
       email: registrationData.email,
@@ -57,6 +63,8 @@ export const registerUser = async ({
     if (!userData.user) {
       throw new Error('יצירת משתמש נכשלה');
     }
+
+    console.log('User created successfully:', userData.user.id);
 
     // Add a delay to ensure the user is created before proceeding
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -82,6 +90,8 @@ export const registerUser = async ({
       throw subscriptionError;
     }
     
+    console.log('Subscription created successfully');
+    
     // Create payment history record
     await supabase.from('payment_history').insert({
       user_id: userData.user.id,
@@ -103,6 +113,7 @@ export const registerUser = async ({
     
     if (profileError) {
       console.error('Error updating profile:', profileError);
+      // Continue anyway as this is not critical
     }
     
     // Store contract signature if available

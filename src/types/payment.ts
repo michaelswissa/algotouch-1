@@ -59,3 +59,11 @@ export interface RegistrationData {
   };
   registrationTime: string;
 }
+
+// Note: This ensures the CardcomPaymentResponse is properly typed
+export interface CardcomPaymentResponse {
+  success: boolean;
+  url?: string;
+  error?: string;
+  transactionId?: string;
+}
