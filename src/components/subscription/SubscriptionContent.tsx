@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
@@ -69,7 +70,12 @@ const SubscriptionContent = () => {
         }
         
         if (data.registrationData) {
-          console.log('Restoring registration data from server');
+          console.log('Restoring registration data from server:', {
+            email: data.registrationData.email,
+            hasPassword: !!data.registrationData.password,
+            planId: data.registrationData.planId
+          });
+          
           updateRegistrationData(data.registrationData);
           
           if (success) {
@@ -85,6 +91,7 @@ const SubscriptionContent = () => {
         setRestoringSession(false);
       });
       
+      // Remove regId from URL
       params.delete('regId');
       navigate({ search: params.toString() }, { replace: true });
     }
@@ -102,7 +109,9 @@ const SubscriptionContent = () => {
     console.log('Subscription page: Checking for registration data and subscription status', {
       isAuthenticated,
       isRegistering,
-      planId
+      planId,
+      hasRegistrationData: !!registrationData,
+      registrationEmail: registrationData?.email
     });
     
     if (isAuthenticated && user) {
@@ -115,7 +124,18 @@ const SubscriptionContent = () => {
   }, [user, planId, isAuthenticated, isRegistering, checkUserSubscription]);
 
   const processRestoredRegistration = async (regData: RegistrationData) => {
-    console.log('Processing restored registration after payment');
+    console.log('Processing restored registration after payment', {
+      hasEmail: !!regData.email,
+      hasPassword: !!regData.password,
+      hasUserData: !!regData.userData,
+      hasContract: !!regData.contractDetails
+    });
+    
+    if (!regData.email || !regData.password || !regData.userData) {
+      console.error('Missing required registration data');
+      toast.error('חסרים פרטי הרשמה חיוניים');
+      return;
+    }
     
     try {
       const result = await registerUser({
@@ -166,8 +186,23 @@ const SubscriptionContent = () => {
     return <Navigate to="/my-subscription" replace />;
   }
 
-  if (!isAuthenticated && !registrationData && !isRegistering && !planId && !restoringSession) {
-    console.log('No registration data found and user is not authenticated, redirecting to auth');
+  // Check if registration data is valid when it's needed
+  const isValidRegistrationData = () => {
+    if (isAuthenticated && user) return true; // User is authenticated, no need for registration data
+    
+    if (!registrationData) return false;
+    
+    // Check if we have complete registration data
+    return !!(
+      registrationData.email && 
+      registrationData.password && 
+      registrationData.userData?.firstName && 
+      registrationData.userData?.lastName
+    );
+  };
+
+  if (!isAuthenticated && !isRegistering && !planId && !restoringSession && !isValidRegistrationData()) {
+    console.log('No valid registration data found and user is not authenticated, redirecting to auth');
     return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
   }
 

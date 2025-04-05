@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
@@ -14,6 +14,7 @@ import SecurityNote from './SecurityNote';
 import { getSubscriptionPlans, createTokenData } from './utils/paymentHelpers';
 import { registerUser } from '@/services/registration/registerUser'; 
 import { TokenData, RegistrationData } from '@/types/payment';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface PaymentFormProps {
   planId: string;
@@ -29,18 +30,34 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   const [cvv, setCvv] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
 
   // Load registration data from session storage
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       try {
-        setRegistrationData(JSON.parse(storedData));
+        const parsedData = JSON.parse(storedData);
+        setRegistrationData(parsedData);
+        console.log("Loaded registration data:", {
+          email: parsedData.email,
+          hasPassword: !!parsedData.password,
+          hasUserData: !!parsedData.userData,
+          planId: parsedData.planId
+        });
+        
+        // Validate registration data
+        if (!parsedData.email || !parsedData.password || !parsedData.userData?.firstName) {
+          setRegistrationError('חסרים פרטי משתמש. אנא חזור לדף ההרשמה ומלא את כל השדות הנדרשים.');
+        }
       } catch (e) {
         console.error("Error parsing registration data:", e);
+        setRegistrationError('שגיאה בטעינת פרטי הרשמה. אנא נסה להירשם מחדש.');
       }
+    } else if (!user) {
+      setRegistrationError('לא נמצאו פרטי הרשמה. אנא חזור לדף ההרשמה או התחבר למערכת.');
     }
-  }, []);
+  }, [user]);
 
   // Get plan details
   const planDetails = getSubscriptionPlans();
@@ -67,6 +84,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       
       // Two paths: registration flow or existing user flow
       if (!user) {
+        // Check if we have valid registration data before proceeding
+        if (!registrationData || !registrationData.email || !registrationData.password || 
+            !registrationData.userData || !registrationData.userData.firstName) {
+          throw new Error('פרטי ההרשמה חסרים או לא תקינים. אנא חזור לעמוד ההרשמה והתחל מחדש.');
+        }
+        
         await handleNewUserPayment(tokenData);
       } else {
         await handleExistingUserPayment(tokenData);
@@ -91,7 +114,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     console.log('Processing payment for new user with registration data:', {
       email: registrationData.email,
       planId: registrationData.planId,
-      hasPlan: !!registrationData.planId
+      hasPassword: !!registrationData.password,
+      hasUserData: !!registrationData.userData,
+      firstName: registrationData.userData?.firstName,
+      lastName: registrationData.userData?.lastName
     });
     
     // First create the user with subscription
@@ -203,8 +229,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
 
   // External payment processing with Cardcom
   const handleExternalPayment = async () => {
-    if (!user && !registrationData) {
-      toast.error('יש להתחבר או להשלים הרשמה כדי להמשיך');
+    // Check for registration data validity if not authenticated
+    if (!user && (!registrationData || !registrationData.email || !registrationData.password)) {
+      toast.error('חסרים פרטים להרשמה. אנא חזור לעמוד ההרשמה ומלא את כל הפרטים הנדרשים.');
       return;
     }
     
@@ -258,6 +285,44 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       setIsProcessing(false);
     }
   };
+
+  // If registration data is invalid, show an error and options to go back
+  if (registrationError && !user) {
+    return (
+      <Card className="max-w-lg mx-auto" dir="rtl">
+        <CardHeader>
+          <CardTitle>שגיאה בתהליך ההרשמה</CardTitle>
+          <CardDescription>חסרים פרטי התחברות או שאירעה שגיאה בעיבוד הפרטים</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{registrationError}</AlertDescription>
+          </Alert>
+          
+          <div className="mt-4 space-y-4">
+            <p className="text-center text-muted-foreground">אנא בחר אחת מהאפשרויות הבאות:</p>
+            
+            <div className="flex flex-col space-y-2">
+              <Button 
+                onClick={() => navigate('/auth?tab=signup', { state: { redirectToSubscription: true } })}
+                variant="default"
+              >
+                חזור להרשמה
+              </Button>
+              
+              <Button 
+                onClick={() => navigate('/auth', { replace: true })}
+                variant="outline"
+              >
+                התחבר עם חשבון קיים
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
