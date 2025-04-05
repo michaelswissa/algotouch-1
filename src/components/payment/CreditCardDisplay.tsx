@@ -124,20 +124,24 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
             {renderCardLogo()}
           </div>
           
-          <div className={styles.chip}></div>
+          <div className={styles.chipContainer}>
+            <div className={styles.chip}></div>
+            {cardType === 'visa' && <div className={styles.contactless}></div>}
+          </div>
           
           <div className={styles.cardNumber}>
             {formatCardNumber(cardNumber)}
           </div>
           
           <div className={styles.cardholderDetails}>
-            <div className={styles.expiryDate}>
-              <div className={styles.expiryLabel}>MM/YY</div>
-              <div className={styles.expiryValue}>{expiryDate || 'MM/YY'}</div>
+            <div className={styles.cardholderName}>
+              <div className={styles.cardholderLabel}>CARD HOLDER</div>
+              <div className={styles.cardholderValue}>{cardholderName || 'YOUR NAME'}</div>
             </div>
             
-            <div className={styles.cardholderName}>
-              <div className={styles.cardholderValue}>{cardholderName || 'YOUR NAME'}</div>
+            <div className={styles.expiryDate}>
+              <div className={styles.expiryLabel}>VALID THRU</div>
+              <div className={styles.expiryValue}>{expiryDate || 'MM/YY'}</div>
             </div>
           </div>
         </div>
@@ -145,10 +149,17 @@ const CreditCardDisplay: React.FC<CreditCardDisplayProps> = ({
         <div className={styles.back}>
           <div className={styles.magneticStrip}></div>
           <div className={styles.signatureStrip}>
-            <div className={styles.cvv}>{cvv || '123'}</div>
+            <div className={styles.signatureLine}></div>
+            <div className={styles.cvvContainer}>
+              <div className={styles.cvvLabel}>CVV</div>
+              <div className={styles.cvv}>{cvv || '***'}</div>
+            </div>
+          </div>
+          <div className={styles.cardBackLogo}>
+            {renderCardLogo()}
           </div>
           <div className={styles.cardBackText}>
-            This card is property of the issuer. Use of this card is subject to the agreement with the issuer.
+            This card is property of the issuer. Use of this card constitutes acceptance of the agreement with the issuer.
           </div>
         </div>
       </div>
