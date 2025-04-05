@@ -29,13 +29,13 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
   };
 };
 
-// Updated to include index signature to make it compatible with Json type
+// Updated TokenData interface with an index signature to make it compatible with Json type
 export interface TokenData {
   lastFourDigits: string;
   expiryMonth: string;
   expiryYear: string;
   cardholderName: string;
-  [key: string]: string | number | boolean | null | TokenData[]; // Adding index signature for Json compatibility
+  [key: string]: string | number | boolean | null | TokenData[] | undefined; // Adding index signature for Json compatibility
 }
 
 export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {

@@ -5,6 +5,7 @@ export interface TokenData {
   expiryYear: string;
   cardholderName: string;
   simulated?: boolean;
+  [key: string]: string | number | boolean | null | TokenData[] | undefined; // Adding index signature for Json compatibility
 }
 
 export interface ContractSignatureData {

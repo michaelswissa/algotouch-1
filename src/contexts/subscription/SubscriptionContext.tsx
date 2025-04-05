@@ -100,7 +100,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       const isActive = data.status === 'active';
       const isTrial = data.status === 'trial' && trialEndsAt && trialEndsAt > now;
       const isValidPeriod = currentPeriodEndsAt && currentPeriodEndsAt > now;
-      const isCancelled = data.cancelled_at !== null;
+      const isCancelled = data.cancelled_at !== null && data.cancelled_at !== undefined;
       
       const activeStatus = isActive || isTrial || (isValidPeriod && !isCancelled);
       
