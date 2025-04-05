@@ -299,42 +299,6 @@ export type Database = {
           },
         ]
       }
-      payment_tokens: {
-        Row: {
-          card_brand: string | null
-          card_last_four: string | null
-          created_at: string
-          id: string
-          is_active: boolean | null
-          token: string
-          token_expiry: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          card_brand?: string | null
-          card_last_four?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean | null
-          token: string
-          token_expiry: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          card_brand?: string | null
-          card_last_four?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean | null
-          token?: string
-          token_expiry?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           birth_date: string | null
@@ -379,16 +343,12 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          cancelled_at: string | null
           contract_signed: boolean | null
           contract_signed_at: string | null
-          contract_signed_location: string | null
           created_at: string | null
           current_period_ends_at: string | null
           id: string
-          next_charge_date: string | null
           payment_method: Json | null
-          payment_token_id: string | null
           plan_type: string
           status: string
           trial_ends_at: string | null
@@ -396,16 +356,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          cancelled_at?: string | null
           contract_signed?: boolean | null
           contract_signed_at?: string | null
-          contract_signed_location?: string | null
           created_at?: string | null
           current_period_ends_at?: string | null
           id?: string
-          next_charge_date?: string | null
           payment_method?: Json | null
-          payment_token_id?: string | null
           plan_type?: string
           status?: string
           trial_ends_at?: string | null
@@ -413,31 +369,19 @@ export type Database = {
           user_id: string
         }
         Update: {
-          cancelled_at?: string | null
           contract_signed?: boolean | null
           contract_signed_at?: string | null
-          contract_signed_location?: string | null
           created_at?: string | null
           current_period_ends_at?: string | null
           id?: string
-          next_charge_date?: string | null
           payment_method?: Json | null
-          payment_token_id?: string | null
           plan_type?: string
           status?: string
           trial_ends_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_payment_token_id_fkey"
-            columns: ["payment_token_id"]
-            isOneToOne: false
-            referencedRelation: "payment_tokens"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_badges: {
         Row: {

@@ -1,89 +1,259 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as nodemailer from "npm:nodemailer@6.9.7";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
+
+interface EmailRequest {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  attachmentData?: {
+    filename: string;
+    content: string; // Base64 encoded content
+    mimeType: string;
+  }[];
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 204,
+    });
   }
-  
+
   try {
-    const { to, subject, html, text, replyTo, attachmentData } = await req.json();
-    
-    if (!to || !subject || !html) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required email fields (to, subject, html)' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
+    console.log("--- SMTP SENDER FUNCTION CALLED ---");
     
     // Get SMTP configuration from environment variables
-    const smtpHost = Deno.env.get('SMTP_HOST');
-    const smtpPort = Deno.env.get('SMTP_PORT');
-    const smtpUser = Deno.env.get('SMTP_USER');
-    const smtpPass = Deno.env.get('SMTP_PASS');
+    const smtp_host = Deno.env.get("SMTP_HOST");
+    const smtp_port = parseInt(Deno.env.get("SMTP_PORT") || "587");
+    const smtp_user = Deno.env.get("SMTP_USER");
+    const smtp_pass = Deno.env.get("SMTP_PASSWORD");
+    const smtp_from = Deno.env.get("SMTP_FROM") || "noreply@algotouch.co.il";
     
-    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-      console.error('Missing SMTP environment variables');
+    // Log SMTP configuration (without sensitive details)
+    console.log("SMTP Configuration:");
+    console.log(`Host: ${smtp_host || "MISSING"}`);
+    console.log(`Port: ${smtp_port}`);
+    console.log(`User: ${smtp_user ? "Provided" : "MISSING"}`);
+    console.log(`From: ${smtp_from}`);
+    
+    // Check if SMTP is properly configured
+    if (!smtp_host || !smtp_user || !smtp_pass) {
+      const missing = [];
+      if (!smtp_host) missing.push("SMTP_HOST");
+      if (!smtp_user) missing.push("SMTP_USER");
+      if (!smtp_pass) missing.push("SMTP_PASSWORD");
+      
+      const errorMessage = `SMTP not configured properly. Missing: ${missing.join(", ")}`;
+      console.error(errorMessage);
+      
       return new Response(
-        JSON.stringify({ error: 'SMTP configuration is missing' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        JSON.stringify({
+          success: false,
+          error: errorMessage,
+          details: {
+            host: smtp_host ? "✓" : "✗",
+            port: smtp_port ? "✓" : "✗",
+            user: smtp_user ? "✓" : "✗",
+            pass: smtp_pass ? "✓" : "✗",
+            from: smtp_from ? "✓" : "✗"
+          }
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
       );
     }
     
-    // Create transporter
-    const transporter = nodemailer.default.createTransport({
-      host: smtpHost,
-      port: parseInt(smtpPort),
-      secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
+    // Parse request body
+    let emailRequest: EmailRequest;
+    try {
+      emailRequest = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid JSON request body",
+          details: parseError.message
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+    
+    console.log("Email request received:", {
+      to: emailRequest.to,
+      subject: emailRequest.subject,
+      hasAttachments: !!emailRequest.attachmentData?.length
     });
     
-    // Prepare email options
-    const mailOptions = {
-      from: `"Lovable" <${smtpUser}>`,
-      to: to,
-      subject: subject,
-      html: html,
-      text: text || undefined,
-      replyTo: replyTo || undefined,
-      attachments: [],
+    // Validate email request
+    if (!emailRequest.to || !emailRequest.subject || !emailRequest.html) {
+      const missing = [];
+      if (!emailRequest.to) missing.push("to");
+      if (!emailRequest.subject) missing.push("subject");
+      if (!emailRequest.html) missing.push("html");
+      
+      const errorMessage = `Invalid email request. Missing: ${missing.join(", ")}`;
+      console.error(errorMessage);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+    
+    // Create SMTP client
+    console.log("Creating SMTP client");
+    let client: SMTPClient;
+    
+    try {
+      client = new SMTPClient({
+        connection: {
+          hostname: smtp_host,
+          port: smtp_port,
+          tls: true,
+          auth: {
+            username: smtp_user,
+            password: smtp_pass,
+          },
+          timeout: 30000, // 30 seconds
+        },
+        debug: { logger: true }
+      });
+    } catch (clientError) {
+      console.error("Error creating SMTP client:", clientError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to create SMTP client",
+          details: clientError.message
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    }
+    
+    // Prepare email
+    const email: any = {
+      from: smtp_from,
+      to: emailRequest.to,
+      subject: emailRequest.subject,
+      html: emailRequest.html,
+      content: emailRequest.text
     };
     
-    // Add attachments if present
-    if (attachmentData && Array.isArray(attachmentData)) {
-      for (const attachment of attachmentData) {
-        mailOptions.attachments.push({
+    // Add attachments if they exist
+    if (emailRequest.attachmentData && emailRequest.attachmentData.length > 0) {
+      console.log(`Processing ${emailRequest.attachmentData.length} attachments`);
+      
+      try {
+        email.attachments = emailRequest.attachmentData.map(attachment => ({
           filename: attachment.filename,
-          content: attachment.content,
+          content: Uint8Array.from(atob(attachment.content), c => c.charCodeAt(0)),
           contentType: attachment.mimeType,
-        });
+        }));
+      } catch (attachmentError) {
+        console.error("Error processing attachments:", attachmentError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Failed to process email attachments",
+            details: attachmentError.message
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
       }
     }
     
-    // Send email
-    console.log(`Sending email to ${to}`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
+    // Connect to SMTP server and send email
+    try {
+      console.log("Connecting to SMTP server");
+      await client.connect();
+      
+      console.log("Sending email");
+      const info = await client.send(email);
+      console.log("Email sent successfully:", info);
+      
+      // Return success response
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messageId: info.messageId,
+          sent: true
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    } catch (sendError) {
+      console.error("Error sending email:", sendError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to send email",
+          details: {
+            message: sendError.message,
+            code: sendError.code
+          }
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    } finally {
+      // Always close the connection
+      try {
+        await client.close();
+        console.log("SMTP connection closed");
+      } catch (closeError) {
+        console.warn("Error closing SMTP connection:", closeError);
+      }
+    }
+  } catch (error) {
+    console.error("Unhandled error in SMTP sender function:", error);
     
     return new Response(
-      JSON.stringify({ success: true, messageId: info.messageId }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-  } catch (error) {
-    console.error('Error sending email:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error sending email' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({
+        success: false,
+        error: "Unhandled error in SMTP sender function",
+        details: {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+          code: error.code
+        }
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
     );
   }
 });
