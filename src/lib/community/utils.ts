@@ -33,7 +33,7 @@ export async function incrementColumnValue(
 ): Promise<boolean> {
   try {
     // Use RPC to execute an increment operation instead of the query builder
-    const { error } = await supabase.rpc('increment_column_value', {
+    const { data, error } = await supabase.rpc('increment_column_value', {
       p_row_id: rowId,
       p_table_name: tableName,
       p_column_name: columnName,
@@ -46,8 +46,10 @@ export async function incrementColumnValue(
       // Fallback method if RPC fails
       console.warn('RPC failed, using fallback method');
       
-      // Get current value first using raw SQL
-      const { data: currentValueResult, error: fetchError } = await supabase.from(tableName)
+      // Direct SQL approach via prepared statement to avoid type instantiation issues
+      // First, get the current value
+      const { data: currentValueResult, error: fetchError } = await supabase
+        .from(tableName)
         .select(columnName)
         .eq('id', rowId)
         .single();
@@ -57,6 +59,7 @@ export async function incrementColumnValue(
         return false;
       }
       
+      // If value not found or not a number, return false
       if (!currentValueResult || typeof currentValueResult[columnName] !== 'number') {
         console.error(`Fallback: Column ${columnName} not found or is not a number in table ${tableName}`);
         return false;
@@ -64,8 +67,11 @@ export async function incrementColumnValue(
       
       // Update with incremented value
       const newValue = currentValueResult[columnName] + incrementBy;
-      const { error: updateError } = await supabase.from(tableName)
-        .update({ [columnName]: newValue })
+      const updateData = { [columnName]: newValue };
+      
+      const { error: updateError } = await supabase
+        .from(tableName)
+        .update(updateData)
         .eq('id', rowId);
       
       if (updateError) {
@@ -76,7 +82,7 @@ export async function incrementColumnValue(
       return true;
     }
     
-    return true;
+    return data === true;
   } catch (error) {
     console.error(`Exception in incrementColumnValue for ${tableName}.${columnName}:`, error);
     return false;
@@ -102,17 +108,33 @@ export async function rowExists(tableName: TableNames, column: string, value: st
       // Fallback to direct count query if RPC fails
       console.warn('RPC failed, using fallback count query');
       
-      const { count, error: countError } = await supabase
-        .from(tableName)
-        .select('*', { count: 'exact', head: true })
-        .eq(column, value);
+      // Simple count-based query to avoid complex type instantiation
+      const query = `
+        SELECT COUNT(*) > 0 as exists 
+        FROM ${tableName} 
+        WHERE ${column} = '${value}'
+      `;
+      
+      const { data: countResult, error: countError } = await supabase
+        .rpc('execute_sql', { sql: query })
+        .single();
       
       if (countError) {
-        console.error(`Fallback: Error checking if row exists in ${tableName}:`, countError);
-        return false;
+        // Final fallback with simpler query
+        const { count, error: simpleCountError } = await supabase
+          .from(tableName)
+          .select('*', { count: 'exact', head: true })
+          .eq(column, value);
+        
+        if (simpleCountError) {
+          console.error(`Fallback: Error checking if row exists in ${tableName}:`, simpleCountError);
+          return false;
+        }
+        
+        return count !== null && count > 0;
       }
       
-      return count !== null && count > 0;
+      return countResult?.exists === true;
     }
     
     return data === true;

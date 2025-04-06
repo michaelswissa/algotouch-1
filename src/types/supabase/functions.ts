@@ -21,6 +21,23 @@ export interface FunctionsDatabase {
         };
         Returns: boolean;
       };
+      increment_column_value: {
+        Args: {
+          p_row_id: string;
+          p_table_name: string;
+          p_column_name: string;
+          p_increment_by?: number;
+        };
+        Returns: boolean;
+      };
+      check_row_exists: {
+        Args: {
+          p_table_name: string;
+          p_column_name: string;
+          p_value: string;
+        };
+        Returns: boolean;
+      };
     };
   };
 }
