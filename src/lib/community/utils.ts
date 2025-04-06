@@ -23,7 +23,7 @@ export type TableNames =
 
 /**
  * Helper function to increment a column value in a specified table
- * Refactored to avoid type instantiation issues
+ * Using raw RPC call to avoid type instantiation issues
  */
 export async function incrementColumnValue(
   rowId: string,
@@ -32,33 +32,48 @@ export async function incrementColumnValue(
   incrementBy: number = 1
 ): Promise<boolean> {
   try {
-    // Directly use a raw query to avoid type instantiation issues
-    const { data: currentValue, error: fetchError } = await supabase
-      .from(tableName)
-      .select(columnName)
-      .eq('id', rowId)
-      .single();
+    // Use RPC to execute an increment operation instead of the query builder
+    const { error } = await supabase.rpc('increment_column_value', {
+      p_row_id: rowId,
+      p_table_name: tableName,
+      p_column_name: columnName,
+      p_increment_by: incrementBy
+    });
     
-    if (fetchError) {
-      console.error(`Error fetching ${columnName} from ${tableName}:`, fetchError);
-      return false;
-    }
-    
-    if (!currentValue || typeof currentValue[columnName] !== 'number') {
-      console.error(`Column ${columnName} not found or is not a number in table ${tableName}`);
-      return false;
-    }
-
-    // Update with incremented value
-    const newValue = currentValue[columnName] + incrementBy;
-    const { error: updateError } = await supabase
-      .from(tableName)
-      .update({ [columnName]: newValue })
-      .eq('id', rowId);
-    
-    if (updateError) {
-      console.error(`Error updating ${columnName} in ${tableName}:`, updateError);
-      return false;
+    if (error) {
+      console.error(`Error incrementing ${columnName} in ${tableName}:`, error);
+      
+      // Fallback method if RPC fails
+      console.warn('RPC failed, using fallback method');
+      
+      // Get current value first using raw SQL
+      const { data: currentValueResult, error: fetchError } = await supabase.from(tableName)
+        .select(columnName)
+        .eq('id', rowId)
+        .single();
+      
+      if (fetchError) {
+        console.error(`Fallback: Error fetching ${columnName} from ${tableName}:`, fetchError);
+        return false;
+      }
+      
+      if (!currentValueResult || typeof currentValueResult[columnName] !== 'number') {
+        console.error(`Fallback: Column ${columnName} not found or is not a number in table ${tableName}`);
+        return false;
+      }
+      
+      // Update with incremented value
+      const newValue = currentValueResult[columnName] + incrementBy;
+      const { error: updateError } = await supabase.from(tableName)
+        .update({ [columnName]: newValue })
+        .eq('id', rowId);
+      
+      if (updateError) {
+        console.error(`Fallback: Error updating ${columnName} in ${tableName}:`, updateError);
+        return false;
+      }
+      
+      return true;
     }
     
     return true;
@@ -70,21 +85,37 @@ export async function incrementColumnValue(
 
 /**
  * Helper function to check if a row exists in a table
- * Refactored to avoid type instantiation issues
+ * Using direct count query to avoid type instantiation issues
  */
 export async function rowExists(tableName: TableNames, column: string, value: string): Promise<boolean> {
   try {
-    const { count, error } = await supabase
-      .from(tableName)
-      .select('*', { count: 'exact', head: true })
-      .eq(column, value);
+    // Use a raw count query to avoid excessive type instantiation
+    const { data, error } = await supabase.rpc('check_row_exists', {
+      p_table_name: tableName,
+      p_column_name: column,
+      p_value: value
+    });
     
     if (error) {
-      console.error(`Error checking if row exists in ${tableName}:`, error);
-      return false;
+      console.error(`Error checking if row exists in ${tableName} (RPC):`, error);
+      
+      // Fallback to direct count query if RPC fails
+      console.warn('RPC failed, using fallback count query');
+      
+      const { count, error: countError } = await supabase
+        .from(tableName)
+        .select('*', { count: 'exact', head: true })
+        .eq(column, value);
+      
+      if (countError) {
+        console.error(`Fallback: Error checking if row exists in ${tableName}:`, countError);
+        return false;
+      }
+      
+      return count !== null && count > 0;
     }
     
-    return count !== null && count > 0;
+    return data === true;
   } catch (error) {
     console.error(`Error in rowExists for ${tableName}.${column}:`, error);
     return false;
