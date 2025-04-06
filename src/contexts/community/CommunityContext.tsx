@@ -2,13 +2,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '../auth';
 import { CommunityContextType } from './types';
-import { User } from '@/contexts/auth/types';
 import {
   getCommunityPosts, registerCommunityPost, getPostById, likePost, uploadPostMedia,
   getPostComments, addComment, getAllTags, createTag, addTagsToPost,
-  getUserBadges, getUserReputation, initCommunityStorage
+  getUserBadges, getAllBadges, getUserReputation, getUserReputationPoints,
+  initCommunityStorage
 } from '@/lib/community';
-import { Comment, Post, Tag, UserBadge } from '@/lib/community/types';
+import { Comment, Post, Tag, UserBadge, UserStreak, Badge } from '@/lib/community/types';
 import { toast } from 'sonner';
 
 // Create context with default empty values
@@ -20,7 +20,10 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [posts, setPosts] = useState<Post[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [badges, setBadges] = useState<UserBadge[]>([]);
+  const [allBadges, setAllBadges] = useState<Badge[]>([]);
   const [reputationPoints, setReputationPoints] = useState(0);
+  const [userLevel, setUserLevel] = useState(1);
+  const [userStreak, setUserStreak] = useState<UserStreak | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [activePost, setActivePost] = useState<Post | null>(null);
@@ -33,6 +36,7 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await initCommunityStorage();
         await fetchTags();
         await fetchPosts();
+        await fetchAllBadges();
       } catch (error) {
         console.error('Error initializing community:', error);
       }
@@ -44,8 +48,8 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Fetch current user's data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      fetchUserBadges(user);
-      fetchUserReputation(user);
+      fetchUserBadges(user.id);
+      fetchUserReputation(user.id);
     }
   }, [isAuthenticated, user]);
   
@@ -82,20 +86,30 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
   
-  const fetchUserBadges = async (user: User) => {
+  const fetchAllBadges = async () => {
     try {
-      const fetchedBadges = await getUserBadges(user.id);
+      const badges = await getAllBadges();
+      setAllBadges(badges);
+    } catch (error) {
+      console.error('Error fetching all badges:', error);
+    }
+  };
+  
+  const fetchUserBadges = async (userId: string) => {
+    try {
+      const fetchedBadges = await getUserBadges(userId);
       setBadges(fetchedBadges);
     } catch (error) {
       console.error('Error fetching user badges:', error);
     }
   };
   
-  const fetchUserReputation = async (user: User) => {
+  const fetchUserReputation = async (userId: string) => {
     try {
-      const reputation = await getUserReputation(user.id);
+      const reputation = await getUserReputation(userId);
       if (reputation) {
         setReputationPoints(reputation.points);
+        setUserLevel(reputation.level);
       }
     } catch (error) {
       console.error('Error fetching user reputation:', error);
@@ -166,7 +180,7 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await fetchPosts();
         
         // If the user had points awarded, refresh their reputation
-        await fetchUserReputation(user);
+        await fetchUserReputation(user.id);
         
         return true;
       }
@@ -250,6 +264,11 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     activePostId,
     activePost,
     activePostComments,
+    userLevel,
+    userPoints: reputationPoints,
+    userBadges: badges,
+    userStreak,
+    allBadges,
     addNewPost,
     handlePostLiked,
     setActivePostId,
@@ -259,8 +278,8 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshData: {
       fetchPosts,
       fetchTags,
-      fetchUserBadges: () => user && fetchUserBadges(user),
-      fetchUserReputation: () => user && fetchUserReputation(user)
+      fetchUserBadges: () => user && fetchUserBadges(user.id),
+      fetchUserReputation: () => user && fetchUserReputation(user.id)
     }
   };
   

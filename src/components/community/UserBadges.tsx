@@ -28,18 +28,18 @@ interface UserBadgesProps {
 }
 
 export default function UserBadges({ 
-  earnedBadges, 
-  allBadges, 
+  earnedBadges = [], // Provide a default empty array
+  allBadges = [],    // Provide a default empty array
   className,
   showLocked = false 
 }: UserBadgesProps) {
-  // Map earned badges by ID for quick lookup
-  const earnedBadgesMap = earnedBadges.reduce<Record<string, UserBadge>>((acc, badge) => {
-    if (badge.badge) {
+  // Map earned badges by ID for quick lookup, safely handling undefined
+  const earnedBadgesMap = earnedBadges?.reduce<Record<string, UserBadge>>((acc, badge) => {
+    if (badge?.badge) {
       acc[badge.badge.id] = badge;
     }
     return acc;
-  }, {});
+  }, {}) || {};
   
   const formatDate = (dateStr: string) => {
     try {
@@ -61,7 +61,7 @@ export default function UserBadges({
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       <TooltipProvider>
-        {allBadges.map((badge) => {
+        {(allBadges || []).map((badge) => {
           const isEarned = !!earnedBadgesMap[badge.id];
           
           // Skip locked badges if not showing them
@@ -99,7 +99,7 @@ export default function UserBadges({
                 <div className="space-y-1">
                   <p className="font-semibold">{badge.name}</p>
                   <p className="text-sm">{badge.description}</p>
-                  {isEarned && earnedBadgesMap[badge.id].earned_at && (
+                  {isEarned && earnedBadgesMap[badge.id]?.earned_at && (
                     <p className="text-xs text-muted-foreground mt-1">
                       הושג ב-{formatDate(earnedBadgesMap[badge.id].earned_at)}
                     </p>

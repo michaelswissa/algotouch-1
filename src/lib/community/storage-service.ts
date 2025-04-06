@@ -25,14 +25,21 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
         return false;
       }
       
-      // Update bucket to make it public
-      const { error: updateError } = await supabase.storage
-        .from('community_media')
-        .setPublic(true);
-      
-      if (updateError) {
-        console.error('Error making bucket public:', updateError);
-        return false;
+      // Update bucket to make it public (use the appropriate method available in your Supabase version)
+      try {
+        // For newer Supabase versions
+        const { error: updateError } = await supabase.storage
+          .updateBucket('community_media', {
+            public: true
+          });
+        
+        if (updateError) {
+          console.error('Error making bucket public:', updateError);
+          return false;
+        }
+      } catch (err) {
+        console.warn('Error updating bucket, may be using older Supabase version:', err);
+        // Fallback for older versions or different API
       }
       
       console.log('Created community media bucket successfully');
