@@ -11,6 +11,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
       profiles: OriginalDatabase['public']['Tables']['profiles'];
       subscriptions: OriginalDatabase['public']['Tables']['subscriptions'];
       payment_tokens: OriginalDatabase['public']['Tables']['payment_tokens'];
+      temp_registration_data: OriginalDatabase['public']['Tables']['temp_registration_data'];
       
       // Add our new community tables
       community_reputation: {
@@ -192,7 +193,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
         };
         Relationships: [];
       };
-      // Add user_streaks table definition
       user_streaks: {
         Row: {
           id: string;
