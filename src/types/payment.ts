@@ -1,5 +1,6 @@
 
 export interface TokenData {
+  token?: string;
   lastFourDigits: string;
   expiryMonth: string;
   expiryYear: string;
@@ -59,12 +60,42 @@ export interface RegistrationData {
     phone?: string;
   };
   registrationTime: string;
+  paymentToken?: {
+    token?: string;
+    expiry?: string;
+    last4Digits?: string;
+    cardholderName?: string;
+  };
 }
 
-// Note: This ensures the CardcomPaymentResponse is properly typed
 export interface CardcomPaymentResponse {
   success: boolean;
   url?: string;
   error?: string;
-  transactionId?: string;
+  lowProfileId?: string; // Updated from transactionId to match the new API
+  tempRegistrationId?: string;
+  simulated?: boolean;
+}
+
+export interface CardcomVerifyResponse {
+  success: boolean;
+  paymentDetails?: {
+    transactionId: number;
+    amount: number;
+    cardLastDigits: string;
+    approvalNumber: string;
+    cardType: string;
+    cardExpiry: string;
+    cardOwnerName: string;
+    cardOwnerEmail: string;
+    cardOwnerPhone: string;
+  };
+  tokenInfo?: {
+    token: string;
+    expiryDate: string;
+    approvalNumber: string;
+  };
+  registrationId?: string;
+  error?: string;
+  details?: any;
 }

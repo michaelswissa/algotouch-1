@@ -51,7 +51,8 @@ serve(async (req) => {
     console.log('Starting user registration:', {
       email: registrationData.email,
       firstName: registrationData.userData.firstName,
-      planId: registrationData.planId
+      planId: registrationData.planId,
+      hasPaymentToken: !!registrationData.paymentToken || !!tokenData
     });
 
     // Create the user account
@@ -82,6 +83,9 @@ serve(async (req) => {
     const trialEndsAt = new Date();
     trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
 
+    // Determine payment method from either tokenData or registrationData.paymentToken
+    const paymentMethod = tokenData || registrationData.paymentToken || null;
+
     // Create the subscription record
     const { error: subscriptionError } = await supabaseClient
       .from('subscriptions')
@@ -90,7 +94,7 @@ serve(async (req) => {
         plan_type: registrationData.planId,
         status: 'trial',
         trial_ends_at: trialEndsAt.toISOString(),
-        payment_method: tokenData,
+        payment_method: paymentMethod,
         contract_signed: true,
         contract_signed_at: new Date().toISOString()
       });
@@ -108,7 +112,7 @@ serve(async (req) => {
       subscription_id: userData.user.id,
       amount: 0,
       status: 'trial_started',
-      payment_method: tokenData
+      payment_method: paymentMethod
     });
 
     // Update profile information
@@ -126,7 +130,8 @@ serve(async (req) => {
     }
 
     // Store contract signature if available
-    if (contractDetails?.contractHtml && contractDetails?.signature) {
+    const contractData = contractDetails || registrationData.contractDetails;
+    if (contractData?.contractHtml && contractData?.signature) {
       try {
         // Get client IP address (will be missing in development, that's ok)
         let ipAddress = null;
@@ -149,18 +154,18 @@ serve(async (req) => {
             full_name: `${registrationData.userData.firstName} ${registrationData.userData.lastName}`,
             email: registrationData.email,
             phone: registrationData.userData.phone || null,
-            signature: contractDetails.signature,
-            contract_html: contractDetails.contractHtml,
+            signature: contractData.signature,
+            contract_html: contractData.contractHtml,
             ip_address: ipAddress,
-            user_agent: contractDetails.browserInfo?.userAgent || navigator.userAgent,
-            browser_info: contractDetails.browserInfo || {
+            user_agent: contractData.browserInfo?.userAgent || navigator.userAgent,
+            browser_info: contractData.browserInfo || {
               language: navigator.language,
               platform: navigator.platform,
               timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
             },
-            contract_version: contractDetails.contractVersion || "1.0",
-            agreed_to_terms: contractDetails.agreedToTerms || false,
-            agreed_to_privacy: contractDetails.agreedToPrivacy || false,
+            contract_version: contractData.contractVersion || "1.0",
+            agreed_to_terms: contractData.agreedToTerms || false,
+            agreed_to_privacy: contractData.agreedToPrivacy || false,
           });
 
         if (signatureError) {

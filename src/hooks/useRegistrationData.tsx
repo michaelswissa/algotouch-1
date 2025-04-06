@@ -21,6 +21,12 @@ interface RegistrationData {
   };
   contractSignedAt?: string;
   registrationTime?: string;
+  paymentToken?: {
+    token?: string;
+    expiry?: string;
+    last4Digits?: string;
+    cardholderName?: string;
+  };
 }
 
 export const useRegistrationData = () => {
@@ -51,16 +57,21 @@ export const useRegistrationData = () => {
           email: data.email, 
           firstName: data.userData?.firstName,
           registrationTime: data.registrationTime,
+          hasPaymentToken: !!data.paymentToken,
           age: registrationTime ? Math.round((now.getTime() - registrationTime.getTime()) / 60000) + ' minutes' : 'unknown'
         });
         
         setRegistrationData(data);
         
-        if (data.contractSigned) {
-          setCurrentStep(3);
+        // Determine the current step based on stored registration data
+        if (data.paymentToken?.token) {
+          setCurrentStep(4); // Payment completed
+          setSelectedPlan(data.planId);
+        } else if (data.contractSigned) {
+          setCurrentStep(3); // Ready for payment
           setSelectedPlan(data.planId);
         } else if (data.planId) {
-          setCurrentStep(2);
+          setCurrentStep(2); // Ready for contract
           setSelectedPlan(data.planId);
         }
       } catch (error) {
@@ -86,7 +97,9 @@ export const useRegistrationData = () => {
     sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
     
     // Automatically update steps based on data
-    if (newData.contractSigned) {
+    if (newData.paymentToken?.token) {
+      setCurrentStep(4);
+    } else if (newData.contractSigned) {
       setCurrentStep(3);
     } else if (newData.planId && currentStep === 1) {
       setCurrentStep(2);
@@ -95,6 +108,17 @@ export const useRegistrationData = () => {
     if (newData.planId) {
       setSelectedPlan(newData.planId);
     }
+  };
+
+  const setPaymentToken = (tokenData: {
+    token: string;
+    expiry?: string;
+    last4Digits?: string;
+    cardholderName?: string;
+  }) => {
+    updateRegistrationData({
+      paymentToken: tokenData
+    });
   };
 
   const clearRegistrationData = () => {
@@ -108,6 +132,7 @@ export const useRegistrationData = () => {
   return {
     registrationData,
     updateRegistrationData,
+    setPaymentToken,
     clearRegistrationData,
     currentStep,
     setCurrentStep,

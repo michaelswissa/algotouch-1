@@ -20,15 +20,240 @@ function handleCors(req: Request) {
   return null;
 }
 
-// CardCom API credentials
-const CARDCOM_TERMINAL = Deno.env.get('CARDCOM_TERMINAL') || '160138'; // From provided credentials
-const CARDCOM_USERNAME = Deno.env.get('CARDCOM_USERNAME') || 'ImJlMKKTwIOMxWFCmZeQ'; // From provided credentials
-const CARDCOM_API_PASSWORD = Deno.env.get('CARDCOM_API_PASSWORD') || 'P7fut5MQigFNrBge3ZhU'; // From provided credentials
+// CardCom API configuration
+const API_CONFIG = {
+  TERMINAL: Deno.env.get('CARDCOM_TERMINAL') || '160138',
+  USERNAME: Deno.env.get('CARDCOM_USERNAME') || 'ImJlMKKTwIOMxWFCmZeQ',
+  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD') || 'P7fut5MQigFNrBge3ZhU',
+  BASE_URL: 'https://secure.cardcom.solutions/api/v11',
+};
 
-// CardCom API URLs
-const CARDCOM_BASE_URL = 'https://secure.cardcom.solutions';
-const CARDCOM_LOW_PROFILE_URL = `${CARDCOM_BASE_URL}/Interface/LowProfile.aspx`;
-const CARDCOM_INDICATOR_URL = `${CARDCOM_BASE_URL}/Interface/BillGoldGetLowProfileIndicator.aspx`;
+// CardCom operation types
+enum OperationType {
+  CHARGE_ONLY = 1,        // Charge card only
+  CHARGE_AND_TOKEN = 2,   // Charge and create token
+  TOKEN_ONLY = 3,         // Create token only (for future charges)
+}
+
+// Create a payment session with CardCom API v11
+async function createPaymentSession(params: any) {
+  const { 
+    planId,
+    amount,
+    operationType = OperationType.TOKEN_ONLY,
+    successUrl,
+    errorUrl,
+    webHookUrl,
+    returnValue,
+    cardOwnerName,
+    cardOwnerEmail,
+    cardOwnerPhone
+  } = params;
+  
+  try {
+    // Prepare the request payload for LowProfile Create
+    const payload = {
+      TerminalNumber: parseInt(API_CONFIG.TERMINAL),
+      ApiName: API_CONFIG.USERNAME,
+      ReturnValue: returnValue || 'direct-payment',
+      Amount: amount,
+      SuccessRedirectUrl: successUrl,
+      FailedRedirectUrl: errorUrl,
+      WebHookUrl: webHookUrl,
+      Operation: operationType.toString(),
+      Language: "he",
+      ISOCoinId: 1, // ILS
+      
+      // Product info
+      ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+      
+      // Payment options
+      MaxNumOfPayments: planId === 'annual' ? '12' : '1',
+      
+      // UI settings for collecting customer info
+      UIDefinition: {
+        ShowCardOwnerName: true,
+        ShowCardOwnerEmail: true,
+        ShowCardOwnerPhone: true,
+        CardOwnerName: cardOwnerName || "",
+        CardOwnerEmail: cardOwnerEmail || "",
+        CardOwnerPhone: cardOwnerPhone || "",
+      }
+    };
+
+    console.log('Creating CardCom payment session:', { 
+      planId, 
+      amount, 
+      operationType,
+      webhookConfigured: !!webHookUrl
+    });
+    
+    // Make the API request
+    const response = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/Create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`CardCom API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.ResponseCode !== 0) {
+      throw new Error(`CardCom error: ${result.Description || 'Unknown error'}`);
+    }
+    
+    return {
+      success: true,
+      lowProfileId: result.LowProfileId,
+      url: result.Url
+    };
+  } catch (error: any) {
+    console.error('Error creating CardCom payment session:', error);
+    throw error;
+  }
+}
+
+// Verify payment status with CardCom
+async function verifyPayment(lowProfileId: string) {
+  try {
+    const payload = {
+      TerminalNumber: parseInt(API_CONFIG.TERMINAL),
+      ApiName: API_CONFIG.USERNAME,
+      ApiPassword: API_CONFIG.PASSWORD,
+      LowProfileId: lowProfileId
+    };
+    
+    const response = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/GetLpResult`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`CardCom verification error: ${response.status} ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    
+    // Payment is successful if ResponseCode is 0
+    if (result.ResponseCode !== 0) {
+      return {
+        success: false,
+        error: result.Description || 'Payment verification failed',
+        details: result
+      };
+    }
+    
+    // Extract useful information from the response
+    const paymentDetails = {
+      transactionId: result.TranzactionId,
+      amount: result.TranzactionInfo?.Amount,
+      cardLastDigits: result.TranzactionInfo?.Last4CardDigitsString || result.UIValues?.CardLastFourDigits,
+      approvalNumber: result.TranzactionInfo?.ApprovalNumber,
+      cardType: result.TranzactionInfo?.CardInfo,
+      cardExpiry: `${result.UIValues?.CardMonth || ''}/${result.UIValues?.CardYear || ''}`,
+      cardOwnerName: result.UIValues?.CardOwnerName,
+      cardOwnerEmail: result.UIValues?.CardOwnerEmail,
+      cardOwnerPhone: result.UIValues?.CardOwnerPhone,
+    };
+    
+    // Extract token information if available
+    const tokenInfo = result.TokenInfo ? {
+      token: result.TokenInfo.Token,
+      expiryDate: result.TokenInfo.TokenExDate,
+      approvalNumber: result.TokenInfo.TokenApprovalNumber
+    } : null;
+    
+    // Get the registration ID if it was passed in ReturnValue
+    const registrationId = result.ReturnValue;
+    
+    return {
+      success: true,
+      paymentDetails,
+      tokenInfo,
+      registrationId,
+      rawResponse: result
+    };
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    throw error;
+  }
+}
+
+// Process a direct charge using a token
+async function processTokenCharge(params: any) {
+  try {
+    const { 
+      amount, 
+      token, 
+      cardOwnerName,
+      cardOwnerEmail,
+      cardOwnerPhone,
+      identityNumber,
+      numOfPayments = 1,
+      externalTransactionId
+    } = params;
+    
+    const payload = {
+      TerminalNumber: parseInt(API_CONFIG.TERMINAL),
+      ApiName: API_CONFIG.USERNAME,
+      ApiPassword: API_CONFIG.PASSWORD,
+      Amount: amount,
+      Token: token,
+      ExternalUniqTranId: externalTransactionId,
+      NumOfPayments: numOfPayments,
+      CardOwnerInformation: {
+        FullName: cardOwnerName,
+        CardOwnerEmail: cardOwnerEmail,
+        Phone: cardOwnerPhone,
+        IdentityNumber: identityNumber
+      },
+      ISOCoinId: 1, // ILS
+    };
+    
+    const response = await fetch(`${API_CONFIG.BASE_URL}/Transactions/Transaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`CardCom token charge error: ${response.status} ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.ResponseCode !== 0) {
+      return {
+        success: false,
+        error: result.Description || 'Token charge failed',
+        details: result
+      };
+    }
+    
+    return {
+      success: true,
+      transactionId: result.TranzactionId,
+      amount: result.Amount,
+      approvalNumber: result.ApprovalNumber,
+      cardLastDigits: result.Last4CardDigits,
+      rawResponse: result
+    };
+  } catch (error) {
+    console.error('Error processing token charge:', error);
+    throw error;
+  }
+}
 
 serve(async (req) => {
   // Handle CORS
@@ -37,7 +262,7 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const path = url.pathname.split('/').pop();
+    const path = url.pathname.split('/').pop() || '';
 
     // Create a Supabase client
     const supabaseClient = createClient(
@@ -50,28 +275,25 @@ serve(async (req) => {
       }
     );
 
-    // Get user from token if available
+    // Get authenticated user information if available
     let user = null;
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-      try {
-        const { data } = await supabaseClient.auth.getUser();
-        user = data.user;
-        console.log('Authenticated user:', user?.email);
-      } catch (authError) {
-        console.error('Auth error:', authError);
-        // Continue without user - might be registration flow
-      }
+    try {
+      const { data } = await supabaseClient.auth.getUser();
+      user = data.user;
+      console.log('Authenticated user:', user?.email);
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      // Continue without user - might be registration flow
     }
 
-    // Create payment session with Cardcom
+    // Create payment session with CardCom
     if (path === 'create-payment') {
       const { 
         planId, 
         userId, 
         fullName, 
         email, 
-        operationType, 
+        operationType = 1, 
         successRedirectUrl, 
         errorRedirectUrl,
         registrationData 
@@ -102,103 +324,50 @@ serve(async (req) => {
             
           if (tempError) {
             console.error('Error storing temp registration:', tempError);
-            return new Response(
-              JSON.stringify({ error: 'Failed to store registration data' }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500,
-              }
-            );
+            throw new Error('Failed to store registration data: ' + tempError.message);
           } else {
             console.log('Stored temp registration data with ID:', tempRegistrationId);
           }
-        } catch (storageError) {
+        } catch (storageError: any) {
           console.error('Error in temp registration storage:', storageError);
-          return new Response(
-            JSON.stringify({ error: 'Error storing registration data' }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500,
-            }
-          );
+          throw new Error('Error storing registration data: ' + storageError.message);
         }
       }
 
       try {
         // Determine payment amount based on plan
-        let sumToBill = '0';
+        let amount = '0.00';
         if (planId === 'monthly') {
-          sumToBill = '99.00'; // Free trial, but will charge 99 after trial
+          amount = '99.00'; // Free trial, but will charge 99 after trial
         } else if (planId === 'annual') {
-          sumToBill = '899.00';
+          amount = '899.00';
         } else if (planId === 'vip') {
-          sumToBill = '1999.00';
+          amount = '1999.00';
         }
 
-        // Initialize payment session with Cardcom
-        const formData = new URLSearchParams();
-        formData.append('TerminalNumber', CARDCOM_TERMINAL);
-        formData.append('UserName', CARDCOM_USERNAME);
-        formData.append('APILevel', '10');
-        formData.append('Codepage', '65001');
-        formData.append('Operation', operationType.toString());
-        formData.append('Language', 'he');
-        formData.append('CoinId', '1'); // ILS
-        
-        // Payment details
-        formData.append('SumToBill', sumToBill);
-        formData.append('ProductName', `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`);
-        
-        // URLs
-        formData.append('SuccessRedirectUrl', successRedirectUrl + (tempRegistrationId ? `&regId=${tempRegistrationId}` : ''));
-        formData.append('ErrorRedirectUrl', errorRedirectUrl);
-        formData.append('IndicatorUrl', `${url.origin}/subscription/payment-notification`);
-        
-        // Include registration identifier to link back after payment
-        formData.append('ReturnValue', tempRegistrationId || 'direct-payment');
-        
-        // Payment options
-        formData.append('MaxNumOfPayments', planId === 'monthly' ? '1' : planId === 'annual' ? '12' : '1');
-        formData.append('ShowCardOwnerPhone', 'true');
-        formData.append('ShowCardOwnerEmail', 'true');
-        
-        // Make the request to Cardcom
-        console.log('Sending request to Cardcom:', CARDCOM_LOW_PROFILE_URL);
-        const response = await fetch(CARDCOM_LOW_PROFILE_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: formData.toString(),
+        // Generate webhook URL using the current origin
+        const origin = url.origin;
+        const webhookUrl = `${origin}/payment-notification`;
+
+        // Create CardCom payment session
+        const sessionResult = await createPaymentSession({
+          planId,
+          amount,
+          operationType,
+          successUrl: `${successRedirectUrl}${tempRegistrationId ? `&regId=${tempRegistrationId}` : ''}`,
+          errorUrl: errorRedirectUrl,
+          webHookUrl: webhookUrl,
+          returnValue: tempRegistrationId || 'direct-payment',
+          cardOwnerName: fullName,
+          cardOwnerEmail: email,
+          cardOwnerPhone: registrationData?.userData?.phone
         });
-        
-        if (!response.ok) {
-          throw new Error(`CardCom API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const responseText = await response.text();
-        console.log('CardCom API response:', responseText);
-        
-        // Parse the response
-        const responseParams = new URLSearchParams(responseText);
-        const responseCode = responseParams.get('ResponseCode');
-        
-        if (responseCode !== '0') {
-          throw new Error(`CardCom error: ${responseParams.get('Description') || 'Unknown error'}`);
-        }
-        
-        const lowProfileCode = responseParams.get('LowProfileCode');
-        const paymentUrl = responseParams.get('url');
-        
-        if (!paymentUrl) {
-          throw new Error('No payment URL received from CardCom');
-        }
         
         return new Response(
           JSON.stringify({
             success: true,
-            url: paymentUrl,
-            lowProfileCode,
+            lowProfileId: sessionResult.lowProfileId,
+            url: sessionResult.url,
             tempRegistrationId
           }),
           {
@@ -230,7 +399,10 @@ serve(async (req) => {
         }
         
         return new Response(
-          JSON.stringify({ error: cardcomError.message }),
+          JSON.stringify({ 
+            success: false,
+            error: cardcomError.message 
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500,
@@ -245,7 +417,10 @@ serve(async (req) => {
       
       if (!registrationId) {
         return new Response(
-          JSON.stringify({ error: 'Missing registration ID' }),
+          JSON.stringify({ 
+            success: false,
+            error: 'Missing registration ID' 
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
@@ -264,7 +439,10 @@ serve(async (req) => {
       if (error || !data) {
         console.error('Error retrieving temp registration:', error);
         return new Response(
-          JSON.stringify({ error: 'Registration data not found or expired' }),
+          JSON.stringify({ 
+            success: false,
+            error: 'Registration data not found or expired' 
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 404,
@@ -291,13 +469,16 @@ serve(async (req) => {
       );
     }
 
-    // Verify payment status with Cardcom
+    // Verify payment status with CardCom
     if (path === 'verify-payment') {
-      const { lowProfileCode } = await req.json();
+      const { lowProfileId } = await req.json();
       
-      if (!lowProfileCode) {
+      if (!lowProfileId) {
         return new Response(
-          JSON.stringify({ error: 'Missing lowProfileCode' }),
+          JSON.stringify({ 
+            success: false,
+            error: 'Missing lowProfileId' 
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
@@ -306,48 +487,10 @@ serve(async (req) => {
       }
       
       try {
-        // Create URL with params
-        const verifyUrl = `${CARDCOM_INDICATOR_URL}?terminalnumber=${CARDCOM_TERMINAL}&username=${CARDCOM_USERNAME}&lowprofilecode=${lowProfileCode}`;
-        
-        const response = await fetch(verifyUrl);
-        if (!response.ok) {
-          throw new Error(`CardCom verification error: ${response.status} ${response.statusText}`);
-        }
-        
-        const responseText = await response.text();
-        const responseParams = new URLSearchParams(responseText);
-        
-        // Check if payment was successful
-        const operationResponse = responseParams.get('OperationResponse');
-        
-        if (operationResponse !== '0') {
-          return new Response(
-            JSON.stringify({ 
-              success: false,
-              error: 'Payment was not successful',
-              details: responseText
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200,
-            }
-          );
-        }
-        
-        // Parse other useful fields
-        const returnValue = responseParams.get('ReturnValue'); // This should contain our temp registration ID
+        const verifyResult = await verifyPayment(lowProfileId);
         
         return new Response(
-          JSON.stringify({
-            success: true,
-            registrationId: returnValue,
-            paymentDetails: {
-              cardLastDigits: responseParams.get('ExtShvaParams.CardNumber5'),
-              approvalNumber: responseParams.get('ExtShvaParams.ApprovalNumber71'),
-              cardType: responseParams.get('ExtShvaParams.Mutag24'),
-              cardExpiry: responseParams.get('ExtShvaParams.Tokef30'),
-            }
-          }),
+          JSON.stringify(verifyResult),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
@@ -356,7 +499,151 @@ serve(async (req) => {
       } catch (error: any) {
         console.error('Error verifying payment:', error);
         return new Response(
-          JSON.stringify({ error: error.message }),
+          JSON.stringify({ 
+            success: false,
+            error: error.message 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
+      }
+    }
+    
+    // Process a direct charge using a token
+    if (path === 'charge-token') {
+      const { 
+        token,
+        amount,
+        cardholderName,
+        email,
+        phone,
+        identityNumber,
+        numOfPayments,
+        externalTransactionId
+      } = await req.json();
+      
+      if (!token || !amount) {
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Missing required fields: token and amount' 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          }
+        );
+      }
+      
+      try {
+        const chargeResult = await processTokenCharge({
+          amount,
+          token,
+          cardOwnerName: cardholderName,
+          cardOwnerEmail: email,
+          cardOwnerPhone: phone,
+          identityNumber,
+          numOfPayments,
+          externalTransactionId: externalTransactionId || `charge_${Date.now()}`
+        });
+        
+        return new Response(
+          JSON.stringify(chargeResult),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } catch (error: any) {
+        console.error('Error processing token charge:', error);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: error.message 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
+      }
+    }
+    
+    // Payment notification webhook handler
+    if (path === 'payment-notification') {
+      try {
+        // Parse the webhook payload
+        const payload = await req.json();
+        console.log('Payment notification received:', payload);
+        
+        // Store the webhook notification in the database for processing
+        const { error } = await supabaseClient
+          .from('payment_notifications')
+          .insert({
+            payload,
+            processed: false,
+            registration_id: payload.ReturnValue
+          });
+        
+        if (error) {
+          console.error('Error storing payment notification:', error);
+        }
+        
+        // If this contains a registration ID, try to process it
+        if (payload.ReturnValue && payload.OperationResponse === '0') {
+          // Get the registration data
+          const { data: regData } = await supabaseClient
+            .from('temp_registration_data')
+            .select('registration_data')
+            .eq('id', payload.ReturnValue)
+            .single();
+            
+          if (regData?.registration_data) {
+            console.log('Found registration data for webhook notification');
+            
+            // Extract token info if available
+            if (payload.TokenInfo?.Token) {
+              // Update the registration data with token information
+              const updatedRegData = {
+                ...regData.registration_data,
+                paymentToken: {
+                  token: payload.TokenInfo.Token,
+                  expiry: payload.TokenInfo.TokenExDate,
+                  last4Digits: payload.TranzactionInfo?.Last4CardDigits || ''
+                }
+              };
+              
+              // Store updated registration data
+              await supabaseClient
+                .from('temp_registration_data')
+                .update({
+                  registration_data: updatedRegData,
+                  payment_processed: true
+                })
+                .eq('id', payload.ReturnValue);
+            }
+          }
+        }
+        
+        // Return success response
+        return new Response(
+          JSON.stringify({ 
+            success: true 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } catch (error: any) {
+        console.error('Error processing payment notification:', error);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: error.message 
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500,
@@ -367,7 +654,10 @@ serve(async (req) => {
 
     // If no valid path is provided
     return new Response(
-      JSON.stringify({ error: 'Invalid endpoint' }),
+      JSON.stringify({ 
+        success: false,
+        error: 'Invalid endpoint' 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -376,7 +666,10 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Error processing request:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
