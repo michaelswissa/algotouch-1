@@ -8,3 +8,4 @@ export * from './comments-service';
 export * from './course-service';
 export * from './tags-service';
 export * from './storage-service';
+export * from './utils';

@@ -1,8 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Comment } from './types';
 import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
 import { toast } from 'sonner';
+import { incrementColumnValue } from './utils';
 
 /**
  * Get comments for a specific post
@@ -128,12 +128,8 @@ export async function addComment(
       return null;
     }
     
-    // Update post comment count using the increment function
-    await supabase.rpc('increment', { 
-      row_id: postId,
-      table_name: 'community_posts',
-      column_name: 'comments'
-    });
+    // Update post comment count
+    await incrementColumnValue(postId, 'community_posts', 'comments');
     
     // Award points for adding a comment
     const commentId = data.id;
@@ -156,14 +152,8 @@ export async function likeComment(
   userId: string
 ): Promise<boolean> {
   try {
-    // Update the comment likes count using the increment function
-    await supabase.rpc('increment', {
-      row_id: commentId,
-      table_name: 'community_comments',
-      column_name: 'likes'
-    });
-    
-    return true;
+    // Update the comment likes count
+    return await incrementColumnValue(commentId, 'community_comments', 'likes');
   } catch (error) {
     console.error('Exception in likeComment:', error);
     return false;

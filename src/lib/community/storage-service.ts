@@ -25,6 +25,16 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
         return false;
       }
       
+      // Update bucket to make it public
+      const { error: updateError } = await supabase.storage
+        .from('community_media')
+        .setPublic(true);
+      
+      if (updateError) {
+        console.error('Error making bucket public:', updateError);
+        return false;
+      }
+      
       console.log('Created community media bucket successfully');
       return true;
     }

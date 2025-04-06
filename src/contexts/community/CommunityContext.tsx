@@ -2,11 +2,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '../auth';
 import { CommunityContextType } from './types';
-import { User } from '../auth/types';
+import { User } from '@/contexts/auth/types';
 import {
   getCommunityPosts, registerCommunityPost, getPostById, likePost, uploadPostMedia,
   getPostComments, addComment, getAllTags, createTag, addTagsToPost,
-  getUserBadges, getUserReputationPoints, initCommunityStorage
+  getUserBadges, getUserReputation, initCommunityStorage
 } from '@/lib/community';
 import { Comment, Post, Tag, UserBadge } from '@/lib/community/types';
 import { toast } from 'sonner';
@@ -93,8 +93,10 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const fetchUserReputation = async (user: User) => {
     try {
-      const points = await getUserReputationPoints(user.id);
-      setReputationPoints(points);
+      const reputation = await getUserReputation(user.id);
+      if (reputation) {
+        setReputationPoints(reputation.points);
+      }
     } catch (error) {
       console.error('Error fetching user reputation:', error);
     }

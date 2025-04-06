@@ -165,5 +165,18 @@ export async function getUserReputation(userId: string): Promise<ReputationData 
   }
 }
 
+/**
+ * Get user's reputation points (a simpler function for just getting points)
+ */
+export async function getUserReputationPoints(userId: string): Promise<number> {
+  try {
+    const reputation = await getUserReputation(userId);
+    return reputation ? reputation.points : 0;
+  } catch (error) {
+    console.error('Exception in getUserReputationPoints:', error);
+    return 0;
+  }
+}
+
 // Export the main functions
 export { ACTIVITY_TYPES };

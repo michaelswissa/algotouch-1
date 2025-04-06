@@ -153,7 +153,7 @@ export function PostList() {
                       <div className="flex flex-wrap gap-2 mt-3">
                         {post.tags.map(tag => (
                           <Badge key={tag.id} variant="outline" className="bg-blue-50">
-                            <TagIcon className="h-3 w-3 mr-1" /> {tag.name}
+                            <Tag className="h-3 w-3 mr-1" /> {tag.name}
                           </Badge>
                         ))}
                       </div>
@@ -248,7 +248,7 @@ export function PostList() {
                 <div className="flex flex-wrap gap-2 mt-3">
                   {activePost.tags.map(tag => (
                     <Badge key={tag.id} variant="outline" className="bg-blue-50">
-                      <TagIcon className="h-3 w-3 mr-1" /> {tag.name}
+                      <Tag className="h-3 w-3 mr-1" /> {tag.name}
                     </Badge>
                   ))}
                 </div>

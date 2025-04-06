@@ -1,54 +1,40 @@
 
 import { 
-  Badge, 
-  UserBadge, 
   Post, 
   Comment,
   Tag,
-  ReputationData,
-  CourseProgress,
-  UserStreak
-} from '@/lib/community';
+  UserBadge
+} from '@/lib/community/types';
 
 export interface CommunityContextType {
-  // Reputation data
-  userPoints: number;
-  userLevel: number;
-  
-  // Badge data
-  userBadges: UserBadge[];
-  allBadges: Badge[];
-  
-  // Posts data
   posts: Post[];
-  loading: boolean;
-  
-  // Tags data
   tags: Tag[];
-
-  // Course progress data
-  courseProgress: CourseProgress[];
-
-  // User streak data
-  userStreak: UserStreak | null;
-
-  // Active post for viewing/commenting
+  badges: UserBadge[];
+  reputationPoints: number;
+  loading: boolean;
   activePostId: string | null;
   activePost: Post | null;
   activePostComments: Comment[];
   
-  // Actions
-  refreshData: () => Promise<void>;
-  handlePostCreated: () => Promise<void>;
+  // Post functions
+  addNewPost: (title: string, content: string, mediaUrls?: string[], tagIds?: string[], newTags?: string[]) => Promise<boolean>;
   handlePostLiked: (postId: string) => Promise<void>;
-  checkAndAwardDailyLogin: () => Promise<void>;
-  recordLessonWatched: (courseId: string, lessonId: string) => Promise<boolean>;
-  completeModule: (courseId: string, moduleId: string) => Promise<boolean>;
-  completeCourse: (courseId: string) => Promise<boolean>;
   
-  // New actions for comments, media, and post details
-  setActivePostId: (postId: string | null) => void;
+  // Comment functions
+  addNewComment: (postId: string, content: string, parentCommentId?: string) => Promise<string | null>;
   handleCommentAdded: (postId: string) => Promise<void>;
-  addNewComment: (postId: string, content: string, parentId?: string) => Promise<string | null>;
-  uploadMedia: (file: File) => Promise<string | null>;
+  setActivePostId: (postId: string | null) => void;
+  
+  // Media upload
+  createPost: {
+    uploadMedia: (file: File) => Promise<string | null>;
+  };
+  
+  // Data refresh functions
+  refreshData: {
+    fetchPosts: () => Promise<void>;
+    fetchTags: () => Promise<void>;
+    fetchUserBadges: () => void;
+    fetchUserReputation: () => void;
+  };
 }

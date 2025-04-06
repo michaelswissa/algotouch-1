@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ interface NewPostFormProps {
 }
 
 export function NewPostForm({ user }: NewPostFormProps) {
-  const { addNewPost, tags } = useCommunity();
+  const { addNewPost, tags, createPost } = useCommunity();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [title, setTitle] = useState('');
@@ -66,7 +65,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
       for (const file of files) {
         // Upload file and get URL
         try {
-          const { createPost } = useCommunity();
           const imageUrl = await createPost.uploadMedia(file);
           
           if (imageUrl) {

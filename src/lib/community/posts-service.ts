@@ -1,8 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Post, Tag } from './types';
+import { Post } from './types';
 import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
 import { toast } from 'sonner';
 import { getTagsForPost } from './tags-service';
+import { incrementColumnValue } from './utils';
 
 /**
  * Register a post in the community
@@ -93,19 +94,15 @@ export async function likePost(
       return false;
     }
     
-    // Update the post likes count using the increment function
-    await supabase.rpc('increment', {
-      row_id: postId,
-      table_name: 'community_posts',
-      column_name: 'likes'
-    });
+    // Update the post likes count
+    const success = await incrementColumnValue(postId, 'community_posts', 'likes');
     
     // Award points to the post author (not to the person who liked)
-    if (post.user_id && post.user_id !== userId) {
+    if (success && post.user_id && post.user_id !== userId) {
       await awardPoints(post.user_id, ACTIVITY_TYPES.POST_LIKED, postId);
     }
     
-    return true;
+    return success;
   } catch (error) {
     console.error('Exception in likePost:', error);
     return false;
