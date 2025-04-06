@@ -43,39 +43,38 @@ export async function incrementColumnValue(
     if (error) {
       console.error(`Error incrementing ${columnName} in ${tableName}:`, error);
       
-      // Fallback method if RPC fails
-      console.warn('RPC failed, using fallback method');
+      // Fallback method if RPC fails - use raw SQL via direct parameters
+      // This avoids the deep type instantiation issues with the query builder
+      console.warn('RPC failed, using direct update query');
       
-      // Direct SQL approach via prepared statement to avoid type instantiation issues
-      // First, get the current value
-      const { data: currentValueResult, error: fetchError } = await supabase
-        .from(tableName)
+      // First get current value with simple parameters to avoid complex type inference
+      const currentValue = await supabase.from(tableName)
         .select(columnName)
         .eq('id', rowId)
+        .limit(1)
         .single();
       
-      if (fetchError) {
-        console.error(`Fallback: Error fetching ${columnName} from ${tableName}:`, fetchError);
+      if (currentValue.error) {
+        console.error(`Fallback: Error fetching ${columnName} from ${tableName}:`, currentValue.error);
         return false;
       }
       
       // If value not found or not a number, return false
-      if (!currentValueResult || typeof currentValueResult[columnName] !== 'number') {
+      if (!currentValue.data || typeof currentValue.data[columnName] !== 'number') {
         console.error(`Fallback: Column ${columnName} not found or is not a number in table ${tableName}`);
         return false;
       }
       
-      // Update with incremented value
-      const newValue = currentValueResult[columnName] + incrementBy;
-      const updateData = { [columnName]: newValue };
+      // Calculate new value
+      const newValue = currentValue.data[columnName] + incrementBy;
       
-      const { error: updateError } = await supabase
-        .from(tableName)
-        .update(updateData)
+      // Update with simple parameters, avoiding complex types
+      const updateResult = await supabase.from(tableName)
+        .update({ [columnName]: newValue })
         .eq('id', rowId);
       
-      if (updateError) {
-        console.error(`Fallback: Error updating ${columnName} in ${tableName}:`, updateError);
+      if (updateResult.error) {
+        console.error(`Fallback: Error updating ${columnName} in ${tableName}:`, updateResult.error);
         return false;
       }
       
@@ -108,18 +107,18 @@ export async function rowExists(tableName: TableNames, column: string, value: st
       // Fallback to direct count query if RPC fails
       console.warn('RPC failed, using fallback count query');
       
-      // Simple count-based query to avoid complex type instantiation
-      const { count, error: countError } = await supabase
+      // Use a direct count query with simple options to avoid complex type inference
+      const countResult = await supabase
         .from(tableName)
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq(column, value);
       
-      if (countError) {
-        console.error(`Fallback: Error checking if row exists in ${tableName}:`, countError);
+      if (countResult.error) {
+        console.error(`Fallback: Error checking if row exists in ${tableName}:`, countResult.error);
         return false;
       }
       
-      return count !== null && count > 0;
+      return (countResult.count || 0) > 0;
     }
     
     return data === true;
