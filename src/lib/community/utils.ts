@@ -1,9 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Define specific table names as a literal type instead of using keyof Database
-// This avoids the excessive type instantiation errors
-type TableNames = 
+// Define specific table names as a literal string union type to avoid excessive type instantiation
+export type TableNames = 
   | 'app_config'
   | 'community_activities'
   | 'community_badges'
@@ -32,7 +31,7 @@ export async function incrementColumnValue(
   incrementBy: number = 1
 ): Promise<boolean> {
   try {
-    // Get the current value
+    // Get the current value first
     const { data, error } = await supabase
       .from(tableName)
       .select(columnName)
