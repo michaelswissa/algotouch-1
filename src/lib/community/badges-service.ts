@@ -32,10 +32,25 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
     
     // Transform the data to match our UserBadge type
     const formattedData = data?.map(item => {
+      // First check if badge exists and is an object before using it
+      if (item.badge && typeof item.badge === 'object' && !Array.isArray(item.badge)) {
+        return {
+          id: item.id,
+          earned_at: item.earned_at,
+          badge: item.badge as Badge
+        } as UserBadge;
+      }
+      // Return a fallback object if badge is missing or malformed
       return {
         id: item.id,
         earned_at: item.earned_at,
-        badge: item.badge as Badge
+        badge: {
+          id: item.badge_id,
+          name: 'Unknown Badge',
+          description: 'Badge information unavailable',
+          icon: 'award',
+          points_required: 0
+        }
       } as UserBadge;
     }) || [];
     
