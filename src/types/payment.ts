@@ -32,6 +32,7 @@ export interface SubscriptionPlan {
   features: string[];
   trialDays: number;
   billingCycle: 'monthly' | 'annual' | 'one-time';
+  currency?: string;
 }
 
 export interface PaymentHistoryItem {

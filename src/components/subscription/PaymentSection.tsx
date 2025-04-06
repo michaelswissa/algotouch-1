@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,11 +28,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [iframeHeight, setIframeHeight] = useState(650);
 
   const initiateCardcomPayment = async () => {
-    if (!user) {
-      toast.error('יש להתחבר כדי להמשיך');
-      return;
-    }
-
     setIsLoading(true);
     try {
       let operationType = 3; // Default: token creation only (for monthly trial)
@@ -42,16 +38,26 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         operationType = 1; // Charge only
       }
 
+      // Get registration data if available (for guest checkout)
+      const registrationData = sessionStorage.getItem('registration_data') 
+        ? JSON.parse(sessionStorage.getItem('registration_data') || '{}')
+        : null;
+
+      // Prepare payload based on whether user is logged in or not
+      const payload = {
+        planId: selectedPlan,
+        userId: user?.id,
+        fullName: fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName || '',
+        email: email || user?.email || registrationData?.email || '',
+        operationType,
+        successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${selectedPlan}`,
+        errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${selectedPlan}`,
+        // Include registration data for account creation after payment
+        registrationData: registrationData
+      };
+
       const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
-        body: {
-          planId: selectedPlan,
-          userId: user.id,
-          fullName: fullName || '',
-          email: email || user.email || '',
-          operationType,
-          successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${selectedPlan}`,
-          errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${selectedPlan}`
-        }
+        body: payload
       });
 
       if (error) {

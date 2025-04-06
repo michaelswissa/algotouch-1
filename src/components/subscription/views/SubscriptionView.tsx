@@ -25,6 +25,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({
   onPaymentComplete,
   onBack
 }) => {
+  // Step 1: Plan Selection
   if (currentStep === 1) {
     return (
       <SubscriptionPlans 
@@ -34,6 +35,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({
     );
   }
   
+  // Step 2: Contract Signing (if applicable)
   if (currentStep === 2 && selectedPlan) {
     return (
       <ContractSection
@@ -45,6 +47,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({
     );
   }
   
+  // Step 3: Payment Processing
   if (currentStep === 3 && selectedPlan) {
     return (
       <PaymentSection
@@ -55,11 +58,12 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({
     );
   }
   
+  // Step 4: Success Page After Completion
   if (currentStep === 4) {
     return <SubscriptionSuccess />;
   }
   
-  // Default view - shouldn't reach here in normal flow
+  // Default view - fallback to the first step
   return <SubscriptionPlans onSelectPlan={onPlanSelect} selectedPlanId={selectedPlan} />;
 };
 
