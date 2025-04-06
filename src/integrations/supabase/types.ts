@@ -90,6 +90,54 @@ export type Database = {
         }
         Relationships: []
       }
+      community_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          likes: number
+          parent_comment_id: string | null
+          post_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          likes?: number
+          parent_comment_id?: string | null
+          post_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          likes?: number
+          parent_comment_id?: string | null
+          post_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_posts: {
         Row: {
           comments: number
@@ -97,6 +145,7 @@ export type Database = {
           created_at: string
           id: string
           likes: number
+          media_urls: string[] | null
           title: string
           updated_at: string
           user_id: string
@@ -107,6 +156,7 @@ export type Database = {
           created_at?: string
           id?: string
           likes?: number
+          media_urls?: string[] | null
           title: string
           updated_at?: string
           user_id: string
@@ -117,6 +167,7 @@ export type Database = {
           created_at?: string
           id?: string
           likes?: number
+          media_urls?: string[] | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -147,6 +198,24 @@ export type Database = {
           points?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      community_tags: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -334,6 +403,36 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      post_tags: {
+        Row: {
+          post_id: string
+          tag_id: string
+        }
+        Insert: {
+          post_id: string
+          tag_id: string
+        }
+        Update: {
+          post_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_tags_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "community_tags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

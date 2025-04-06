@@ -61,10 +61,35 @@ export interface Post {
   comments: number;
   created_at: string;
   updated_at: string;
+  media_urls?: string[] | null;
   profiles?: {
     first_name: string | null;
     last_name: string | null;
   };
+  tags?: Tag[];
+}
+
+// Interface for comment data
+export interface Comment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  likes: number;
+  parent_comment_id: string | null;
+  created_at: string;
+  updated_at: string;
+  profiles?: {
+    first_name: string | null;
+    last_name: string | null;
+  };
+  replies?: Comment[];
+}
+
+// Interface for tag data
+export interface Tag {
+  id: string;
+  name: string;
 }
 
 // Interface for course progress data

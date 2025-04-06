@@ -1,0 +1,62 @@
+
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+/**
+ * Check if the storage bucket exists, and create it if it doesn't
+ */
+export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
+  try {
+    // Check if the bucket exists
+    const { data: bucket, error: getBucketError } = await supabase.storage
+      .getBucket('community_media');
+    
+    if (getBucketError && getBucketError.message.includes('The bucket does not exist')) {
+      // Create the bucket if it doesn't exist
+      const { error: createBucketError } = await supabase.storage
+        .createBucket('community_media', {
+          public: true,
+          fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+        });
+      
+      if (createBucketError) {
+        console.error('Error creating community media bucket:', createBucketError);
+        return false;
+      }
+      
+      // Set the bucket policy to public
+      const { error: policyError } = await supabase.storage
+        .from('community_media')
+        .updateBucketPublic(true);
+      
+      if (policyError) {
+        console.error('Error setting bucket policy:', policyError);
+      }
+      
+      console.log('Created community media bucket successfully');
+      return true;
+    }
+    
+    return !!bucket;
+  } catch (error) {
+    console.error('Exception in ensureCommunityMediaBucketExists:', error);
+    return false;
+  }
+}
+
+/**
+ * Initialize storage for community features
+ */
+export async function initCommunityStorage(): Promise<void> {
+  try {
+    const bucketExists = await ensureCommunityMediaBucketExists();
+    
+    if (!bucketExists) {
+      toast.error('שגיאה באתחול אחסון המדיה לקהילה');
+    }
+  } catch (error) {
+    console.error('Error initializing community storage:', error);
+    toast.error('שגיאה באתחול אחסון המדיה לקהילה');
+  }
+}

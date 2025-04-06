@@ -98,6 +98,7 @@ export interface CommunityDatabase {
           comments: number;
           created_at: string;
           updated_at: string;
+          media_urls: string[] | null;
         };
         Insert: {
           id?: string;
@@ -108,6 +109,7 @@ export interface CommunityDatabase {
           comments?: number;
           created_at?: string;
           updated_at?: string;
+          media_urls?: string[] | null;
         };
         Update: {
           id?: string;
@@ -118,8 +120,105 @@ export interface CommunityDatabase {
           comments?: number;
           created_at?: string;
           updated_at?: string;
+          media_urls?: string[] | null;
         };
         Relationships: [];
+      };
+      community_comments: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          content: string;
+          likes: number;
+          parent_comment_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          user_id: string;
+          content: string;
+          likes?: number;
+          parent_comment_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          user_id?: string;
+          content?: string;
+          likes?: number;
+          parent_comment_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_parent_comment_id_fkey";
+            columns: ["parent_comment_id"];
+            isOneToOne: false;
+            referencedRelation: "community_comments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "community_comments_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "community_posts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      community_tags: {
+        Row: {
+          id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      post_tags: {
+        Row: {
+          post_id: string;
+          tag_id: string;
+        };
+        Insert: {
+          post_id: string;
+          tag_id: string;
+        };
+        Update: {
+          post_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "post_tags_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "community_posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "post_tags_tag_id_fkey";
+            columns: ["tag_id"];
+            isOneToOne: false;
+            referencedRelation: "community_tags";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       community_activities: {
         Row: {
@@ -151,3 +250,4 @@ export interface CommunityDatabase {
     };
   };
 }
+
