@@ -84,7 +84,7 @@ export async function rowExists(tableName: TableNames, column: string, value: st
     
     return count !== null && count > 0;
   } catch (error) {
-    console.error(`Exception in rowExists for ${tableName}.${column}:`, error);
+    console.error(`Error in rowExists for ${tableName}.${column}:`, error);
     return false;
   }
 }
