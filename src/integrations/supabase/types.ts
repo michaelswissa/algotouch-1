@@ -439,6 +439,30 @@ export type Database = {
           },
         ]
       }
+      temp_registration_data: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          registration_data: Json
+          used: boolean
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          registration_data: Json
+          used?: boolean
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          registration_data?: Json
+          used?: boolean
+        }
+        Relationships: []
+      }
       user_badges: {
         Row: {
           badge_id: string

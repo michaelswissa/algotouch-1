@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useRegistrationData } from '@/hooks/useRegistrationData';
 import { RegistrationData } from '@/types/payment';
-import { registerUser } from '@/services/registration/registerUser';
 import { processSignedContract } from '@/lib/contracts/contract-service';
 
 export const useSubscriptionFlow = () => {
@@ -102,7 +101,39 @@ export const useSubscriptionFlow = () => {
       }
       setIsLoading(false);
     } else {
-      setIsLoading(false);
+      // Check if there's a temp registration in localStorage
+      const tempRegId = localStorage.getItem('temp_registration_id');
+      if (tempRegId) {
+        setRestoringSession(true);
+        
+        // Try to restore from temp storage
+        supabase.functions.invoke('cardcom-payment/get-registration-data', {
+          body: { registrationId: tempRegId }
+        })
+        .then(({ data, error }) => {
+          if (!error && data?.success && data.registrationData) {
+            console.log('Restored registration data from temp storage');
+            updateRegistrationData(data.registrationData);
+            
+            // If payment was successful, process the registration
+            if (step === '4' && success) {
+              processRestoredRegistration(data.registrationData);
+            }
+            
+            // Clear the temp ID
+            localStorage.removeItem('temp_registration_id');
+          }
+        })
+        .catch(err => {
+          console.error('Error restoring temp registration:', err);
+        })
+        .finally(() => {
+          setRestoringSession(false);
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [location.search]);
 
@@ -137,26 +168,36 @@ export const useSubscriptionFlow = () => {
     if (!regData.email || !regData.password || !regData.userData) {
       console.error('Missing required registration data');
       toast.error('חסרים פרטי הרשמה חיוניים');
+      setCurrentStep(3); // Go back to payment step
       return;
     }
     
     try {
-      const result = await registerUser({
-        registrationData: regData,
-        tokenData: {
-          lastFourDigits: '****',
-          expiryMonth: '**',
-          expiryYear: '****',
-          cardholderName: `${regData.userData.firstName || ''} ${regData.userData.lastName || ''}`.trim(),
-          simulated: true
-        },
-        contractDetails: regData.contractDetails || null
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('register-user', {
+        body: {
+          registrationData: regData,
+          tokenData: {
+            lastFourDigits: '****',
+            expiryMonth: '**',
+            expiryYear: '****',
+            cardholderName: `${regData.userData.firstName || ''} ${regData.userData.lastName || ''}`.trim(),
+            simulated: true
+          },
+          contractDetails: regData.contractDetails || null
+        }
       });
       
-      if (!result.success) {
-        throw new Error(result.error || 'שגיאה לא ידועה בהשלמת ההרשמה');
+      if (error) {
+        throw new Error(error.message);
       }
       
+      if (!data?.success) {
+        throw new Error(data?.error || 'שגיאה לא ידועה בהשלמת ההרשמה');
+      }
+      
+      // Try to sign in
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: regData.email,
         password: regData.password
@@ -167,19 +208,26 @@ export const useSubscriptionFlow = () => {
       }
       
       sessionStorage.removeItem('registration_data');
+      localStorage.removeItem('temp_registration_id');
       
       setCurrentStep(4);
       toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
     } catch (error: any) {
       console.error('Error processing restored registration:', error);
       toast.error(error.message || 'אירעה שגיאה בהשלמת תהליך ההרשמה');
+      setCurrentStep(3); // Go back to payment step
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Handle plan selection
   const handlePlanSelect = (planId: string) => {
     console.log('Selected plan in handlePlanSelect:', planId);
-    updateRegistrationData({ planId });
+    updateRegistrationData({ 
+      planId,
+      registrationTime: new Date().toISOString() 
+    });
     setSelectedPlan(planId);
     setCurrentStep(2);
   };
@@ -250,6 +298,11 @@ export const useSubscriptionFlow = () => {
   const handlePaymentComplete = () => {
     setCurrentStep(4);
     console.log('Payment completed');
+    
+    // Check for active subscription
+    if (isAuthenticated && user?.id) {
+      checkUserSubscription(user.id);
+    }
   };
 
   // Handle step navigation

@@ -28,15 +28,30 @@ export const useRegistrationData = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(undefined);
 
+  // On component mount, load registration data from sessionStorage
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       try {
         const data = JSON.parse(storedData);
+        
+        // Check if the data is still valid (within 30 minutes)
+        const registrationTime = data.registrationTime ? new Date(data.registrationTime) : null;
+        const now = new Date();
+        const isValid = registrationTime && ((now.getTime() - registrationTime.getTime()) < 30 * 60 * 1000);
+        
+        // If data is too old, ignore it
+        if (!registrationTime || !isValid) {
+          console.log('Registration data has expired, clearing session');
+          sessionStorage.removeItem('registration_data');
+          return;
+        }
+        
         console.log('Registration data found:', { 
           email: data.email, 
           firstName: data.userData?.firstName,
-          registrationTime: data.registrationTime 
+          registrationTime: data.registrationTime,
+          age: registrationTime ? Math.round((now.getTime() - registrationTime.getTime()) / 60000) + ' minutes' : 'unknown'
         });
         
         setRegistrationData(data);
@@ -50,6 +65,7 @@ export const useRegistrationData = () => {
         }
       } catch (error) {
         console.error('Error parsing registration data:', error);
+        sessionStorage.removeItem('registration_data');
       }
     }
   }, []);
@@ -60,7 +76,10 @@ export const useRegistrationData = () => {
     if (registrationData) {
       updatedData = { ...registrationData, ...newData };
     } else {
-      updatedData = newData as RegistrationData;
+      updatedData = {
+        ...newData,
+        registrationTime: newData.registrationTime || new Date().toISOString()
+      } as RegistrationData;
     }
     
     setRegistrationData(updatedData);
@@ -78,9 +97,18 @@ export const useRegistrationData = () => {
     }
   };
 
+  const clearRegistrationData = () => {
+    sessionStorage.removeItem('registration_data');
+    localStorage.removeItem('temp_registration_id');
+    setRegistrationData(null);
+    setCurrentStep(1);
+    setSelectedPlan(undefined);
+  };
+
   return {
     registrationData,
     updateRegistrationData,
+    clearRegistrationData,
     currentStep,
     setCurrentStep,
     selectedPlan,
