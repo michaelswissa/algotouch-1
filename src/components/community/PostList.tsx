@@ -127,14 +127,21 @@ export function PostList() {
               <div className="flex items-start gap-4">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={`https://avatar.vercel.sh/${post.user_id}?size=40`} />
-                  <AvatarFallback>{formatUserName(post).charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{post.profiles?.first_name?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
                 
                 <div className="flex-1">
                   <div className="flex justify-between">
                     <div>
-                      <h3 className="font-medium">@{formatUserName(post)}</h3>
-                      <p className="text-sm text-gray-500">{formatPostTime(post.created_at)}</p>
+                      <h3 className="font-medium">@
+                        {post.profiles?.first_name || post.profiles?.last_name 
+                          ? `${post.profiles?.first_name || ''} ${post.profiles?.last_name || ''}`.trim()
+                          : `סוחר${post.user_id.substring(0, 4)}`
+                        }
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {new Date(post.created_at).toLocaleString('he-IL')}
+                      </p>
                     </div>
                   </div>
                   
@@ -146,7 +153,7 @@ export function PostList() {
                       <div className="flex flex-wrap gap-2 mt-3">
                         {post.tags.map(tag => (
                           <Badge key={tag.id} variant="outline" className="bg-blue-50">
-                            <Tag className="h-3 w-3 mr-1" /> {tag.name}
+                            <TagIcon className="h-3 w-3 mr-1" /> {tag.name}
                           </Badge>
                         ))}
                       </div>
@@ -222,10 +229,13 @@ export function PostList() {
                     <AvatarFallback>{activePost.profiles?.first_name?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                   <span className="text-sm font-medium">
-                    {formatUserName(activePost)}
+                    {activePost.profiles?.first_name || activePost.profiles?.last_name 
+                      ? `${activePost.profiles?.first_name || ''} ${activePost.profiles?.last_name || ''}`.trim()
+                      : `סוחר${activePost.user_id.substring(0, 4)}`
+                    }
                   </span>
                   <span className="text-xs text-gray-500">
-                    {formatPostTime(activePost.created_at)}
+                    {new Date(activePost.created_at).toLocaleString('he-IL')}
                   </span>
                 </div>
               </DialogHeader>
@@ -238,7 +248,7 @@ export function PostList() {
                 <div className="flex flex-wrap gap-2 mt-3">
                   {activePost.tags.map(tag => (
                     <Badge key={tag.id} variant="outline" className="bg-blue-50">
-                      <Tag className="h-3 w-3 mr-1" /> {tag.name}
+                      <TagIcon className="h-3 w-3 mr-1" /> {tag.name}
                     </Badge>
                   ))}
                 </div>

@@ -41,7 +41,7 @@ export async function getPostComments(postId: string): Promise<Comment[]> {
     // Get replies
     const { data: replies, error: repliesError } = await supabase
       .from('community_comments')
-      .select('*, profiles:profiles(id, first_name, last_name)')
+      .select('*')
       .eq('post_id', postId)
       .not('parent_comment_id', 'is', null);
     
@@ -49,10 +49,34 @@ export async function getPostComments(postId: string): Promise<Comment[]> {
       console.error('Error fetching replies:', repliesError);
     }
     
+    // Get profiles for replies
+    const replyUserIds = replies ? [...new Set(replies.map(reply => reply.user_id))] : [];
+    const { data: replyProfiles, error: replyProfilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', replyUserIds);
+    
+    if (replyProfilesError) {
+      console.error('Error fetching profiles for replies:', replyProfilesError);
+    }
+    
     // Format and combine data
     const formattedComments = comments.map(comment => {
       const profile = profiles?.find(p => p.id === comment.user_id);
       const commentReplies = replies?.filter(reply => reply.parent_comment_id === comment.id) || [];
+      
+      // Format replies with their profiles
+      const formattedReplies = commentReplies.map(reply => {
+        const replyProfile = replyProfiles?.find(p => p.id === reply.user_id);
+        
+        return {
+          ...reply,
+          profiles: replyProfile ? {
+            first_name: replyProfile.first_name,
+            last_name: replyProfile.last_name
+          } : undefined
+        } as Comment;
+      });
       
       return {
         ...comment,
@@ -60,10 +84,7 @@ export async function getPostComments(postId: string): Promise<Comment[]> {
           first_name: profile.first_name,
           last_name: profile.last_name
         } : undefined,
-        replies: commentReplies.map(reply => ({
-          ...reply,
-          profiles: reply.profiles
-        }))
+        replies: formattedReplies
       } as Comment;
     });
     
@@ -107,16 +128,12 @@ export async function addComment(
       return null;
     }
     
-    // Update post comment count using a separate query
-    const { error: updateError } = await supabase.rpc('increment', { 
+    // Update post comment count using the increment function
+    await supabase.rpc('increment', { 
       row_id: postId,
       table_name: 'community_posts',
       column_name: 'comments'
     });
-    
-    if (updateError) {
-      console.error('Error updating comment count:', updateError);
-    }
     
     // Award points for adding a comment
     const commentId = data.id;
@@ -139,17 +156,12 @@ export async function likeComment(
   userId: string
 ): Promise<boolean> {
   try {
-    // Update the comment likes count using a separate query
-    const { error: updateError } = await supabase.rpc('increment', {
+    // Update the comment likes count using the increment function
+    await supabase.rpc('increment', {
       row_id: commentId,
       table_name: 'community_comments',
       column_name: 'likes'
     });
-    
-    if (updateError) {
-      console.error('Error liking comment:', updateError);
-      return false;
-    }
     
     return true;
   } catch (error) {

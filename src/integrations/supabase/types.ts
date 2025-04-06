@@ -629,6 +629,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      increment: {
+        Args: {
+          row_id: string
+          table_name: string
+          column_name: string
+        }
+        Returns: undefined
+      }
       is_admin: {
         Args: {
           user_id: string

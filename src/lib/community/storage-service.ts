@@ -25,9 +25,6 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
         return false;
       }
       
-      // Note: The updateBucketPublic function is no longer needed
-      // as we've set public: true in the createBucket options
-      
       console.log('Created community media bucket successfully');
       return true;
     }

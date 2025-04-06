@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Post, Tag } from './types';
 import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
@@ -94,17 +93,12 @@ export async function likePost(
       return false;
     }
     
-    // Update the post likes count using RPC
-    const { error: updateError } = await supabase.rpc('increment', {
+    // Update the post likes count using the increment function
+    await supabase.rpc('increment', {
       row_id: postId,
       table_name: 'community_posts',
       column_name: 'likes'
     });
-    
-    if (updateError) {
-      console.error('Error updating likes:', updateError);
-      return false;
-    }
     
     // Award points to the post author (not to the person who liked)
     if (post.user_id && post.user_id !== userId) {

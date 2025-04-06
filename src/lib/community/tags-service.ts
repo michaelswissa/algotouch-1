@@ -30,18 +30,31 @@ export async function getAllTags(): Promise<Tag[]> {
  */
 export async function getTagsForPost(postId: string): Promise<Tag[]> {
   try {
-    const { data, error } = await supabase
+    // First get the tag IDs for the post
+    const { data: postTags, error: postTagsError } = await supabase
       .from('post_tags')
-      .select('tag:tag_id(id, name)')
+      .select('tag_id')
       .eq('post_id', postId);
     
-    if (error) {
-      console.error('Error fetching post tags:', error);
+    if (postTagsError || !postTags || postTags.length === 0) {
+      if (postTagsError) console.error('Error fetching post tags:', postTagsError);
       return [];
     }
     
-    // Extract the actual tag objects from the response
-    return data.map(item => item.tag as Tag);
+    // Get the tag details
+    const tagIds = postTags.map(item => item.tag_id);
+    
+    const { data: tags, error: tagsError } = await supabase
+      .from('community_tags')
+      .select('*')
+      .in('id', tagIds);
+    
+    if (tagsError) {
+      console.error('Error fetching tags:', tagsError);
+      return [];
+    }
+    
+    return tags as Tag[];
   } catch (error) {
     console.error('Exception in getTagsForPost:', error);
     return [];
