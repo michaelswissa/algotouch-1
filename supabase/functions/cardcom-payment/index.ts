@@ -23,8 +23,8 @@ function handleCors(req: Request) {
 // CardCom API configuration
 const API_CONFIG = {
   TERMINAL: Deno.env.get('CARDCOM_TERMINAL') || '160138',
-  USERNAME: Deno.env.get('CARDCOM_USERNAME') || 'ImJlMKKTwIOMxWFCmZeQ',
-  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD') || 'P7fut5MQigFNrBge3ZhU',
+  USERNAME: Deno.env.get('CARDCOM_USERNAME') || 'bLaocQRMSnwphQRUVG3b',
+  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD') || 'i9nr6caGbgheTdYfQbo6',
   BASE_URL: 'https://secure.cardcom.solutions/api/v11',
 };
 
@@ -677,3 +677,4 @@ serve(async (req) => {
     );
   }
 });
+
