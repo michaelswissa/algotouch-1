@@ -23,6 +23,7 @@ export type TableNames =
 
 /**
  * Helper function to increment a column value in a specified table
+ * Refactored to avoid type instantiation issues
  */
 export async function incrementColumnValue(
   rowId: string,
@@ -31,27 +32,28 @@ export async function incrementColumnValue(
   incrementBy: number = 1
 ): Promise<boolean> {
   try {
-    // Get the current value first
-    const { data, error } = await supabase
+    // Directly use a raw query to avoid type instantiation issues
+    const { data: currentValue, error: fetchError } = await supabase
       .from(tableName)
       .select(columnName)
       .eq('id', rowId)
       .single();
     
-    if (error) {
-      console.error(`Error fetching ${columnName} from ${tableName}:`, error);
+    if (fetchError) {
+      console.error(`Error fetching ${columnName} from ${tableName}:`, fetchError);
       return false;
     }
     
-    if (!data || !(columnName in data)) {
-      console.error(`Column ${columnName} not found in table ${tableName}`);
+    if (!currentValue || typeof currentValue[columnName] !== 'number') {
+      console.error(`Column ${columnName} not found or is not a number in table ${tableName}`);
       return false;
     }
 
     // Update with incremented value
+    const newValue = currentValue[columnName] + incrementBy;
     const { error: updateError } = await supabase
       .from(tableName)
-      .update({ [columnName]: data[columnName] + incrementBy })
+      .update({ [columnName]: newValue })
       .eq('id', rowId);
     
     if (updateError) {
@@ -68,10 +70,11 @@ export async function incrementColumnValue(
 
 /**
  * Helper function to check if a row exists in a table
+ * Refactored to avoid type instantiation issues
  */
 export async function rowExists(tableName: TableNames, column: string, value: string): Promise<boolean> {
   try {
-    const { data, error, count } = await supabase
+    const { count, error } = await supabase
       .from(tableName)
       .select('*', { count: 'exact', head: true })
       .eq(column, value);
