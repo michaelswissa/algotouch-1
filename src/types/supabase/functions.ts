@@ -38,6 +38,12 @@ export interface FunctionsDatabase {
         };
         Returns: boolean;
       };
+      execute_sql: {
+        Args: {
+          sql: string;
+        };
+        Returns: unknown;
+      };
     };
   };
 }

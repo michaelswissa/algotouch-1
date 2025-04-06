@@ -109,32 +109,17 @@ export async function rowExists(tableName: TableNames, column: string, value: st
       console.warn('RPC failed, using fallback count query');
       
       // Simple count-based query to avoid complex type instantiation
-      const query = `
-        SELECT COUNT(*) > 0 as exists 
-        FROM ${tableName} 
-        WHERE ${column} = '${value}'
-      `;
-      
-      const { data: countResult, error: countError } = await supabase
-        .rpc('execute_sql', { sql: query })
-        .single();
+      const { count, error: countError } = await supabase
+        .from(tableName)
+        .select('*', { count: 'exact', head: true })
+        .eq(column, value);
       
       if (countError) {
-        // Final fallback with simpler query
-        const { count, error: simpleCountError } = await supabase
-          .from(tableName)
-          .select('*', { count: 'exact', head: true })
-          .eq(column, value);
-        
-        if (simpleCountError) {
-          console.error(`Fallback: Error checking if row exists in ${tableName}:`, simpleCountError);
-          return false;
-        }
-        
-        return count !== null && count > 0;
+        console.error(`Fallback: Error checking if row exists in ${tableName}:`, countError);
+        return false;
       }
       
-      return countResult?.exists === true;
+      return count !== null && count > 0;
     }
     
     return data === true;
