@@ -1,8 +1,26 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
 
-type TableNames = keyof Database['public']['Tables'];
+// Define specific table names as a literal type instead of using keyof Database
+// This avoids the excessive type instantiation errors
+type TableNames = 
+  | 'app_config'
+  | 'community_activities'
+  | 'community_badges'
+  | 'community_comments'
+  | 'community_posts'
+  | 'community_reputation'
+  | 'community_tags'
+  | 'contract_signatures'
+  | 'course_progress'
+  | 'payment_history'
+  | 'payment_tokens'
+  | 'post_tags'
+  | 'profiles'
+  | 'subscriptions'
+  | 'temp_registration_data'
+  | 'user_badges'
+  | 'user_streaks';
 
 /**
  * Helper function to increment a column value in a specified table

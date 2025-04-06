@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Post } from './types';
 import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
@@ -57,8 +58,8 @@ export async function registerCommunityPost(
       }
     }
     
-    // Award points for creating a post
-    const success = await awardPoints(userId, ACTIVITY_TYPES.NEW_POST, postId);
+    // Award points for creating a post - using POST_CREATED instead of NEW_POST
+    const success = await awardPoints(userId, ACTIVITY_TYPES.POST_CREATED, postId);
     
     if (success) {
       toast.success('קיבלת 10 נקודות עבור פרסום פוסט חדש!', {

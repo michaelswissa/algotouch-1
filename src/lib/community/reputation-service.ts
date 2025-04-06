@@ -16,7 +16,7 @@ export const ACTIVITY_TYPES = {
 };
 
 // Point values for each activity type
-const POINTS_MAP = {
+export const POINTS_MAP = {
   [ACTIVITY_TYPES.DAILY_LOGIN]: 2,
   [ACTIVITY_TYPES.POST_CREATED]: 10,
   [ACTIVITY_TYPES.POST_LIKED]: 1,
