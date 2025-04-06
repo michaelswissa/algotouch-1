@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { TokenData, RegistrationData } from '@/types/payment';
-import { registerUser } from '@/services/registration/registerUser';
 import { getSubscriptionPlans } from '../utils/paymentHelpers';
 
 interface UsePaymentProcessProps {
@@ -30,6 +29,9 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
 
   // Load registration data from session storage
   const loadRegistrationData = () => {
+    // If user is authenticated, we don't need registration data
+    if (user) return true;
+    
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       try {
@@ -42,70 +44,110 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           planId: parsedData.planId
         });
         
-        // Validate registration data
-        if (!parsedData.email || !parsedData.password || !parsedData.userData?.firstName) {
-          setRegistrationError('חסרים פרטי משתמש. אנא חזור לדף ההרשמה ומלא את כל השדות הנדרשים.');
-          return false;
-        }
         return true;
       } catch (e) {
         console.error("Error parsing registration data:", e);
-        setRegistrationError('שגיאה בטעינת פרטי הרשמה. אנא נסה להירשם מחדש.');
+        setRegistrationError('שגיאה בטעינת פרטי הרשמה. אנא נסה מחדש.');
         return false;
       }
-    } else if (!user) {
-      setRegistrationError('לא נמצאו פרטי הרשמה. אנא חזור לדף ההרשמה או התחבר למערכת.');
-      return false;
+    } else {
+      console.log("No registration data found but that's okay - user can pay first and register later");
+      return true;
     }
-    return true;
   };
 
-  // Process payment for new users (registration flow)
-  const handleNewUserPayment = async (tokenData: TokenData) => {
-    if (!registrationData) {
-      throw new Error('פרטי ההרשמה חסרים. אנא חזור לעמוד ההרשמה והתחל מחדש.');
+  // Process payment and create user for new users
+  const handlePaymentAndCreateUser = async (tokenData: TokenData) => {
+    if (!registrationData && !user) {
+      // Create a temporary record that will be completed after payment
+      const tempRegId = `temp_reg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      localStorage.setItem('temp_registration_id', tempRegId);
+      
+      // If we have partial data, save it
+      if (registrationData) {
+        const { data, error } = await supabase.functions.invoke('cardcom-payment/save-registration-data', {
+          body: {
+            registrationId: tempRegId,
+            registrationData
+          }
+        });
+        
+        if (error) {
+          console.error("Error saving registration data:", error);
+          throw new Error('שגיאה בשמירת נתוני הרשמה זמניים');
+        }
+      }
+      
+      // No user creation yet - will be done after payment and registration
+      return;
     }
 
-    console.log('Processing payment for new user with registration data:', {
-      email: registrationData.email,
-      planId: registrationData.planId,
-      hasPassword: !!registrationData.password,
-      hasUserData: !!registrationData.userData,
-      firstName: registrationData.userData?.firstName,
-      lastName: registrationData.userData?.lastName
-    });
-    
-    // First create the user with subscription
-    const result = await registerUser({
-      registrationData,
-      tokenData,
-      contractDetails: registrationData.contractDetails || null
-    });
-    
-    if (!result.success) {
-      throw result.error;
-    }
-    
-    // Clear registration data from session storage
-    sessionStorage.removeItem('registration_data');
-    
-    // Log in the newly created user
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: registrationData.email,
-      password: registrationData.password
-    });
-    
-    if (signInError) {
-      console.error('Error signing in after registration:', signInError);
-      // Continue anyway, as the registration was successful
+    if (registrationData && !user) {
+      // Implement user registration after successful payment
+      const { data: userData, error: userError } = await supabase.auth.signUp({
+        email: registrationData.email,
+        password: registrationData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
+          data: {
+            first_name: registrationData.userData?.firstName,
+            last_name: registrationData.userData?.lastName,
+            registration_complete: true,
+            signup_step: 'completed',
+            signup_date: new Date().toISOString()
+          }
+        }
+      });
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      if (!userData.user) {
+        throw new Error('יצירת משתמש נכשלה');
+      }
+
+      // Add a delay to ensure the user is created before proceeding
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create subscription
+      const trialEndsAt = new Date();
+      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
+      
+      const { error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userData.user.id,
+          plan_type: registrationData.planId,
+          status: 'trial',
+          trial_ends_at: trialEndsAt.toISOString(),
+          payment_method: tokenData,
+          contract_signed: true,
+          contract_signed_at: new Date().toISOString()
+        });
+      
+      if (subscriptionError) {
+        console.error('Subscription error:', subscriptionError);
+        throw subscriptionError;
+      }
+      
+      // Create payment history record
+      await supabase.from('payment_history').insert({
+        user_id: userData.user.id,
+        subscription_id: userData.user.id,
+        amount: 0,
+        status: 'trial_started',
+        payment_method: tokenData
+      });
+    } else if (user) {
+      // Handle existing user payment
+      await handleExistingUserPayment(tokenData);
     }
   };
 
   // Handle payment process for existing users
   const handleExistingUserPayment = async (tokenData: TokenData) => {
-    if (!user) {
-      throw new Error('משתמש לא מחובר. אנא התחבר תחילה.');
-    }
+    if (!user) return;
     
     // Determine operation type based on plan
     let operationType = planId === 'monthly' ? 3 : // Create token only (trial)
@@ -209,20 +251,15 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         cardholderName
       };
       
-      // Two paths: registration flow or existing user flow
-      if (!user) {
-        // Check if we have valid registration data before proceeding
-        if (!registrationData || !registrationData.email || !registrationData.password || 
-            !registrationData.userData || !registrationData.userData.firstName) {
-          throw new Error('פרטי ההרשמה חסרים או לא תקינים. אנא חזור לעמוד ההרשמה והתחל מחדש.');
-        }
-        
-        await handleNewUserPayment(tokenData);
-      } else {
-        await handleExistingUserPayment(tokenData);
-      }
+      await handlePaymentAndCreateUser(tokenData);
       
       toast.success('התשלום התקבל בהצלחה!');
+      
+      // Clear registration data from session storage
+      if (registrationData) {
+        sessionStorage.removeItem('registration_data');
+      }
+      
       onPaymentComplete();
     } catch (error: any) {
       console.error('Payment processing error:', error);
@@ -234,12 +271,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
 
   // External payment processing with Cardcom
   const handleExternalPayment = async () => {
-    // Check for registration data validity if not authenticated
-    if (!user && (!registrationData || !registrationData.email || !registrationData.password)) {
-      toast.error('חסרים פרטים להרשמה. אנא חזור לעמוד ההרשמה ומלא את כל הפרטים הנדרשים.');
-      return;
-    }
-    
     setIsProcessing(true);
     try {
       let operationType = 3; // Default: token creation only (for monthly trial)
@@ -250,20 +281,24 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         operationType = 1; // Charge only
       }
 
-      const payload: any = {
+      // Determine user info for the payload
+      const userInfo = user 
+        ? { userId: user.id, email: user.email }
+        : registrationData
+          ? { 
+              fullName: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim(),
+              email: registrationData.email,
+              registrationData
+            }
+          : { fullName: '', email: '' };
+
+      const payload = {
         planId,
-        userId: user?.id,
-        fullName: user ? undefined : `${registrationData?.userData?.firstName || ''} ${registrationData?.userData?.lastName || ''}`.trim(),
-        email: user?.email || registrationData?.email,
+        ...userInfo,
         operationType,
         successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${planId}`,
         errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${planId}`
       };
-      
-      // If we have registration data and no authenticated user, include it in the payload
-      if (registrationData && !user) {
-        payload.registrationData = registrationData;
-      }
 
       const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
         body: payload
