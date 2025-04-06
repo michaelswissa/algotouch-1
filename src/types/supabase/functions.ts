@@ -38,6 +38,31 @@ export interface FunctionsDatabase {
         };
         Returns: boolean;
       };
+      check_column_value: {
+        Args: {
+          p_table_name: string;
+          p_column_name: string;
+          p_row_id: string;
+        };
+        Returns: number;
+      };
+      update_column_value: {
+        Args: {
+          p_table_name: string;
+          p_column_name: string;
+          p_value: number;
+          p_row_id: string;
+        };
+        Returns: boolean;
+      };
+      check_exists_direct: {
+        Args: {
+          p_table_name: string;
+          p_column_name: string;
+          p_value: string;
+        };
+        Returns: boolean;
+      };
       execute_sql: {
         Args: {
           sql: string;
