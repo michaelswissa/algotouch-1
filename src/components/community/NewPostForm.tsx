@@ -1,17 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Image, Link2, Send, X, Tag as TagIcon } from 'lucide-react';
+import { Image as ImageIcon, Link2, Send, X, Tag as TagIcon } from 'lucide-react';
 import { registerCommunityPost, uploadPostMedia } from '@/lib/community';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth';
 import { useCommunity } from '@/contexts/community/CommunityContext';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { getAllTags, createTag } from '@/lib/community/tags-service';
@@ -36,7 +34,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
   
-  // Fetch available tags
   useEffect(() => {
     async function fetchTags() {
       const tags = await getAllTags();
@@ -45,7 +42,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
     fetchTags();
   }, []);
   
-  // Handle media upload
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !isAuthenticated) return;
@@ -53,7 +49,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
     setIsUploading(true);
     
     try {
-      // Only allow up to 5 images
       const remainingSlots = 5 - uploadedMediaUrls.length;
       const filesToUpload = Array.from(files).slice(0, remainingSlots);
       
@@ -75,17 +70,14 @@ export function NewPostForm({ user }: NewPostFormProps) {
       toast.error('שגיאה בהעלאת קבצי מדיה');
     } finally {
       setIsUploading(false);
-      // Clear the input to allow uploading the same file again
       e.target.value = '';
     }
   };
   
-  // Remove uploaded media
   const handleRemoveMedia = (indexToRemove: number) => {
     setUploadedMediaUrls(prev => prev.filter((_, index) => index !== indexToRemove));
   };
   
-  // Handle tag selection
   const handleTagSelect = (tagId: string) => {
     const tag = availableTags.find(t => t.id === tagId);
     if (tag && !selectedTags.some(t => t.id === tag.id)) {
@@ -93,12 +85,10 @@ export function NewPostForm({ user }: NewPostFormProps) {
     }
   };
   
-  // Handle tag removal
   const handleRemoveTag = (tagId: string) => {
     setSelectedTags(prev => prev.filter(tag => tag.id !== tagId));
   };
   
-  // Create new tag
   const handleCreateTag = async () => {
     if (!newTagInput.trim() || !isAuthenticated) return;
     
@@ -117,7 +107,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
     }
   };
   
-  // Create post with title, content, media, and tags
   const handleCreatePost = async () => {
     if (!isAuthenticated) {
       toast.error('יש להתחבר כדי לפרסם');
@@ -165,7 +154,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
           </Avatar>
           
           <div className="flex-1">
-            {/* Title input */}
             <Input
               placeholder={isAuthenticated ? "כותרת הפוסט (אופציונלי)" : "התחבר כדי לפרסם..."}
               className="mb-3"
@@ -175,7 +163,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
               maxLength={100}
             />
             
-            {/* Content input */}
             <Textarea
               placeholder={isAuthenticated ? "שתף את המחשבות שלך..." : "התחבר כדי לפרסם..."}
               className="min-h-[100px] resize-none mb-3 border-gray-200"
@@ -184,7 +171,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
               disabled={!isAuthenticated || loading}
             />
             
-            {/* Display selected tags */}
             {selectedTags.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {selectedTags.map(tag => (
@@ -203,17 +189,15 @@ export function NewPostForm({ user }: NewPostFormProps) {
               </div>
             )}
             
-            {/* Display uploaded media */}
             {uploadedMediaUrls.length > 0 && (
               <div className="grid grid-cols-5 gap-2 mb-3">
                 {uploadedMediaUrls.map((url, index) => (
                   <div key={index} className="relative group">
                     <AspectRatio ratio={1/1} className="bg-muted rounded-md overflow-hidden">
-                      <Image 
+                      <img 
                         src={url} 
-                        alt={`תמונה ${index + 1}`} 
-                        fill 
-                        className="object-cover"
+                        alt={`תמונה ${index + 1}`}
+                        className="object-cover w-full h-full"
                       />
                       <Button
                         variant="destructive"
@@ -231,7 +215,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
             
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
-                {/* Media upload button */}
                 <div className="relative">
                   <input
                     type="file"
@@ -248,18 +231,16 @@ export function NewPostForm({ user }: NewPostFormProps) {
                     className="gap-1 relative" 
                     disabled={!isAuthenticated || loading || isUploading || uploadedMediaUrls.length >= 5}
                   >
-                    <Image size={16} />
+                    <ImageIcon size={16} />
                     {isUploading ? 'מעלה...' : 'תמונה'}
                   </Button>
                 </div>
                 
-                {/* Link button (placeholder) */}
                 <Button variant="outline" size="sm" className="gap-1" disabled={!isAuthenticated || loading}>
                   <Link2 size={16} />
                   קישור
                 </Button>
                 
-                {/* Tags dropdown */}
                 <div className="flex items-center gap-1">
                   <Combobox
                     items={availableTags.map(tag => ({
@@ -273,7 +254,6 @@ export function NewPostForm({ user }: NewPostFormProps) {
                     triggerContent={<><TagIcon size={16} /> תגיות</>}
                   />
                   
-                  {/* New tag input */}
                   <div className="flex gap-1">
                     <Input
                       placeholder="תגית חדשה"
@@ -294,14 +274,13 @@ export function NewPostForm({ user }: NewPostFormProps) {
                 </div>
               </div>
               
-              {/* Publish button */}
               <Button 
                 onClick={handleCreatePost} 
                 className="gap-1" 
                 disabled={!isAuthenticated || loading || !newPostContent.trim()}
               >
                 <Send size={16} />
-                פרסם {isAuthenticated && "(+10 נקודות)"}
+                פרסם {isAuthenticated ? "(+10 נקודות)" : ""}
               </Button>
             </div>
           </div>

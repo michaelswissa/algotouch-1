@@ -94,11 +94,12 @@ export async function likePost(
       return false;
     }
     
-    // Update the post likes count
-    const { error: updateError } = await supabase
-      .from('community_posts')
-      .update({ likes: post.likes + 1 })
-      .eq('id', postId);
+    // Update the post likes count using RPC
+    const { error: updateError } = await supabase.rpc('increment', {
+      row_id: postId,
+      table_name: 'community_posts',
+      column_name: 'likes'
+    });
     
     if (updateError) {
       console.error('Error updating likes:', updateError);

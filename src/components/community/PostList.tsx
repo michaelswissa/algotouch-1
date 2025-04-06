@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,7 +12,6 @@ import { Post } from '@/lib/community/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CommentSection } from './CommentSection';
 import { AspectRatio } from '../ui/aspect-ratio';
-import Image from 'next/image';
 
 export function PostList() {
   const { isAuthenticated, user } = useAuth();
@@ -30,7 +28,6 @@ export function PostList() {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Helper function to format post time
   const formatPostTime = (timeString: string) => {
     const postTime = new Date(timeString);
     const now = new Date();
@@ -46,7 +43,6 @@ export function PostList() {
     return `לפני ${diffInDays} ימים`;
   };
   
-  // Helper function to format user name
   const formatUserName = (post: Post) => {
     if (post.profiles?.first_name || post.profiles?.last_name) {
       return `${post.profiles.first_name || ''} ${post.profiles.last_name || ''}`.trim();
@@ -54,7 +50,6 @@ export function PostList() {
     return `סוחר${post.user_id.substring(0, 4)}`;
   };
   
-  // Function to handle liking a post
   const handleLikePostClick = async (postId: string) => {
     if (!isAuthenticated) {
       toast.error('יש להתחבר כדי לבצע פעולה זו');
@@ -147,7 +142,6 @@ export function PostList() {
                     <h4 className="font-semibold text-lg mb-2">{post.title}</h4>
                     <p className="text-gray-700 whitespace-pre-line">{post.content}</p>
                     
-                    {/* Display tags if available */}
                     {post.tags && post.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {post.tags.map(tag => (
@@ -158,7 +152,6 @@ export function PostList() {
                       </div>
                     )}
                     
-                    {/* Display media if available */}
                     {post.media_urls && post.media_urls.length > 0 && (
                       <div className="grid grid-cols-2 gap-2 mt-3">
                         {post.media_urls.slice(0, 4).map((url, idx) => (
@@ -168,11 +161,10 @@ export function PostList() {
                             onClick={() => handleOpenImageModal(url)}
                           >
                             <AspectRatio ratio={16/9}>
-                              <Image 
+                              <img 
                                 src={url} 
                                 alt={`תמונה ${idx + 1}`}
-                                fill
-                                className="object-cover"
+                                className="object-cover w-full h-full"
                               />
                             </AspectRatio>
                           </div>
@@ -215,7 +207,6 @@ export function PostList() {
         ))}
       </div>
 
-      {/* Post detail dialog with comments */}
       <Dialog 
         open={activePostId !== null} 
         onOpenChange={(open) => !open && setActivePostId(null)}
@@ -243,7 +234,6 @@ export function PostList() {
                 {activePost.content}
               </div>
               
-              {/* Display tags */}
               {activePost.tags && activePost.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
                   {activePost.tags.map(tag => (
@@ -254,7 +244,6 @@ export function PostList() {
                 </div>
               )}
               
-              {/* Display media */}
               {activePost.media_urls && activePost.media_urls.length > 0 && (
                 <div className="grid grid-cols-2 gap-2 mt-4">
                   {activePost.media_urls.map((url, idx) => (
@@ -264,11 +253,10 @@ export function PostList() {
                       onClick={() => handleOpenImageModal(url)}
                     >
                       <AspectRatio ratio={16/9}>
-                        <Image 
+                        <img 
                           src={url} 
                           alt={`תמונה ${idx + 1}`}
-                          fill
-                          className="object-cover"
+                          className="object-cover w-full h-full"
                         />
                       </AspectRatio>
                     </div>
@@ -276,7 +264,6 @@ export function PostList() {
                 </div>
               )}
               
-              {/* Comment section */}
               <CommentSection 
                 postId={activePost.id} 
                 comments={activePostComments} 
@@ -286,16 +273,13 @@ export function PostList() {
         </DialogContent>
       </Dialog>
 
-      {/* Image modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
         <DialogContent className="max-w-4xl p-0 bg-transparent border-none shadow-none">
           {selectedImage && (
             <div className="relative w-full h-full max-h-[80vh] flex items-center justify-center">
-              <Image 
+              <img 
                 src={selectedImage}
                 alt="תמונה מוגדלת"
-                width={1200}
-                height={800}
                 className="object-contain max-h-[80vh] rounded-lg"
               />
             </div>

@@ -25,14 +25,8 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
         return false;
       }
       
-      // Set the bucket policy to public
-      const { error: policyError } = await supabase.storage
-        .from('community_media')
-        .updateBucketPublic(true);
-      
-      if (policyError) {
-        console.error('Error setting bucket policy:', policyError);
-      }
+      // Note: The updateBucketPublic function is no longer needed
+      // as we've set public: true in the createBucket options
       
       console.log('Created community media bucket successfully');
       return true;

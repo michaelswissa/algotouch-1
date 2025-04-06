@@ -14,7 +14,7 @@ export async function getPostComments(postId: string): Promise<Comment[]> {
       .from('community_comments')
       .select('*')
       .eq('post_id', postId)
-      .is('parent_comment_id', null) // Only top-level comments
+      .eq('parent_comment_id', null) // Only top-level comments
       .order('created_at', { ascending: true });
     
     if (error) {
@@ -43,7 +43,7 @@ export async function getPostComments(postId: string): Promise<Comment[]> {
       .from('community_comments')
       .select('*, profiles:profiles(id, first_name, last_name)')
       .eq('post_id', postId)
-      .not.is('parent_comment_id', null);
+      .not('parent_comment_id', 'is', null);
     
     if (repliesError) {
       console.error('Error fetching replies:', repliesError);
@@ -107,11 +107,16 @@ export async function addComment(
       return null;
     }
     
-    // Update post comment count
-    await supabase
-      .from('community_posts')
-      .update({ comments: supabase.rpc('increment', { row_id: postId, table: 'community_posts', column_name: 'comments' }) })
-      .eq('id', postId);
+    // Update post comment count using a separate query
+    const { error: updateError } = await supabase.rpc('increment', { 
+      row_id: postId,
+      table_name: 'community_posts',
+      column_name: 'comments'
+    });
+    
+    if (updateError) {
+      console.error('Error updating comment count:', updateError);
+    }
     
     // Award points for adding a comment
     const commentId = data.id;
@@ -134,16 +139,15 @@ export async function likeComment(
   userId: string
 ): Promise<boolean> {
   try {
-    // Update the comment likes count
-    const { error } = await supabase
-      .from('community_comments')
-      .update({ 
-        likes: supabase.rpc('increment', { row_id: commentId, table: 'community_comments', column_name: 'likes' }) 
-      })
-      .eq('id', commentId);
+    // Update the comment likes count using a separate query
+    const { error: updateError } = await supabase.rpc('increment', {
+      row_id: commentId,
+      table_name: 'community_comments',
+      column_name: 'likes'
+    });
     
-    if (error) {
-      console.error('Error liking comment:', error);
+    if (updateError) {
+      console.error('Error liking comment:', updateError);
       return false;
     }
     
