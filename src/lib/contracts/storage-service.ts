@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ContractData } from './izidoc-service';
 import { toast } from 'sonner';
@@ -161,7 +160,7 @@ export async function getContractURL(userId: string): Promise<string | null> {
     // First check if we have a stored URL in contract_signatures
     const { data: signature, error } = await supabase
       .from('contract_signatures')
-      .select('pdf_url, contract_html')
+      .select('id, pdf_url, contract_html')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -196,10 +195,12 @@ export async function getContractURL(userId: string): Promise<string | null> {
         
         if (data?.signedUrl) {
           // Update the record with the new URL
-          await supabase
-            .from('contract_signatures')
-            .update({ pdf_url: data.signedUrl })
-            .eq('id', signature.id);
+          if (signature.id) {  // Check if signature.id exists
+            await supabase
+              .from('contract_signatures')
+              .update({ pdf_url: data.signedUrl })
+              .eq('id', signature.id);
+          }
           
           return data.signedUrl;
         }

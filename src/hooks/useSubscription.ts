@@ -18,6 +18,7 @@ interface Subscription {
     expiryMonth: string;
     expiryYear: string;
   } | Json | null;
+  contract_signed?: boolean | null; // Added contract_signed property
 }
 
 // Interface for processed subscription details
