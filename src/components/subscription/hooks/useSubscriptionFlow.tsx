@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -232,7 +231,7 @@ export const useSubscriptionFlow = () => {
     setCurrentStep(2);
   };
 
-  // Handle contract signature
+  // Handle contract signature - direct to IFRAME payment
   const handleContractSign = async (contractData: any) => {
     console.log('Contract signed, data received:', {
       hasSignature: Boolean(contractData?.signature),
@@ -291,6 +290,7 @@ export const useSubscriptionFlow = () => {
       console.log('User not authenticated, storing contract data for later processing');
     }
     
+    // Go directly to the payment step
     setCurrentStep(3);
   };
 

@@ -1,9 +1,8 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { CardContent, CardFooter } from '@/components/ui/card';
-import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 import SecurityNote from './SecurityNote';
 import { SubscriptionPlan } from '@/types/payment';
@@ -25,21 +24,11 @@ interface PaymentCardFormProps {
 const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
   plan,
   isProcessing,
-  onSubmit,
   onExternalPayment,
   planId
 }) => {
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardholderName, setCardholderName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  
-  const handleSubmitForm = (e: React.FormEvent) => {
-    onSubmit(e, { cardNumber, cardholderName, expiryDate, cvv });
-  };
-
   return (
-    <form onSubmit={handleSubmitForm}>
+    <>
       <CardContent className="space-y-5 pt-4">
         <PlanSummary 
           planName={plan.name} 
@@ -50,17 +39,6 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
         />
         
         <Separator />
-        
-        <PaymentDetails 
-          cardNumber={cardNumber}
-          setCardNumber={setCardNumber}
-          cardholderName={cardholderName}
-          setCardholderName={setCardholderName}
-          expiryDate={expiryDate}
-          setExpiryDate={setExpiryDate}
-          cvv={cvv}
-          setCvv={setCvv}
-        />
         
         <SecurityNote />
       </CardContent>
@@ -73,7 +51,7 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
         >
           {isProcessing ? 'מעבד תשלום...' : planId === 'monthly' 
             ? 'התחל תקופת ניסיון חינם' 
-            : 'בצע תשלום'}
+            : 'בצע תשלום מאובטח'}
           <ChevronRight className="h-5 w-5 mr-1" />
         </Button>
         
@@ -85,7 +63,7 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
           </p>
         </div>
       </CardFooter>
-    </form>
+    </>
   );
 };
 

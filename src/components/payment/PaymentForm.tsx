@@ -17,7 +17,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     registrationData,
     registrationError,
     loadRegistrationData,
-    handleSubmit,
     handleExternalPayment,
     plan
   } = usePaymentProcess({ planId, onPaymentComplete });
@@ -39,13 +38,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
           <CreditCard className="h-5 w-5 text-primary" />
           <CardTitle>פרטי תשלום</CardTitle>
         </div>
-        <CardDescription>הזן את פרטי כרטיס האשראי שלך לתשלום</CardDescription>
+        <CardDescription>לחץ על הכפתור למטה להמשך לעמוד התשלום המאובטח</CardDescription>
       </CardHeader>
       
       <PaymentCardForm
         plan={plan}
         isProcessing={isProcessing}
-        onSubmit={handleSubmit}
+        onSubmit={() => {}}
         onExternalPayment={handleExternalPayment}
         planId={planId}
       />
