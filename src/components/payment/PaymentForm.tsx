@@ -33,8 +33,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   }
 
   return (
-    <Card className="max-w-2xl mx-auto shadow-lg border-2 border-border/30" dir="rtl">
-      <CardHeader className="bg-muted/30 pb-6 border-b">
+    <Card className="max-w-2xl mx-auto shadow-lg border-2 border-primary/20 hover-glow" dir="rtl">
+      <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent pb-6 border-b">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" />
@@ -43,7 +43,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
           <CardDescription className="text-base">
             הזן את פרטי התשלום שלך באופן מאובטח למטה
           </CardDescription>
-          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground bg-primary/5 p-2 px-3 rounded-md">
+          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground bg-primary/10 p-2 px-3 rounded-md border border-primary/20">
             <ShieldCheck className="h-4 w-4 text-primary flex-shrink-0" />
             <span>כל פרטי התשלום מוצפנים ומאובטחים באמצעות הצפנת SSL</span>
           </div>

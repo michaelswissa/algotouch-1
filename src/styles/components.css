@@ -64,3 +64,14 @@
   }
 }
 
+/* Hover glow effect for payment card */
+.hover-glow {
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.15), 0 8px 10px -6px rgba(0, 102, 255, 0.1);
+  transform: translateY(-2px);
+}
+

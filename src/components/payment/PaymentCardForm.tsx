@@ -37,7 +37,7 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
           currency="$" 
         />
         
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border border-border/50 shadow-sm">
+        <div className="bg-muted/30 rounded-lg p-6 border-2 border-primary/10 shadow-sm hover:shadow-md transition-shadow">
           <div className="text-center mb-4">
             <h3 className="text-lg font-medium">מעבר למערכת תשלומים מאובטחת</h3>
             <p className="text-muted-foreground text-sm mt-1">
@@ -46,8 +46,8 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
           </div>
           
           <div className="flex justify-center">
-            <div className="relative w-full max-w-xs h-36 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-primary/40 flex items-center justify-center animate-pulse-subtle">
-              <ExternalLink className="h-10 w-10 text-primary/40" />
+            <div className="relative w-full max-w-xs h-36 bg-gradient-to-br from-primary/5 to-secondary/20 rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center animate-pulse-subtle shadow-inner">
+              <ExternalLink className="h-10 w-10 text-primary/50" />
               <div className="absolute bottom-2 text-xs text-center text-muted-foreground px-4">
                 לחץ על כפתור "בצע תשלום" למטה כדי לעבור למסך התשלום
               </div>
@@ -78,9 +78,9 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
         </Button>
         
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-1 text-primary/80">
+          <div className="flex items-center justify-center gap-1 text-primary font-medium">
             <ShieldCheck className="h-4 w-4" />
-            <span className="text-sm font-medium">תשלום מאובטח באמצעות CardCom</span>
+            <span className="text-sm">תשלום מאובטח באמצעות CardCom</span>
           </div>
           
           <p className="text-xs text-center text-muted-foreground max-w-md mx-auto">
