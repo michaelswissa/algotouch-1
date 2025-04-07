@@ -1,18 +1,20 @@
 
 import React from 'react';
-import SubscriptionPlans from '@/components/SubscriptionPlans';
-import ContractSection from '@/components/subscription/ContractSection';
-import PaymentSection from '@/components/subscription/payment/PaymentSection';
-import SubscriptionSuccess from '@/components/subscription/SubscriptionSuccess';
+import PaymentView from './PaymentView';
+import PlanSelectionView from './PlanSelectionView';
+import ContractView from './ContractView';
+import CompletionView from './CompletionView';
+import { Steps } from '../../../types/subscription';
+import PaymentSection from '../payment/PaymentSection';
 
 interface SubscriptionViewProps {
-  currentStep: number;
-  selectedPlan: string | null;
-  fullName: string | null;
-  onPlanSelect: (planId: string) => void;
-  onContractSign: (contractData: any) => Promise<void>;
+  currentStep: Steps;
+  selectedPlan: string;
+  fullName: string;
+  onPlanSelect: (plan: string) => void;
+  onContractSign: (contractId: string) => void;
   onPaymentComplete: () => void;
-  onBack: (step: number) => void;
+  onBack: (step: Steps) => void;
 }
 
 const SubscriptionView: React.FC<SubscriptionViewProps> = ({
@@ -22,48 +24,43 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({
   onPlanSelect,
   onContractSign,
   onPaymentComplete,
-  onBack
+  onBack,
 }) => {
-  // Step 1: Plan Selection
-  if (currentStep === 1) {
-    return (
-      <SubscriptionPlans 
-        onSelectPlan={onPlanSelect} 
-        selectedPlanId={selectedPlan} 
-      />
-    );
-  }
-  
-  // Step 2: Contract Signing (if applicable)
-  if (currentStep === 2 && selectedPlan) {
-    return (
-      <ContractSection
+  switch (currentStep) {
+    case 'plan-selection':
+      return (
+        <PlanSelectionView 
+          onPlanSelect={onPlanSelect}
+          selectedPlan={selectedPlan}
+        />
+      );
+    case 'contract':
+      return (
+        <ContractView
+          selectedPlan={selectedPlan}
+          fullName={fullName}
+          onComplete={onContractSign}
+          onBack={() => onBack('plan-selection')}
+        />
+      );
+    case 'payment':
+      return (
+        <PaymentSection
+          selectedPlan={selectedPlan}
+          onPaymentComplete={onPaymentComplete}
+          onBack={() => onBack('contract')}
+        />
+      );
+    case 'completion':
+      return (
+        <CompletionView />
+      );
+    default:
+      return <PlanSelectionView 
+        onPlanSelect={onPlanSelect}
         selectedPlan={selectedPlan}
-        fullName={fullName}
-        onSign={onContractSign}
-        onBack={() => onBack(1)}
-      />
-    );
+      />;
   }
-  
-  // Step 3: Payment Processing
-  if (currentStep === 3 && selectedPlan) {
-    return (
-      <PaymentSection
-        selectedPlan={selectedPlan}
-        onPaymentComplete={onPaymentComplete}
-        onBack={() => onBack(2)}
-      />
-    );
-  }
-  
-  // Step 4: Success Page After Completion
-  if (currentStep === 4) {
-    return <SubscriptionSuccess />;
-  }
-  
-  // Default view - fallback to the first step
-  return <SubscriptionPlans onSelectPlan={onPlanSelect} selectedPlanId={selectedPlan} />;
 };
 
 export default SubscriptionView;

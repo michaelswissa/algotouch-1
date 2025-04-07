@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { usePaymentInitialization } from './hooks/usePaymentInitialization';
+import { usePaymentUrlParams } from './hooks/usePaymentUrlParams';
 import { getPlanDetails } from './PlanUtilities';
 import PaymentSectionHeader from './PaymentSectionHeader';
 import PaymentIframe from './PaymentIframe';
@@ -20,18 +21,28 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   onPaymentComplete,
   onBack
 }) => {
-  const {
-    isLoading,
-    paymentUrl,
-    initiateCardcomPayment
-  } = usePaymentInitialization(selectedPlan, onPaymentComplete, onBack);
-
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Handle payment initialization
+  const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
+    selectedPlan,
+    onPaymentComplete, 
+    onBack, 
+    setIsLoading
+  );
+  
+  // Handle URL parameters for success/error redirects
+  usePaymentUrlParams(onPaymentComplete, setIsLoading);
+  
+  // Determine if this is a monthly plan (with trial)
   const isMonthlyPlan = selectedPlan === 'monthly';
 
+  // Show loading screen when initializing payment
   if (isLoading) {
     return <PaymentLoading />;
   }
 
+  // Show error screen if payment URL couldn't be generated
   if (!paymentUrl) {
     return (
       <PaymentError 
