@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,13 @@ import BillingInfo from './subscription/BillingInfo';
 import PaymentMethodInfo from './subscription/PaymentMethodInfo';
 import SubscriptionFooter from './subscription/SubscriptionFooter';
 import LoadingSkeleton from './subscription/LoadingSkeleton';
+import ContractViewer from './subscription/ContractViewer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const UserSubscription = () => {
   const navigate = useNavigate();
   const { subscription, loading, details } = useSubscription();
+  const [activeTab, setActiveTab] = useState('details');
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -60,6 +63,7 @@ const UserSubscription = () => {
   }
 
   const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
+  const hasContract = subscription.contract_signed;
 
   return (
     <SubscriptionCard
@@ -67,29 +71,54 @@ const UserSubscription = () => {
       description={`סטטוס: ${details?.statusText}`}
     >
       <>
-        {subscription.status === 'trial' && details && (
-          <SubscriptionStatus 
-            status={subscription.status} 
-            daysLeft={details.daysLeft} 
-            progressValue={details.progressValue} 
-          />
-        )}
-        
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          {details && (
-            <>
-              <BillingInfo 
-                nextBillingDate={details.nextBillingDate} 
-                planPrice={details.planPrice}
-                currency="$"
+        <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="my-2 w-full">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="details">פרטי מנוי</TabsTrigger>
+            <TabsTrigger value="contract">הסכם</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="details" className="mt-4">
+            {subscription.status === 'trial' && details && (
+              <SubscriptionStatus 
+                status={subscription.status} 
+                daysLeft={details.daysLeft} 
+                progressValue={details.progressValue} 
               />
-              
-              <PaymentMethodInfo 
-                paymentMethod={details.paymentMethod} 
-              />
-            </>
-          )}
-        </div>
+            )}
+            
+            <div className="grid grid-cols-1 gap-4 mt-4">
+              {details && (
+                <>
+                  <BillingInfo 
+                    nextBillingDate={details.nextBillingDate} 
+                    planPrice={details.planPrice}
+                    currency="$"
+                  />
+                  
+                  <PaymentMethodInfo 
+                    paymentMethod={details.paymentMethod} 
+                  />
+                </>
+              )}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="contract" className="mt-4">
+            {hasContract ? (
+              <ContractViewer />
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground mb-4">לא נמצא הסכם חתום</p>
+                <Button 
+                  onClick={() => navigate('/subscription')}
+                  variant="outline"
+                >
+                  השלם את תהליך ההרשמה
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </>
       <SubscriptionFooter planType={subscription.plan_type} />
     </SubscriptionCard>

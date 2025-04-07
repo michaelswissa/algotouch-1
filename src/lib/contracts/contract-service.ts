@@ -1,7 +1,7 @@
 
 import { toast } from 'sonner';
 import { callIzidocSignFunction, ContractData } from './izidoc-service';
-import { saveContractToDatabase, updateSubscriptionStatus } from './storage-service';
+import { saveContractToDatabase, updateSubscriptionStatus, ensureContractsBucketExists } from './storage-service';
 import { sendContractConfirmationEmail } from './email-service';
 
 /**
@@ -28,6 +28,9 @@ export async function processSignedContract(
       toast.error('חסרים פרטים הכרחיים לעיבוד החוזה');
       return false;
     }
+    
+    // Ensure contracts bucket exists
+    await ensureContractsBucketExists();
     
     // Improved logging to debug contract data
     console.log('Contract data signature length:', contractData.signature?.length || 0);
@@ -68,6 +71,7 @@ export async function processSignedContract(
     // Try to update the subscription status as well
     await updateSubscriptionStatus(userId);
     
+    toast.success('ההסכם נחתם ונשמר בהצלחה!');
     return true;
   } catch (error) {
     console.error('Exception processing contract signature:', error);

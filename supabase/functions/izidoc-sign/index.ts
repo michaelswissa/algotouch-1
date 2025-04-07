@@ -100,6 +100,15 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
     const encoder = new TextEncoder();
     const bytes = encoder.encode(contractData);
     
+    // Make sure the folder exists
+    try {
+      await supabase.storage.from('contracts').list(request.userId);
+    } catch (folderError) {
+      console.log("Error checking user folder, will be created on upload:", folderError);
+    }
+    
+    console.log(`Uploading contract file to storage: ${request.userId}/${contractFileName}`);
+    
     const { data: storageData, error: storageError } = await supabase
       .storage
       .from('contracts')
@@ -114,6 +123,7 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
     
     if (storageError) {
       console.error("Error storing contract in storage:", storageError);
+      console.error("Storage error details:", JSON.stringify(storageError));
     } else {
       console.log("Contract stored in storage successfully:", storageData.path);
     }
