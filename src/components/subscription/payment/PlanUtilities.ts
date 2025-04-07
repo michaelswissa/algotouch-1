@@ -1,6 +1,4 @@
 
-import { getPlanName } from '@/components/subscription/planData';
-
 export const getPlanDetails = (selectedPlan: string) => {
   if (selectedPlan === 'monthly') {
     return {

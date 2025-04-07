@@ -1,51 +1,24 @@
 
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
-import { registerNewUser } from '@/components/payment/services/paymentService';
+import { useAuth } from '@/contexts/auth';
 
 export const usePaymentInitialization = (
   selectedPlan: string,
   onPaymentComplete: () => void,
   onBack: () => void
 ) => {
+  const { fullName, email } = useSubscriptionContext();
+  const { user } = useAuth(); // Get user from useAuth instead of context
   const [isLoading, setIsLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-  const { user } = useSubscriptionContext();
-  const { fullName, email } = useSubscriptionContext();
 
   // Automatically create iframe payment URL on component mount
   useEffect(() => {
     initiateCardcomPayment();
   }, []);
-
-  // Handle query parameters on component mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
-    const success = params.get('success');
-    const regId = params.get('regId');
-    
-    if (error === 'true') {
-      toast.error('התשלום נכשל, אנא נסה שנית');
-    } else if (success === 'true') {
-      if (regId) {
-        // Need to verify payment and complete registration
-        verifyPaymentAndCompleteRegistration(regId);
-      } else {
-        toast.success('התשלום התקבל בהצלחה!');
-        onPaymentComplete();
-      }
-    }
-    
-    // Always check for temp registration ID in localStorage
-    const storedRegId = localStorage.getItem('temp_registration_id');
-    if (storedRegId && !regId) {
-      console.log('Found stored registration ID:', storedRegId);
-      retrieveAndProcessRegistrationData(storedRegId);
-    }
-  }, [onPaymentComplete]);
 
   const initiateCardcomPayment = async () => {
     setIsLoading(true);
@@ -107,6 +80,33 @@ export const usePaymentInitialization = (
       setIsLoading(false);
     }
   };
+
+  // Handle query parameters on component mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const success = params.get('success');
+    const regId = params.get('regId');
+    
+    if (error === 'true') {
+      toast.error('התשלום נכשל, אנא נסה שנית');
+    } else if (success === 'true') {
+      if (regId) {
+        // Need to verify payment and complete registration
+        verifyPaymentAndCompleteRegistration(regId);
+      } else {
+        toast.success('התשלום התקבל בהצלחה!');
+        onPaymentComplete();
+      }
+    }
+    
+    // Always check for temp registration ID in localStorage
+    const storedRegId = localStorage.getItem('temp_registration_id');
+    if (storedRegId && !regId) {
+      console.log('Found stored registration ID:', storedRegId);
+      retrieveAndProcessRegistrationData(storedRegId);
+    }
+  }, [onPaymentComplete]);
 
   const retrieveAndProcessRegistrationData = async (registrationId: string) => {
     try {
@@ -193,6 +193,50 @@ export const usePaymentInitialization = (
       toast.error(error.message || 'שגיאה בהשלמת תהליך ההרשמה והתשלום');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const registerNewUser = async (registrationData: any) => {
+    try {
+      // Auto-create token data with basic info
+      const tokenData = {
+        lastFourDigits: '****',
+        expiryMonth: '**',
+        expiryYear: '****',
+        cardholderName: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim(),
+        simulated: true
+      };
+      
+      // Register user 
+      const { data, error } = await supabase.functions.invoke('register-user', {
+        body: {
+          registrationData,
+          tokenData,
+          contractDetails: registrationData.contractDetails || null
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Try to sign in the user
+      if (registrationData.email && registrationData.password) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: registrationData.email,
+          password: registrationData.password
+        });
+        
+        if (signInError) {
+          console.error('Error signing in after registration:', signInError);
+        }
+      }
+      
+      // Clear session storage regardless of sign in result
+      sessionStorage.removeItem('registration_data');
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      return { success: false, error: error.message || 'שגיאה בתהליך ההרשמה' };
     }
   };
 
