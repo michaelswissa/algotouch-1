@@ -2,9 +2,8 @@
 import React from 'react';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
 import ContractSection from '@/components/subscription/ContractSection';
-import PaymentSection from '@/components/subscription/PaymentSection';
+import PaymentSection from '@/components/subscription/payment/PaymentSection';
 import SubscriptionSuccess from '@/components/subscription/SubscriptionSuccess';
-import { SubscriptionPlan } from '@/types/payment';
 
 interface SubscriptionViewProps {
   currentStep: number;
