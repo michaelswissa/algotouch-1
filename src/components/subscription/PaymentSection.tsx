@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -332,13 +333,13 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
             אנא מלא את פרטי התשלום במערכת הסליקה המאובטחת
           </CardDescription>
           
-          <div className="mt-4 p-3 bg-white rounded-md shadow-sm border border-muted">
+          <div className="mt-4 p-3 bg-gradient-to-br from-primary/10 to-background rounded-md shadow border border-primary/20">
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-lg">{planDetails.name}</span>
               <span className="text-lg font-bold text-primary">{planDetails.price}</span>
             </div>
-            <p className="text-sm text-muted-foreground">{planDetails.description}</p>
-            <div className="flex items-center gap-2 mt-3 text-sm">
+            <p className="text-sm text-foreground">{planDetails.description}</p>
+            <div className="flex items-center gap-2 mt-3 text-sm bg-primary/5 px-3 py-1.5 rounded-full w-fit">
               <CheckCircle className="h-4 w-4 text-green-500" />
               <span>{planDetails.info}</span>
             </div>
