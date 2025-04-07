@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CreditCard, AlertCircle } from 'lucide-react';
+import { CreditCard, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import PaymentForm from '@/components/payment/PaymentForm';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -26,6 +28,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [iframeHeight, setIframeHeight] = useState(650);
+  const [paymentMethod, setPaymentMethod] = useState<'direct' | 'iframe'>('direct');
 
   const initiateCardcomPayment = async () => {
     setIsLoading(true);
@@ -77,6 +80,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         }
         
         setPaymentUrl(data.url);
+        setPaymentMethod('iframe');
       } else {
         throw new Error('לא התקבלה כתובת תשלום מהשרת');
       }
@@ -262,85 +266,165 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  return (
-    <div className="max-w-3xl mx-auto">
-      {!paymentUrl ? (
-        <Card className="max-w-lg mx-auto" dir="rtl">
-          <CardHeader>
+  const getPlanDetails = () => {
+    if (selectedPlan === 'monthly') {
+      return {
+        name: 'מנוי חודשי',
+        price: '$99',
+        description: 'כולל חודש ניסיון חינם',
+        info: 'החיוב הראשון יתבצע רק לאחר 30 יום'
+      };
+    } else if (selectedPlan === 'annual') {
+      return {
+        name: 'מנוי שנתי',
+        price: '$899',
+        description: 'חסכון של 25% לעומת מנוי חודשי',
+        info: 'חיוב חד פעמי עבור שנה שלמה'
+      };
+    } else {
+      return {
+        name: 'מנוי VIP',
+        price: '$3,499',
+        description: 'תשלום חד פעמי לכל החיים',
+        info: 'גישה מלאה לכל החיים ללא חיובים נוספים'
+      };
+    }
+  };
+
+  const planDetails = getPlanDetails();
+
+  const renderPaymentContent = () => {
+    if (paymentMethod === 'iframe' && paymentUrl) {
+      return (
+        <Card className="max-w-3xl mx-auto border-primary/20 shadow-lg overflow-hidden" dir="rtl">
+          <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 pb-0">
             <div className="flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-primary" />
-              <CardTitle>תשלום</CardTitle>
+              <CardTitle className="text-xl">השלם את התשלום</CardTitle>
             </div>
-            <CardDescription>
-              {selectedPlan === 'monthly' 
-                ? 'הירשם למנוי חודשי עם חודש ניסיון חינם' 
-                : selectedPlan === 'annual' 
-                  ? 'הירשם למנוי שנתי עם 25% הנחה' 
-                  : 'הירשם למנוי VIP לכל החיים'}
+            <CardDescription className="text-base">
+              אנא מלא את פרטי התשלום במערכת הסליקה המאובטחת
             </CardDescription>
+            
+            <div className="mt-4 p-3 bg-white rounded-md shadow-sm border border-muted">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-lg">{planDetails.name}</span>
+                <span className="text-lg font-bold text-primary">{planDetails.price}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{planDetails.description}</p>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {selectedPlan === 'monthly' 
-                  ? 'המנוי כולל חודש ניסיון חינם. החיוב הראשון יתבצע רק לאחר 30 יום.'
-                  : selectedPlan === 'annual' 
-                    ? 'המנוי השנתי משקף חיסכון של 3 חודשים בהשוואה למנוי חודשי.' 
-                    : 'מנוי VIP הוא תשלום חד פעמי המעניק גישה לכל החיים.'}
-              </AlertDescription>
-            </Alert>
-            
-            <PaymentForm 
-              planId={selectedPlan}
-              onPaymentComplete={onPaymentComplete}
-            />
-            
-            <div className="flex flex-col items-center mt-6 space-y-2">
-              <p className="text-center text-sm text-muted-foreground">לחלופין, ניתן לשלם באמצעות כרטיס אשראי ישירות במערכת סליקה מאובטחת:</p>
-              <Button
-                variant="outline"
-                onClick={initiateCardcomPayment}
-                disabled={isLoading}
-                className="mt-2"
-              >
-                {isLoading ? 'מעבד...' : 'המשך לתשלום מאובטח של Cardcom'}
-              </Button>
+          
+          <CardContent className="p-0 mt-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/5 pointer-events-none"></div>
+              <iframe 
+                src={paymentUrl}
+                width="100%"
+                height={iframeHeight}
+                frameBorder="0"
+                title="Cardcom Payment Form"
+                className="w-full"
+              />
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={onBack}>
-              חזור
-            </Button>
-          </CardFooter>
-        </Card>
-      ) : (
-        <Card className="max-w-3xl mx-auto overflow-hidden" dir="rtl">
-          <CardHeader className="pb-0">
-            <CardTitle>פרטי תשלום</CardTitle>
-            <CardDescription>אנא מלא את פרטי התשלום בטופס המאובטח</CardDescription>
-          </CardHeader>
-          <CardContent className="mt-4 p-0">
-            <iframe 
-              src={paymentUrl}
-              width="100%"
-              height={iframeHeight}
-              frameBorder="0"
-              title="Cardcom Payment Form"
-              className="w-full"
-            />
-          </CardContent>
-          <CardFooter className="flex justify-start">
+          
+          <CardFooter className="flex justify-start pt-4 border-t">
             <Button 
               variant="outline" 
-              onClick={() => setPaymentUrl(null)}
-              className="mt-2"
+              onClick={() => setPaymentMethod('direct')}
+              className="mt-2 flex items-center gap-2"
+              size="sm"
             >
+              <ArrowLeft className="h-4 w-4" />
               חזור לבחירת שיטת תשלום
             </Button>
           </CardFooter>
         </Card>
-      )}
+      );
+    }
+    
+    return (
+      <Card className="max-w-lg mx-auto border-primary/20 shadow-lg" dir="rtl">
+        <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-primary" />
+            <CardTitle>תשלום מאובטח</CardTitle>
+          </div>
+          <CardDescription>
+            {selectedPlan === 'monthly' 
+              ? 'הירשם למנוי חודשי עם חודש ניסיון חינם' 
+              : selectedPlan === 'annual' 
+                ? 'הירשם למנוי שנתי עם 25% הנחה' 
+                : 'הירשם למנוי VIP לכל החיים'}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-4 pt-6">
+          <div className="bg-muted/40 p-4 rounded-md border border-border/40">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-semibold">{planDetails.name}</span>
+              <span className="font-bold text-lg">{planDetails.price}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{planDetails.description}</p>
+            <div className="flex items-center gap-2 mt-3 text-sm">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span>{planDetails.info}</span>
+            </div>
+          </div>
+          
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {selectedPlan === 'monthly' 
+                ? 'המנוי כולל חודש ניסיון חינם. החיוב הראשון יתבצע רק לאחר 30 יום.'
+                : selectedPlan === 'annual' 
+                  ? 'המנוי השנתי משקף חיסכון של 3 חודשים בהשוואה למנוי חודשי.' 
+                  : 'מנוי VIP הוא תשלום חד פעמי המעניק גישה לכל החיים.'}
+            </AlertDescription>
+          </Alert>
+          
+          <Tabs defaultValue="cardcom" className="w-full">
+            <TabsList className="grid grid-cols-2 mb-4">
+              <TabsTrigger value="cardcom">כרטיס אשראי</TabsTrigger>
+              <TabsTrigger value="paypal" disabled>PayPal</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="cardcom" className="space-y-4 mt-2">
+              <PaymentForm 
+                planId={selectedPlan}
+                onPaymentComplete={onPaymentComplete}
+              />
+              
+              <Separator className="my-4" />
+              
+              <div className="flex flex-col items-center space-y-4">
+                <p className="text-center text-sm text-muted-foreground">לחלופין, ניתן לעבור למסך תשלום מאובטח:</p>
+                <Button
+                  onClick={initiateCardcomPayment}
+                  disabled={isLoading}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  {isLoading ? 'מעבד...' : 'עבור למסך תשלום מאובטח'}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        
+        <CardFooter className="flex justify-between pt-2 border-t">
+          <Button variant="outline" onClick={onBack} size="sm">
+            חזור
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      {renderPaymentContent()}
     </div>
   );
 };

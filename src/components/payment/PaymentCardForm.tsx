@@ -7,6 +7,7 @@ import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 import SecurityNote from './SecurityNote';
 import { SubscriptionPlan } from '@/types/payment';
+import { ChevronRight } from 'lucide-react';
 
 interface PaymentCardFormProps {
   plan: SubscriptionPlan;
@@ -39,13 +40,13 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
 
   return (
     <form onSubmit={handleSubmitForm}>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5 pt-4">
         <PlanSummary 
           planName={plan.name} 
           price={plan.price} 
           description={plan.description}
           hasTrial={planId === 'monthly'}
-          currency="$" // Keep displaying prices in dollars
+          currency="$" 
         />
         
         <Separator />
@@ -63,14 +64,17 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
         
         <SecurityNote />
       </CardContent>
-      <CardFooter className="flex flex-col space-y-4">
+      <CardFooter className="flex flex-col space-y-4 pt-4 border-t bg-muted/20">
         <Button 
-          onClick={onExternalPayment} 
-          className="w-full bg-primary" 
           type="button"
+          onClick={onExternalPayment} 
+          className="w-full bg-primary hover:bg-primary/90 transition-colors"
           disabled={isProcessing}
         >
-          {isProcessing ? 'מעבד תשלום...' : planId === 'monthly' ? 'התחל תקופת ניסיון חינם' : 'בצע תשלום'}
+          {isProcessing ? 'מעבד תשלום...' : planId === 'monthly' 
+            ? 'התחל תקופת ניסיון חינם' 
+            : 'בצע תשלום'}
+          <ChevronRight className="h-5 w-5 mr-1" />
         </Button>
         
         <div className="text-center">
