@@ -356,14 +356,14 @@ serve(async (req) => {
       }
 
       try {
-        // Determine payment amount based on plan
+        // Determine payment amount based on plan with proper USD to NIS conversion
         let amount = '0.00';
         if (planId === 'monthly') {
-          amount = '99.00'; // Free trial, but will charge 99 ILS after trial
+          amount = '375.00'; // 99 USD in NIS
         } else if (planId === 'annual') {
-          amount = '899.00'; // 899 ILS for annual plan
+          amount = '3410.00'; // 899 USD in NIS
         } else if (planId === 'vip') {
-          amount = '1999.00'; // 1999 ILS for VIP plan
+          amount = '13270.00'; // 3499 USD in NIS
         }
 
         // Generate webhook URL using the current origin

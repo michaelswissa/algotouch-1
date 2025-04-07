@@ -79,6 +79,7 @@ export interface FunctionsDatabase {
           identity_number?: string;
           num_of_payments?: number;
           external_transaction_id?: string;
+          currency?: string;
         };
         Returns: {
           success: boolean;
