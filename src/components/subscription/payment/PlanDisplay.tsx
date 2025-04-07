@@ -59,9 +59,8 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
           <p className="text-slate-300 text-sm">{planDetails.description}</p>
         </div>
         
-        {/* Restructured features section with consistent styling and vertical layout */}
+        {/* Restructured features section with consistent styling and vertical layout - removed heading */}
         <div className="px-4 py-3 bg-slate-700/30 border-t border-slate-600/40">
-          <h4 className="text-sm font-medium text-white mb-3 text-right">יתרונות המנוי:</h4>
           <div className="flex flex-col gap-3 text-right">
             <FeatureItem 
               icon={<Shield className="h-4 w-4 text-cyan-400" />}
