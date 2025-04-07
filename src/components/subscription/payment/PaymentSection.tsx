@@ -54,7 +54,10 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Card className="max-w-3xl mx-auto border-primary/30 shadow-xl overflow-hidden hover-glow" dir="rtl">
+      <Card 
+        className="max-w-3xl mx-auto border-primary/30 shadow-xl overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_-5px_rgba(0,102,255,0.15)] animate-fade-in" 
+        dir="rtl"
+      >
         <PaymentSectionHeader 
           selectedPlan={selectedPlan} 
           getPlanDetails={() => getPlanDetails(selectedPlan)} 

@@ -17,11 +17,11 @@ const PaymentSectionFooter: React.FC<PaymentSectionFooterProps> = ({
   onBack 
 }) => {
   return (
-    <CardFooter className="flex flex-col sm:flex-row justify-between py-4 px-6 border-t border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+    <CardFooter className="flex flex-col sm:flex-row justify-between py-5 px-6 border-t border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
       <Button 
         variant="outline" 
         onClick={onBack}
-        className="flex items-center gap-2 border-primary/30 hover:bg-primary/10 mb-3 sm:mb-0"
+        className="flex items-center gap-2 border-primary/30 hover:bg-primary/10 mb-3 sm:mb-0 transition-all"
         size="sm"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -38,11 +38,11 @@ const PaymentSectionFooter: React.FC<PaymentSectionFooterProps> = ({
         </div>
       </Alert>
       
-      {/* Start button for mobile */}
-      <div className="w-full sm:hidden mt-4">
+      {/* Start button for mobile - enhanced with shadow and hover effects */}
+      <div className="w-full sm:hidden mt-5">
         <Button 
           size="lg"
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-90"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 hover:scale-[1.02] shadow-[0_4px_12px_-4px_rgba(0,102,255,0.3)] transition-all"
           disabled={isLoading}
         >
           <span>{isMonthlyPlan ? 'התחל תקופת ניסיון' : 'המשך לתשלום'}</span>
