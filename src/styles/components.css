@@ -1,4 +1,5 @@
 
+
 /* Add loading pulse animation for data fetching */
 .data-pulse {
   animation: data-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -73,5 +74,71 @@
 .hover-glow:hover {
   box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.15), 0 8px 10px -6px rgba(0, 102, 255, 0.1);
   transform: translateY(-2px);
+}
+
+/* Premium card effect for payment elements */
+.premium-card {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1),
+              0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.premium-card:hover {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15),
+              0 8px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+}
+
+/* Badge animation for free trial */
+.badge-pulse {
+  animation: badge-pulse 2s infinite ease-in-out;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
+/* Trust badge animations */
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.trust-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Premium gradient backgrounds */
+.premium-gradient {
+  background: linear-gradient(135deg, 
+    rgba(var(--primary-rgb), 0.2), 
+    rgba(var(--primary-rgb), 0.05)
+  );
+}
+
+/* Payment form section transition */
+.payment-section-transition {
+  transition: all 0.5s ease;
+}
+
+.payment-section-transition:hover {
+  background-color: rgba(var(--primary-rgb), 0.02);
 }
 
