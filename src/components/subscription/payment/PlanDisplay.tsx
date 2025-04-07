@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle, Gift, Star, Shield, Clock, ArrowRight, Users } from 'lucide-react';
+import { CheckCircle, Gift, Star, Shield, Clock, ArrowRight, Users, Diamond } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -43,14 +43,14 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
             </div>
           </div>
           
-          {/* Enhanced social proof indicator */}
-          <div className="flex items-center gap-1 mt-2 text-xs text-slate-300">
+          {/* Updated social proof with trader selection instead of user count */}
+          <div className="flex items-center gap-1 mt-2 text-xs text-slate-300 justify-end">
+            <span>נבחר בקפידה על ידי סוחרים מנוסים</span>
             <div className="flex">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} className="h-3 w-3 text-amber-400 fill-amber-400" />
               ))}
             </div>
-            <span>מעל 10,000 משתמשים מרוצים</span>
           </div>
         </div>
         

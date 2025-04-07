@@ -22,7 +22,7 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
   const isMonthlyPlan = selectedPlan === 'monthly';
 
   return (
-    <CardHeader className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-7 border-b border-primary/20">
+    <CardHeader className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-7 border-b border-primary/20" dir="rtl">
       {/* Background effects */}
       <div className="absolute inset-0 opacity-5 background-noise"></div>
       <div className="absolute -top-40 -right-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
