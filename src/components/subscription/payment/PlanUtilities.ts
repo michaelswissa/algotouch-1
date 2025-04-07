@@ -1,25 +1,26 @@
 
-export const getPlanDetails = (selectedPlan: string) => {
-  if (selectedPlan === 'monthly') {
+export const getPlanDetails = (planId: string) => {
+  if (planId === 'annual') {
     return {
-      name: 'מנוי חודשי',
-      price: '$99',
-      description: 'כולל חודש ניסיון חינם',
-      info: 'החיוב הראשון יתבצע רק לאחר 30 יום'
-    };
-  } else if (selectedPlan === 'annual') {
-    return {
-      name: 'מנוי שנתי',
+      name: 'שנתי',
       price: '$899',
-      description: 'חסכון של 25% לעומת מנוי חודשי',
-      info: 'חיוב חד פעמי עבור שנה שלמה'
+      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
+      info: 'חיוב מיידי לכל השנה'
+    };
+  } else if (planId === 'vip') {
+    return {
+      name: 'VIP',
+      price: '$3499',
+      description: 'גישה לכל החיים בתשלום חד פעמי',
+      info: 'חיוב מיידי חד פעמי'
     };
   } else {
+    // Default to monthly plan
     return {
-      name: 'מנוי VIP',
-      price: '$3,499',
-      description: 'תשלום חד פעמי לכל החיים',
-      info: 'גישה מלאה לכל החיים ללא חיובים נוספים'
+      name: 'חודשי',
+      price: '$99',
+      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
+      info: 'החיוב הראשון לאחר 30 יום'
     };
-  };
+  }
 };

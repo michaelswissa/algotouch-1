@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CreditCard } from 'lucide-react';
+import { CardHeader } from '@/components/ui/card';
 import PlanDetailsSummary from './PlanDisplay';
 
 interface PaymentSectionHeaderProps {
@@ -22,33 +21,20 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
   const isMonthlyPlan = selectedPlan === 'monthly';
 
   return (
-    <CardHeader className="relative bg-gradient-to-br from-slate-800/80 via-slate-900/90 to-slate-950 pb-8 border-b border-primary/20 overflow-hidden">
-      {/* Subtle background pattern effect */}
+    <CardHeader className="relative bg-gradient-to-br from-slate-800/80 via-slate-900/90 to-slate-950 pb-6 border-b border-primary/20">
+      {/* Background effects */}
       <div className="absolute inset-0 opacity-5 background-noise"></div>
-      
-      {/* Decorative glow effect */}
       <div className="absolute -top-40 -right-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
       <div className="absolute -bottom-40 -left-20 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl"></div>
       
-      {/* Header content */}
+      {/* Header content with new plan display */}
       <div className="relative">
-        <div className="flex items-center gap-4 mb-5 animate-fade-in">
-          <div className="relative">
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-md"></div>
-            <div className="relative bg-gradient-to-br from-primary/20 to-primary/10 p-3 rounded-full shadow-xl ring-1 ring-primary/30 backdrop-blur-sm">
-              <CreditCard className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-          <div>
-            <CardTitle className="text-2xl font-bold tracking-wider text-white">השלם את התשלום</CardTitle>
-            <CardDescription className="text-base mt-2 text-slate-300/90 leading-relaxed">
-              אנא מלא את פרטי התשלום במערכת הסליקה המאובטחת
-            </CardDescription>
-          </div>
+        <div className="flex flex-col gap-1 mb-2 animate-fade-in">
+          <h2 className="text-xl font-bold tracking-wider text-white text-right">הזן את פרטי הכרטיס האשראי שלך לתשלום</h2>
         </div>
       </div>
       
-      {/* Premium Plan Summary Box with modern design */}
+      {/* New premium plan summary box with updated styling */}
       <PlanDetailsSummary planDetails={planDetails} isMonthlyPlan={isMonthlyPlan} />
     </CardHeader>
   );
