@@ -2,6 +2,7 @@
 import React from 'react';
 import { CardHeader } from '@/components/ui/card';
 import PlanDetailsSummary from './PlanDisplay';
+import { Diamond } from 'lucide-react';
 
 interface PaymentSectionHeaderProps {
   selectedPlan: string;
@@ -31,11 +32,13 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
       <div className="relative">
         <div className="flex flex-col gap-1 mb-4 animate-fade-in">
           <h2 className="text-xl font-bold tracking-wider text-white text-right">הזן את פרטי הכרטיס האשראי שלך לתשלום</h2>
-          <p className="text-slate-400 text-sm text-right">בחרת במסלול {planDetails.name}</p>
+          <p className="text-slate-400 text-sm text-right">
+            צעדים אחרונים - תוכל להתחיל להשתמש תוך דקה!
+          </p>
         </div>
       </div>
       
-      {/* Updated premium plan summary box with improved styling */}
+      {/* Updated premium plan summary with improved value proposition */}
       <PlanDetailsSummary planDetails={planDetails} isMonthlyPlan={isMonthlyPlan} />
     </CardHeader>
   );
