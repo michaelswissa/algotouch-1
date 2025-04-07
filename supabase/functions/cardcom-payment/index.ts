@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
@@ -22,11 +21,17 @@ function handleCors(req: Request) {
 
 // CardCom API configuration
 const API_CONFIG = {
-  TERMINAL: Deno.env.get('CARDCOM_TERMINAL') || '160138',
-  USERNAME: Deno.env.get('CARDCOM_USERNAME') || 'bLaocQRMSnwphQRUVG3b',
-  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD') || 'i9nr6caGbgheTdYfQbo6',
+  TERMINAL: Deno.env.get('CARDCOM_TERMINAL'),
+  USERNAME: Deno.env.get('CARDCOM_USERNAME'),
+  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD'),
   BASE_URL: 'https://secure.cardcom.solutions/api/v11',
 };
+
+// Log configuration for debugging (without exposing sensitive values)
+console.log('CardCom API configuration initialized with terminal:', 
+  API_CONFIG.TERMINAL ? '[terminal configured]' : '[terminal missing]');
+console.log('CardCom API credentials status:',
+  (API_CONFIG.USERNAME && API_CONFIG.PASSWORD) ? '[credentials configured]' : '[credentials missing]');
 
 // CardCom operation types
 enum OperationType {
@@ -49,6 +54,11 @@ async function createPaymentSession(params: any) {
     cardOwnerEmail,
     cardOwnerPhone
   } = params;
+  
+  // Validate required configuration
+  if (!API_CONFIG.TERMINAL || !API_CONFIG.USERNAME) {
+    throw new Error('Missing CardCom configuration. Please check environment variables.');
+  }
   
   try {
     // Prepare the request payload for LowProfile Create
@@ -122,6 +132,11 @@ async function createPaymentSession(params: any) {
 // Verify payment status with CardCom
 async function verifyPayment(lowProfileId: string) {
   try {
+    // Validate required configuration
+    if (!API_CONFIG.TERMINAL || !API_CONFIG.USERNAME || !API_CONFIG.PASSWORD) {
+      throw new Error('Missing CardCom configuration. Please check environment variables.');
+    }
+    
     const payload = {
       TerminalNumber: parseInt(API_CONFIG.TERMINAL),
       ApiName: API_CONFIG.USERNAME,
@@ -191,6 +206,11 @@ async function verifyPayment(lowProfileId: string) {
 // Process a direct charge using a token
 async function processTokenCharge(params: any) {
   try {
+    // Validate required configuration
+    if (!API_CONFIG.TERMINAL || !API_CONFIG.USERNAME || !API_CONFIG.PASSWORD) {
+      throw new Error('Missing CardCom configuration. Please check environment variables.');
+    }
+    
     const { 
       amount, 
       token, 
@@ -677,4 +697,3 @@ serve(async (req) => {
     );
   }
 });
-
