@@ -45,6 +45,7 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
           price={plan.price} 
           description={plan.description}
           hasTrial={planId === 'monthly'}
+          currency="$" // Keep displaying prices in dollars
         />
         
         <Separator />

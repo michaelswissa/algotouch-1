@@ -359,11 +359,11 @@ serve(async (req) => {
         // Determine payment amount based on plan
         let amount = '0.00';
         if (planId === 'monthly') {
-          amount = '99.00'; // Free trial, but will charge 99 after trial
+          amount = '99.00'; // Free trial, but will charge 99 ILS after trial
         } else if (planId === 'annual') {
-          amount = '899.00';
+          amount = '899.00'; // 899 ILS for annual plan
         } else if (planId === 'vip') {
-          amount = '1999.00';
+          amount = '1999.00'; // 1999 ILS for VIP plan
         }
 
         // Generate webhook URL using the current origin
