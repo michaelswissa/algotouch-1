@@ -1,3 +1,4 @@
+
 /* Add loading pulse animation for data fetching */
 .data-pulse {
   animation: data-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -31,3 +32,35 @@
 .elevated-card:hover {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
+
+/* Payment form animation */
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8; 
+    transform: scale(0.98);
+  }
+}
+
+/* Payment iframe placeholder */
+.payment-iframe-placeholder {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(110deg, #f5f7fa 8%, #e6e9f0 18%, #f5f7fa 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+

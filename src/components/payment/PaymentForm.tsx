@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, ShieldCheck } from 'lucide-react';
 import { usePaymentProcess } from './hooks/usePaymentProcess';
 import PaymentErrorCard from './PaymentErrorCard';
 import PaymentCardForm from './PaymentCardForm';
@@ -33,13 +33,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   }
 
   return (
-    <Card className="max-w-lg mx-auto" dir="rtl">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5 text-primary" />
-          <CardTitle>פרטי תשלום</CardTitle>
+    <Card className="max-w-2xl mx-auto shadow-lg border-2 border-border/30" dir="rtl">
+      <CardHeader className="bg-muted/30 pb-6 border-b">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-primary" />
+            <CardTitle className="text-2xl">פרטי תשלום</CardTitle>
+          </div>
+          <CardDescription className="text-base">
+            הזן את פרטי התשלום שלך באופן מאובטח למטה
+          </CardDescription>
+          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground bg-primary/5 p-2 px-3 rounded-md">
+            <ShieldCheck className="h-4 w-4 text-primary flex-shrink-0" />
+            <span>כל פרטי התשלום מוצפנים ומאובטחים באמצעות הצפנת SSL</span>
+          </div>
         </div>
-        <CardDescription>לחץ על הכפתור למטה להמשך לעמוד התשלום המאובטח</CardDescription>
       </CardHeader>
       
       <PaymentCardForm
