@@ -90,6 +90,14 @@ export interface FunctionsDatabase {
           details?: any;
         };
       };
+      cancel_subscription: {
+        Args: {};
+        Returns: {
+          success: boolean;
+          message?: string;
+          error?: string;
+        };
+      };
     };
   };
 }

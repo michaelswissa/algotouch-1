@@ -9,6 +9,7 @@ interface SubscriptionContextType {
   hasActiveSubscription: boolean;
   isCheckingSubscription: boolean;
   checkUserSubscription: (userId: string) => Promise<void>;
+  refreshSubscription: () => Promise<void>;
   fullName: string | null;
   email: string | null;
   subscriptionDetails: any | null;
@@ -70,6 +71,12 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     }
   }, [user]);
 
+  const refreshSubscription = async () => {
+    if (user?.id) {
+      await checkUserSubscription(user.id);
+    }
+  };
+
   const checkUserSubscription = async (userId: string) => {
     try {
       setIsCheckingSubscription(true);
@@ -120,6 +127,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     hasActiveSubscription,
     isCheckingSubscription,
     checkUserSubscription,
+    refreshSubscription,
     fullName,
     email,
     subscriptionDetails,

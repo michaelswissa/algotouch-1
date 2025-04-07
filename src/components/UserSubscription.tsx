@@ -91,7 +91,7 @@ const UserSubscription = () => {
           )}
         </div>
       </>
-      <SubscriptionFooter />
+      <SubscriptionFooter planType={subscription.plan_type} />
     </SubscriptionCard>
   );
 };
