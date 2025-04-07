@@ -1,5 +1,4 @@
 
-
 /* Add loading pulse animation for data fetching */
 .data-pulse {
   animation: data-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -34,19 +33,17 @@
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
-/* Payment form animation */
+/* Payment form animation - simplified */
 .animate-pulse-subtle {
   animation: pulse-subtle 3s infinite ease-in-out;
 }
 
 @keyframes pulse-subtle {
   0%, 100% { 
-    opacity: 1; 
-    transform: scale(1);
+    opacity: 1;
   }
   50% { 
-    opacity: 0.8; 
-    transform: scale(0.98);
+    opacity: 0.8;
   }
 }
 
@@ -65,49 +62,18 @@
   }
 }
 
-/* Hover glow effect for payment card */
+/* Hover glow effect - simplified */
 .hover-glow {
   transition: all 0.3s ease-in-out;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
 }
 
 .hover-glow:hover {
-  box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.15), 0 8px 10px -6px rgba(0, 102, 255, 0.1);
-  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -5px rgba(0, 102, 255, 0.1);
+  transform: translateY(-1px);
 }
 
-/* Premium card effect for payment elements */
-.premium-card {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.05));
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1),
-              0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-}
-
-.premium-card:hover {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15),
-              0 8px 16px rgba(0, 0, 0, 0.12);
-  transform: translateY(-4px);
-}
-
-/* Badge animation for free trial */
-.badge-pulse {
-  animation: badge-pulse 2s infinite ease-in-out;
-}
-
-@keyframes badge-pulse {
-  0%, 100% { 
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% { 
-    opacity: 0.85;
-    transform: scale(1.05);
-  }
-}
-
-/* Trust badge animations */
+/* Trust badge animations - simplified */
 .trust-badge {
   display: inline-flex;
   align-items: center;
@@ -122,23 +88,41 @@
 
 .trust-badge:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Premium gradient backgrounds */
-.premium-gradient {
-  background: linear-gradient(135deg, 
-    rgba(var(--primary-rgb), 0.2), 
-    rgba(var(--primary-rgb), 0.05)
-  );
-}
-
-/* Payment form section transition */
+/* Payment form section transition - simplified */
 .payment-section-transition {
-  transition: all 0.5s ease;
+  transition: all 0.3s ease;
 }
 
-.payment-section-transition:hover {
-  background-color: rgba(var(--primary-rgb), 0.02);
+/* Premium badge animation */
+.premium-badge {
+  position: relative;
+  overflow: hidden;
 }
 
+.premium-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: badge-shine 3s infinite;
+}
+
+@keyframes badge-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  20%, 100% {
+    transform: translateX(100%);
+  }
+}
