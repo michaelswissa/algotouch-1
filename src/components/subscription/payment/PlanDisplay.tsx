@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Shield, Gift, Star, Clock, ArrowRight, Diamond, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -118,7 +119,7 @@ export const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, descripti
     )}>
       {icon}
     </div>
-    <div className="mr-3 text-right">
+    <div className="mr-5 text-right">
       <div className={cn(
         "font-medium leading-snug", 
         highlighted ? "text-white text-sm" : "text-slate-200 text-sm"
@@ -133,3 +134,4 @@ export const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, descripti
 );
 
 export default PlanDetailsSummary;
+
