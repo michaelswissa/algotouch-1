@@ -63,27 +63,21 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
         <SecurityNote />
       </CardContent>
       <CardFooter className="flex flex-col space-y-4">
-        <Button type="submit" className="w-full" disabled={isProcessing}>
+        <Button 
+          onClick={onExternalPayment} 
+          className="w-full bg-primary" 
+          type="button"
+          disabled={isProcessing}
+        >
           {isProcessing ? 'מעבד תשלום...' : planId === 'monthly' ? 'התחל תקופת ניסיון חינם' : 'בצע תשלום'}
         </Button>
         
         <div className="text-center">
-          <p className="text-xs text-center text-muted-foreground max-w-md mx-auto mb-2">
+          <p className="text-xs text-center text-muted-foreground max-w-md mx-auto">
             {planId === 'monthly' 
               ? 'ע"י לחיצה על כפתור זה, אתה מאשר את פרטי התשלום לחיוב אוטומטי לאחר תקופת הניסיון'
               : 'ע"י לחיצה על כפתור זה, אתה מאשר את ביצוע התשלום בהתאם לתנאי השימוש'}
           </p>
-          
-          <p className="text-center text-sm text-muted-foreground">לחלופין, ניתן לשלם באמצעות כרטיס אשראי ישירות במערכת סליקה מאובטחת:</p>
-          
-          <Button
-            variant="outline"
-            onClick={onExternalPayment}
-            disabled={isProcessing}
-            className="mt-2"
-          >
-            {isProcessing ? 'מעבד...' : 'המשך לתשלום מאובטח'}
-          </Button>
         </div>
       </CardFooter>
     </form>

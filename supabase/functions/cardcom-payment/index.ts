@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
@@ -397,26 +398,6 @@ serve(async (req) => {
         );
       } catch (cardcomError: any) {
         console.error('CardCom API error:', cardcomError);
-        
-        // For demo/development, create a simulated payment URL
-        if (Deno.env.get('ENVIRONMENT') === 'development' || !cardcomError.message.includes('CardCom API error')) {
-          console.log('Creating simulated payment URL for development');
-          const baseUrl = req.headers.get('origin') || 'http://localhost:3000';
-          const paymentUrl = `${baseUrl}/subscription?step=4&success=true&plan=${planId}${tempRegistrationId ? `&regId=${tempRegistrationId}` : ''}`;
-          
-          return new Response(
-            JSON.stringify({
-              success: true,
-              url: paymentUrl,
-              tempRegistrationId,
-              simulated: true
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200,
-            }
-          );
-        }
         
         return new Response(
           JSON.stringify({ 
