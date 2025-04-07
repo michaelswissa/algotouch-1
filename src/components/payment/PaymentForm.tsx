@@ -17,6 +17,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     registrationData,
     registrationError,
     loadRegistrationData,
+    handleSubmit,
     handleExternalPayment,
     plan
   } = usePaymentProcess({ planId, onPaymentComplete });
@@ -44,7 +45,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       <PaymentCardForm
         plan={plan}
         isProcessing={isProcessing}
-        onSubmit={() => {}}
+        onSubmit={handleSubmit}
         onExternalPayment={handleExternalPayment}
         planId={planId}
       />
