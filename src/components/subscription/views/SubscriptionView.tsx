@@ -1,6 +1,5 @@
 
 import React from 'react';
-import PaymentView from './PaymentView';
 import PlanSelectionView from './PlanSelectionView';
 import ContractView from './ContractView';
 import CompletionView from './CompletionView';
