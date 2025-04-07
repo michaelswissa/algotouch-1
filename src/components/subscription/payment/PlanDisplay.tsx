@@ -44,13 +44,13 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
           </div>
           
           {/* Updated social proof with trader selection with proper RTL */}
-          <div className="flex items-center gap-1 mt-2 text-xs text-slate-300 justify-end">
-            <span>נבחר בקפידה ע"י סוחרים מנוסים</span>
+          <div className="flex items-center gap-1 mt-2 text-xs text-slate-300">
             <div className="flex">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} className="h-3 w-3 text-amber-400 fill-amber-400" />
               ))}
             </div>
+            <span>נבחר בקפידה ע"י סוחרים מנוסים</span>
           </div>
         </div>
         
@@ -61,7 +61,7 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
         
         {/* Restructured features section with consistent styling and vertical layout - removed heading */}
         <div className="px-4 py-3 bg-slate-700/30 border-t border-slate-600/40">
-          <div className="flex flex-col gap-3 text-right">
+          <div className="flex flex-col gap-3">
             <FeatureItem 
               icon={<Shield className="h-4 w-4 text-cyan-400" />}
               title="גישה מלאה לכל התכונות"
@@ -87,13 +87,13 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
         {/* Simplified payment info section */}
         <div className="px-4 py-2 bg-slate-700/50 border-t border-slate-600/40">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400 text-right font-medium opacity-80">
+            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+              <ArrowRight className="h-3 w-3" />
+              <span>מנוי פשוט, ללא אותיות קטנות</span>
+            </div>
+            <p className="text-xs text-slate-400 font-medium opacity-80">
               {isMonthlyPlan ? 'החיוב הראשון לאחר 30 יום' : 'חיוב מיידי'}
             </p>
-            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-              <span>מנוי פשוט, ללא אותיות קטנות</span>
-              <ArrowRight className="h-3 w-3" />
-            </div>
           </div>
         </div>
       </div>
@@ -109,22 +109,23 @@ interface FeatureItemProps {
 }
 
 export const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, description, highlighted }) => (
-  <div className="flex items-start justify-end">
-    <div className="text-right">
-      <div className="flex items-center justify-end gap-1.5">
-        <span className={cn(
-          "font-medium", 
-          highlighted ? "text-white text-sm" : "text-slate-200 text-sm"
-        )}>
-          {title}
-        </span>
+  <div className="flex items-center">
+    <div className={cn(
+      "bg-slate-700/50 p-1.5 rounded-md",
+      highlighted ? "bg-primary/10" : ""
+    )}>
+      {icon}
+    </div>
+    <div className="mr-2 text-right">
+      <div className={cn(
+        "font-medium", 
+        highlighted ? "text-white text-sm" : "text-slate-200 text-sm"
+      )}>
+        {title}
       </div>
       <p className="text-xs text-slate-400 mt-0.5">
         {description}
       </p>
-    </div>
-    <div className="ml-2 mt-0.5 bg-slate-700/50 p-1.5 rounded-md">
-      {icon}
     </div>
   </div>
 );
