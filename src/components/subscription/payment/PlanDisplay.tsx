@@ -45,12 +45,12 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
           
           {/* Updated social proof with trader selection with proper RTL */}
           <div className="flex items-center gap-1 mt-2 text-xs text-slate-300 justify-end">
+            <span>נבחר בקפידה ע"י סוחרים מנוסים</span>
             <div className="flex">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} className="h-3 w-3 text-amber-400 fill-amber-400" />
               ))}
             </div>
-            <span>נבחר בקפידה על ידי סוחרים מנוסים</span>
           </div>
         </div>
         
@@ -88,13 +88,13 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
         {/* Simplified payment info section */}
         <div className="px-4 py-2 bg-slate-700/50 border-t border-slate-600/40">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-              <ArrowRight className="h-3 w-3" />
-              <span>מנוי פשוט, ללא אותיות קטנות</span>
-            </div>
             <p className="text-xs text-slate-400 text-right font-medium opacity-80">
               {isMonthlyPlan ? 'החיוב הראשון לאחר 30 יום' : 'חיוב מיידי'}
             </p>
+            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+              <span>מנוי פשוט, ללא אותיות קטנות</span>
+              <ArrowRight className="h-3 w-3" />
+            </div>
           </div>
         </div>
       </div>
