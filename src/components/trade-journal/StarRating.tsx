@@ -29,9 +29,9 @@ const StarRating: React.FC<StarRatingProps> = ({
 }) => {
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      {Array.from({ length: max }, (_, i) => i + 1).map((rating) => (
-        <TooltipProvider key={rating}>
-          <Tooltip>
+      <TooltipProvider>
+        {Array.from({ length: max }, (_, i) => i + 1).map((rating) => (
+          <Tooltip key={rating}>
             <TooltipTrigger asChild>
               <button
                 type="button"
@@ -53,8 +53,8 @@ const StarRating: React.FC<StarRatingProps> = ({
               <p>{tooltips[rating] || `דירוג ${rating}`}</p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
-      ))}
+        ))}
+      </TooltipProvider>
     </div>
   );
 };

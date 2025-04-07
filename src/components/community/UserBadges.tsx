@@ -112,8 +112,8 @@ export default function UserBadges({
                 </div>
               </TooltipContent>
             </Tooltip>
-          );
-        })}
+          )}
+        )}
       </TooltipProvider>
     </div>
   );

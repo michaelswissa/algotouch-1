@@ -57,9 +57,9 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
             <Toaster />
             <Sonner position="top-right" expand={true} closeButton toastOptions={{
               classNames: {
@@ -170,9 +170,9 @@ const App = () => {
               {/* Catch all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+          </TooltipProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 };

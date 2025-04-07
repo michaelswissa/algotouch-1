@@ -36,8 +36,8 @@ export function LevelIndicator({ level, points, className }: LevelIndicatorProps
   
   return (
     <div className={cn("flex flex-col space-y-1", className)}>
-      <div className="flex justify-between items-center">
-        <TooltipProvider>
+      <TooltipProvider>
+        <div className="flex justify-between items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Badge className={cn("font-semibold", getLevelColor(level))}>
@@ -54,8 +54,7 @@ export function LevelIndicator({ level, points, className }: LevelIndicatorProps
               </div>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
+          
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="text-xs text-muted-foreground cursor-help">
@@ -66,10 +65,8 @@ export function LevelIndicator({ level, points, className }: LevelIndicatorProps
               <p>נקודות לרמה הבאה: {pointsToNextLevel - currentLevelPoints}</p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
-      </div>
-      
-      <TooltipProvider>
+        </div>
+        
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="cursor-help">

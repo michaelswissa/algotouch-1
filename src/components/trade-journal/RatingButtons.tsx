@@ -48,9 +48,9 @@ const RatingButtons: React.FC<RatingButtonsProps> = ({
   return (
     <>
       <div className={cn("flex flex-wrap gap-2 justify-between", className)}>
-        {options.map((option) => (
-          <TooltipProvider key={option.value}>
-            <Tooltip>
+        <TooltipProvider>
+          {options.map((option) => (
+            <Tooltip key={option.value}>
               <TooltipTrigger asChild>
                 <Button
                   type="button"
@@ -72,8 +72,8 @@ const RatingButtons: React.FC<RatingButtonsProps> = ({
                 </TooltipContent>
               )}
             </Tooltip>
-          </TooltipProvider>
-        ))}
+          ))}
+        </TooltipProvider>
       </div>
 
       {/* Notes Dialog */}
