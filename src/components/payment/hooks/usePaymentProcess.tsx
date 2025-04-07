@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -25,7 +24,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<PaymentError | null>(null);
 
-  // Get plan details
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -33,9 +31,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Load registration data from session storage
   const loadRegistrationData = () => {
-    // If user is authenticated, we don't need registration data
     if (user) return true;
     
     const storedData = sessionStorage.getItem('registration_data');
@@ -63,25 +59,21 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     }
   };
 
-  // Process payment and handle token storage
   const handlePaymentProcessing = async (tokenData: TokenData) => {
     try {
       setPaymentError(null);
       
-      // Determine operation type based on plan and whether the user exists
-      let operationType = 3; // Default: token creation only (for monthly trial)
+      let operationType = 3; // Default: token creation only (for monthly subscription with free trial)
       
       if (planId === 'annual') {
-        operationType = 2; // Charge and create token
+        operationType = 2; // Charge and create token for recurring annual payments
       } else if (planId === 'vip') {
-        operationType = 1; // Charge only
+        operationType = 1; // Charge only - one-time payment
       }
       
-      // If the user is authenticated, handle the payment immediately
       if (user) {
         await handleExistingUserPayment(tokenData, operationType);
       } else if (registrationData) {
-        // For new users, store the token with registration data
         const updatedData = {
           ...registrationData,
           paymentToken: {
@@ -96,16 +88,13 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
         setRegistrationData(updatedData);
         
-        // Proceed with user registration if we have all the data
         if (updatedData.email && updatedData.password) {
           await registerNewUser(updatedData, tokenData);
         }
       } else {
-        // Create a temporary record that will be completed after payment
         const tempRegId = `temp_reg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         localStorage.setItem('temp_registration_id', tempRegId);
         
-        // Store minimal registration data with token information
         const minimalRegData = {
           planId,
           paymentToken: {
@@ -119,7 +108,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         
         sessionStorage.setItem('registration_data', JSON.stringify(minimalRegData));
         
-        // We'll redirect to the registration form after this
         toast.success('התשלום התקבל בהצלחה! נא להשלים את תהליך ההרשמה.');
         onPaymentComplete();
       }
@@ -137,7 +125,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     }
   };
 
-  // Handle payment process for existing users
   const handleExistingUserPayment = async (tokenData: TokenData, operationType: number) => {
     if (!user) return;
     
@@ -147,7 +134,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       operationType
     });
     
-    // Create direct payment using our tokenization service
     const now = new Date();
     let trialEndsAt = null;
     let periodEndsAt = null;
@@ -160,7 +146,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
     }
     
-    // Update subscription in database
     const { error: subscriptionError } = await supabase
       .from('subscriptions')
       .upsert({
@@ -178,10 +163,8 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       throw new Error(`שגיאה בעדכון מנוי: ${subscriptionError.message}`);
     }
     
-    // Record payment history
     const price = planDetails[planId as keyof typeof planDetails]?.price || 0;
     
-    // Only create payment record for non-trial or if explicitly charging
     if (planId !== 'monthly' || operationType !== 3) {
       await supabase
         .from('payment_history')
@@ -197,7 +180,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           }
         });
     } else {
-      // For trials, record a trial_started entry
       await supabase
         .from('payment_history')
         .insert({
@@ -213,10 +195,8 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     toast.success('התשלום התקבל בהצלחה!');
   };
 
-  // Register new user after payment is complete
   const registerNewUser = async (registrationData: any, tokenData: TokenData) => {
     try {
-      // Register user with Supabase Functions
       const { data, error } = await supabase.functions.invoke('register-user', {
         body: {
           registrationData,
@@ -236,7 +216,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         throw new Error(data?.error || 'שגיאה לא ידועה בתהליך ההרשמה');
       }
       
-      // Sign in the new user
       if (registrationData.email && registrationData.password) {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: registrationData.email,
@@ -245,11 +224,9 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         
         if (signInError) {
           console.error("Error signing in after registration:", signInError);
-          // Continue despite sign-in error, user can sign in manually
         }
       }
       
-      // Clear registration data
       sessionStorage.removeItem('registration_data');
       
       toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
@@ -263,7 +240,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     }
   };
 
-  // Handle form submission with card details
   const handleSubmit = async (e: React.FormEvent, cardData: {
     cardNumber: string;
     cardholderName: string;
@@ -282,9 +258,8 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     setIsProcessing(true);
     
     try {
-      // Create token data from card details
       const tokenData: TokenData = {
-        token: `sim_${Date.now()}`, // In real implementation, this would be a real token from CardCom
+        token: `sim_${Date.now()}`,
         lastFourDigits: cardNumber.replace(/\s/g, '').slice(-4),
         expiryMonth: expiryDate.split('/')[0],
         expiryYear: `20${expiryDate.split('/')[1]}`,
@@ -300,19 +275,17 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     }
   };
 
-  // External payment processing with CardCom
   const handleExternalPayment = async () => {
     setIsProcessing(true);
     try {
-      let operationType = 3; // Default: token creation only (for monthly trial)
+      let operationType = 3; // Default: token creation only (for monthly with free trial)
       
       if (planId === 'annual') {
-        operationType = 2; // Charge and create token
+        operationType = 2; // Charge and create token for recurring payments
       } else if (planId === 'vip') {
-        operationType = 1; // Charge only
+        operationType = 1; // Charge only for one-time payment
       }
 
-      // Determine user info for the payload
       const userInfo = user 
         ? { userId: user.id, email: user.email }
         : registrationData
@@ -340,12 +313,10 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       }
 
       if (data?.url) {
-        // If we have a temp registration ID, store it
         if (data.tempRegistrationId) {
           localStorage.setItem('temp_registration_id', data.tempRegistrationId);
         }
         
-        // Redirect to payment page
         window.location.href = data.url;
       } else {
         throw new Error('לא התקבלה כתובת תשלום מהשרת');
