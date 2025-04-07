@@ -22,7 +22,7 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
   const isMonthlyPlan = selectedPlan === 'monthly';
 
   return (
-    <CardHeader className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-7 border-b border-primary/20" dir="rtl">
+    <CardHeader className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-5 border-b border-primary/20" dir="rtl">
       {/* Background effects */}
       <div className="absolute inset-0 opacity-5 background-noise"></div>
       <div className="absolute -top-40 -right-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
@@ -30,7 +30,7 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
       
       {/* Header content with improved typography */}
       <div className="relative">
-        <div className="flex flex-col gap-2 mb-5 animate-fade-in">
+        <div className="flex flex-col gap-2 mb-4 animate-fade-in">
           <h2 className="text-xl font-medium tracking-wider text-white text-right leading-relaxed">
             הזן את פרטי הכרטיס האשראי שלך לתשלום
           </h2>

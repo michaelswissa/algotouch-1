@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle, Gift, Star, Shield, Clock, ArrowRight, Users, Diamond } from 'lucide-react';
+import { CheckCircle, Gift, Star, Shield, Clock, ArrowRight, Diamond } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -16,11 +16,11 @@ interface PlanDetailsSummaryProps {
 
 const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, isMonthlyPlan }) => {
   return (
-    <div className="mt-5 overflow-hidden animate-fade-in">
-      {/* Plan details card with enhanced design and value proposition */}
+    <div className="mt-4 overflow-hidden animate-fade-in">
+      {/* Plan details card with enhanced design and more compact layout */}
       <div className="bg-slate-800/90 rounded-lg overflow-hidden border border-primary/20 shadow-lg">
         {/* Enhanced plan header with better visual hierarchy */}
-        <div className="bg-gradient-to-r from-slate-700/80 to-slate-800/90 px-4 py-3 border-b border-primary/20">
+        <div className="bg-gradient-to-r from-slate-700/80 to-slate-800/90 px-4 py-2.5 border-b border-primary/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {isMonthlyPlan ? (
@@ -55,36 +55,31 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
         </div>
         
         {/* Plan description with improved typography */}
-        <div className="px-4 py-3 text-right bg-slate-700/20">
+        <div className="px-4 py-2 text-right bg-slate-700/20">
           <p className="text-slate-300 text-sm">{planDetails.description}</p>
         </div>
         
-        {/* Enhanced features with visual grouping and better hierarchy */}
-        <div className="px-4 py-4 bg-slate-700/30 border-t border-slate-600/40">
-          <h4 className="text-sm font-medium text-white mb-3 text-right">יתרונות המנוי:</h4>
-          <div className="grid grid-cols-1 gap-4">
+        {/* Enhanced features with more consistent icons and better spacing */}
+        <div className="px-4 py-3 bg-slate-700/30 border-t border-slate-600/40">
+          <h4 className="text-sm font-medium text-white mb-2 text-right">יתרונות המנוי:</h4>
+          <div className="grid grid-cols-1 gap-3">
             <FeatureItem 
-              icon={<Shield className="h-4.5 w-4.5 text-cyan-400" />}
+              icon={<Shield className="h-4 w-4 text-cyan-400" />}
               title="גישה מלאה לכל התכונות"
-              description="כל הכלים, הקורסים והמשאבים שלנו ללא הגבלה"
+              description="כל הכלים והמשאבים שלנו ללא הגבלה"
               highlighted
             />
             <FeatureItem 
-              icon={<Clock className="h-4.5 w-4.5 text-green-400" />}
-              title="ביטול בכל עת, ללא התחייבות"
-              description="שליטה מלאה בידיים שלך - תוכל לבטל מתי שתרצה"
+              icon={<Clock className="h-4 w-4 text-green-400" />}
+              title="ביטול בכל עת"
+              description="שליטה מלאה בידיים שלך"
               highlighted
-            />
-            <FeatureItem 
-              icon={<Users className="h-4.5 w-4.5 text-blue-400" />}
-              title="תמיכה אישית מהמומחים שלנו"
-              description="צוות מקצועי זמין לכל שאלה ובעיה"
             />
             
             {isMonthlyPlan && (
               <div className="flex items-center gap-2 justify-end text-sm mt-1">
                 <div className={cn(
-                  "flex items-center gap-2 py-2 px-4 rounded-md",
+                  "flex items-center gap-2 py-1.5 px-4 rounded-md",
                   "bg-primary/20 border border-primary/30 shadow-sm hover:shadow transition-all",
                   "text-primary font-medium text-sm animate-pulse-subtle"
                 )}>
@@ -96,19 +91,16 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
           </div>
         </div>
         
-        {/* Enhanced payment info section with better spacing */}
-        <div className="px-4 py-3 bg-slate-700/50 border-t border-slate-600/40">
+        {/* Simplified payment info section */}
+        <div className="px-4 py-2 bg-slate-700/50 border-t border-slate-600/40">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-400 text-right font-medium opacity-80">
               {isMonthlyPlan ? 'החיוב הראשון לאחר 30 יום' : 'חיוב מיידי'}
             </p>
             <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-              <span>שליטה מלאה בידיים שלך</span>
+              <span>מנוי פשוט, ללא אותיות קטנות</span>
               <ArrowRight className="h-3 w-3" />
             </div>
-          </div>
-          <div className="mt-2 text-xs text-center text-slate-400 opacity-70">
-            ללא התחייבות. תוכל לבטל בכל רגע.
           </div>
         </div>
       </div>
