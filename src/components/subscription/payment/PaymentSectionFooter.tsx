@@ -39,14 +39,14 @@ const PaymentSectionFooter: React.FC<PaymentSectionFooterProps> = ({
       </Alert>
       
       {/* Start button for mobile - enhanced with shadow and hover effects */}
-      <div className="w-full sm:hidden mt-5">
+      <div className="w-full sm:hidden mt-6">
         <Button 
           size="lg"
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 hover:scale-[1.02] shadow-[0_4px_12px_-4px_rgba(0,102,255,0.3)] transition-all"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-95 hover:scale-[1.03] shadow-[0_4px_16px_-4px_rgba(0,102,255,0.4)] transition-all group"
           disabled={isLoading}
         >
           <span>{isMonthlyPlan ? 'התחל תקופת ניסיון' : 'המשך לתשלום'}</span>
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
         </Button>
       </div>
     </CardFooter>
