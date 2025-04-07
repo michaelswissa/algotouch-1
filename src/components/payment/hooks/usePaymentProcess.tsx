@@ -1,28 +1,31 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { TokenData, RegistrationData } from '@/types/payment';
+import { TokenData } from '@/types/payment';
 import { getSubscriptionPlans } from '../utils/paymentHelpers';
-
-interface UsePaymentProcessProps {
-  planId: string;
-  onPaymentComplete: () => void;
-}
-
-interface PaymentError extends Error {
-  code?: string;
-  details?: any;
-}
+import { useRegistrationData } from './useRegistrationData';
+import { 
+  handleExistingUserPayment, 
+  registerNewUser,
+  initiateExternalPayment
+} from '../services/paymentService';
+import { UsePaymentProcessProps, PaymentError } from './types';
 
 export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProcessProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
-  const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<PaymentError | null>(null);
+  
+  const { 
+    registrationData, 
+    registrationError, 
+    loadRegistrationData,
+    updateRegistrationData,
+    clearRegistrationData
+  } = useRegistrationData();
 
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -30,34 +33,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     : planId === 'vip' 
       ? planDetails.vip 
       : planDetails.monthly;
-
-  const loadRegistrationData = () => {
-    if (user) return true;
-    
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setRegistrationData(parsedData);
-        console.log("Loaded registration data:", {
-          email: parsedData.email,
-          hasPassword: !!parsedData.password,
-          hasUserData: !!parsedData.userData,
-          planId: parsedData.planId,
-          hasPaymentToken: !!parsedData.paymentToken
-        });
-        
-        return true;
-      } catch (e) {
-        console.error("Error parsing registration data:", e);
-        setRegistrationError('שגיאה בטעינת פרטי הרשמה. אנא נסה מחדש.');
-        return false;
-      }
-    } else {
-      console.log("No registration data found but that's okay - user can pay first and register later");
-      return true;
-    }
-  };
 
   const handlePaymentProcessing = async (tokenData: TokenData) => {
     try {
@@ -72,7 +47,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       }
       
       if (user) {
-        await handleExistingUserPayment(tokenData, operationType);
+        await handleExistingUserPayment(user.id, planId, tokenData, operationType, planDetails);
       } else if (registrationData) {
         const updatedData = {
           ...registrationData,
@@ -86,7 +61,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         };
         
         sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
-        setRegistrationData(updatedData);
+        updateRegistrationData(updatedData);
         
         if (updatedData.email && updatedData.password) {
           await registerNewUser(updatedData, tokenData);
@@ -109,7 +84,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         sessionStorage.setItem('registration_data', JSON.stringify(minimalRegData));
         
         toast.success('התשלום התקבל בהצלחה! נא להשלים את תהליך ההרשמה.');
-        onPaymentComplete();
       }
       
       onPaymentComplete();
@@ -122,121 +96,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       setPaymentError(paymentError);
       toast.error(error.message || 'שגיאה בתהליך התשלום. אנא נסה שנית.');
-    }
-  };
-
-  const handleExistingUserPayment = async (tokenData: TokenData, operationType: number) => {
-    if (!user) return;
-    
-    console.log('Processing payment for existing user:', {
-      userId: user.id,
-      planId,
-      operationType
-    });
-    
-    const now = new Date();
-    let trialEndsAt = null;
-    let periodEndsAt = null;
-    
-    if (planId === 'monthly') {
-      trialEndsAt = new Date(now);
-      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1);
-    } else if (planId === 'annual') {
-      periodEndsAt = new Date(now);
-      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
-    }
-    
-    const { error: subscriptionError } = await supabase
-      .from('subscriptions')
-      .upsert({
-        user_id: user.id,
-        plan_type: planId,
-        status: planId === 'monthly' ? 'trial' : 'active',
-        trial_ends_at: trialEndsAt?.toISOString() || null,
-        current_period_ends_at: periodEndsAt?.toISOString() || null,
-        payment_method: tokenData,
-        contract_signed: true,
-        contract_signed_at: now.toISOString()
-      });
-    
-    if (subscriptionError) {
-      throw new Error(`שגיאה בעדכון מנוי: ${subscriptionError.message}`);
-    }
-    
-    const price = planDetails[planId as keyof typeof planDetails]?.price || 0;
-    
-    if (planId !== 'monthly' || operationType !== 3) {
-      await supabase
-        .from('payment_history')
-        .insert({
-          user_id: user.id,
-          subscription_id: user.id,
-          amount: price,
-          currency: 'USD',
-          status: 'completed',
-          payment_method: {
-            ...tokenData,
-            simulated: false 
-          }
-        });
-    } else {
-      await supabase
-        .from('payment_history')
-        .insert({
-          user_id: user.id,
-          subscription_id: user.id,
-          amount: 0,
-          currency: 'USD',
-          status: 'trial_started',
-          payment_method: tokenData
-        });
-    }
-    
-    toast.success('התשלום התקבל בהצלחה!');
-  };
-
-  const registerNewUser = async (registrationData: any, tokenData: TokenData) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('register-user', {
-        body: {
-          registrationData,
-          tokenData: {
-            ...tokenData,
-            simulated: false
-          },
-          contractDetails: registrationData.contractDetails || null
-        }
-      });
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      if (!data?.success) {
-        throw new Error(data?.error || 'שגיאה לא ידועה בתהליך ההרשמה');
-      }
-      
-      if (registrationData.email && registrationData.password) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: registrationData.email,
-          password: registrationData.password
-        });
-        
-        if (signInError) {
-          console.error("Error signing in after registration:", signInError);
-        }
-      }
-      
-      sessionStorage.removeItem('registration_data');
-      
-      toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
-      
-      return { success: true, userId: data.userId };
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      
-      const registrationError = new Error(error.message || 'שגיאה בתהליך ההרשמה');
-      throw registrationError;
     }
   };
 
@@ -278,49 +137,13 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   const handleExternalPayment = async () => {
     setIsProcessing(true);
     try {
-      let operationType = 3; // Default: token creation only (for monthly with free trial)
+      const data = await initiateExternalPayment(planId, user, registrationData);
       
-      if (planId === 'annual') {
-        operationType = 2; // Charge and create token for recurring payments
-      } else if (planId === 'vip') {
-        operationType = 1; // Charge only for one-time payment
+      if (data.tempRegistrationId) {
+        localStorage.setItem('temp_registration_id', data.tempRegistrationId);
       }
-
-      const userInfo = user 
-        ? { userId: user.id, email: user.email }
-        : registrationData
-          ? { 
-              fullName: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim(),
-              email: registrationData.email,
-              registrationData
-            }
-          : { fullName: '', email: '' };
-
-      const payload = {
-        planId,
-        ...userInfo,
-        operationType,
-        successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${planId}`,
-        errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${planId}`
-      };
-
-      const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
-        body: payload
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (data?.url) {
-        if (data.tempRegistrationId) {
-          localStorage.setItem('temp_registration_id', data.tempRegistrationId);
-        }
-        
-        window.location.href = data.url;
-      } else {
-        throw new Error('לא התקבלה כתובת תשלום מהשרת');
-      }
+      
+      window.location.href = data.url;
     } catch (error: any) {
       console.error('Error initiating external payment:', error);
       
