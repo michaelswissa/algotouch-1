@@ -16,12 +16,12 @@ interface PlanDetailsSummaryProps {
 
 const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, isMonthlyPlan }) => {
   return (
-    <div className="mt-6 overflow-hidden animate-fade-in">
-      {/* Plan details card with enhanced design and more compact layout */}
+    <div className="mt-5 overflow-hidden animate-fade-in">
+      {/* More compact plan details card */}
       <div className="bg-slate-800/90 rounded-lg overflow-hidden border border-white/10 shadow-inner">
-        {/* Enhanced plan header with better visual hierarchy */}
-        <div className="bg-gradient-to-r from-slate-700/80 to-slate-800/90 px-4 py-3.5 border-b border-primary/20">
-          <div className="flex items-center justify-between gap-4">
+        {/* Reorganized plan header with stars and selection text moved to the left */}
+        <div className="bg-gradient-to-r from-slate-700/80 to-slate-800/90 px-4 py-3 border-b border-primary/20">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               {isMonthlyPlan ? (
                 <Clock className="h-5 w-5 text-primary" />
@@ -43,25 +43,25 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
             </div>
           </div>
           
-          {/* Updated social proof with trader selection with proper RTL - improved spacing */}
-          <div className="flex items-center justify-end gap-1.5 mt-4 text-xs text-slate-200">
-            <span>נבחר בקפידה ע"י סוחרים מנוסים</span>
+          {/* Stars and social proof moved to the left with RTL alignment */}
+          <div className="flex items-center justify-start gap-1.5 mt-3 text-xs text-slate-200">
             <div className="flex">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
               ))}
             </div>
+            <span>נבחר בקפידה ע"י סוחרים מנוסים</span>
           </div>
         </div>
         
-        {/* Plan description with improved typography */}
-        <div className="px-4 py-3 text-right bg-slate-700/20">
+        {/* More compact plan description */}
+        <div className="px-4 py-2 text-right bg-slate-700/20">
           <p className="text-slate-300 text-sm leading-relaxed">{planDetails.description}</p>
         </div>
         
-        {/* Restructured features section with better spacing and visual separation */}
-        <div className="px-4 py-5 bg-slate-700/30 border-t border-slate-600/40">
-          <div className="flex flex-col gap-6 bg-slate-800/70 p-4 rounded-xl border border-white/10 shadow-[inset_0_2px_8px_rgba(0,0,0,0.2)]">
+        {/* More compact features section */}
+        <div className="px-4 py-4 bg-slate-700/30 border-t border-slate-600/40">
+          <div className="flex flex-col gap-4 bg-slate-800/70 p-3 rounded-xl border border-white/10 shadow-[inset_0_2px_8px_rgba(0,0,0,0.2)]">
             <FeatureItem 
               icon={<Shield className="h-5 w-5 text-cyan-400 stroke-[2.2px]" />}
               title="גישה מלאה לכל התכונות"
@@ -84,14 +84,14 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
           </div>
         </div>
         
-        {/* Improved payment info section */}
-        <div className="px-4 py-5 bg-slate-700/50 border-t border-slate-600/40">
+        {/* More compact payment info section */}
+        <div className="px-4 py-3 bg-slate-700/50 border-t border-slate-600/40">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1.5 rounded-full hover:bg-primary/15 transition-colors">
+            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full hover:bg-primary/15 transition-colors">
               <ArrowRight className="h-3.5 w-3.5" />
               <span>מנוי פשוט, ללא אותיות קטנות</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium mt-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
               <Calendar className="h-3.5 w-3.5 text-slate-400" />
               <p className="text-[#C1C7D0] leading-[1.6]">
                 {isMonthlyPlan ? 'החיוב הראשון לאחר 30 יום' : 'חיוב מיידי'}
@@ -114,19 +114,19 @@ interface FeatureItemProps {
 export const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, description, highlighted }) => (
   <div className="flex items-center group">
     <div className={cn(
-      "bg-slate-700/80 p-2.5 rounded-full flex items-center justify-center group-hover:scale-105 transition-all",
+      "bg-slate-700/80 p-2 rounded-full flex items-center justify-center group-hover:scale-105 transition-all",
       highlighted ? "bg-primary/20 shadow-sm" : ""
     )}>
       {icon}
     </div>
     <div className="mr-3 text-right">
       <div className={cn(
-        "font-medium leading-relaxed", 
+        "font-medium leading-snug", 
         highlighted ? "text-white text-sm" : "text-slate-200 text-sm"
       )}>
         {title}
       </div>
-      <p className="text-xs text-slate-400 mt-0.5 leading-[1.5]">
+      <p className="text-xs text-slate-400 mt-0.5 leading-tight">
         {description}
       </p>
     </div>
