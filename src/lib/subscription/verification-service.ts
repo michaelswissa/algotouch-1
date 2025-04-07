@@ -191,19 +191,10 @@ export async function recordFailedPayment(
       currency: 'ILS'
     });
     
-    // Update subscription with failure count
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('payment_failures')
-      .eq('id', subscriptionId)
-      .single();
-    
-    const failureCount = (subscription?.payment_failures || 0) + 1;
-    
+    // Update subscription with last payment failure info
     await supabase
       .from('subscriptions')
       .update({
-        payment_failures: failureCount,
         last_payment_failure: new Date().toISOString(),
         payment_failure_reason: error?.message || 'Unknown error'
       })
@@ -224,7 +215,6 @@ export async function clearFailedPaymentStatus(subscriptionId: string): Promise<
     await supabase
       .from('subscriptions')
       .update({
-        payment_failures: 0,
         last_payment_failure: null,
         payment_failure_reason: null
       })

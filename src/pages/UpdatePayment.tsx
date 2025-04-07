@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import PaymentCardForm from '@/components/payment/PaymentCardForm';
 import { clearFailedPaymentStatus } from '@/lib/subscription/verification-service';
 import { useEnhancedSubscription } from '@/contexts/subscription/EnhancedSubscriptionContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const UpdatePayment = () => {
   const navigate = useNavigate();
