@@ -29,13 +29,13 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
       
       {/* Header content */}
       <div className="relative">
-        <div className="flex flex-col gap-1 mb-5 animate-fade-in">
+        <div className="flex flex-col gap-1 mb-4 animate-fade-in">
           <h2 className="text-xl font-bold tracking-wider text-white text-right">הזן את פרטי הכרטיס האשראי שלך לתשלום</h2>
           <p className="text-slate-400 text-sm text-right">בחרת במסלול {planDetails.name}</p>
         </div>
       </div>
       
-      {/* Enhanced plan summary box with improved styling */}
+      {/* Updated premium plan summary box with improved styling */}
       <PlanDetailsSummary planDetails={planDetails} isMonthlyPlan={isMonthlyPlan} />
     </CardHeader>
   );
