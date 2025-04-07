@@ -1,5 +1,5 @@
 
-import { TokenData } from '../utils/paymentHelpers';
+import { TokenData } from '@/types/payment';
 
 export interface UsePaymentProcessProps {
   planId: string;
