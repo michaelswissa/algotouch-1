@@ -8,7 +8,6 @@ import PlanSummary from './PlanSummary';
 import SecurityNote from './SecurityNote';
 import { SubscriptionPlan } from '@/types/payment';
 import { ChevronRight } from 'lucide-react';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
 interface PaymentCardFormProps {
   plan: SubscriptionPlan;
@@ -42,15 +41,13 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
   return (
     <form onSubmit={handleSubmitForm}>
       <CardContent className="space-y-5 pt-4">
-        <TooltipProvider>
-          <PlanSummary 
-            planName={plan.name} 
-            price={plan.price} 
-            description={plan.description}
-            hasTrial={planId === 'monthly'}
-            currency="$" 
-          />
-        </TooltipProvider>
+        <PlanSummary 
+          planName={plan.name} 
+          price={plan.price} 
+          description={plan.description}
+          hasTrial={planId === 'monthly'}
+          currency="$" 
+        />
         
         <Separator />
         
