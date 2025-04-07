@@ -69,6 +69,27 @@ export interface FunctionsDatabase {
         };
         Returns: unknown;
       };
+      process_token_charge: {
+        Args: {
+          token: string;
+          amount: number;
+          card_owner_name?: string;
+          card_owner_email?: string;
+          card_owner_phone?: string;
+          identity_number?: string;
+          num_of_payments?: number;
+          external_transaction_id?: string;
+        };
+        Returns: {
+          success: boolean;
+          transaction_id?: string;
+          amount?: number;
+          approval_number?: string;
+          card_last_digits?: string;
+          error?: string;
+          details?: any;
+        };
+      };
     };
   };
 }
