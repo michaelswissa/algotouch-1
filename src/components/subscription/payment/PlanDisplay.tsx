@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle, Gift, Star, Shield, Clock, ArrowRight, Diamond } from 'lucide-react';
+import { Shield, Gift, Star, Clock, ArrowRight, Diamond } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -43,14 +43,14 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
             </div>
           </div>
           
-          {/* Updated social proof with trader selection instead of user count */}
+          {/* Updated social proof with trader selection with proper RTL */}
           <div className="flex items-center gap-1 mt-2 text-xs text-slate-300 justify-end">
-            <span>נבחר בקפידה על ידי סוחרים מנוסים</span>
             <div className="flex">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} className="h-3 w-3 text-amber-400 fill-amber-400" />
               ))}
             </div>
+            <span>נבחר בקפידה על ידי סוחרים מנוסים</span>
           </div>
         </div>
         
@@ -59,34 +59,28 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
           <p className="text-slate-300 text-sm">{planDetails.description}</p>
         </div>
         
-        {/* Enhanced features with more consistent icons and better spacing */}
+        {/* Restructured features section with consistent styling and vertical layout */}
         <div className="px-4 py-3 bg-slate-700/30 border-t border-slate-600/40">
-          <h4 className="text-sm font-medium text-white mb-2 text-right">יתרונות המנוי:</h4>
-          <div className="grid grid-cols-1 gap-3">
+          <h4 className="text-sm font-medium text-white mb-3 text-right">יתרונות המנוי:</h4>
+          <div className="flex flex-col gap-3 text-right">
             <FeatureItem 
               icon={<Shield className="h-4 w-4 text-cyan-400" />}
               title="גישה מלאה לכל התכונות"
               description="כל הכלים והמשאבים שלנו ללא הגבלה"
-              highlighted
             />
             <FeatureItem 
               icon={<Clock className="h-4 w-4 text-green-400" />}
               title="ביטול בכל עת"
               description="שליטה מלאה בידיים שלך"
-              highlighted
             />
             
             {isMonthlyPlan && (
-              <div className="flex items-center gap-2 justify-end text-sm mt-1">
-                <div className={cn(
-                  "flex items-center gap-2 py-1.5 px-4 rounded-md",
-                  "bg-primary/20 border border-primary/30 shadow-sm hover:shadow transition-all",
-                  "text-primary font-medium text-sm animate-pulse-subtle"
-                )}>
-                  <span>חודש ניסיון חינם</span>
-                  <Gift className="h-4 w-4" />
-                </div>
-              </div>
+              <FeatureItem 
+                icon={<Gift className="h-4 w-4 text-primary" />}
+                title="חודש ניסיון חינם"
+                description="נסה את המערכת ללא תשלום"
+                highlighted
+              />
             )}
           </div>
         </div>
@@ -94,13 +88,13 @@ const PlanDetailsSummary: React.FC<PlanDetailsSummaryProps> = ({ planDetails, is
         {/* Simplified payment info section */}
         <div className="px-4 py-2 bg-slate-700/50 border-t border-slate-600/40">
           <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+              <ArrowRight className="h-3 w-3" />
+              <span>מנוי פשוט, ללא אותיות קטנות</span>
+            </div>
             <p className="text-xs text-slate-400 text-right font-medium opacity-80">
               {isMonthlyPlan ? 'החיוב הראשון לאחר 30 יום' : 'חיוב מיידי'}
             </p>
-            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-              <span>מנוי פשוט, ללא אותיות קטנות</span>
-              <ArrowRight className="h-3 w-3" />
-            </div>
           </div>
         </div>
       </div>
@@ -125,12 +119,8 @@ export const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, descripti
         )}>
           {title}
         </span>
-        <CheckCircle className={cn(
-          "h-4 w-4 flex-shrink-0",
-          highlighted ? "text-primary" : "text-green-400"
-        )} />
       </div>
-      <p className="text-xs text-slate-400 mt-0.5 pr-6">
+      <p className="text-xs text-slate-400 mt-0.5">
         {description}
       </p>
     </div>
