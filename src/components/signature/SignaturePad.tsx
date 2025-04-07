@@ -44,8 +44,8 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
     context.strokeStyle = '#000000';
     setCtx(context);
     
-    // Clear canvas and set background
-    context.fillStyle = '#f8f8f8';
+    // Clear canvas and set background to pure white
+    context.fillStyle = '#FFFFFF';
     context.fillRect(0, 0, canvas.width, canvas.height);
     
     // Load signature if provided
@@ -120,7 +120,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
   const clearSignature = () => {
     if (!ctx || !canvasRef.current) return;
     
-    ctx.fillStyle = '#f8f8f8';
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     setHasSignature(false);
     onChange('');
@@ -128,7 +128,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
 
   return (
     <div className="flex flex-col space-y-2">
-      <div className="border rounded-md overflow-hidden bg-[#f8f8f8] dark:bg-slate-900 w-full" style={{ width, height }}>
+      <div className="border rounded-md overflow-hidden bg-white w-full" style={{ width, height }}>
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
