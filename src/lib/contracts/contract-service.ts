@@ -1,8 +1,6 @@
 
 import { toast } from 'sonner';
-import { callIzidocSignFunction, ContractData } from './izidoc-service';
-import { saveContractToDatabase, updateSubscriptionStatus, ensureContractsBucketExists } from './storage-service';
-import { sendContractConfirmationEmail } from './email-service';
+import { saveContractToDatabase, updateSubscriptionStatus } from './storage-service';
 
 /**
  * Processes a signed contract, saving it to the database and sending confirmation
@@ -12,7 +10,7 @@ export async function processSignedContract(
   planId: string,
   fullName: string,
   email: string,
-  contractData: ContractData
+  contractData: any
 ): Promise<boolean> {
   try {
     console.log('Processing signed contract for user:', { userId, planId, email });
@@ -29,43 +27,12 @@ export async function processSignedContract(
       return false;
     }
     
-    // Ensure contracts bucket exists
-    await ensureContractsBucketExists();
-    
-    // Improved logging to debug contract data
-    console.log('Contract data signature length:', contractData.signature?.length || 0);
-    console.log('Contract data contains HTML:', Boolean(contractData.contractHtml));
-    console.log('Contract user agreement:', {
-      agreedToTerms: contractData.agreedToTerms,
-      agreedToPrivacy: contractData.agreedToPrivacy
-    });
-    
-    // Try the direct edge function approach first (preferred)
-    const result = await callIzidocSignFunction(userId, planId, fullName, email, contractData);
-    
-    if (result.success) {
-      // Function call was successful
-      toast.success('ההסכם נחתם ונשמר בהצלחה!');
-      return true;
-    }
-    
-    console.warn('Direct function call failed, falling back to client-side processing', result.error);
-    
-    // Save the contract signature to Supabase directly as fallback
+    // Save the contract signature to Supabase
     const saveResult = await saveContractToDatabase(userId, planId, fullName, email, contractData);
     
     if (!saveResult.success) {
       toast.error('שגיאה בשמירת החתימה');
       return false;
-    }
-    
-    // Also try to send a confirmation email directly, in case the edge function fails
-    try {
-      await sendContractConfirmationEmail(email, fullName, new Date().toISOString());
-      console.log('Contract confirmation email sent directly');
-    } catch (emailError) {
-      console.error('Error sending direct confirmation email:', emailError);
-      // Don't return false here, as the contract was still saved successfully
     }
     
     // Try to update the subscription status as well
@@ -80,7 +47,5 @@ export async function processSignedContract(
   }
 }
 
-// Re-export component functions for backward compatibility
-export * from './email-service';
-export * from './izidoc-service';
+// Export other functions for backward compatibility
 export * from './storage-service';

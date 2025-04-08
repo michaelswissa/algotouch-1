@@ -1,39 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
-import { ContractData } from './izidoc-service';
-import { toast } from 'sonner';
 
-/**
- * Ensures that the contracts storage bucket exists
- */
-export async function ensureContractsBucketExists(): Promise<boolean> {
-  try {
-    // Check if the bucket exists
-    const { data: bucketExists, error: checkError } = await supabase.storage
-      .getBucket('contracts');
-    
-    if (checkError) {
-      console.log('Error checking bucket, attempting to create it:', checkError);
-      // Try to create the bucket if it doesn't exist
-      const { error: createError } = await supabase.storage
-        .createBucket('contracts', {
-          public: false,
-          fileSizeLimit: 10485760, // 10MB
-        });
-      
-      if (createError) {
-        console.error('Error creating contracts bucket:', createError);
-        return false;
-      }
-      
-      return true;
-    }
-    
-    return !!bucketExists;
-  } catch (error) {
-    console.error('Exception in ensureContractsBucketExists:', error);
-    return false;
-  }
-}
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 /**
  * Saves contract signature data directly to Supabase
@@ -43,32 +10,15 @@ export async function saveContractToDatabase(
   planId: string,
   fullName: string,
   email: string,
-  contractData: ContractData
+  contractData: any
 ): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
-    // First ensure the storage bucket exists
-    await ensureContractsBucketExists();
+    console.log('Saving contract for user:', userId, 'plan:', planId);
     
-    // Store the contract HTML in storage first
-    const contractFileName = `contract_${userId}_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(contractData.contractHtml);
-    
-    console.log('Uploading contract to storage bucket for user:', userId);
-    
-    // Try to upload the contract to storage
-    const { data: storageData, error: storageError } = await supabase
-      .storage
-      .from('contracts')
-      .upload(`${userId}/${contractFileName}`, bytes, {
-        contentType: 'text/html',
-        upsert: true
-      });
-    
-    if (storageError) {
-      console.error('Error saving contract to storage:', storageError);
-    } else {
-      console.log('Contract saved to storage successfully:', storageData?.path);
+    // Validate inputs
+    if (!userId || !contractData?.contractHtml || !contractData?.signature) {
+      console.error('Missing required contract data');
+      return { success: false, error: 'Missing required contract data' };
     }
     
     // Store contract signature in the database
@@ -81,14 +31,13 @@ export async function saveContractToDatabase(
         email: email,
         signature: contractData.signature,
         contract_html: contractData.contractHtml,
-        agreed_to_terms: contractData.agreedToTerms,
-        agreed_to_privacy: contractData.agreedToPrivacy,
+        agreed_to_terms: contractData.agreedToTerms || false,
+        agreed_to_privacy: contractData.agreedToPrivacy || false,
         contract_version: contractData.contractVersion || "1.0",
         browser_info: contractData.browserInfo || {
           userAgent: navigator.userAgent,
           language: navigator.language,
           platform: navigator.platform,
-          screenSize: `${window.innerWidth}x${window.innerHeight}`,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         }
       })
@@ -96,29 +45,14 @@ export async function saveContractToDatabase(
       .single();
 
     if (error) {
-      console.error('Error saving contract signature directly:', error);
+      console.error('Error saving contract signature:', error);
       return { success: false, error };
     }
 
     console.log('Contract signature saved successfully:', data);
     
-    // Generate a URL to the saved contract
-    const { data: urlData } = await supabase
-      .storage
-      .from('contracts')
-      .createSignedUrl(`${userId}/${contractFileName}`, 60 * 60 * 24 * 7); // 7 days
-    
-    if (urlData?.signedUrl) {
-      console.log('Contract signed URL created:', urlData.signedUrl);
-      
-      // Update the contract_signatures record with the PDF URL
-      await supabase
-        .from('contract_signatures')
-        .update({
-          pdf_url: urlData.signedUrl
-        })
-        .eq('id', data.id);
-    }
+    // Update subscription status
+    await updateSubscriptionStatus(userId);
     
     return { success: true, data };
   } catch (error) {
@@ -153,63 +87,27 @@ export async function updateSubscriptionStatus(userId: string): Promise<{ succes
 }
 
 /**
- * Gets the URL of a signed contract for a user
+ * Verifies if a contract has been signed
  */
-export async function getContractURL(userId: string): Promise<string | null> {
+export async function verifyContractSignature(userId: string): Promise<{ signed: boolean; signedAt?: string }> {
   try {
-    // First check if we have a stored URL in contract_signatures
-    const { data: signature, error } = await supabase
-      .from('contract_signatures')
-      .select('id, pdf_url, contract_html')
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('contract_signed, contract_signed_at')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
       .maybeSingle();
     
     if (error) {
-      console.error('Error getting contract signature:', error);
-      return null;
+      console.error('Error verifying contract signature:', error);
+      return { signed: false };
     }
     
-    // If we have a stored URL, return it
-    if (signature?.pdf_url) {
-      return signature.pdf_url;
-    }
-    
-    // If we have the HTML but no URL, create a new URL
-    if (signature?.contract_html) {
-      // List files in user's folder to find the contract
-      const { data: files } = await supabase
-        .storage
-        .from('contracts')
-        .list(userId);
-      
-      const contractFile = files?.find(file => file.name.startsWith('contract_'));
-      
-      if (contractFile) {
-        // Create a signed URL
-        const { data } = await supabase
-          .storage
-          .from('contracts')
-          .createSignedUrl(`${userId}/${contractFile.name}`, 60 * 60 * 24 * 7); // 7 days
-        
-        if (data?.signedUrl) {
-          // Update the record with the new URL
-          if (signature.id) {  // Check if signature.id exists
-            await supabase
-              .from('contract_signatures')
-              .update({ pdf_url: data.signedUrl })
-              .eq('id', signature.id);
-          }
-          
-          return data.signedUrl;
-        }
-      }
-    }
-    
-    return null;
+    return { 
+      signed: data?.contract_signed || false,
+      signedAt: data?.contract_signed_at
+    };
   } catch (error) {
-    console.error('Exception getting contract URL:', error);
-    return null;
+    console.error('Exception verifying contract signature:', error);
+    return { signed: false };
   }
 }

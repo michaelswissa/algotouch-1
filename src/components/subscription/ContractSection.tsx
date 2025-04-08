@@ -29,6 +29,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      // Pass the contract data directly to the parent
       onSign(contractData);
     } catch (error) {
       console.error('Error signing contract:', error);
