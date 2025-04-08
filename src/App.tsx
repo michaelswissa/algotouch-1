@@ -11,10 +11,11 @@ import MySubscriptionPage from './pages/MySubscriptionPage'; // Changed from MyS
 import ContractDetails from './pages/ContractDetails';
 
 import { Toaster } from 'sonner';
+import { AuthProvider } from './contexts/auth/AuthProvider';
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Toaster position="top-center" richColors />
       <Router>
         <Routes>
@@ -31,7 +32,7 @@ function App() {
           <Route path="*" element={<h1>Page not found</h1>} />
         </Routes>
       </Router>
-    </>
+    </AuthProvider>
   );
 }
 
