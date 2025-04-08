@@ -3,28 +3,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider } from "@/contexts/auth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
-import CalendarPage from "./pages/Calendar";
-import TradeJournal from "./pages/TradeJournal";
-import MonthlyReport from "./pages/MonthlyReport";
-import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
-import Community from "./pages/Community";
-import Courses from "./pages/Courses";
-import CourseDetail from "./pages/CourseDetail";
-import AIAssistant from "./pages/AIAssistant";
-import NotFound from "./pages/NotFound";
-import NewTrade from "./pages/NewTrade";
-import Journal from "./pages/Journal";
-import Auth from "./pages/Auth";
-import Profile from "./pages/Profile";
-import Subscription from "./pages/Subscription";
-import MySubscriptionPage from "./pages/MySubscriptionPage";
-import Index from "./pages/Index";
+import AppRoutes from "./AppRoutes";
 
 // Configure with refresh on error
 const queryClient = new QueryClient({
@@ -72,104 +54,7 @@ const App = () => {
                 success: '!bg-green-500/20 border-green-500/50',
               }
             }} />
-            <Routes>
-              {/* Root route - redirects to auth page */}
-              <Route path="/" element={<Index />} />
-              
-              {/* Public routes */}
-              <Route path="/auth" element={
-                <ProtectedRoute requireAuth={false}>
-                  <Auth />
-                </ProtectedRoute>
-              } />
-              
-              {/* Subscription routes - protected to ensure auth first */}
-              <Route path="/subscription/:planId" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
-              <Route path="/subscription" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
-              <Route path="/my-subscription" element={
-                <ProtectedRoute>
-                  <MySubscriptionPage />
-                </ProtectedRoute>
-              } />
-              
-              {/* Protected routes - require authentication */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/calendar" element={
-                <ProtectedRoute>
-                  <CalendarPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/trade-journal" element={
-                <ProtectedRoute>
-                  <TradeJournal />
-                </ProtectedRoute>
-              } />
-              <Route path="/monthly-report" element={
-                <ProtectedRoute>
-                  <MonthlyReport />
-                </ProtectedRoute>
-              } />
-              <Route path="/journal" element={
-                <ProtectedRoute>
-                  <Journal />
-                </ProtectedRoute>
-              } />
-              <Route path="/blog" element={
-                <ProtectedRoute>
-                  <Blog />
-                </ProtectedRoute>
-              } />
-              <Route path="/blog/:id" element={
-                <ProtectedRoute>
-                  <BlogPost />
-                </ProtectedRoute>
-              } />
-              <Route path="/community" element={
-                <ProtectedRoute>
-                  <Community />
-                </ProtectedRoute>
-              } />
-              <Route path="/courses" element={
-                <ProtectedRoute>
-                  <Courses />
-                </ProtectedRoute>
-              } />
-              <Route path="/courses/:courseId" element={
-                <ProtectedRoute>
-                  <CourseDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/ai-assistant" element={
-                <ProtectedRoute>
-                  <AIAssistant />
-                </ProtectedRoute>
-              } />
-              <Route path="/new-trade" element={
-                <ProtectedRoute>
-                  <NewTrade />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              
-              {/* Catch all route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppRoutes />
           </TooltipProvider>
         </AuthProvider>
       </BrowserRouter>

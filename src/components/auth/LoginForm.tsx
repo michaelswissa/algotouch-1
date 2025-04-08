@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface LoginFormProps {
   onLoginSuccess?: () => void;
@@ -14,6 +14,7 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const { signIn, resetPassword } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
@@ -35,6 +36,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       await signIn(email, password);
       
       console.log('Login successful, redirectToSubscription:', state?.redirectToSubscription);
+      
+      // Handle navigation after successful login
+      setTimeout(() => {
+        if (state?.redirectToSubscription) {
+          navigate('/subscription', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 300);
       
       if (onLoginSuccess) {
         onLoginSuccess();
