@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EnhancedProtectedRoute from './components/EnhancedProtectedRoute';
 import { EnhancedSubscriptionProvider } from './contexts/subscription/EnhancedSubscriptionContext';
 import { AuthProvider } from './contexts/auth';
+import './App.css';
 
 // Pages
 import Auth from './pages/Auth';

@@ -163,7 +163,7 @@ const EnhancedProtectedRoute: React.FC<EnhancedProtectedRouteProps> = ({
     }
     
     // Check if the subscription is in grace period
-    if (details && details.gracePeriodActive) {
+    if (details && details.gracePeriodActive === true) {
       // Allow access during grace period with a warning
       toast.warning(`נמצא בתקופת חסד: נותרו ${details.gracePeriodDays || 0} ימים לעדכון פרטי תשלום`, {
         action: {
