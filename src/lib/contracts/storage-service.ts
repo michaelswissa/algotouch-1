@@ -82,6 +82,14 @@ export async function saveContractToDatabase(
     const pdfUrl = uploadResult.success ? uploadResult.url : null;
     console.log(uploadResult.success ? 'Contract uploaded to storage' : 'Failed to upload contract to storage');
     
+    // Always send email with contract to support, as a backup
+    try {
+      await sendContractByEmail(userId, fullName, email, contractData.contractHtml, contractId);
+    } catch (emailError) {
+      console.error('Error sending contract by email:', emailError);
+      // Continue even if email fails
+    }
+    
     // Store contract signature in the database
     const { data, error } = await supabase
       .from('contract_signatures')
@@ -136,6 +144,65 @@ export async function saveContractToDatabase(
 }
 
 /**
+ * Sends contract by email as a backup measure
+ */
+async function sendContractByEmail(
+  userId: string,
+  fullName: string,
+  email: string,
+  contractHtml: string,
+  contractId: string
+): Promise<boolean> {
+  try {
+    console.log(`Sending contract backup email for user: ${userId}, contract: ${contractId}`);
+    
+    // Prepare email content
+    const subject = `[BACKUP] Contract signed - ${fullName}`;
+    const htmlContent = `
+      <h1>Contract Backup</h1>
+      <p>This is an automatic backup of a signed contract.</p>
+      <p><strong>User ID:</strong> ${userId}</p>
+      <p><strong>Name:</strong> ${fullName}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Contract ID:</strong> ${contractId}</p>
+      <p><strong>Signed at:</strong> ${new Date().toISOString()}</p>
+      <hr>
+      <p>The full contract HTML is attached to this email.</p>
+    `;
+    
+    // Convert HTML to Base64 for attachment
+    const encoder = new TextEncoder();
+    const contractBytes = encoder.encode(contractHtml);
+    const contractBase64 = btoa(String.fromCharCode(...new Uint8Array(contractBytes)));
+    
+    // Send email using edge function
+    const { data, error } = await supabase.functions.invoke('smtp-sender', {
+      body: {
+        to: "support@algotouch.co.il",
+        subject: subject,
+        html: htmlContent,
+        attachmentData: [{
+          filename: `contract-${fullName.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0,10)}.html`,
+          content: contractBase64,
+          mimeType: "text/html"
+        }]
+      }
+    });
+    
+    if (error || !data?.success) {
+      console.error('Error sending contract backup email:', error || data);
+      return false;
+    }
+    
+    console.log('Contract backup email sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Exception sending contract backup email:', error);
+    return false;
+  }
+}
+
+/**
  * Uploads contract HTML to storage bucket
  */
 export async function uploadContractToStorage(
@@ -145,6 +212,30 @@ export async function uploadContractToStorage(
 ): Promise<{ success: boolean; url?: string; error?: any }> {
   try {
     console.log(`Uploading contract HTML to storage for user: ${userId}, contract: ${contractId}`);
+    
+    // Check if the contracts bucket exists and create it if needed
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const contractsBucketExists = buckets?.some(bucket => bucket.name === 'contracts');
+      
+      if (!contractsBucketExists) {
+        console.log('Contracts bucket does not exist, attempting to create it');
+        const { error: createError } = await supabase.storage.createBucket('contracts', {
+          public: false,
+          fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: ['text/html', 'application/pdf']
+        });
+        
+        if (createError) {
+          console.error('Error creating contracts bucket:', createError);
+          return { success: false, error: createError };
+        }
+        console.log('Created contracts bucket successfully');
+      }
+    } catch (bucketCheckError) {
+      console.error('Error checking for contracts bucket:', bucketCheckError);
+      // Continue anyway, we'll try the upload
+    }
     
     // Generate a file name based on contract ID
     const fileName = `${userId}/${contractId}.html`;

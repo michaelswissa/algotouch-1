@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -59,7 +60,7 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
   console.log(`Storing signature for user: ${request.userId}, plan: ${request.planId}`);
   try {
     // Store the contract HTML in storage first
-    const contractFileName = `contract_${request.userId}_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
+    const contractFileName = `${request.userId}/contract_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
     const contractData = request.contractHtml;
     
     // Create contracts bucket if it doesn't exist
@@ -75,6 +76,7 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
           .createBucket('contracts', {
             public: false,
             fileSizeLimit: 10485760, // 10MB
+            allowedMimeTypes: ['text/html', 'application/pdf']
           });
         
         if (bucketError) {
@@ -91,6 +93,7 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
         await supabase.storage.createBucket('contracts', {
           public: false,
           fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: ['text/html', 'application/pdf']
         });
         console.log("Created contracts bucket successfully after error");
       } catch (createBucketError) {
@@ -112,13 +115,13 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
       console.log("Error checking user folder, will be created on upload:", folderError);
     }
     
-    console.log(`Uploading contract file to storage: ${userFolder}/${contractFileName}`);
+    console.log(`Uploading contract file to storage: ${contractFileName}`);
     
     const { data: storageData, error: storageError } = await supabase
       .storage
       .from('contracts')
       .upload(
-        `${userFolder}/${contractFileName}`, 
+        contractFileName, 
         bytes,
         {
           contentType: 'text/html',
@@ -137,7 +140,7 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
     const { data: urlData, error: urlError } = await supabase
       .storage
       .from('contracts')
-      .createSignedUrl(`${userFolder}/${contractFileName}`, 60 * 60 * 24 * 7); // 7 days expiry
+      .createSignedUrl(contractFileName, 60 * 60 * 24 * 7); // 7 days expiry
     
     const contractUrl = urlError ? null : urlData?.signedUrl;
     console.log("Contract signed URL created:", contractUrl ? "success" : "failed");
@@ -412,6 +415,7 @@ serve(async (req) => {
     
     let adminEmailResult;
     try {
+      // Always send to the admin for backup purposes
       console.log("Sending email to admin via direct email function");
       adminEmailResult = await sendEmailDirectly(
         supabase,
@@ -419,7 +423,7 @@ serve(async (req) => {
         `הסכם חדש נחתם - ${request.fullName}`,
         adminEmailBody,
         [{
-          filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
+          filename: `contract-${request.fullName.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0,10)}.html`,
           content: contractBase64,
           mimeType: "text/html"
         }]
