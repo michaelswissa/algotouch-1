@@ -7,16 +7,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { ShieldCheck, CreditCard } from 'lucide-react';
+import { ShieldCheck, CreditCard, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useEnhancedSubscription } from '@/contexts/subscription/EnhancedSubscriptionContext';
+import { resolvePaymentIssue } from '@/lib/subscription/verification-service';
 
 const UpdatePayment = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { subscription, details, loading } = useSubscription();
+  const { status, details, refreshSubscription } = useEnhancedSubscription();
+  
   const [cardNumber, setCardNumber] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -110,21 +112,28 @@ const UpdatePayment = () => {
       // Record payment history
       await supabase.from('payment_history').insert({
         user_id: user.id,
-        subscription_id: subscription?.id || user.id,
-        amount: 0, // Convert string to number here (0 for update payment method)
-        currency: 'USD',
+        subscription_id: user.id,
+        amount: 0, // 0 for update payment method
+        currency: 'ILS',
         status: 'payment_method_updated',
         payment_method: tokenData
       });
       
-      // Update subscription with new payment method
-      await supabase
-        .from('subscriptions')
-        .update({ 
-          payment_method: tokenData,
-          status: subscription?.status === 'failed' ? 'active' : subscription?.status
-        })
-        .eq('user_id', user.id);
+      // Resolve any payment issues
+      if (status?.hasPaymentIssue) {
+        await resolvePaymentIssue(user.id, tokenData);
+      } else {
+        // Just update subscription with new payment method
+        await supabase
+          .from('subscriptions')
+          .update({ 
+            payment_method: tokenData
+          })
+          .eq('user_id', user.id);
+      }
+      
+      // Refresh subscription status
+      await refreshSubscription();
       
       toast.success('פרטי התשלום עודכנו בהצלחה');
       navigate('/my-subscription');
@@ -136,20 +145,6 @@ const UpdatePayment = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <Layout className="py-8">
-        <div className="max-w-xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>טוען...</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout className="py-8">
       <div className="max-w-xl mx-auto">
@@ -160,8 +155,26 @@ const UpdatePayment = () => {
               <CardTitle>עדכון פרטי תשלום</CardTitle>
             </div>
             <CardDescription>
-              הזן את פרטי כרטיס האשראי החדש שלך
+              {status?.hasPaymentIssue ? 
+                'נדרש עדכון פרטי תשלום בעקבות בעיה בחיוב האחרון' :
+                'הזן את פרטי כרטיס האשראי החדש שלך'}
             </CardDescription>
+            
+            {/* Show problem details if there's a payment issue */}
+            {status?.hasPaymentIssue && details?.paymentFailureReason && (
+              <div className="mt-2 bg-destructive/10 dark:bg-destructive/20 p-3 rounded-md border border-destructive/20 flex gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive">בעיית תשלום:</p>
+                  <p>{details.paymentFailureReason}</p>
+                  {status.gracePeriodDays && (
+                    <p className="mt-1 font-medium">
+                      יש להסדיר את התשלום תוך {status.gracePeriodDays} ימים למניעת חסימת הגישה
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4 pt-4">
