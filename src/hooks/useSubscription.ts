@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
@@ -34,6 +33,8 @@ export interface SubscriptionDetails {
     expiryMonth: string;
     expiryYear: string;
   } | null;
+  gracePeriodActive?: boolean;
+  gracePeriodDays?: number;
 }
 
 export const useSubscription = () => {
@@ -135,7 +136,9 @@ export const useSubscription = () => {
       nextBillingDate,
       progressValue,
       daysLeft,
-      paymentMethod: paymentMethodDetails
+      paymentMethod: paymentMethodDetails,
+      gracePeriodActive: false,
+      gracePeriodDays: 0
     };
   };
 

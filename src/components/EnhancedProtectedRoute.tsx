@@ -138,7 +138,7 @@ const EnhancedProtectedRoute: React.FC<EnhancedProtectedRouteProps> = ({
     }
     
     // Allow access if there is a payment issue or the user is in grace period
-    if (subscription?.status === 'failed' || details?.gracePeriodActive) {
+    if (subscription?.status === 'failed' || (details && details.gracePeriodActive)) {
       return <>{children}</>;
     }
     
@@ -163,9 +163,9 @@ const EnhancedProtectedRoute: React.FC<EnhancedProtectedRouteProps> = ({
     }
     
     // Check if the subscription is in grace period
-    if (details?.gracePeriodActive) {
+    if (details && details.gracePeriodActive) {
       // Allow access during grace period with a warning
-      toast.warning(`נמצא בתקופת חסד: נותרו ${details.gracePeriodDays} ימים לעדכון פרטי תשלום`, {
+      toast.warning(`נמצא בתקופת חסד: נותרו ${details.gracePeriodDays || 0} ימים לעדכון פרטי תשלום`, {
         action: {
           label: 'עדכן',
           onClick: () => window.location.href = '/update-payment'
