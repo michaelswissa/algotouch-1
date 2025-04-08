@@ -10,10 +10,13 @@ interface LayoutProps {
 }
 
 const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
-  // Remove the automatic dark class addition that was happening here
-  
+  useEffect(() => {
+    // Add dark class to html element
+    document.documentElement.classList.add('dark');
+  }, []);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground transition-all duration-300" dir="rtl">
+    <div className="flex h-screen overflow-hidden dark:bg-background dark:text-foreground transition-all duration-300" dir="rtl">
       {!hideSidebar && <Sidebar />}
       <main className={cn(
         "flex-1 overflow-y-auto p-4 animate-fade-in bg-main-background bg-cover bg-center bg-fixed bg-no-repeat relative", 
@@ -29,7 +32,7 @@ const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
         <div className="absolute w-64 h-64 rounded-full bg-blue-300/10 blur-2xl top-1/2 right-1/3 floating-element pointer-events-none" style={{ animationDelay: "1.5s" }}></div>
         
         {/* Modern glass effect container with enhanced depth */}
-        <div className="rounded-xl min-h-full p-6 backdrop-blur-sm bg-white/90 shadow-lg z-10 relative border border-white/40 transition-all duration-300">
+        <div className="rounded-xl min-h-full p-6 backdrop-blur-sm bg-white/90 dark:bg-white/10 shadow-lg z-10 relative border border-white/40 dark:border-white/10 transition-all duration-300">
           {/* Subtle accent border */}
           <div className="absolute inset-0 rounded-xl border border-primary/20 opacity-30 pointer-events-none"></div>
           
