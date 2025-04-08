@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
@@ -27,12 +28,17 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       setIsProcessing(true);
       console.log('Contract signed, forwarding data to parent component');
       
-      const signature = document.getElementById('signature').toDataURL();
-      const contractHtml = document.getElementById('contractHtml').innerHTML;
-      const agreedToTerms = document.getElementById('agreedToTerms').checked;
-      const agreedToPrivacy = document.getElementById('agreedToPrivacy').checked;
+      const signatureElement = document.getElementById('signature') as HTMLCanvasElement;
+      const contractHtmlElement = document.getElementById('contractHtml') as HTMLDivElement;
+      const agreedToTermsElement = document.getElementById('agreedToTerms') as HTMLInputElement;
+      const agreedToPrivacyElement = document.getElementById('agreedToPrivacy') as HTMLInputElement;
       
-      if (signature && contractHtml) {
+      if (signatureElement && contractHtmlElement) {
+        const signature = signatureElement.toDataURL();
+        const contractHtml = contractHtmlElement.innerHTML;
+        const agreedToTerms = agreedToTermsElement.checked;
+        const agreedToPrivacy = agreedToPrivacyElement.checked;
+        
         const contractData = {
           signature,
           contractHtml,

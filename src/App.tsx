@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/auth';
-import { ToastContainer } from 'sonner';
+import { Toaster } from 'sonner';
 
 // Import page components
 import Auth from './pages/Auth';
@@ -14,7 +15,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <ToastContainer />
+        <Toaster />
         <Routes>
           <Route path="/" element={<Auth />} />
           <Route path="/auth" element={<Auth />} />
