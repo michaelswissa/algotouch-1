@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { Steps } from '@/types/subscription';
@@ -29,20 +30,11 @@ export const useSubscriptionFlow = () => {
     if (sessionData) {
       try {
         const data = JSON.parse(sessionData);
-        // Always ensure plan selection comes before contract
-        if (data.step && data.step !== 'plan-selection' && !data.selectedPlan) {
-          // If we don't have a selected plan, force back to plan selection
-          setCurrentStep('plan-selection');
-        } else {
-          // Otherwise restore the saved step
-          if (data.step) setCurrentStep(data.step as Steps);
-          if (data.selectedPlan) setSelectedPlan(data.selectedPlan);
-          if (data.contractId) setContractId(data.contractId);
-        }
+        if (data.step) setCurrentStep(data.step as Steps);
+        if (data.selectedPlan) setSelectedPlan(data.selectedPlan);
+        if (data.contractId) setContractId(data.contractId);
       } catch (e) {
         console.error('Error parsing session data', e);
-        // Reset to beginning on error
-        setCurrentStep('plan-selection');
       }
     }
   }, []);

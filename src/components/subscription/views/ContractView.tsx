@@ -30,14 +30,8 @@ const ContractView: React.FC<ContractViewProps> = ({
       return;
     }
     
-    // Add the plan ID to the contract data
-    const enhancedContractData = {
-      ...contractData,
-      planId: selectedPlan,
-    };
-    
     // Pass the data to the parent component
-    onComplete(enhancedContractData);
+    onComplete(contractData);
   };
 
   return (
