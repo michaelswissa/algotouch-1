@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Sidebar from './Sidebar';
 import { cn } from '@/lib/utils';
 
@@ -10,9 +10,12 @@ interface LayoutProps {
 }
 
 const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
-  useEffect(() => {
-    // Add dark class to html element
-    document.documentElement.classList.add('dark');
+  // צריך להבטיח שה-dark mode יישאר קבוע
+  React.useEffect(() => {
+    // הוסף dark class לאלמנט html אם הוא לא קיים כבר
+    if (!document.documentElement.classList.contains('dark')) {
+      document.documentElement.classList.add('dark');
+    }
   }, []);
 
   return (
@@ -32,7 +35,7 @@ const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
         <div className="absolute w-64 h-64 rounded-full bg-blue-300/10 blur-2xl top-1/2 right-1/3 floating-element pointer-events-none" style={{ animationDelay: "1.5s" }}></div>
         
         {/* Modern glass effect container with enhanced depth */}
-        <div className="rounded-xl min-h-full p-6 backdrop-blur-sm bg-white/90 dark:bg-white/10 shadow-lg z-10 relative border border-white/40 dark:border-white/10 transition-all duration-300">
+        <div className="rounded-xl min-h-full p-6 backdrop-blur-sm bg-white/10 dark:bg-white/10 shadow-lg z-10 relative border border-white/40 dark:border-white/10 transition-all duration-300">
           {/* Subtle accent border */}
           <div className="absolute inset-0 rounded-xl border border-primary/20 opacity-30 pointer-events-none"></div>
           

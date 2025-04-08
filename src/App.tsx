@@ -13,6 +13,9 @@ import ContractDetails from './pages/ContractDetails';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/auth/AuthProvider';
 
+// הוסף את ה-class dark ל-html כברירת מחדל בעת הטעינה הראשונית
+document.documentElement.classList.add('dark');
+
 function App() {
   return (
     <AuthProvider>
