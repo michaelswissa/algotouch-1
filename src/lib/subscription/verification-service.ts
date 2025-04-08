@@ -191,12 +191,26 @@ export async function recordFailedPayment(
       currency: 'ILS'
     });
     
-    // Update subscription with last payment failure info
+    // Store payment failure info in payment_method JSON field as metadata
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('payment_method')
+      .eq('id', subscriptionId)
+      .single();
+    
+    const updatedPaymentMethod = {
+      ...(subscription?.payment_method || {}),
+      failureInfo: {
+        lastFailureDate: new Date().toISOString(),
+        failureReason: error?.message || 'Unknown error'
+      }
+    };
+    
+    // Update subscription with payment failure metadata
     await supabase
       .from('subscriptions')
       .update({
-        last_payment_failure: new Date().toISOString(),
-        payment_failure_reason: error?.message || 'Unknown error'
+        payment_method: updatedPaymentMethod
       })
       .eq('id', subscriptionId);
     
@@ -212,13 +226,25 @@ export async function recordFailedPayment(
  */
 export async function clearFailedPaymentStatus(subscriptionId: string): Promise<boolean> {
   try {
-    await supabase
+    // Get current payment_method to update it
+    const { data: subscription } = await supabase
       .from('subscriptions')
-      .update({
-        last_payment_failure: null,
-        payment_failure_reason: null
-      })
-      .eq('id', subscriptionId);
+      .select('payment_method')
+      .eq('id', subscriptionId)
+      .single();
+    
+    if (subscription?.payment_method) {
+      // Create a copy without the failureInfo
+      const { failureInfo, ...cleanPaymentMethod } = subscription.payment_method as any;
+      
+      // Update subscription removing the failure info
+      await supabase
+        .from('subscriptions')
+        .update({
+          payment_method: cleanPaymentMethod
+        })
+        .eq('id', subscriptionId);
+    }
     
     return true;
   } catch (error) {

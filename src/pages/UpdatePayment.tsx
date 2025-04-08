@@ -73,7 +73,7 @@ const UpdatePayment = () => {
         .insert({
           user_id: user.id,
           subscription_id: subscription.id,
-          amount: 0, // Token update only
+          amount: 0, // Use 0 as a numeric value for token update only
           status: 'completed',
           payment_method: tokenData,
           currency: 'ILS'
