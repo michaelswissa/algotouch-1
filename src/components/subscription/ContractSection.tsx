@@ -4,6 +4,7 @@ import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/auth';
 
 interface ContractSectionProps {
   selectedPlan: string;
@@ -19,6 +20,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onBack 
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const { user } = useAuth();
   
   // Function to handle contract signing
   const handleSignContract = async (contractData: any) => {
@@ -29,8 +31,11 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Pass the contract data directly to the parent
-      onSign(contractData);
+      // Pass the contract data directly to the parent along with user information
+      onSign({
+        ...contractData,
+        userId: user?.id // This will be undefined if the user isn't authenticated
+      });
     } catch (error) {
       console.error('Error signing contract:', error);
     } finally {

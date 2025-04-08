@@ -1,6 +1,8 @@
 
 import React from 'react';
 import ContractSection from '@/components/subscription/ContractSection';
+import { useAuth } from '@/contexts/auth';
+import { toast } from 'sonner';
 
 interface ContractViewProps {
   selectedPlan: string;
@@ -15,11 +17,28 @@ const ContractView: React.FC<ContractViewProps> = ({
   onComplete,
   onBack
 }) => {
+  const { user } = useAuth();
+
+  const handleContractSign = (contractData: any) => {
+    // Check if we have registration data in the session (for users in the signup flow)
+    const registrationData = sessionStorage.getItem('registration_data');
+    const isRegistering = registrationData ? true : false;
+
+    // If user is not authenticated and we're not in the registration flow, show error
+    if (!user?.id && !isRegistering) {
+      toast.error('משתמש לא מזוהה. אנא התחבר או הירשם תחילה.');
+      return;
+    }
+    
+    // Pass the data to the parent component
+    onComplete(contractData);
+  };
+
   return (
     <ContractSection
       selectedPlan={selectedPlan}
       fullName={fullName}
-      onSign={onComplete}
+      onSign={handleContractSign}
       onBack={onBack}
     />
   );

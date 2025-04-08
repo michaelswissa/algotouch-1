@@ -55,25 +55,57 @@ export const useSubscriptionFlow = () => {
   };
   
   const handleContractSign = async (contractData: any) => {
-    if (!user?.id) {
-      toast.error('משתמש לא מזוהה');
-      return;
-    }
-    
     try {
-      // Process and save the contract
-      const success = await processSignedContract(
-        user.id,
-        selectedPlan,
-        fullName || contractData.fullName,
-        email || contractData.email,
-        contractData
-      );
+      const registrationData = sessionStorage.getItem('registration_data');
+      let userId = user?.id;
+      let userFullName = fullName;
+      let userEmail = email;
       
-      if (success) {
-        setCurrentStep('payment');
+      // If there's registration data and no authenticated user,
+      // get the data from the registration flow
+      if (!userId && registrationData) {
+        try {
+          const parsedData = JSON.parse(registrationData);
+          
+          // If we don't have the user data yet, store the contract data for later
+          if (parsedData) {
+            // Store contract data in registration data for processing after signup
+            parsedData.contractSigned = true;
+            parsedData.contractDetails = contractData;
+            parsedData.contractSignedAt = new Date().toISOString();
+            parsedData.planId = selectedPlan;
+            
+            // Update the registration data in session storage
+            sessionStorage.setItem('registration_data', JSON.stringify(parsedData));
+            
+            // Proceed to payment step
+            setCurrentStep('payment');
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing registration data:', error);
+        }
+      }
+      
+      // If we have a user ID, process the contract normally
+      if (userId) {
+        // Process and save the contract
+        const success = await processSignedContract(
+          userId,
+          selectedPlan,
+          userFullName || contractData.fullName,
+          userEmail || contractData.email,
+          contractData
+        );
+        
+        if (success) {
+          setCurrentStep('payment');
+        } else {
+          toast.error('שגיאה בשמירת החוזה');
+        }
       } else {
-        toast.error('שגיאה בשמירת החוזה');
+        // No user and no registration data - show error
+        toast.error('משתמש לא מזוהה. אנא התחבר או הירשם תחילה.');
       }
     } catch (error) {
       console.error('Error processing contract:', error);
