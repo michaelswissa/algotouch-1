@@ -3,23 +3,19 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
-import { useEnhancedSubscription } from '@/contexts/subscription/EnhancedSubscriptionContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAuth?: boolean;
-  requireCompleteRegistration?: boolean;
   publicPaths?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
-  requireCompleteRegistration = false,
   publicPaths = ['/auth']
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
-  const { status, isChecking } = useEnhancedSubscription();
   const location = useLocation();
   const [hasRegistrationData, setHasRegistrationData] = useState(false);
   const [isValidRegistration, setIsValidRegistration] = useState(false);
@@ -54,7 +50,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }, [location.pathname]);
 
   // Show consistent loader while auth is initializing
-  if (!initialized || loading || (isAuthenticated && requireCompleteRegistration && isChecking)) {
+  if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner size="lg" />
@@ -86,24 +82,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
     console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
-  }
-  
-  // Special verification for users who need to complete their registration
-  if (requireCompleteRegistration && isAuthenticated && status) {
-    if (!status.hasCompletedRegistration) {
-      console.log("ProtectedRoute: User needs to complete registration");
-      return <Navigate to="/subscription" state={{ from: location }} replace />;
-    }
-    
-    if (!status.hasSignedContract) {
-      console.log("ProtectedRoute: User needs to sign contract");
-      return <Navigate to="/subscription?step=2" state={{ from: location }} replace />;
-    }
-    
-    if (status.requiresPaymentUpdate) {
-      console.log("ProtectedRoute: User needs to update payment method");
-      return <Navigate to="/update-payment" state={{ from: location }} replace />;
-    }
   }
 
   if (requireAuth && !isAuthenticated) {

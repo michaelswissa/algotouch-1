@@ -1,64 +1,179 @@
 
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'sonner';
-import { AuthProvider } from '@/contexts/auth';
-import { EnhancedSubscriptionProvider } from '@/contexts/subscription/EnhancedSubscriptionContext';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import Dashboard from '@/pages/Dashboard';
-import Auth from '@/pages/Auth';
-import Subscription from '@/pages/Subscription';
-import UpdatePayment from '@/pages/UpdatePayment';
-import Layout from '@/components/Layout';
-import PaymentUpdateBanner from '@/components/subscription/PaymentUpdateBanner';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { AuthProvider } from "@/contexts/auth";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Dashboard from "./pages/Dashboard";
+import CalendarPage from "./pages/Calendar";
+import TradeJournal from "./pages/TradeJournal";
+import MonthlyReport from "./pages/MonthlyReport";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
+import Community from "./pages/Community";
+import Courses from "./pages/Courses";
+import CourseDetail from "./pages/CourseDetail";
+import AIAssistant from "./pages/AIAssistant";
+import NotFound from "./pages/NotFound";
+import NewTrade from "./pages/NewTrade";
+import Journal from "./pages/Journal";
+import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
+import Subscription from "./pages/Subscription";
+import MySubscriptionPage from "./pages/MySubscriptionPage";
+import Index from "./pages/Index";
 
-const App: React.FC = () => {
+// Configure with refresh on error
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 60 * 1000,
+    },
+  },
+});
+
+const App = () => {
+  // Set RTL direction and dark mode at the document level
+  useEffect(() => {
+    document.documentElement.dir = "rtl";
+    document.documentElement.lang = "he";
+    document.documentElement.classList.add('dark');
+    
+    // Add transition classes to body for smoother theme transitions
+    document.body.classList.add('transition-colors', 'duration-300');
+    
+    // Fade in the whole app
+    const timer = setTimeout(() => {
+      document.body.style.opacity = "1";
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <EnhancedSubscriptionProvider>
-          <PaymentUpdateBanner />
-          <Routes>
-            <Route path="/auth" element={
-              <ProtectedRoute requireAuth={false}>
-                <Auth />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/subscription/*" element={
-              <ProtectedRoute>
-                <Subscription />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/update-payment" element={
-              <ProtectedRoute>
-                <UpdatePayment />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/my-subscription" element={
-              <ProtectedRoute requireCompleteRegistration={true}>
-                <Layout>
-                  <div className="container py-6">
-                    <h1>My Subscription Page</h1>
-                  </div>
-                </Layout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard" element={
-              <ProtectedRoute requireAuth={true} requireCompleteRegistration={true}>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/" element={<ProtectedRoute requireAuth={true}><Dashboard /></ProtectedRoute>} />
-          </Routes>
-          <Toaster position="top-center" richColors />
-        </EnhancedSubscriptionProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner position="top-right" expand={true} closeButton toastOptions={{
+              classNames: {
+                toast: 'group p-4 backdrop-blur-md bg-secondary/90 dark:bg-card/90 shadow-xl',
+                title: 'text-base font-semibold text-foreground',
+                description: 'text-sm text-muted-foreground',
+                actionButton: 'bg-primary text-primary-foreground',
+                cancelButton: 'bg-secondary text-secondary-foreground',
+                error: '!bg-red-500/20 border-red-500/50',
+                success: '!bg-green-500/20 border-green-500/50',
+              }
+            }} />
+            <Routes>
+              {/* Root route - redirects to auth page */}
+              <Route path="/" element={<Index />} />
+              
+              {/* Public routes */}
+              <Route path="/auth" element={
+                <ProtectedRoute requireAuth={false}>
+                  <Auth />
+                </ProtectedRoute>
+              } />
+              
+              {/* Subscription routes - protected to ensure auth first */}
+              <Route path="/subscription/:planId" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
+              <Route path="/subscription" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
+              <Route path="/my-subscription" element={
+                <ProtectedRoute>
+                  <MySubscriptionPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Protected routes - require authentication */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/calendar" element={
+                <ProtectedRoute>
+                  <CalendarPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/trade-journal" element={
+                <ProtectedRoute>
+                  <TradeJournal />
+                </ProtectedRoute>
+              } />
+              <Route path="/monthly-report" element={
+                <ProtectedRoute>
+                  <MonthlyReport />
+                </ProtectedRoute>
+              } />
+              <Route path="/journal" element={
+                <ProtectedRoute>
+                  <Journal />
+                </ProtectedRoute>
+              } />
+              <Route path="/blog" element={
+                <ProtectedRoute>
+                  <Blog />
+                </ProtectedRoute>
+              } />
+              <Route path="/blog/:id" element={
+                <ProtectedRoute>
+                  <BlogPost />
+                </ProtectedRoute>
+              } />
+              <Route path="/community" element={
+                <ProtectedRoute>
+                  <Community />
+                </ProtectedRoute>
+              } />
+              <Route path="/courses" element={
+                <ProtectedRoute>
+                  <Courses />
+                </ProtectedRoute>
+              } />
+              <Route path="/courses/:courseId" element={
+                <ProtectedRoute>
+                  <CourseDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/ai-assistant" element={
+                <ProtectedRoute>
+                  <AIAssistant />
+                </ProtectedRoute>
+              } />
+              <Route path="/new-trade" element={
+                <ProtectedRoute>
+                  <NewTrade />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              
+              {/* Catch all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 };
 

@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth';
-import { useEnhancedSubscription } from '@/contexts/subscription/EnhancedSubscriptionContext';
 import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
-  const { status, isChecking } = useEnhancedSubscription();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
@@ -69,34 +68,9 @@ const Auth = () => {
     );
   }
 
-  // If user is already authenticated, check if they've completed registration
+  // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
-    if (isChecking) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
-          <Spinner size="lg" />
-        </div>
-      );
-    }
-    
-    console.log("Auth page: User is authenticated, checking registration status");
-    
-    // If user hasn't completed registration, redirect to appropriate step
-    if (status && !status.hasCompletedRegistration) {
-      return <Navigate to="/subscription?step=1" replace />;
-    }
-    
-    // If user hasn't signed contract, redirect to contract step
-    if (status && !status.hasSignedContract) {
-      return <Navigate to="/subscription?step=2" replace />;
-    }
-    
-    // If user needs to update payment, redirect to payment update page
-    if (status && status.requiresPaymentUpdate) {
-      return <Navigate to="/update-payment" replace />;
-    }
-    
-    // Otherwise, redirect to dashboard or requested page
+    console.log("Auth page: User is authenticated, redirecting to appropriate page");
     if (state?.redirectToSubscription) {
       return <Navigate to="/subscription" replace />;
     }
