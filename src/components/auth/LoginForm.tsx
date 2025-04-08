@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface LoginFormProps {
   onLoginSuccess?: () => void;
@@ -19,7 +18,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [loggingIn, setLoggingIn] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const location = useLocation();
-  const state = location.state as { redirectToSubscription?: boolean };
+  const navigate = useNavigate();
+  const state = location.state as { redirectToSubscription?: boolean, from?: Location };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +38,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       if (onLoginSuccess) {
         onLoginSuccess();
+      } else {
+        if (state?.redirectToSubscription) {
+          navigate('/subscription', { replace: true });
+        } else if (state?.from) {
+          navigate(state.from.pathname, { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       }
     } catch (error: any) {
       console.error('Login error:', error);
       
-      // Show specific error messages for common errors
       if (error.message.includes('Invalid login credentials')) {
         toast.error('פרטי התחברות שגויים. אנא בדוק את הדוא"ל והסיסמה');
       } else if (error.message.includes('Email not confirmed')) {
@@ -65,7 +72,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       setResettingPassword(true);
       console.log('Requesting password reset for:', email);
       
-      // Use the AuthContext resetPassword method
       await resetPassword(email);
       
       console.log('Password reset email sent successfully');
