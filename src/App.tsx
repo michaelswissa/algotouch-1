@@ -1,13 +1,14 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Import your pages
-import Home from './pages/Home';
+import Index from './pages/Index'; // Changed from Home to Index
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Subscription from './pages/Subscription';
-import MySubscription from './pages/MySubscription';
-import ContractDetails from './pages/ContractDetails'; // New import
+import MySubscriptionPage from './pages/MySubscriptionPage'; // Changed from MySubscription to MySubscriptionPage
+import ContractDetails from './pages/ContractDetails';
 
 import { Toaster } from 'sonner';
 
@@ -17,12 +18,12 @@ function App() {
       <Toaster position="top-center" richColors />
       <Router>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/subscription" element={<Subscription />} />
-          <Route path="/my-subscription" element={<MySubscription />} />
-          <Route path="/contract/:contractId" element={<ContractDetails />} /> {/* New route */}
+          <Route path="/my-subscription" element={<MySubscriptionPage />} />
+          <Route path="/contract/:contractId" element={<ContractDetails />} />
           
           {/* Add any other routes you have */}
           
