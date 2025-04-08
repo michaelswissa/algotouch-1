@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
 import { useSubscriptionFlow } from './hooks/useSubscriptionFlow';
@@ -18,6 +18,27 @@ const SubscriptionContent = () => {
     handleBackToStep,
     isAuthenticated
   } = useSubscriptionFlow();
+
+  // Validate the current flow when component loads
+  useEffect(() => {
+    // Check URL parameters for plan selection
+    const urlParams = new URLSearchParams(window.location.search);
+    const planParam = urlParams.get('plan');
+    
+    // If we have a plan parameter but no selected plan, use it
+    if (planParam && !selectedPlan && currentStep === 'plan-selection') {
+      handlePlanSelect(planParam);
+    }
+    
+    // Make sure the step sequence is valid
+    if (currentStep === 'payment' && !selectedPlan) {
+      console.log('Invalid flow state: payment step without selected plan, redirecting to plan selection');
+      handleBackToStep('plan-selection');
+    } else if (currentStep === 'contract' && !selectedPlan) {
+      console.log('Invalid flow state: contract step without selected plan, redirecting to plan selection');
+      handleBackToStep('plan-selection');
+    }
+  }, [currentStep, selectedPlan]);
 
   if (isLoading) {
     return (
