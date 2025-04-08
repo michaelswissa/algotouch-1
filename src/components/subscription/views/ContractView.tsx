@@ -20,6 +20,14 @@ const ContractView: React.FC<ContractViewProps> = ({
   const { user } = useAuth();
 
   const handleContractSign = (contractData: any) => {
+    // Additional validation to ensure we have a plan selected
+    if (!selectedPlan) {
+      console.error("Cannot sign contract: No plan selected");
+      toast.error('אנא בחר תכנית מנוי תחילה');
+      onBack(); // Go back to plan selection
+      return;
+    }
+    
     // Check if we have registration data in the session (for users in the signup flow)
     const registrationData = sessionStorage.getItem('registration_data');
     const isRegistering = registrationData ? true : false;
@@ -39,7 +47,16 @@ const ContractView: React.FC<ContractViewProps> = ({
     // Generate temp contract ID for session storage
     if (isRegistering) {
       enhancedContractData.tempContractId = `temp_contract_${Date.now()}`;
+      console.log('Generated temp contract ID:', enhancedContractData.tempContractId);
+    } else {
+      console.log('User is authenticated, using regular contract flow');
     }
+    
+    console.log('Contract signed, sending data to parent component', { 
+      planId: selectedPlan, 
+      isRegistering, 
+      hasUserId: !!user?.id 
+    });
     
     // Pass the data to the parent component
     onComplete(enhancedContractData);

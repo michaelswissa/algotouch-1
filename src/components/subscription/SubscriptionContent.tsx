@@ -20,29 +20,27 @@ const SubscriptionContent = () => {
     contractId
   } = useSubscriptionFlow();
 
-  // Validate the current flow when component loads
+  // Additional validation every time the step changes
   useEffect(() => {
-    // Check URL parameters for plan selection
-    const urlParams = new URLSearchParams(window.location.search);
-    const planParam = urlParams.get('plan');
+    console.log(`Current step changed to: ${currentStep}`, {
+      selectedPlan,
+      contractId,
+      isAuthenticated
+    });
     
-    // If we have a plan parameter but no selected plan, use it
-    if (planParam && !selectedPlan && currentStep === 'plan-selection') {
-      handlePlanSelect(planParam);
-    }
-    
-    // Always validate step sequence to make sure we don't skip steps
+    // Strict validation to ensure steps are followed in sequence
     if (currentStep === 'payment' && !selectedPlan) {
-      console.log('Invalid flow state: payment step without selected plan, redirecting to plan selection');
+      console.error('Invalid flow state: payment step without selected plan, redirecting to plan selection');
       handleBackToStep('plan-selection');
     } else if (currentStep === 'payment' && !contractId) {
-      console.log('Invalid flow state: payment step without signed contract, redirecting to contract step');
+      console.error('Invalid flow state: payment step without signed contract, redirecting to contract step');
       handleBackToStep('contract');
     } else if (currentStep === 'contract' && !selectedPlan) {
-      console.log('Invalid flow state: contract step without selected plan, redirecting to plan selection');
+      console.error('Invalid flow state: contract step without selected plan, redirecting to plan selection');
       handleBackToStep('plan-selection');
     }
-  }, [currentStep, selectedPlan, contractId, handlePlanSelect, handleBackToStep]);
+    
+  }, [currentStep, selectedPlan, contractId, isAuthenticated, handleBackToStep]);
 
   if (isLoading) {
     return (

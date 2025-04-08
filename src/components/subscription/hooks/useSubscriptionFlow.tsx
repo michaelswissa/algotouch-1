@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { Steps } from '@/types/subscription';
@@ -23,30 +24,73 @@ export const useSubscriptionFlow = () => {
   const navigate = useNavigate();
   const isAuthenticated = !!email;
 
-  // If user has session data, try to restore it
+  // Validate the current step based on available data
+  const validateStep = (step: Steps): Steps => {
+    console.log(`Validating step: ${step}, selectedPlan: ${selectedPlan}, contractId: ${contractId}`);
+    
+    // Always allow plan selection
+    if (step === 'plan-selection') return step;
+    
+    // For contract step, we need a selected plan
+    if (step === 'contract') {
+      if (!selectedPlan) {
+        console.log('Contract step requested but no plan selected, returning to plan selection');
+        return 'plan-selection';
+      }
+      return step;
+    }
+    
+    // For payment step, we need both a selected plan and a signed contract
+    if (step === 'payment') {
+      if (!selectedPlan) {
+        console.log('Payment step requested but no plan selected, returning to plan selection');
+        return 'plan-selection';
+      }
+      if (!contractId) {
+        console.log('Payment step requested but no contract signed, returning to contract step');
+        return 'contract';
+      }
+      return step;
+    }
+    
+    // For completion step, just allow it
+    if (step === 'completion') return step;
+    
+    // Default to plan selection for unknown steps
+    return 'plan-selection';
+  };
+
+  // Restore flow state from session storage with validation
   useEffect(() => {
+    console.log('Initializing subscription flow...');
+    
     const sessionData = sessionStorage.getItem('subscription_flow');
+    const params = new URLSearchParams(window.location.search);
+    const planParam = params.get('plan');
+    
     if (sessionData) {
       try {
         const data = JSON.parse(sessionData);
         console.log("Restoring subscription flow from session:", data);
         
-        // Always ensure plan selection comes before contract
-        if (data.step && data.step !== 'plan-selection' && !data.selectedPlan) {
-          // If we don't have a selected plan, force back to plan selection
-          setCurrentStep('plan-selection');
-          console.log("No plan selected, forcing back to plan selection");
-        } else {
-          // Otherwise restore the saved step
-          if (data.step) setCurrentStep(data.step as Steps);
-          if (data.selectedPlan) setSelectedPlan(data.selectedPlan);
-          if (data.contractId) setContractId(data.contractId);
-        }
+        // Set the data we have
+        if (data.selectedPlan) setSelectedPlan(data.selectedPlan);
+        if (data.contractId) setContractId(data.contractId);
+        
+        // Validate the step and set it
+        const validatedStep = validateStep(data.step as Steps);
+        setCurrentStep(validatedStep);
+        
+        console.log(`Restored session with step: ${validatedStep} (originally ${data.step})`);
       } catch (e) {
         console.error('Error parsing session data', e);
-        // Reset to beginning on error
         setCurrentStep('plan-selection');
       }
+    } else if (planParam) {
+      // Handle URL parameter for plan
+      console.log(`Plan specified in URL: ${planParam}, selecting it`);
+      setSelectedPlan(planParam);
+      setCurrentStep('contract'); // Move to contract step since we have a plan
     } else {
       console.log("No subscription flow data in session, starting from plan selection");
       setCurrentStep('plan-selection');
@@ -64,21 +108,11 @@ export const useSubscriptionFlow = () => {
     sessionStorage.setItem('subscription_flow', JSON.stringify(sessionData));
   }, [currentStep, selectedPlan, contractId]);
 
-  // Get URL parameters - if plan is specified, use it
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const planParam = params.get('plan');
-    
-    if (planParam && !selectedPlan && currentStep === 'plan-selection') {
-      console.log(`Plan specified in URL: ${planParam}, selecting it`);
-      setSelectedPlan(planParam);
-      setCurrentStep('contract');
-    }
-  }, []);
-  
   const handlePlanSelect = (planId: string) => {
     console.log(`Plan selected: ${planId}`);
     setSelectedPlan(planId);
+    
+    // Always progress to contract step after selecting a plan
     setCurrentStep('contract');
   };
   
@@ -172,7 +206,12 @@ export const useSubscriptionFlow = () => {
   
   const handleBackToStep = (step: Steps) => {
     console.log(`Going back to step: ${step}`);
-    setCurrentStep(step);
+    const validatedStep = validateStep(step);
+    setCurrentStep(validatedStep);
+    
+    if (validatedStep !== step) {
+      console.log(`Requested step ${step} was invalid, redirected to ${validatedStep}`);
+    }
   };
   
   return {
