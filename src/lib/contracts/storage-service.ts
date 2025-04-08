@@ -146,30 +146,6 @@ export async function uploadContractToStorage(
   try {
     console.log(`Uploading contract HTML to storage for user: ${userId}, contract: ${contractId}`);
     
-    // Check if the contracts bucket exists and create it if needed
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const contractsBucketExists = buckets?.some(bucket => bucket.name === 'contracts');
-      
-      if (!contractsBucketExists) {
-        console.log('Contracts bucket does not exist, attempting to create it');
-        const { error: createError } = await supabase.storage.createBucket('contracts', {
-          public: false,
-          fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['text/html', 'application/pdf']
-        });
-        
-        if (createError) {
-          console.error('Error creating contracts bucket:', createError);
-          return { success: false, error: createError };
-        }
-        console.log('Created contracts bucket successfully');
-      }
-    } catch (bucketCheckError) {
-      console.error('Error checking for contracts bucket:', bucketCheckError);
-      // Continue anyway, we'll try the upload
-    }
-    
     // Generate a file name based on contract ID
     const fileName = `${userId}/${contractId}.html`;
     
