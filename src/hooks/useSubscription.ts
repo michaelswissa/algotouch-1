@@ -34,8 +34,6 @@ export interface SubscriptionDetails {
     expiryMonth: string;
     expiryYear: string;
   } | null;
-  gracePeriodActive?: boolean;
-  gracePeriodDays?: number;
 }
 
 export const useSubscription = () => {
@@ -137,9 +135,7 @@ export const useSubscription = () => {
       nextBillingDate,
       progressValue,
       daysLeft,
-      paymentMethod: paymentMethodDetails,
-      gracePeriodActive: false,
-      gracePeriodDays: 0
+      paymentMethod: paymentMethodDetails
     };
   };
 

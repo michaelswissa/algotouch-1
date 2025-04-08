@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -104,9 +103,6 @@ export function useSecureAuth() {
       
       console.log('Sign in successful');
       toast.success('התחברת בהצלחה!');
-
-      // Instead of using navigate, we'll let the Router handle navigation
-      // based on the updated auth state
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
@@ -175,8 +171,6 @@ export function useSecureAuth() {
       
       console.log('Sign out successful');
       toast.success('התנתקת בהצלחה');
-      
-      // Let Router handle the navigation based on auth state
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
