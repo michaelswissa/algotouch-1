@@ -62,7 +62,7 @@ const Auth = () => {
   // Show loading state while auth is initializing
   if (!initialized || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
         <Spinner size="lg" />
       </div>
     );
@@ -78,11 +78,11 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center dark:bg-background bg-gradient-to-b from-gray-900 to-black p-4" dir="rtl">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4 dark:bg-background dark:text-foreground" dir="rtl">
       <div className="w-full max-w-md space-y-6">
         <AuthHeader />
         
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="signup">הרשמה</TabsTrigger>
             <TabsTrigger value="login">התחברות</TabsTrigger>

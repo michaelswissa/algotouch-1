@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
@@ -12,85 +13,32 @@ interface ContractSectionProps {
   onBack: () => void;
 }
 
-const ContractSection: React.FC<ContractSectionProps> = ({
-  selectedPlan,
-  fullName,
-  onSign,
-  onBack
+const ContractSection: React.FC<ContractSectionProps> = ({ 
+  selectedPlan, 
+  fullName, 
+  onSign, 
+  onBack 
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
   const { user } = useAuth();
   
-  const handleSignContract = async () => {
+  // Function to handle contract signing
+  const handleSignContract = async (contractData: any) => {
     try {
       setIsProcessing(true);
-      setIsSigning(true);
       console.log('Contract signed, forwarding data to parent component');
       
-      const signatureElement = document.getElementById('signature') as HTMLCanvasElement;
-      const contractHtmlElement = document.getElementById('contractHtml') as HTMLDivElement;
-      const agreedToTermsElement = document.getElementById('agreedToTerms') as HTMLInputElement;
-      const agreedToPrivacyElement = document.getElementById('agreedToPrivacy') as HTMLInputElement;
+      // Add a small delay to show the processing state
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (!signatureElement || !contractHtmlElement || !agreedToTermsElement || !agreedToPrivacyElement) {
-        console.error('Missing required elements for contract signing', {
-          hasSignature: !!signatureElement,
-          hasContractHtml: !!contractHtmlElement,
-          hasTermsCheckbox: !!agreedToTermsElement,
-          hasPrivacyCheckbox: !!agreedToPrivacyElement
-        });
-        setIsProcessing(false);
-        setIsSigning(false);
-        return;
-      }
-      
-      if (!agreedToTermsElement.checked || !agreedToPrivacyElement.checked) {
-        console.error('Agreement to terms and privacy is required');
-        alert('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
-        setIsProcessing(false);
-        setIsSigning(false);
-        return;
-      }
-      
-      const signature = signatureElement.toDataURL();
-      const contractHtml = contractHtmlElement.innerHTML;
-      const agreedToTerms = agreedToTermsElement.checked;
-      const agreedToPrivacy = agreedToPrivacyElement.checked;
-      
-      const contractData = {
-        signature,
-        contractHtml,
-        agreedToTerms,
-        agreedToPrivacy,
-        contractVersion: "1.0",
-        browserInfo: {
-          userAgent: navigator.userAgent,
-          language: navigator.language,
-          platform: navigator.platform,
-          screenSize: `${window.innerWidth}x${window.innerHeight}`,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        }
-      };
-
-      // Store the contract ID in local storage as a fallback
-      try {
-        // Generate a temporary contract ID
-        const tempContractId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-        localStorage.setItem('temp_contract_id', tempContractId);
-        
-        // Also keep a local copy of the contract HTML for immediate access
-        localStorage.setItem('temp_contract_html', contractHtml);
-      } catch (storageError) {
-        console.error('Error saving contract to local storage:', storageError);
-        // Continue anyway
-      }
-      
-      setIsSigning(false);
-      onSign(contractData);
+      // Pass the contract data directly to the parent along with user information
+      onSign({
+        ...contractData,
+        userId: user?.id // This will be undefined if the user isn't authenticated
+      });
     } catch (error) {
       console.error('Error signing contract:', error);
-      setIsSigning(false);
+    } finally {
       setIsProcessing(false);
     }
   };
