@@ -78,11 +78,11 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background dark:bg-background p-4" dir="rtl">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center dark:bg-background bg-gradient-to-b from-gray-900 to-black p-4" dir="rtl">
       <div className="w-full max-w-md space-y-6">
         <AuthHeader />
         
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} className="w-full">
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="signup">הרשמה</TabsTrigger>
             <TabsTrigger value="login">התחברות</TabsTrigger>

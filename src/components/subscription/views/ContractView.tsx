@@ -70,7 +70,7 @@ const ContractView: React.FC<ContractViewProps> = ({
         
         try {
           // Parse registration data to update with contract info
-          const parsedRegistrationData = JSON.parse(registrationData);
+          const parsedRegistrationData = JSON.parse(registrationData || '{}');
           parsedRegistrationData.contractDetails = enhancedContractData;
           parsedRegistrationData.planId = selectedPlan;
           sessionStorage.setItem('registration_data', JSON.stringify(parsedRegistrationData));
@@ -83,7 +83,7 @@ const ContractView: React.FC<ContractViewProps> = ({
         console.log('User is authenticated, using regular contract flow');
       }
       
-      console.log('Contract signed, sending data to parent component', { 
+      console.log('Contract signed successfully, sending data to parent component', { 
         planId: selectedPlan, 
         isRegistering, 
         hasUserId: !!user?.id,
@@ -91,7 +91,7 @@ const ContractView: React.FC<ContractViewProps> = ({
       });
       
       // Pass the data to the parent component
-      onComplete(enhancedContractData);
+      onComplete(enhancedContractData.tempContractId || enhancedContractData);
     } catch (error) {
       console.error('Error in contract signing flow:', error);
       toast.error('שגיאה בתהליך חתימת החוזה');
