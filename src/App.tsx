@@ -2,8 +2,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EnhancedProtectedRoute from './components/EnhancedProtectedRoute';
-import { EnhancedSubscriptionProvider } from './contexts/subscription/EnhancedSubscriptionContext';
 import { AuthProvider } from './contexts/auth';
+import { EnhancedSubscriptionProvider } from './contexts/subscription/EnhancedSubscriptionContext';
 import './App.css';
 
 // Pages
@@ -15,8 +15,8 @@ import Dashboard from './pages/Dashboard';
 
 const App = () => {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <EnhancedSubscriptionProvider>
           <Routes>
             {/* Public routes */}
@@ -65,8 +65,8 @@ const App = () => {
             } />
           </Routes>
         </EnhancedSubscriptionProvider>
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 };
 

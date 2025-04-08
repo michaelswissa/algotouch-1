@@ -138,7 +138,7 @@ const EnhancedProtectedRoute: React.FC<EnhancedProtectedRouteProps> = ({
     }
     
     // Allow access if there is a payment issue or the user is in grace period
-    if (subscription?.status === 'failed' || (details && details.gracePeriodActive)) {
+    if (subscription?.status === 'failed' || (details && details.gracePeriodActive === true)) {
       return <>{children}</>;
     }
     
