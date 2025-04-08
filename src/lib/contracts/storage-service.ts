@@ -1,6 +1,19 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// Re-export all functionality from modular files
+export * from './bucket-service';
+export * from './email-service';
+export * from './file-service';
+export * from './izidoc-service';
+export * from './user-service';
+export * from './db-service';
+
+// Keep the original function for backward compatibility,
+// but ensure it uses the newly modularized functions
+import { saveContractToDatabase } from './db-service';
+import { updateSubscriptionStatus } from './user-service';
+import { callIzidocSignFunction } from './izidoc-service';
 
 /**
  * Calls the izidoc-sign edge function
@@ -203,80 +216,6 @@ async function sendContractByEmail(
 }
 
 /**
- * Uploads contract HTML to storage bucket
- */
-export async function uploadContractToStorage(
-  userId: string,
-  contractHtml: string,
-  contractId: string
-): Promise<{ success: boolean; url?: string; error?: any }> {
-  try {
-    console.log(`Uploading contract HTML to storage for user: ${userId}, contract: ${contractId}`);
-    
-    // Check if the contracts bucket exists and create it if needed
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const contractsBucketExists = buckets?.some(bucket => bucket.name === 'contracts');
-      
-      if (!contractsBucketExists) {
-        console.log('Contracts bucket does not exist, attempting to create it');
-        const { error: createError } = await supabase.storage.createBucket('contracts', {
-          public: false,
-          fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['text/html', 'application/pdf']
-        });
-        
-        if (createError) {
-          console.error('Error creating contracts bucket:', createError);
-          return { success: false, error: createError };
-        }
-        console.log('Created contracts bucket successfully');
-      }
-    } catch (bucketCheckError) {
-      console.error('Error checking for contracts bucket:', bucketCheckError);
-      // Continue anyway, we'll try the upload
-    }
-    
-    // Generate a file name based on contract ID
-    const fileName = `${userId}/${contractId}.html`;
-    
-    // Prepare the file content
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(contractHtml);
-    
-    // Upload the file to the contracts bucket
-    const { data, error } = await supabase
-      .storage
-      .from('contracts')
-      .upload(fileName, bytes, {
-        contentType: 'text/html',
-        upsert: true
-      });
-    
-    if (error) {
-      console.error('Error uploading contract to storage:', error);
-      return { success: false, error };
-    }
-    
-    console.log('Contract uploaded successfully to storage:', data?.path);
-    
-    // Create a URL for accessing the contract
-    const { data: urlData } = await supabase
-      .storage
-      .from('contracts')
-      .createSignedUrl(fileName, 60 * 60 * 24 * 30); // 30 days expiry
-    
-    return { 
-      success: true, 
-      url: urlData?.signedUrl
-    };
-  } catch (error) {
-    console.error('Exception uploading contract to storage:', error);
-    return { success: false, error };
-  }
-}
-
-/**
  * Updates user metadata with additional information
  */
 async function updateUserMetadata(userId: string, metadata: any): Promise<boolean> {
@@ -392,6 +331,80 @@ export async function getContractById(contractId: string): Promise<{ success: bo
     return { success: true, contract: data };
   } catch (error) {
     console.error('Exception retrieving contract:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Uploads contract HTML to storage bucket
+ */
+export async function uploadContractToStorage(
+  userId: string,
+  contractHtml: string,
+  contractId: string
+): Promise<{ success: boolean; url?: string; error?: any }> {
+  try {
+    console.log(`Uploading contract HTML to storage for user: ${userId}, contract: ${contractId}`);
+    
+    // Check if the contracts bucket exists and create it if needed
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const contractsBucketExists = buckets?.some(bucket => bucket.name === 'contracts');
+      
+      if (!contractsBucketExists) {
+        console.log('Contracts bucket does not exist, attempting to create it');
+        const { error: createError } = await supabase.storage.createBucket('contracts', {
+          public: false,
+          fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: ['text/html', 'application/pdf']
+        });
+        
+        if (createError) {
+          console.error('Error creating contracts bucket:', createError);
+          return { success: false, error: createError };
+        }
+        console.log('Created contracts bucket successfully');
+      }
+    } catch (bucketCheckError) {
+      console.error('Error checking for contracts bucket:', bucketCheckError);
+      // Continue anyway, we'll try the upload
+    }
+    
+    // Generate a file name based on contract ID
+    const fileName = `${userId}/${contractId}.html`;
+    
+    // Prepare the file content
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(contractHtml);
+    
+    // Upload the file to the contracts bucket
+    const { data, error } = await supabase
+      .storage
+      .from('contracts')
+      .upload(fileName, bytes, {
+        contentType: 'text/html',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Error uploading contract to storage:', error);
+      return { success: false, error };
+    }
+    
+    console.log('Contract uploaded successfully to storage:', data?.path);
+    
+    // Create a URL for accessing the contract
+    const { data: urlData } = await supabase
+      .storage
+      .from('contracts')
+      .createSignedUrl(fileName, 60 * 60 * 24 * 30); // 30 days expiry
+    
+    return { 
+      success: true, 
+      url: urlData?.signedUrl
+    };
+  } catch (error) {
+    console.error('Exception uploading contract to storage:', error);
     return { success: false, error };
   }
 }

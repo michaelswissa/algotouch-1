@@ -1,10 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-/**
- * Interface for contract data used in signing process
- */
 export interface ContractData {
   signature: string;
   contractHtml?: string;
@@ -23,7 +19,7 @@ export interface ContractData {
 }
 
 /**
- * Directly calls the izidoc-sign function to process a contract
+ * Calls the izidoc-sign edge function
  */
 export async function callIzidocSignFunction(
   userId: string,
@@ -33,7 +29,7 @@ export async function callIzidocSignFunction(
   contractData: ContractData
 ): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
-    console.log('Calling izidoc-sign function directly:', {
+    console.log('Calling izidoc-sign edge function:', {
       userId, 
       planId, 
       email, 
@@ -62,7 +58,7 @@ export async function callIzidocSignFunction(
     });
 
     if (error) {
-      console.error('Error from izidoc-sign function:', error);
+      console.error('Error from izidoc-sign edge function:', error);
       return { success: false, error };
     }
 
