@@ -36,6 +36,11 @@ const ContractView: React.FC<ContractViewProps> = ({
       planId: selectedPlan,
     };
     
+    // Generate temp contract ID for session storage
+    if (isRegistering) {
+      enhancedContractData.tempContractId = `temp_contract_${Date.now()}`;
+    }
+    
     // Pass the data to the parent component
     onComplete(enhancedContractData);
   };

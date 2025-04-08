@@ -29,10 +29,13 @@ export const useSubscriptionFlow = () => {
     if (sessionData) {
       try {
         const data = JSON.parse(sessionData);
+        console.log("Restoring subscription flow from session:", data);
+        
         // Always ensure plan selection comes before contract
         if (data.step && data.step !== 'plan-selection' && !data.selectedPlan) {
           // If we don't have a selected plan, force back to plan selection
           setCurrentStep('plan-selection');
+          console.log("No plan selected, forcing back to plan selection");
         } else {
           // Otherwise restore the saved step
           if (data.step) setCurrentStep(data.step as Steps);
@@ -44,6 +47,9 @@ export const useSubscriptionFlow = () => {
         // Reset to beginning on error
         setCurrentStep('plan-selection');
       }
+    } else {
+      console.log("No subscription flow data in session, starting from plan selection");
+      setCurrentStep('plan-selection');
     }
   }, []);
   
@@ -54,16 +60,31 @@ export const useSubscriptionFlow = () => {
       selectedPlan,
       contractId
     };
+    console.log("Saving subscription flow to session:", sessionData);
     sessionStorage.setItem('subscription_flow', JSON.stringify(sessionData));
   }, [currentStep, selectedPlan, contractId]);
+
+  // Get URL parameters - if plan is specified, use it
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const planParam = params.get('plan');
+    
+    if (planParam && !selectedPlan && currentStep === 'plan-selection') {
+      console.log(`Plan specified in URL: ${planParam}, selecting it`);
+      setSelectedPlan(planParam);
+      setCurrentStep('contract');
+    }
+  }, []);
   
   const handlePlanSelect = (planId: string) => {
+    console.log(`Plan selected: ${planId}`);
     setSelectedPlan(planId);
     setCurrentStep('contract');
   };
   
   const handleContractSign = async (contractData: any) => {
     try {
+      console.log("Contract signed with data:", contractData);
       const registrationData = sessionStorage.getItem('registration_data');
       let userId = user?.id;
       let userFullName = fullName;
@@ -85,6 +106,12 @@ export const useSubscriptionFlow = () => {
             
             // Update the registration data in session storage
             sessionStorage.setItem('registration_data', JSON.stringify(parsedData));
+            console.log("Contract data stored in registration data for later processing");
+            
+            // Save contract ID for flow validation
+            if (contractData.tempContractId) {
+              setContractId(contractData.tempContractId);
+            }
             
             // Proceed to payment step
             setCurrentStep('payment');
@@ -107,6 +134,12 @@ export const useSubscriptionFlow = () => {
         );
         
         if (success) {
+          console.log("Contract processed successfully");
+          if (typeof success === 'string') {
+            setContractId(success);
+          } else {
+            setContractId('signed');
+          }
           setCurrentStep('payment');
         } else {
           toast.error('שגיאה בשמירת החוזה');
@@ -138,6 +171,7 @@ export const useSubscriptionFlow = () => {
   };
   
   const handleBackToStep = (step: Steps) => {
+    console.log(`Going back to step: ${step}`);
     setCurrentStep(step);
   };
   

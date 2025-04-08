@@ -16,7 +16,8 @@ const SubscriptionContent = () => {
     handleContractSign,
     handlePaymentComplete,
     handleBackToStep,
-    isAuthenticated
+    isAuthenticated,
+    contractId
   } = useSubscriptionFlow();
 
   // Validate the current flow when component loads
@@ -30,15 +31,18 @@ const SubscriptionContent = () => {
       handlePlanSelect(planParam);
     }
     
-    // Make sure the step sequence is valid
+    // Always validate step sequence to make sure we don't skip steps
     if (currentStep === 'payment' && !selectedPlan) {
       console.log('Invalid flow state: payment step without selected plan, redirecting to plan selection');
       handleBackToStep('plan-selection');
+    } else if (currentStep === 'payment' && !contractId) {
+      console.log('Invalid flow state: payment step without signed contract, redirecting to contract step');
+      handleBackToStep('contract');
     } else if (currentStep === 'contract' && !selectedPlan) {
       console.log('Invalid flow state: contract step without selected plan, redirecting to plan selection');
       handleBackToStep('plan-selection');
     }
-  }, [currentStep, selectedPlan]);
+  }, [currentStep, selectedPlan, contractId, handlePlanSelect, handleBackToStep]);
 
   if (isLoading) {
     return (
