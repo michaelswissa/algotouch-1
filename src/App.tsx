@@ -1,38 +1,27 @@
-
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './contexts/auth';
+import { ToastContainer } from 'sonner';
 
-// Import your pages
-import Index from './pages/Index'; // Changed from Home to Index
+// Import page components
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Subscription from './pages/Subscription';
-import MySubscriptionPage from './pages/MySubscriptionPage'; // Changed from MySubscription to MySubscriptionPage
-import ContractDetails from './pages/ContractDetails';
-
-import { Toaster } from 'sonner';
-import { AuthProvider } from './contexts/auth/AuthProvider';
-
-// הוסף את ה-class dark ל-html כברירת מחדל בעת הטעינה הראשונית
-document.documentElement.classList.add('dark');
+import UserSubscription from './components/UserSubscription';
+import Contract from './pages/Contract';
 
 function App() {
   return (
     <AuthProvider>
-      <Toaster position="top-center" richColors />
       <Router>
+        <ToastContainer />
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Auth />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/subscription" element={<Subscription />} />
-          <Route path="/my-subscription" element={<MySubscriptionPage />} />
-          <Route path="/contract/:contractId" element={<ContractDetails />} />
-          
-          {/* Add any other routes you have */}
-          
-          {/* Catch-all route */}
-          <Route path="*" element={<h1>Page not found</h1>} />
+          <Route path="/user-subscription" element={<UserSubscription />} />
+          <Route path="/contract/:contractId" element={<Contract />} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
@@ -13,29 +12,58 @@ interface ContractSectionProps {
   onBack: () => void;
 }
 
-const ContractSection: React.FC<ContractSectionProps> = ({ 
-  selectedPlan, 
-  fullName, 
-  onSign, 
-  onBack 
+const ContractSection: React.FC<ContractSectionProps> = ({
+  selectedPlan,
+  fullName,
+  onSign,
+  onBack
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
   const { user } = useAuth();
   
-  // Function to handle contract signing
-  const handleSignContract = async (contractData: any) => {
+  const handleSignContract = async () => {
     try {
       setIsProcessing(true);
       console.log('Contract signed, forwarding data to parent component');
       
-      // Add a small delay to show the processing state
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const signature = document.getElementById('signature').toDataURL();
+      const contractHtml = document.getElementById('contractHtml').innerHTML;
+      const agreedToTerms = document.getElementById('agreedToTerms').checked;
+      const agreedToPrivacy = document.getElementById('agreedToPrivacy').checked;
       
-      // Pass the contract data directly to the parent along with user information
-      onSign({
-        ...contractData,
-        userId: user?.id // This will be undefined if the user isn't authenticated
-      });
+      if (signature && contractHtml) {
+        const contractData = {
+          signature,
+          contractHtml,
+          agreedToTerms,
+          agreedToPrivacy,
+          contractVersion: "1.0",
+          browserInfo: {
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            platform: navigator.platform,
+            screenSize: `${window.innerWidth}x${window.innerHeight}`,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          }
+        };
+
+        // Store the contract ID in local storage as a fallback
+        try {
+          // Generate a temporary contract ID
+          const tempContractId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+          localStorage.setItem('temp_contract_id', tempContractId);
+          
+          // Also keep a local copy of the contract HTML for immediate access
+          localStorage.setItem('temp_contract_html', contractHtml);
+        } catch (storageError) {
+          console.error('Error saving contract to local storage:', storageError);
+          // Continue anyway
+        }
+        
+        setIsSigning(false);
+        onSign(contractData);
+      }
     } catch (error) {
       console.error('Error signing contract:', error);
     } finally {
