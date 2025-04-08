@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   const handleSignContract = async () => {
     try {
       setIsProcessing(true);
+      setIsSigning(true);
       console.log('Contract signed, forwarding data to parent component');
       
       const signatureElement = document.getElementById('signature') as HTMLCanvasElement;
@@ -33,46 +33,64 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       const agreedToTermsElement = document.getElementById('agreedToTerms') as HTMLInputElement;
       const agreedToPrivacyElement = document.getElementById('agreedToPrivacy') as HTMLInputElement;
       
-      if (signatureElement && contractHtmlElement) {
-        const signature = signatureElement.toDataURL();
-        const contractHtml = contractHtmlElement.innerHTML;
-        const agreedToTerms = agreedToTermsElement.checked;
-        const agreedToPrivacy = agreedToPrivacyElement.checked;
-        
-        const contractData = {
-          signature,
-          contractHtml,
-          agreedToTerms,
-          agreedToPrivacy,
-          contractVersion: "1.0",
-          browserInfo: {
-            userAgent: navigator.userAgent,
-            language: navigator.language,
-            platform: navigator.platform,
-            screenSize: `${window.innerWidth}x${window.innerHeight}`,
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-          }
-        };
-
-        // Store the contract ID in local storage as a fallback
-        try {
-          // Generate a temporary contract ID
-          const tempContractId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-          localStorage.setItem('temp_contract_id', tempContractId);
-          
-          // Also keep a local copy of the contract HTML for immediate access
-          localStorage.setItem('temp_contract_html', contractHtml);
-        } catch (storageError) {
-          console.error('Error saving contract to local storage:', storageError);
-          // Continue anyway
-        }
-        
+      if (!signatureElement || !contractHtmlElement || !agreedToTermsElement || !agreedToPrivacyElement) {
+        console.error('Missing required elements for contract signing', {
+          hasSignature: !!signatureElement,
+          hasContractHtml: !!contractHtmlElement,
+          hasTermsCheckbox: !!agreedToTermsElement,
+          hasPrivacyCheckbox: !!agreedToPrivacyElement
+        });
+        setIsProcessing(false);
         setIsSigning(false);
-        onSign(contractData);
+        return;
       }
+      
+      if (!agreedToTermsElement.checked || !agreedToPrivacyElement.checked) {
+        console.error('Agreement to terms and privacy is required');
+        alert('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
+        setIsProcessing(false);
+        setIsSigning(false);
+        return;
+      }
+      
+      const signature = signatureElement.toDataURL();
+      const contractHtml = contractHtmlElement.innerHTML;
+      const agreedToTerms = agreedToTermsElement.checked;
+      const agreedToPrivacy = agreedToPrivacyElement.checked;
+      
+      const contractData = {
+        signature,
+        contractHtml,
+        agreedToTerms,
+        agreedToPrivacy,
+        contractVersion: "1.0",
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          screenSize: `${window.innerWidth}x${window.innerHeight}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      };
+
+      // Store the contract ID in local storage as a fallback
+      try {
+        // Generate a temporary contract ID
+        const tempContractId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem('temp_contract_id', tempContractId);
+        
+        // Also keep a local copy of the contract HTML for immediate access
+        localStorage.setItem('temp_contract_html', contractHtml);
+      } catch (storageError) {
+        console.error('Error saving contract to local storage:', storageError);
+        // Continue anyway
+      }
+      
+      setIsSigning(false);
+      onSign(contractData);
     } catch (error) {
       console.error('Error signing contract:', error);
-    } finally {
+      setIsSigning(false);
       setIsProcessing(false);
     }
   };
