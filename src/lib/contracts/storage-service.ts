@@ -3,6 +3,58 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 /**
+ * Calls the izidoc-sign edge function
+ */
+export async function callIzidocSignFunction(
+  userId: string,
+  planId: string,
+  fullName: string,
+  email: string,
+  contractData: any
+): Promise<{ success: boolean; data?: any; error?: any }> {
+  try {
+    console.log('Calling izidoc-sign edge function:', {
+      userId, 
+      planId, 
+      email, 
+      hasSignature: !!contractData.signature
+    });
+    
+    const { data, error } = await supabase.functions.invoke('izidoc-sign', {
+      body: {
+        userId,
+        planId,
+        fullName,
+        email,
+        signature: contractData.signature,
+        contractHtml: contractData.contractHtml,
+        agreedToTerms: contractData.agreedToTerms,
+        agreedToPrivacy: contractData.agreedToPrivacy,
+        contractVersion: contractData.contractVersion || "1.0",
+        browserInfo: contractData.browserInfo || {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          screenSize: `${window.innerWidth}x${window.innerHeight}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      },
+    });
+
+    if (error) {
+      console.error('Error from izidoc-sign edge function:', error);
+      return { success: false, error };
+    }
+
+    console.log('Contract processed successfully by izidoc-sign:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Exception calling izidoc-sign function:', error);
+    return { success: false, error };
+  }
+}
+
+/**
  * Saves contract signature data directly to Supabase
  */
 export async function saveContractToDatabase(
@@ -24,6 +76,12 @@ export async function saveContractToDatabase(
     // Generate a unique contract ID to be used in URLs
     const contractId = crypto.randomUUID();
     
+    // Try to upload HTML to storage
+    const uploadResult = await uploadContractToStorage(userId, contractData.contractHtml, contractId);
+    
+    const pdfUrl = uploadResult.success ? uploadResult.url : null;
+    console.log(uploadResult.success ? 'Contract uploaded to storage' : 'Failed to upload contract to storage');
+    
     // Store contract signature in the database
     const { data, error } = await supabase
       .from('contract_signatures')
@@ -38,6 +96,7 @@ export async function saveContractToDatabase(
         agreed_to_terms: contractData.agreedToTerms || false,
         agreed_to_privacy: contractData.agreedToPrivacy || false,
         contract_version: contractData.contractVersion || "1.0",
+        pdf_url: pdfUrl,
         browser_info: contractData.browserInfo || {
           userAgent: navigator.userAgent,
           language: navigator.language,
@@ -77,30 +136,96 @@ export async function saveContractToDatabase(
 }
 
 /**
+ * Uploads contract HTML to storage bucket
+ */
+export async function uploadContractToStorage(
+  userId: string,
+  contractHtml: string,
+  contractId: string
+): Promise<{ success: boolean; url?: string; error?: any }> {
+  try {
+    console.log(`Uploading contract HTML to storage for user: ${userId}, contract: ${contractId}`);
+    
+    // Check if the contracts bucket exists and create it if needed
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const contractsBucketExists = buckets?.some(bucket => bucket.name === 'contracts');
+      
+      if (!contractsBucketExists) {
+        console.log('Contracts bucket does not exist, attempting to create it');
+        const { error: createError } = await supabase.storage.createBucket('contracts', {
+          public: false,
+          fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: ['text/html', 'application/pdf']
+        });
+        
+        if (createError) {
+          console.error('Error creating contracts bucket:', createError);
+          return { success: false, error: createError };
+        }
+        console.log('Created contracts bucket successfully');
+      }
+    } catch (bucketCheckError) {
+      console.error('Error checking for contracts bucket:', bucketCheckError);
+      // Continue anyway, we'll try the upload
+    }
+    
+    // Generate a file name based on contract ID
+    const fileName = `${userId}/${contractId}.html`;
+    
+    // Prepare the file content
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(contractHtml);
+    
+    // Upload the file to the contracts bucket
+    const { data, error } = await supabase
+      .storage
+      .from('contracts')
+      .upload(fileName, bytes, {
+        contentType: 'text/html',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Error uploading contract to storage:', error);
+      return { success: false, error };
+    }
+    
+    console.log('Contract uploaded successfully to storage:', data?.path);
+    
+    // Create a URL for accessing the contract
+    const { data: urlData } = await supabase
+      .storage
+      .from('contracts')
+      .createSignedUrl(fileName, 60 * 60 * 24 * 30); // 30 days expiry
+    
+    return { 
+      success: true, 
+      url: urlData?.signedUrl
+    };
+  } catch (error) {
+    console.error('Exception uploading contract to storage:', error);
+    return { success: false, error };
+  }
+}
+
+/**
  * Updates user metadata with additional information
  */
 async function updateUserMetadata(userId: string, metadata: any): Promise<boolean> {
   try {
-    const { data: user, error: getUserError } = await supabase.auth.admin.getUserById(userId);
-    
-    if (getUserError || !user) {
-      console.error('Error getting user for metadata update:', getUserError);
-      return false;
-    }
-    
-    // Merge with existing metadata
-    const updatedMetadata = {
-      ...user.user.user_metadata,
-      ...metadata
-    };
-    
-    const { error: updateError } = await supabase.auth.admin.updateUserById(
-      userId,
-      { user_metadata: updatedMetadata }
-    );
+    // We can't directly access auth.admin from the client,
+    // so we'll update the profiles table instead
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        updated_at: new Date().toISOString(),
+        ...metadata
+      })
+      .eq('id', userId);
     
     if (updateError) {
-      console.error('Error updating user metadata:', updateError);
+      console.error('Error updating user profile metadata:', updateError);
       return false;
     }
     
@@ -184,6 +309,7 @@ export async function verifyContractSignature(userId: string): Promise<{ signed:
  */
 export async function getContractById(contractId: string): Promise<{ success: boolean; contract?: any; error?: any }> {
   try {
+    console.log('Fetching contract with ID:', contractId);
     const { data, error } = await supabase
       .from('contract_signatures')
       .select('*')
@@ -195,6 +321,7 @@ export async function getContractById(contractId: string): Promise<{ success: bo
       return { success: false, error };
     }
     
+    console.log('Contract retrieved successfully');
     return { success: true, contract: data };
   } catch (error) {
     console.error('Exception retrieving contract:', error);

@@ -29,14 +29,16 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
 
   useEffect(() => {
     async function fetchContract() {
-      if (!userId) {
-        setError('משתמש לא מזוהה');
+      if (!userId && !externalContractId) {
+        setError('משתמש לא מזוהה ומזהה הסכם חסר');
         setLoading(false);
         return;
       }
       
       setLoading(true);
       try {
+        console.log('Fetching contract:', { userId, externalContractId });
+        
         // If a specific contract ID is provided, fetch that contract
         if (externalContractId) {
           const { success, contract, error: fetchError } = await getContractById(externalContractId);
@@ -49,11 +51,13 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
           }
           
           if (!contract || !contract.contract_html) {
-            setError('לא נמצא הסכם חתום');
+            console.error('Contract not found or missing HTML content');
+            setError('לא נמצא הסכם חתום או תוכן ההסכם חסר');
             setLoading(false);
             return;
           }
           
+          console.log('Contract found:', { id: contract.id, hasHtml: !!contract.contract_html });
           setContractData(contract);
           setContractHtml(contract.contract_html);
           setLoading(false);
@@ -61,7 +65,8 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
         }
         
         // Otherwise, find the latest contract for this user
-        const { signed, contractId } = await verifyContractSignature(userId);
+        const { signed, contractId, signedAt } = await verifyContractSignature(userId);
+        console.log('Contract verification result:', { signed, contractId, signedAt });
         
         if (!signed || !contractId) {
           setError('לא נמצא הסכם חתום');
@@ -80,11 +85,13 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
         }
         
         if (!contract || !contract.contract_html) {
-          setError('לא נמצא הסכם חתום');
+          console.error('Contract found but missing HTML content');
+          setError('תוכן ההסכם חסר');
           setLoading(false);
           return;
         }
         
+        console.log('Contract loaded successfully');
         setContractData(contract);
         setContractHtml(contract.contract_html);
       } catch (err) {
@@ -150,7 +157,7 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
     
     const file = new Blob([enhancedHtml], {type: 'text/html'});
     element.href = URL.createObjectURL(file);
-    element.download = `contract-${contractData.full_name || userId}-${new Date().toISOString().slice(0,10)}.html`;
+    element.download = `contract-${contractData.full_name || 'user'}-${new Date().toISOString().slice(0,10)}.html`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
