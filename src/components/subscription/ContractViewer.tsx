@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
-import { supabase } from '@/integrations/supabase/client';
+import { getContractById, verifyContractSignature } from '@/lib/contracts/contract-service';
 import { Button } from '@/components/ui/button';
 import { FileText, Download, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,13 +8,20 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ContractViewerProps {
   userId?: string;
+  contractId?: string;
   onBack?: () => void;
   className?: string;
 }
 
-const ContractViewer: React.FC<ContractViewerProps> = ({ userId: externalUserId, onBack, className }) => {
+const ContractViewer: React.FC<ContractViewerProps> = ({ 
+  userId: externalUserId, 
+  contractId: externalContractId,
+  onBack, 
+  className 
+}) => {
   const { user } = useAuth();
   const [contractHtml, setContractHtml] = useState<string | null>(null);
+  const [contractData, setContractData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -31,27 +37,56 @@ const ContractViewer: React.FC<ContractViewerProps> = ({ userId: externalUserId,
       
       setLoading(true);
       try {
-        // Fetch the contract HTML directly from the database
-        const { data, error: fetchError } = await supabase
-          .from('contract_signatures')
-          .select('contract_html, created_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        
-        if (fetchError) {
-          console.error('Error fetching contract:', fetchError);
-          setError('שגיאה בטעינת ההסכם');
+        // If a specific contract ID is provided, fetch that contract
+        if (externalContractId) {
+          const { success, contract, error: fetchError } = await getContractById(externalContractId);
+          
+          if (fetchError || !success) {
+            console.error('Error fetching specific contract:', fetchError);
+            setError('שגיאה בטעינת ההסכם');
+            setLoading(false);
+            return;
+          }
+          
+          if (!contract || !contract.contract_html) {
+            setError('לא נמצא הסכם חתום');
+            setLoading(false);
+            return;
+          }
+          
+          setContractData(contract);
+          setContractHtml(contract.contract_html);
+          setLoading(false);
           return;
         }
         
-        if (!data || !data.contract_html) {
+        // Otherwise, find the latest contract for this user
+        const { signed, contractId } = await verifyContractSignature(userId);
+        
+        if (!signed || !contractId) {
           setError('לא נמצא הסכם חתום');
+          setLoading(false);
           return;
         }
         
-        setContractHtml(data.contract_html);
+        // Fetch the contract details using the ID
+        const { success, contract, error: fetchError } = await getContractById(contractId);
+        
+        if (fetchError || !success) {
+          console.error('Error fetching contract by ID:', fetchError);
+          setError('שגיאה בטעינת ההסכם');
+          setLoading(false);
+          return;
+        }
+        
+        if (!contract || !contract.contract_html) {
+          setError('לא נמצא הסכם חתום');
+          setLoading(false);
+          return;
+        }
+        
+        setContractData(contract);
+        setContractHtml(contract.contract_html);
       } catch (err) {
         console.error('Error fetching contract:', err);
         setError('שגיאה בטעינת ההסכם');
@@ -61,16 +96,61 @@ const ContractViewer: React.FC<ContractViewerProps> = ({ userId: externalUserId,
     }
     
     fetchContract();
-  }, [userId]);
+  }, [userId, externalContractId]);
 
   // Function to download the contract as an HTML file
   const downloadContract = () => {
-    if (!contractHtml) return;
+    if (!contractHtml || !contractData) return;
     
     const element = document.createElement('a');
-    const file = new Blob([contractHtml], {type: 'text/html'});
+    
+    // Enhance the HTML with additional metadata
+    const enhancedHtml = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="he">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>הסכם חתום - ${contractData.full_name || 'לקוח'}</title>
+        <style>
+          body { font-family: Arial, sans-serif; direction: rtl; padding: 20px; }
+          h2 { color: #333; }
+          .signature-block { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px; }
+          .metadata { margin-top: 30px; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <h2>הסכם חתום</h2>
+        <p>תאריך חתימה: ${new Date(contractData.created_at).toLocaleDateString('he-IL')}</p>
+        
+        <div class="contract-content">
+          ${contractHtml}
+        </div>
+        
+        <div class="signature-block">
+          <h3>פרטי החותם:</h3>
+          <p><strong>שם מלא:</strong> ${contractData.full_name || 'לא צוין'}</p>
+          <p><strong>אימייל:</strong> ${contractData.email || 'לא צוין'}</p>
+          <p><strong>כתובת:</strong> ${contractData.address || 'לא צוין'}</p>
+          <p><strong>טלפון:</strong> ${contractData.phone || 'לא צוין'}</p>
+          ${contractData.signature ? `<p><strong>חתימה:</strong><br><img src="${contractData.signature}" alt="חתימה דיגיטלית" style="max-width: 300px; border: 1px solid #eee;" /></p>` : ''}
+          <p><strong>תאריך חתימה:</strong> ${new Date(contractData.created_at).toLocaleString('he-IL')}</p>
+        </div>
+        
+        <div class="metadata">
+          <h4>מידע נוסף:</h4>
+          <p>מזהה הסכם: ${contractData.id}</p>
+          <p>גרסת הסכם: ${contractData.contract_version || '1.0'}</p>
+          <p>הוסכם לתנאי שימוש: ${contractData.agreed_to_terms ? 'כן' : 'לא'}</p>
+          <p>הוסכם למדיניות פרטיות: ${contractData.agreed_to_privacy ? 'כן' : 'לא'}</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    const file = new Blob([enhancedHtml], {type: 'text/html'});
     element.href = URL.createObjectURL(file);
-    element.download = `contract-${new Date().toISOString().slice(0,10)}.html`;
+    element.download = `contract-${contractData.full_name || userId}-${new Date().toISOString().slice(0,10)}.html`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);

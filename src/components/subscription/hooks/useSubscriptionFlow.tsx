@@ -4,6 +4,8 @@ import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionCont
 import { Steps } from '@/types/subscription';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { processSignedContract } from '@/lib/contracts/contract-service';
+import { useAuth } from '@/contexts/auth';
 
 export const useSubscriptionFlow = () => {
   const [currentStep, setCurrentStep] = useState<Steps>('plan-selection');
@@ -18,6 +20,7 @@ export const useSubscriptionFlow = () => {
     refreshSubscription
   } = useSubscriptionContext();
   
+  const { user } = useAuth();
   const navigate = useNavigate();
   const isAuthenticated = !!email;
 
@@ -51,9 +54,31 @@ export const useSubscriptionFlow = () => {
     setCurrentStep('contract');
   };
   
-  const handleContractSign = (newContractId: string) => {
-    setContractId(newContractId);
-    setCurrentStep('payment');
+  const handleContractSign = async (contractData: any) => {
+    if (!user?.id) {
+      toast.error('משתמש לא מזוהה');
+      return;
+    }
+    
+    try {
+      // Process and save the contract
+      const success = await processSignedContract(
+        user.id,
+        selectedPlan,
+        fullName || contractData.fullName,
+        email || contractData.email,
+        contractData
+      );
+      
+      if (success) {
+        setCurrentStep('payment');
+      } else {
+        toast.error('שגיאה בשמירת החוזה');
+      }
+    } catch (error) {
+      console.error('Error processing contract:', error);
+      toast.error('שגיאה בעיבוד החוזה');
+    }
   };
   
   const handlePaymentComplete = () => {

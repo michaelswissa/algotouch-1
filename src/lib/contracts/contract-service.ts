@@ -35,8 +35,9 @@ export async function processSignedContract(
       return false;
     }
     
-    // Try to update the subscription status as well
-    await updateSubscriptionStatus(userId);
+    // Return the contract ID for potential redirects to view the contract
+    const contractId = saveResult.data?.id;
+    console.log('Contract saved with ID:', contractId);
     
     toast.success('ההסכם נחתם ונשמר בהצלחה!');
     return true;
