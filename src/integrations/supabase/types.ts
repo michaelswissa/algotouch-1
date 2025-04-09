@@ -324,6 +324,39 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_errors: {
+        Row: {
+          context: string | null
+          created_at: string | null
+          error_code: string | null
+          error_details: Json | null
+          error_message: string | null
+          id: string
+          payment_details: Json | null
+          user_id: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string | null
+          error_code?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          payment_details?: Json | null
+          user_id: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string | null
+          error_code?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          payment_details?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_history: {
         Row: {
           amount: number
@@ -367,6 +400,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_sessions: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          expires_at: string
+          id: string
+          payment_details: Json | null
+          plan_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          expires_at: string
+          id: string
+          payment_details?: Json | null
+          plan_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string
+          id?: string
+          payment_details?: Json | null
+          plan_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       payment_tokens: {
         Row: {

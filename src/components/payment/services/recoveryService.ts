@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { PaymentSessionData } from '../hooks/types';
 
 // Send a recovery email to the user after a payment failure
 export const sendRecoveryEmail = async (
@@ -30,21 +31,63 @@ export const sendRecoveryEmail = async (
 };
 
 // Get payment session data for recovery
-export const getRecoverySession = async (sessionId: string) => {
+export const getRecoverySession = async (sessionId: string): Promise<PaymentSessionData | null> => {
   try {
-    // Since we can't access the payment_sessions table directly,
-    // we'll use an edge function to retrieve this data
+    const { data, error } = await supabase
+      .from('payment_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+    
+    if (error) {
+      // If direct access fails, try with the edge function
+      return await getRecoverySessionViaFunction(sessionId);
+    }
+    
+    if (data) {
+      const now = new Date();
+      const expiresAt = new Date(data.expires_at);
+      
+      if (expiresAt > now) {
+        return {
+          sessionId: data.id,
+          userId: data.user_id,
+          email: data.email,
+          planId: data.plan_id,
+          paymentDetails: data.payment_details,
+          expiresAt: data.expires_at
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error retrieving payment session:', error);
+    return await getRecoverySessionViaFunction(sessionId);
+  }
+};
+
+// Fallback method using edge function
+const getRecoverySessionViaFunction = async (sessionId: string): Promise<PaymentSessionData | null> => {
+  try {
     const { data, error } = await supabase.functions.invoke('recover-payment-session/get-session', {
       body: { sessionId }
     });
     
-    if (error) {
-      throw error;
+    if (error || !data) {
+      throw error || new Error('No data returned');
     }
     
-    return data;
+    return {
+      sessionId: data.id,
+      userId: data.user_id,
+      email: data.email,
+      planId: data.plan_id,
+      paymentDetails: data.payment_details,
+      expiresAt: data.expires_at
+    };
   } catch (error) {
-    console.error('Error retrieving payment session:', error);
+    console.error('Error retrieving payment session via function:', error);
     return null;
   }
 };
@@ -55,28 +98,50 @@ export const savePaymentSession = async (sessionData: {
   email?: string;
   planId: string;
   paymentDetails?: any;
-}) => {
+}): Promise<string | null> => {
   try {
     const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
     
-    // Since we can't access the payment_sessions table directly,
-    // we'll use an edge function to save this data
-    const { data, error } = await supabase.functions.invoke('recover-payment-session/save-session', {
-      body: {
-        sessionId,
-        userId: sessionData.userId,
-        email: sessionData.email,
-        planId: sessionData.planId,
-        paymentDetails: sessionData.paymentDetails,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours expiry
+    try {
+      // Try direct database insert first
+      const { error } = await supabase
+        .from('payment_sessions')
+        .insert({
+          id: sessionId,
+          user_id: sessionData.userId,
+          email: sessionData.email,
+          plan_id: sessionData.planId,
+          payment_details: sessionData.paymentDetails,
+          expires_at: expiresAt.toISOString()
+        });
+      
+      if (error) {
+        throw error;
       }
-    });
-    
-    if (error) {
-      throw error;
+      
+      return sessionId;
+    } catch (dbError) {
+      // Fallback to edge function
+      console.log('Direct insert failed, trying via edge function');
+      
+      const { data, error } = await supabase.functions.invoke('recover-payment-session/save-session', {
+        body: {
+          sessionId,
+          userId: sessionData.userId,
+          email: sessionData.email,
+          planId: sessionData.planId,
+          paymentDetails: sessionData.paymentDetails,
+          expiresAt: expiresAt.toISOString()
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return sessionId;
     }
-    
-    return sessionId;
   } catch (error) {
     console.error('Error saving payment session:', error);
     return null;

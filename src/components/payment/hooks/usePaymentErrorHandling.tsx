@@ -3,18 +3,14 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { savePaymentSession, getRecoverySession } from '../services/recoveryService';
+import { PaymentError } from './types';
+import { getErrorMessage, mapErrorCode, isTransientError, logPaymentError } from '../utils/errorHandling';
 
 interface UsePaymentErrorHandlingProps {
   planId?: string;
   onCardUpdate?: () => void;
   onAlternativePayment?: () => void;
-}
-
-interface ErrorHandlingOptions {
-  tokenData?: any;
-  planId?: string;
-  operationType?: number;
-  userInfo?: { userId?: string; email?: string } | null;
 }
 
 export const usePaymentErrorHandling = ({ 
@@ -25,25 +21,53 @@ export const usePaymentErrorHandling = ({
   const [searchParams] = useSearchParams();
   const [isRecovering, setIsRecovering] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [recoveryData, setRecoveryData] = useState<any>(null);
   
   // Check for recovery parameters in URL
   useEffect(() => {
     const recover = searchParams.get('recover');
     const error = searchParams.get('error');
     
-    if (recover && error === 'true') {
-      setSessionId(recover);
-      setIsRecovering(true);
-    }
+    const checkRecoverySession = async () => {
+      if (recover) {
+        setSessionId(recover);
+        setIsRecovering(true);
+        
+        try {
+          const sessionData = await getRecoverySession(recover);
+          if (sessionData) {
+            setRecoveryData(sessionData);
+            toast.info('נמצאו פרטי תשלום שנשמרו בעסקה קודמת');
+          } else {
+            setIsRecovering(false);
+            setSessionId(null);
+            if (error === 'true') {
+              toast.error('שגיאה בעיבוד התשלום, אנא נסה שנית');
+            }
+          }
+        } catch (sessionError) {
+          console.error('Failed to get recovery session:', sessionError);
+          setIsRecovering(false);
+          setSessionId(null);
+        }
+      }
+    };
+    
+    checkRecoverySession();
   }, [searchParams]);
   
   // Handle payment errors and recovery options
-  const handleError = async (error: any, options?: ErrorHandlingOptions) => {
+  const handleError = async (error: any, options?: {
+    tokenData?: any;
+    planId?: string;
+    operationType?: number;
+    userInfo?: { userId?: string; email?: string } | null;
+  }) => {
     console.error('Payment error:', error);
     
     // Try to extract relevant error information
-    const errorCode = error.code || error.errorCode || 'unknown';
-    const errorMessage = error.message || 'An unknown error occurred';
+    const errorCode = mapErrorCode(error);
+    const errorMessage = getErrorMessage(errorCode);
     
     // Create a unique session ID if we're going to attempt recovery
     const recoverySessionId = crypto.randomUUID();
@@ -68,44 +92,59 @@ export const usePaymentErrorHandling = ({
     }
     
     // Save error information for recovery if possible
-    if (options && (recoveryAction || options.userInfo?.email)) {
+    const userId = options?.userInfo?.userId;
+    const userEmail = options?.userInfo?.email;
+    
+    if (recoveryAction || userEmail) {
       try {
-        // Create recovery URL
-        const recoveryUrl = `${window.location.origin}/subscription?step=3&error=true&recover=${recoverySessionId}&plan=${options.planId || planId}`;
-        
-        // Store session for recovery
-        await supabase.functions.invoke('recover-payment-session', {
-          body: {
-            email: options.userInfo?.email || '',
+        // Save session for recovery
+        const savedSessionId = await savePaymentSession({
+          userId,
+          email: userEmail,
+          planId: options?.planId || planId || 'unknown',
+          paymentDetails: {
             errorInfo: {
               code: errorCode,
               message: errorMessage,
               recoveryAction,
-              planId: options.planId || planId,
-              operationType: options.operationType || 3,
-              tokenDetails: options.tokenData ? {
-                last4Digits: options.tokenData.lastFourDigits,
-                expiry: `${options.tokenData.expiryMonth}/${options.tokenData.expiryYear}`,
-              } : null
+              operationType: options?.operationType || 3,
+              tokenDetails: options?.tokenData || null
             },
-            sessionId: recoverySessionId,
-            recoveryUrl
+            ...options
           }
         });
         
-        setSessionId(recoverySessionId);
+        if (savedSessionId) {
+          setSessionId(savedSessionId);
+          
+          // Log error to database
+          await logPaymentError(
+            error,
+            userId,
+            'payment_error_handling',
+            {
+              recoverySessionId: savedSessionId,
+              ...options
+            }
+          );
+        }
       } catch (sessionError) {
         console.error('Failed to store recovery session:', sessionError);
       }
     }
     
-    // Return error information
-    return {
+    // Create PaymentError object with recovery info
+    const paymentError = new PaymentError(
+      recoveryMessage || errorMessage,
       errorCode,
-      errorMessage: recoveryMessage || errorMessage,
-      recoveryAction,
-      recoverySessionId
-    };
+      error.details || error
+    );
+    
+    paymentError.recoverySessionId = sessionId || recoverySessionId;
+    paymentError.recoveryAction = recoveryAction as any;
+    
+    // Return error information
+    return paymentError;
   };
 
   // Function to check if there's a recovery session to resume
@@ -113,26 +152,8 @@ export const usePaymentErrorHandling = ({
     if (!sessionId) return null;
     
     try {
-      const { data, error } = await supabase
-        .from('payment_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .maybeSingle();
-        
-      if (error) throw error;
-      
-      if (data) {
-        // Ensure the session hasn't expired
-        const expiryDate = new Date(data.expires_at);
-        if (expiryDate > new Date()) {
-          return data;
-        } else {
-          console.log('Recovery session has expired');
-          return null;
-        }
-      }
-      
-      return null;
+      const sessionData = await getRecoverySession(sessionId);
+      return sessionData;
     } catch (error) {
       console.error('Error checking recovery session:', error);
       return null;
@@ -143,6 +164,7 @@ export const usePaymentErrorHandling = ({
     handleError,
     checkForRecovery,
     isRecovering,
-    sessionId
+    sessionId,
+    recoveryData
   };
 };
