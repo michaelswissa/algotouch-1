@@ -42,7 +42,8 @@ export const handleExistingUserPayment = async (
   const price = planDetails[planId as keyof typeof planDetails]?.price || 0;
   
   if (planId !== 'monthly' || operationType !== 3) {
-    await supabase
+    // Create payment history record
+    const { data: paymentData, error: paymentError } = await supabase
       .from('payment_history')
       .insert({
         user_id: userId,
@@ -54,7 +55,48 @@ export const handleExistingUserPayment = async (
           ...tokenData,
           simulated: false 
         }
+      })
+      .select()
+      .single();
+      
+    if (paymentError) {
+      console.error('Payment record creation error:', paymentError);
+      throw paymentError;
+    }
+    
+    // Get user information for document generation
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, email, phone')
+      .eq('id', userId)
+      .single();
+      
+    if (userError) {
+      console.error('Error fetching user data for document:', userError);
+    }
+    
+    const userEmail = userData?.email || '';
+    const userName = `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim();
+    
+    // Generate invoice/receipt
+    try {
+      await supabase.functions.invoke('generate-document/generate', {
+        body: {
+          paymentId: paymentData.id,
+          userId: userId,
+          amount: price,
+          planType: planId,
+          email: userEmail,
+          fullName: userName,
+          documentType: 'invoice', // For initial payment we generate invoice
+          phone: userData?.phone || ''
+        }
       });
+    } catch (docError) {
+      console.error('Error generating document:', docError);
+      // Continue with the flow even if document generation fails
+      // We can implement retry logic or queue mechanism in a production app
+    }
   } else {
     await supabase
       .from('payment_history')
@@ -159,4 +201,80 @@ export const initiateExternalPayment = async (
   }
   
   return data;
+};
+
+// New function to request document generation manually
+export const generateDocument = async (
+  userId: string,
+  paymentId: string,
+  documentType: 'invoice' | 'receipt' = 'receipt'
+) => {
+  try {
+    // Fetch needed data
+    const [userResponse, paymentResponse] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('first_name, last_name, email, phone')
+        .eq('id', userId)
+        .single(),
+        
+      supabase
+        .from('payment_history')
+        .select('amount, subscription_id')
+        .eq('id', paymentId)
+        .single()
+    ]);
+    
+    if (userResponse.error) throw userResponse.error;
+    if (paymentResponse.error) throw paymentResponse.error;
+    
+    // Get subscription plan type
+    const { data: subscriptionData, error: subError } = await supabase
+      .from('subscriptions')
+      .select('plan_type')
+      .eq('id', paymentResponse.data.subscription_id)
+      .single();
+      
+    if (subError) throw subError;
+    
+    const userData = userResponse.data;
+    const userName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim();
+    
+    // Call document generation
+    const { data, error } = await supabase.functions.invoke('generate-document/generate', {
+      body: {
+        paymentId,
+        userId,
+        amount: paymentResponse.data.amount,
+        planType: subscriptionData.plan_type,
+        email: userData.email || '',
+        fullName: userName,
+        documentType,
+        phone: userData.phone || ''
+      }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error: any) {
+    console.error('Document generation error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Function to list user's documents
+export const listUserDocuments = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-document/list', {
+      body: { userId }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, documents: data?.documents || [] };
+  } catch (error: any) {
+    console.error('Error listing documents:', error);
+    return { success: false, error: error.message };
+  }
 };

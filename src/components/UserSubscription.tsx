@@ -64,6 +64,7 @@ const UserSubscription = () => {
 
   const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
   const hasContract = subscription.contract_signed;
+  const isCancelled = subscription.cancelled_at !== null && subscription.cancelled_at !== undefined;
 
   return (
     <SubscriptionCard
@@ -72,9 +73,10 @@ const UserSubscription = () => {
     >
       <>
         <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="my-2 w-full">
-          <TabsList className="grid grid-cols-2 w-full">
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="details">פרטי מנוי</TabsTrigger>
             <TabsTrigger value="contract">הסכם</TabsTrigger>
+            <TabsTrigger value="documents">מסמכים</TabsTrigger>
           </TabsList>
           
           <TabsContent value="details" className="mt-4">
@@ -118,11 +120,95 @@ const UserSubscription = () => {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="documents" className="mt-4">
+            <DocumentsList userId={subscription.user_id} />
+          </TabsContent>
         </Tabs>
       </>
       <SubscriptionFooter planType={subscription.plan_type} />
     </SubscriptionCard>
   );
 };
+
+// New component for displaying documents
+const DocumentsList = ({ userId }: { userId: string }) => {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  React.useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        setDocuments(data || []);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDocuments();
+  }, [userId]);
+  
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      </div>
+    );
+  }
+  
+  if (documents.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">אין מסמכים זמינים</p>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-4">
+      <div className="text-sm font-medium text-muted-foreground mb-2">המסמכים שלך</div>
+      <div className="border rounded-md overflow-hidden">
+        <div className="bg-muted px-4 py-2 flex items-center justify-between text-sm font-medium">
+          <span>סוג מסמך</span>
+          <span>תאריך</span>
+        </div>
+        <div className="divide-y">
+          {documents.map((doc) => (
+            <div key={doc.id} className="px-4 py-3 flex items-center justify-between hover:bg-muted/50">
+              <div className="flex items-center gap-2">
+                <DocumentIcon className="h-4 w-4 text-primary" />
+                <span>{doc.document_type === 'invoice' ? 'חשבונית' : 'קבלה'} #{doc.document_number}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {new Date(doc.document_date).toLocaleDateString('he-IL')}
+                </span>
+                <Button variant="ghost" size="sm" asChild>
+                  <a href={doc.document_url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLinkIcon className="h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+import { DocumentIcon, ExternalLinkIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default UserSubscription;
