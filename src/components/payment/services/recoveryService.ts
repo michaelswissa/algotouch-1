@@ -33,37 +33,11 @@ export const sendRecoveryEmail = async (
 // Get payment session data for recovery
 export const getRecoverySession = async (sessionId: string): Promise<PaymentSessionData | null> => {
   try {
-    const { data, error } = await supabase
-      .from('payment_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single();
-    
-    if (error) {
-      // If direct access fails, try with the edge function
-      return await getRecoverySessionViaFunction(sessionId);
-    }
-    
-    if (data) {
-      const now = new Date();
-      const expiresAt = new Date(data.expires_at);
-      
-      if (expiresAt > now) {
-        return {
-          sessionId: data.id,
-          userId: data.user_id,
-          email: data.email,
-          planId: data.plan_id,
-          paymentDetails: data.payment_details,
-          expiresAt: data.expires_at
-        };
-      }
-    }
-    
-    return null;
+    // Try with the edge function instead of direct DB access
+    return await getRecoverySessionViaFunction(sessionId);
   } catch (error) {
     console.error('Error retrieving payment session:', error);
-    return await getRecoverySessionViaFunction(sessionId);
+    return null;
   }
 };
 
@@ -104,27 +78,7 @@ export const savePaymentSession = async (sessionData: {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
     
     try {
-      // Try direct database insert first
-      const { error } = await supabase
-        .from('payment_sessions')
-        .insert({
-          id: sessionId,
-          user_id: sessionData.userId,
-          email: sessionData.email,
-          plan_id: sessionData.planId,
-          payment_details: sessionData.paymentDetails,
-          expires_at: expiresAt.toISOString()
-        });
-      
-      if (error) {
-        throw error;
-      }
-      
-      return sessionId;
-    } catch (dbError) {
-      // Fallback to edge function
-      console.log('Direct insert failed, trying via edge function');
-      
+      // Try via edge function instead of direct DB access
       const { data, error } = await supabase.functions.invoke('recover-payment-session/save-session', {
         body: {
           sessionId,
@@ -141,6 +95,9 @@ export const savePaymentSession = async (sessionData: {
       }
       
       return sessionId;
+    } catch (dbError) {
+      console.error('Failed to save payment session:', dbError);
+      return null;
     }
   } catch (error) {
     console.error('Error saving payment session:', error);

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentErrorData } from '../hooks/types';
 
@@ -104,7 +105,7 @@ export const logPaymentError = async (
   };
   
   // Prepare error data
-  const errorData = {
+  const errorData: PaymentErrorData = {
     errorCode,
     errorMessage,
     context,
@@ -112,14 +113,16 @@ export const logPaymentError = async (
   };
   
   try {
-    // Log to payment_errors table
-    await supabase.from('payment_errors').insert({
-      user_id: userId || 'anonymous',
-      error_code: errorCode,
-      error_message: errorMessage,
-      error_details: errorDetails,
-      context,
-      payment_details: paymentDetails
+    // Log to edge function instead of direct DB access
+    await supabase.functions.invoke('recover-payment-session/log-error', {
+      body: {
+        userId: userId || 'anonymous',
+        errorCode,
+        errorMessage,
+        errorDetails,
+        context,
+        paymentDetails
+      }
     });
     
     console.log('Payment error logged to database');
@@ -177,10 +180,12 @@ export const handlePaymentError = async (
       console.log(`Created recovery session: ${sessionId}`);
     }
     
-    return {
+    const result: PaymentErrorData = {
       ...errorData,
       recoverySessionId: sessionId || undefined
     };
+    
+    return result;
   } catch (recoveryError) {
     console.error('Failed to create recovery session:', recoveryError);
     return errorData;

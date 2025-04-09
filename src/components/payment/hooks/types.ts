@@ -40,4 +40,5 @@ export interface PaymentErrorData {
   errorMessage: string;
   context?: string;
   paymentDetails?: any;
+  recoverySessionId?: string;
 }

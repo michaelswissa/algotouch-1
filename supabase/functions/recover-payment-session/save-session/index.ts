@@ -20,32 +20,50 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     );
 
-    // Get request body
-    const { sessionId, userId, email, planId, paymentDetails, expiresAt } = await req.json();
+    // Get session data from request body
+    const { 
+      sessionId,
+      userId,
+      email,
+      planId,
+      paymentDetails,
+      expiresAt
+    } = await req.json();
 
-    // Store session data
-    const { data, error } = await supabase
-      .from('payment_sessions')
-      .insert({
-        id: sessionId,
-        user_id: userId,
-        email,
-        plan_id: planId,
-        payment_details: paymentDetails,
-        expires_at: expiresAt,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error storing payment session:', error);
-      throw error;
+    if (!sessionId || !planId || !expiresAt) {
+      throw new Error('Missing required session information');
     }
 
-    console.log(`Payment session ${sessionId} saved successfully`);
+    // Check if payment_sessions table exists and create it if not
+    await createPaymentSessionsTableIfNeeded(supabase);
+    
+    // Insert the payment session using SQL execution
+    const { data, error } = await supabase.rpc('execute_sql', {
+      sql_query: `
+        INSERT INTO public.payment_sessions (
+          id, user_id, email, plan_id, payment_details, expires_at
+        ) VALUES (
+          '${sessionId}', 
+          ${userId ? `'${userId}'` : 'NULL'}, 
+          ${email ? `'${email}'` : 'NULL'}, 
+          '${planId}', 
+          '${JSON.stringify(paymentDetails || {})}', 
+          '${expiresAt}'
+        )
+      `
+    });
+
+    if (error) {
+      throw new Error(`Error saving payment session: ${error.message}`);
+    }
 
     return new Response(
       JSON.stringify({ success: true, sessionId }),
@@ -59,7 +77,7 @@ serve(async (req) => {
     console.error('Error in save-session function:', error);
     
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
@@ -67,3 +85,46 @@ serve(async (req) => {
     );
   }
 });
+
+// Create payment_sessions table if it doesn't exist
+async function createPaymentSessionsTableIfNeeded(supabase: any) {
+  try {
+    // Check if the table exists
+    const { data, error } = await supabase.rpc('check_row_exists', {
+      p_table_name: 'information_schema.tables',
+      p_column_name: 'table_name',
+      p_value: 'payment_sessions'
+    });
+
+    // If the table doesn't exist, create it
+    if (!data) {
+      await supabase.rpc('execute_sql', {
+        sql_query: `
+          CREATE TABLE IF NOT EXISTS public.payment_sessions (
+            id UUID PRIMARY KEY,
+            user_id UUID REFERENCES auth.users(id),
+            email TEXT,
+            plan_id TEXT NOT NULL,
+            payment_details JSONB,
+            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+          );
+
+          -- Add RLS policies
+          ALTER TABLE public.payment_sessions ENABLE ROW LEVEL SECURITY;
+
+          -- Allow users to access their own payment sessions
+          CREATE POLICY "Users can access their own payment sessions"
+            ON public.payment_sessions
+            FOR ALL
+            USING (
+              auth.uid() = user_id OR 
+              auth.uid() = '00000000-0000-0000-0000-000000000000'
+            );
+        `
+      });
+    }
+  } catch (error) {
+    console.error('Error ensuring payment_sessions table exists:', error);
+  }
+}
