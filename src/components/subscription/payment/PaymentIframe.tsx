@@ -23,6 +23,19 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     window.addEventListener('resize', handleResize);
     handleResize();
     
+    // Force top redirection for any success or error URL parameters
+    const checkForSuccessOrError = () => {
+      const currentUrl = window.location.href;
+      if (currentUrl.includes('success=true') || currentUrl.includes('error=true')) {
+        console.log('Detected success/error params in iframe URL, redirecting top window');
+        window.top.location.href = currentUrl; // Force top window redirection
+      }
+    };
+
+    // Run check immediately and every 1 second
+    checkForSuccessOrError();
+    const intervalCheck = setInterval(checkForSuccessOrError, 1000);
+    
     // Handle iframe messages for payment status
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -81,13 +94,28 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
           script.innerHTML = `
             // Monitor URL changes in the iframe
             let lastUrl = window.location.href;
+            
+            // Check the URL immediately for any success/error parameters
+            if (lastUrl.includes('success=true') || lastUrl.includes('error=true')) {
+              console.log('Found success/error in iframe URL on load: ' + lastUrl);
+              // Force redirection to the parent window
+              window.parent.postMessage(JSON.stringify({
+                type: 'cardcom_redirect',
+                url: lastUrl,
+                forceRedirect: true
+              }), '*');
+            }
+            
             const observer = new MutationObserver(() => {
               if (window.location.href !== lastUrl) {
                 const newUrl = window.location.href;
                 lastUrl = newUrl;
                 
+                console.log('URL changed in iframe: ' + newUrl);
+                
                 // Check if this is a success or error redirect
                 if (newUrl.includes('success=true')) {
+                  console.log('Detected success=true in iframe URL');
                   // Extract the lowProfileId if present
                   const urlParams = new URLSearchParams(window.location.search);
                   const lpId = urlParams.get('lpId');
@@ -97,15 +125,36 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
                     type: 'cardcom_redirect',
                     url: newUrl,
                     success: true,
+                    forceRedirect: true,
                     lowProfileId: lpId
                   }), '*');
+                  
+                  // Also attempt a direct top window redirect
+                  if (window.top) {
+                    try {
+                      window.top.location.href = newUrl + '&target=_top';
+                    } catch(e) {
+                      console.error('Failed to redirect top window', e);
+                    }
+                  }
                 } else if (newUrl.includes('error=true')) {
+                  console.log('Detected error=true in iframe URL');
                   // Send error message to parent
                   window.parent.postMessage(JSON.stringify({
                     type: 'cardcom_redirect',
                     url: newUrl,
-                    success: false
+                    success: false,
+                    forceRedirect: true
                   }), '*');
+                  
+                  // Also attempt a direct top window redirect
+                  if (window.top) {
+                    try {
+                      window.top.location.href = newUrl + '&target=_top';
+                    } catch(e) {
+                      console.error('Failed to redirect top window', e);
+                    }
+                  }
                 }
               }
             });
@@ -151,10 +200,17 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('message', handleMessage);
+      clearInterval(intervalCheck);
     };
   }, []);
 
   if (!paymentUrl) return null;
+
+  // Ensure target=_top is in the URL
+  let updatedPaymentUrl = paymentUrl;
+  if (!updatedPaymentUrl.includes('target=_top')) {
+    updatedPaymentUrl = updatedPaymentUrl + (updatedPaymentUrl.includes('?') ? '&' : '?') + 'target=_top';
+  }
 
   return (
     <CardContent className="p-0">
@@ -189,13 +245,14 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/5 pointer-events-none"></div>
             <iframe 
               ref={iframeRef}
-              src={paymentUrl}
+              src={updatedPaymentUrl}
               width="100%"
               height={iframeHeight}
               frameBorder="0"
               title="Cardcom Payment Form"
               className="w-full"
               onLoad={() => console.log('Payment iframe loaded')}
+              name="payment_iframe_window"
             />
           </div>
         </div>

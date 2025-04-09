@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { usePaymentInitialization } from './hooks/usePaymentInitialization';
 import { usePaymentUrlParams } from './hooks/usePaymentUrlParams';
@@ -22,6 +22,32 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   onBack
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Effect to check for completion step in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const step = params.get('step');
+    const success = params.get('success');
+    
+    if (step === 'completion' && success === 'true') {
+      const sessionData = sessionStorage.getItem('subscription_flow');
+      
+      if (sessionData) {
+        try {
+          const parsedSession = JSON.parse(sessionData);
+          parsedSession.step = 'completion';
+          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          
+          // Call the completion handler with a slight delay to ensure state is updated
+          setTimeout(() => {
+            onPaymentComplete();
+          }, 100);
+        } catch (error) {
+          console.error('Error parsing session data:', error);
+        }
+      }
+    }
+  }, []);
   
   // Handle payment initialization
   const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(

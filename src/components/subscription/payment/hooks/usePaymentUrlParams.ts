@@ -20,34 +20,46 @@ export const usePaymentUrlParams = (
     try {
       const parsedSession = JSON.parse(sessionData);
       
-      // Special case: if we have step=completion in the URL, force that step
+      // Get URL parameters
       const params = new URLSearchParams(window.location.search);
       const stepParam = params.get('step');
+      const success = params.get('success');
+      const error = params.get('error');
+      const regId = params.get('regId');
+      const lpId = params.get('lpId');
       
+      // Special case: Force completion step
       if (stepParam === 'completion') {
         console.log('Forcing completion step based on URL parameter');
         parsedSession.step = 'completion';
         sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
       }
       
+      // If we detect success parameter and we're in an iframe, attempt to break out
+      const isIframe = window !== window.top;
+      if (isIframe && (success === 'true' || error === 'true')) {
+        console.log('Detected success/error in iframe, redirecting top window');
+        const currentUrl = window.location.href;
+        if (currentUrl.includes('target=_top')) {
+          window.top.location.href = currentUrl;
+          return; // Stop processing to avoid duplicate calls
+        }
+      }
+      
+      // Only process URL params if we're on the right step
       if (parsedSession.step !== 'payment' && parsedSession.step !== 'completion') {
         console.log(`Current step is ${parsedSession.step}, not processing payment URL params`);
         return;
       }
       
-      // Only process URL params if we're on the payment or completion step
+      // Process URL params
       console.log('Processing payment URL parameters');
-      
-      const error = params.get('error');
-      const success = params.get('success');
-      const regId = params.get('regId');
-      const lpId = params.get('lpId');
       
       if (error === 'true') {
         toast.error('התשלום נכשל, אנא נסה שנית');
       } else if (success === 'true') {
-        // Force the step to payment while we verify
-        parsedSession.step = 'payment';
+        // Force the step to completion to ensure we show the success page
+        parsedSession.step = 'completion';
         sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
         
         // If we have a lowProfileId, we need to verify the payment
@@ -61,11 +73,6 @@ export const usePaymentUrlParams = (
         } else {
           console.log('Payment success without verification parameters');
           toast.success('התשלום התקבל בהצלחה!');
-          
-          // Force to completion step
-          parsedSession.step = 'completion';
-          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-          
           onPaymentComplete();
         }
       }

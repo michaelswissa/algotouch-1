@@ -49,8 +49,7 @@ export const usePaymentInitialization = (
       // Create base URLs for success and error redirects
       const baseUrl = `${window.location.origin}/subscription`;
       
-      // Critical fix: Make sure the success redirect URL goes to completion step
-      // Using target=_top to force breaking out of the iframe
+      // Critical fix: Make sure the success redirect URL goes to completion step and breaks out of the iframe
       const successUrl = `${baseUrl}?step=completion&success=true&plan=${selectedPlan}&target=_top`;
       const errorUrl = `${baseUrl}?step=payment&error=true&plan=${selectedPlan}&target=_top`;
 
@@ -83,11 +82,25 @@ export const usePaymentInitialization = (
           localStorage.setItem('temp_registration_id', data.tempRegistrationId);
         }
         
-        // Add target=_top parameter to force the iframe to break out to the top window
+        // Ensure the target=_top parameter is present to force the iframe to break out to the top window
         const finalUrl = new URL(data.url);
         
         // Ensure we're always breaking out of the iframe on redirect
         finalUrl.searchParams.set('target', '_top');
+        
+        // Also ensure the success and error redirect URLs have target=_top
+        let successRedirectUrl = finalUrl.searchParams.get('successRedirectUrl') || '';
+        let errorRedirectUrl = finalUrl.searchParams.get('errorRedirectUrl') || '';
+        
+        if (successRedirectUrl && !successRedirectUrl.includes('target=_top')) {
+          successRedirectUrl += (successRedirectUrl.includes('?') ? '&' : '?') + 'target=_top';
+          finalUrl.searchParams.set('successRedirectUrl', successRedirectUrl);
+        }
+        
+        if (errorRedirectUrl && !errorRedirectUrl.includes('target=_top')) {
+          errorRedirectUrl += (errorRedirectUrl.includes('?') ? '&' : '?') + 'target=_top';
+          finalUrl.searchParams.set('errorRedirectUrl', errorRedirectUrl);
+        }
         
         setPaymentUrl(finalUrl.toString());
       } else {
