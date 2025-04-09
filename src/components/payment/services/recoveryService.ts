@@ -52,6 +52,7 @@ const getRecoverySessionViaFunction = async (sessionId: string): Promise<Payment
       throw error || new Error('No data returned');
     }
     
+    // Map the database column names to our TypeScript interface property names
     return {
       sessionId: data.id,
       userId: data.user_id,

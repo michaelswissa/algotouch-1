@@ -1,131 +1,170 @@
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { savePaymentSession } from '../services/recoveryService';
+import { savePaymentSession, getRecoverySession } from '../services/recoveryService';
+import { PaymentError } from './types';
 import { getErrorMessage, mapErrorCode, isTransientError, logPaymentError } from '../utils/errorHandling';
-import { useAuth } from '@/contexts/auth';
 
 interface UsePaymentErrorHandlingProps {
-  planId: string;
+  planId?: string;
   onCardUpdate?: () => void;
   onAlternativePayment?: () => void;
 }
 
 export const usePaymentErrorHandling = ({ 
-  planId,
-  onCardUpdate,
-  onAlternativePayment
+  planId, 
+  onCardUpdate, 
+  onAlternativePayment 
 }: UsePaymentErrorHandlingProps) => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [isRecovering, setIsRecovering] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [lastError, setLastError] = useState<any>(null);
+  const [recoveryData, setRecoveryData] = useState<any>(null);
   
-  // Check URL for recovery parameter
-  const checkForRecovery = async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const recoveryId = urlParams.get('recover');
+  // Check for recovery parameters in URL
+  useEffect(() => {
+    const recover = searchParams.get('recover');
+    const error = searchParams.get('error');
     
-    if (recoveryId) {
-      setIsRecovering(true);
-      setSessionId(recoveryId);
-      
-      try {
-        // Get session data - import dynamically to avoid circular deps
-        const { getRecoverySession } = await import('../services/recoveryService');
-        const sessionData = await getRecoverySession(recoveryId);
+    const checkRecoverySession = async () => {
+      if (recover) {
+        setSessionId(recover);
+        setIsRecovering(true);
         
-        if (!sessionData) {
-          toast.error('לא נמצא מידע להשלמת התשלום או שפג תוקף הקישור');
+        try {
+          const sessionData = await getRecoverySession(recover);
+          if (sessionData) {
+            setRecoveryData(sessionData);
+            toast.info('נמצאו פרטי תשלום שנשמרו בעסקה קודמת');
+          } else {
+            setIsRecovering(false);
+            setSessionId(null);
+            if (error === 'true') {
+              toast.error('שגיאה בעיבוד התשלום, אנא נסה שנית');
+            }
+          }
+        } catch (sessionError) {
+          console.error('Failed to get recovery session:', sessionError);
           setIsRecovering(false);
-          return;
+          setSessionId(null);
         }
-        
-        // Prefill data from session
-        return {
-          planId: sessionData.plan_id,
-          email: sessionData.email,
-          paymentDetails: sessionData.payment_details
-        };
-      } catch (error) {
-        console.error('Error recovering session:', error);
-        setIsRecovering(false);
       }
-    }
+    };
     
-    return null;
-  };
+    checkRecoverySession();
+  }, [searchParams]);
   
-  // Handle payment error with recovery
-  const handleError = async (error: any, paymentDetails?: any) => {
-    setLastError(error);
+  // Handle payment errors and recovery options
+  const handleError = async (error: any, options?: {
+    tokenData?: any;
+    planId?: string;
+    operationType?: number;
+    userInfo?: { userId?: string; email?: string } | null;
+  }) => {
+    console.error('Payment error:', error);
     
-    // Create session ID for potential recovery
-    const newSessionId = await savePaymentSession({
-      userId: user?.id,
-      email: user?.email,
-      planId,
-      paymentDetails
-    });
-    
-    if (newSessionId) {
-      setSessionId(newSessionId);
-    }
-    
-    // Process the error
+    // Try to extract relevant error information
     const errorCode = mapErrorCode(error);
     const errorMessage = getErrorMessage(errorCode);
     
-    // Log the error
-    const errorInfo = await logPaymentError(
-      error, 
-      user?.id, 
-      'payment-processing', 
-      paymentDetails
+    // Create a unique session ID if we're going to attempt recovery
+    const recoverySessionId = crypto.randomUUID();
+    
+    // Determine recovery action based on error type
+    let recoveryAction = null;
+    let recoveryMessage = null;
+    
+    // Handle specific error types
+    if (errorCode === 'card_declined' || errorCode === '605' || errorCode === 'card_error') {
+      recoveryAction = 'update_card';
+      recoveryMessage = 'כרטיס האשראי נדחה. נסה כרטיס אחר.';
+    } else if (errorCode === 'expired_card' || errorCode === '513') {
+      recoveryAction = 'update_card';
+      recoveryMessage = 'כרטיס האשראי שהזנת פג תוקף. נא להזין כרטיס תקף.';
+    } else if (errorCode === 'insufficient_funds' || errorCode === '607') {
+      recoveryAction = 'alternative_payment';
+      recoveryMessage = 'אין מספיק יתרה בכרטיס. נסה כרטיס אחר או אמצעי תשלום חלופי.';
+    } else if (errorCode === 'network_error' || errorCode === 'timeout') {
+      recoveryAction = 'retry';
+      recoveryMessage = 'אירעה שגיאת תקשורת. נסה שנית.';
+    }
+    
+    // Save error information for recovery if possible
+    const userId = options?.userInfo?.userId;
+    const userEmail = options?.userInfo?.email;
+    
+    if (recoveryAction || userEmail) {
+      try {
+        // Save session for recovery
+        const savedSessionId = await savePaymentSession({
+          userId,
+          email: userEmail,
+          planId: options?.planId || planId || 'unknown',
+          paymentDetails: {
+            errorInfo: {
+              code: errorCode,
+              message: errorMessage,
+              recoveryAction,
+              operationType: options?.operationType || 3,
+              tokenDetails: options?.tokenData || null
+            },
+            ...options
+          }
+        });
+        
+        if (savedSessionId) {
+          setSessionId(savedSessionId);
+          
+          // Log error to database
+          await logPaymentError(
+            error,
+            userId,
+            'payment_error_handling',
+            {
+              recoverySessionId: savedSessionId,
+              ...options
+            }
+          );
+        }
+      } catch (sessionError) {
+        console.error('Failed to store recovery session:', sessionError);
+      }
+    }
+    
+    // Create PaymentError object with recovery info
+    const paymentError = new PaymentError(
+      recoveryMessage || errorMessage,
+      errorCode,
+      error.details || error
     );
     
-    // Display user-friendly message
-    toast.error(errorMessage);
+    paymentError.recoverySessionId = sessionId || recoverySessionId;
+    paymentError.recoveryAction = recoveryAction as any;
     
-    // Handle specific error cases
-    switch (errorCode) {
-      case 'INSUFFICIENT_FUNDS':
-        if (onAlternativePayment) {
-          onAlternativePayment();
-        }
-        break;
-        
-      case 'EXPIRED_CARD':
-        if (onCardUpdate) {
-          onCardUpdate();
-        }
-        break;
-        
-      case 'SESSION_EXPIRED':
-        toast.error('פג תוקף החיבור, אנא התחבר מחדש');
-        // Redirect to login page
-        setTimeout(() => {
-          window.location.href = '/auth';
-        }, 1500);
-        break;
-    }
-    
-    // Send recovery email for persistent errors
-    if (user?.email && user?.id) {
-      const { sendRecoveryEmail } = await import('../services/recoveryService');
-      sendRecoveryEmail(user.email, errorInfo, newSessionId || sessionId);
-    }
-    
-    return errorInfo;
+    // Return error information
+    return paymentError;
   };
-  
+
+  // Function to check if there's a recovery session to resume
+  const checkForRecovery = async () => {
+    if (!sessionId) return null;
+    
+    try {
+      const sessionData = await getRecoverySession(sessionId);
+      return sessionData;
+    } catch (error) {
+      console.error('Error checking recovery session:', error);
+      return null;
+    }
+  };
+
   return {
     handleError,
     checkForRecovery,
     isRecovering,
     sessionId,
-    lastError
+    recoveryData
   };
 };
