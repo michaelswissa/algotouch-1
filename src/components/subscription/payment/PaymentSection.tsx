@@ -25,6 +25,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const successCheckPerformed = React.useRef(false);
   
   // Initialize payment URL
   const { isLoading: isLoadingPayment, paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
@@ -39,13 +40,15 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   
   // Effect to check for completion step in URL immediately on mount
   useEffect(() => {
+    if (successCheckPerformed.current) return; // Only run once
+    successCheckPerformed.current = true;
+    
     const checkUrlForCompletion = () => {
       const params = new URLSearchParams(window.location.search);
       const step = params.get('step');
       const success = params.get('success');
-      const lpId = params.get('lpId');
       
-      console.log('Initial URL parameter check on mount:', { step, success, lpId });
+      console.log('Initial URL parameter check on mount:', { step, success });
       
       // If success=true is present, immediately go to completion step
       if (success === 'true') {
@@ -68,35 +71,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         } catch (error) {
           console.error('Error processing session data:', error);
           // Call completion handler anyway
-          setTimeout(() => {
-            onPaymentComplete();
-          }, 300);
-        }
-        
-        // If we're in an iframe and success is detected, break out to parent
-        if (window !== window.top) {
-          console.log('We are in an iframe with success=true, attempting to break out');
-          
-          try {
-            // Navigate the parent window to the completion step
-            const redirectUrl = `${window.location.origin}/subscription?step=completion&success=true&plan=${selectedPlan}`;
-            
-            // Try multiple approaches to break out of iframe
-            window.parent.postMessage({
-              type: 'cardcom_redirect',
-              url: redirectUrl,
-              success: true,
-              forceRedirect: true
-            }, '*');
-            
-            try {
-              window.top.location.href = redirectUrl;
-            } catch (e) {
-              console.error('Failed to redirect parent window:', e);
-            }
-          } catch (e) {
-            console.error('Error communicating with parent window:', e);
-          }
+          setTimeout(() => onPaymentComplete(), 300);
         }
       }
     };

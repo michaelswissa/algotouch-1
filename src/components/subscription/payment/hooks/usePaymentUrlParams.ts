@@ -20,107 +20,92 @@ export const usePaymentUrlParams = (
   });
 
   useEffect(() => {
-    // Get URL parameters immediately regardless of session status
-    const params = new URLSearchParams(window.location.search);
-    const stepParam = params.get('step');
-    const success = params.get('success');
-    const error = params.get('error');
-    const regId = params.get('regId');
-    const lpId = params.get('lpId');
-    const forceRedirect = params.get('forceRedirect');
-    
-    console.log('Processing URL parameters:', {
-      stepParam,
-      success,
-      error,
-      regId,
-      lpId,
-      forceRedirect
-    });
-    
-    // CRITICAL: Immediately check if success=true is in the URL and force completion
-    if (success === 'true') {
-      console.log('Success=true detected in URL, forcing completion step');
+    // Immediately get URL parameters on mount
+    const processUrlParams = () => {
+      const params = new URLSearchParams(window.location.search);
+      const stepParam = params.get('step');
+      const success = params.get('success');
+      const error = params.get('error');
+      const regId = params.get('regId');
+      const lpId = params.get('lpId');
+      const forceRedirect = params.get('forceRedirect');
       
-      // Create or update session data to completion step
-      try {
-        // Get session data if available
-        const sessionData = sessionStorage.getItem('subscription_flow');
-        let parsedSession = sessionData 
-          ? JSON.parse(sessionData) 
-          : { step: 'completion' };
-        
-        // Always force to completion step when success=true
-        parsedSession.step = 'completion';
-        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-        
-        // Set payment as successful in state
-        setPaymentStatus({
-          success: true,
-          error: false,
-          regId,
-          lpId
-        });
-        
-        // If we have a lowProfileId, we need to verify the payment
-        if (lpId) {
-          console.log('Payment success with lowProfileId, verifying payment:', lpId);
-          verifyPaymentAndCompleteRegistration(lpId, regId || null, onPaymentComplete, setIsLoading);
-        } else if (regId) {
-          console.log('Payment success with registration ID, processing registration');
-          // Need to verify payment and complete registration with regId
-          retrieveAndProcessRegistrationData(regId, onPaymentComplete, setIsLoading);
-        } else {
-          console.log('Payment success without verification parameters');
-          toast.success('התשלום התקבל בהצלחה!');
-          
-          // Call payment complete with a small delay to ensure state is updated
-          setTimeout(() => {
-            onPaymentComplete();
-          }, 300);
-        }
-      } catch (e) {
-        console.error('Error processing success URL parameters:', e);
-        // Still attempt to complete payment even if session data processing fails
-        toast.success('התשלום התקבל בהצלחה!');
-        setTimeout(() => {
-          onPaymentComplete();
-        }, 300);
-      }
-      
-      return; // Exit early after handling success=true
-    }
-    
-    // Check session data for other URL parameter processing
-    const sessionData = sessionStorage.getItem('subscription_flow');
-    
-    if (!sessionData) {
-      console.log('No session data found, skipping additional URL parameter processing');
-      return;
-    }
-    
-    try {
-      const parsedSession = JSON.parse(sessionData);
-      
-      console.log('Session data found:', {
-        currentStep: parsedSession.step,
-        params: Object.fromEntries(params.entries())
+      console.log('Processing URL parameters:', {
+        stepParam,
+        success,
+        error,
+        regId,
+        lpId,
+        forceRedirect
       });
       
-      // Special case: Force completion step if specified in URL
-      if (stepParam === 'completion') {
-        console.log('Forcing completion step based on URL parameter');
-        parsedSession.step = 'completion';
-        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+      // TOP PRIORITY: Check for success parameter - this takes precedence over all other logic
+      if (success === 'true') {
+        console.log('Success=true detected in URL, forcing completion step');
         
-        // Only update payment status if not already processed
-        if (paymentStatus.success !== true) {
+        // Force session data to completion step
+        try {
+          const sessionData = sessionStorage.getItem('subscription_flow');
+          let parsedSession = sessionData 
+            ? JSON.parse(sessionData) 
+            : { step: 'completion' };
+          
+          // Always force to completion step when success=true
+          parsedSession.step = 'completion';
+          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          
+          // Set payment as successful in state
           setPaymentStatus({
             success: true,
             error: false,
             regId,
             lpId
           });
+          
+          // If we have a payment ID (lpId), verify the payment
+          if (lpId) {
+            console.log('Payment success with lowProfileId, verifying payment:', lpId);
+            verifyPaymentAndCompleteRegistration(lpId, regId || null, onPaymentComplete, setIsLoading);
+            return; // Exit early after handling
+          } 
+          
+          // If we have registration data, process it
+          if (regId) {
+            console.log('Payment success with registration ID, processing registration');
+            retrieveAndProcessRegistrationData(regId, onPaymentComplete, setIsLoading);
+            return; // Exit early after handling
+          }
+          
+          // If we have neither lpId nor regId, simply complete
+          console.log('Payment success without verification parameters');
+          toast.success('התשלום התקבל בהצלחה!');
+          
+          // Call payment complete directly
+          onPaymentComplete();
+          return; // Exit early after handling success=true
+        } catch (e) {
+          console.error('Error processing success URL parameters:', e);
+          // Still attempt to complete payment even if session data processing fails
+          toast.success('התשלום התקבל בהצלחה!');
+          onPaymentComplete();
+          return; // Exit early
+        }
+      }
+      
+      // Process step parameter if available
+      if (stepParam === 'completion') {
+        console.log('Forcing completion step based on URL parameter');
+        
+        try {
+          const sessionData = sessionStorage.getItem('subscription_flow');
+          const parsedSession = sessionData 
+            ? JSON.parse(sessionData) 
+            : { step: 'completion' };
+          
+          parsedSession.step = 'completion';
+          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        } catch (e) {
+          console.error('Error updating session for completion step:', e);
         }
       }
       
@@ -156,8 +141,6 @@ export const usePaymentUrlParams = (
             } catch (navErr) {
               console.error('Direct navigation failed:', navErr);
             }
-            
-            console.log('Sent redirect message to parent window:', currentUrl.toString());
           } catch (err) {
             console.error('Error redirecting parent window:', err);
           }
@@ -173,17 +156,31 @@ export const usePaymentUrlParams = (
           errorMessage: 'התשלום נכשל, אנא נסה שנית'
         });
       }
-      
-    } catch (error) {
-      console.error('Error processing payment URL params:', error);
-    }
+    };
     
-    // Always check for temp registration ID in localStorage
+    // Process URL parameters immediately
+    processUrlParams();
+    
+    // Also check for temp registration ID in localStorage
     const storedRegId = localStorage.getItem('temp_registration_id');
     if (storedRegId) {
       console.log('Found stored registration ID:', storedRegId);
       retrieveAndProcessRegistrationData(storedRegId, onPaymentComplete, setIsLoading);
     }
+    
+    // Set up an interval to continuously check for URL changes
+    // This helps catch redirects that might happen after initial load
+    const checkIntervalId = setInterval(() => {
+      const currentParams = new URLSearchParams(window.location.search);
+      const currentSuccess = currentParams.get('success');
+      
+      if (currentSuccess === 'true' && paymentStatus.success !== true) {
+        console.log('Success parameter detected during interval check');
+        processUrlParams();
+      }
+    }, 1000);
+    
+    return () => clearInterval(checkIntervalId);
   }, [onPaymentComplete, setIsLoading]);
   
   return paymentStatus;

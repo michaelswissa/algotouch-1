@@ -338,15 +338,6 @@ serve(async (req) => {
         registrationData 
       } = await req.json();
       
-      console.log('Creating payment session for:', { 
-        planId, 
-        userId: userId || (user?.id || 'anonymous'), 
-        email: email || user?.email || 'anonymous',
-        hasRegistrationData: !!registrationData,
-        successRedirectUrl,
-        errorRedirectUrl
-      });
-      
       // Store registration data temporarily if provided
       let tempRegistrationId = null;
       if (registrationData) {
@@ -404,25 +395,26 @@ serve(async (req) => {
           cardOwnerPhone: registrationData?.userData?.phone
         });
         
-        // Modify the payment URL to use our custom URL parameters
+        // Enhance payment URL with better success URL parameters
         const paymentUrl = new URL(sessionResult.url);
         
-        // Add the lowProfileId and completion step to the success URL
+        // Create an enhanced success URL that will always break out of iframes
         let finalSuccessUrl = successRedirectUrl;
         try {
           const successUrlObj = new URL(finalSuccessUrl);
           
-          // Always set these critical parameters for proper redirection
+          // Essential parameters for proper redirect and completion
           successUrlObj.searchParams.set('lpId', sessionResult.lowProfileId);
           successUrlObj.searchParams.set('step', 'completion');
           successUrlObj.searchParams.set('success', 'true');
           successUrlObj.searchParams.set('target', '_top');
+          successUrlObj.searchParams.set('iframe', '0');
           
           finalSuccessUrl = successUrlObj.toString();
         } catch (e) {
-          console.error('Error modifying success URL:', e);
+          console.error('Error enhancing success URL:', e);
           // Add parameters directly if URL parsing fails
-          finalSuccessUrl += `${finalSuccessUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&step=completion&success=true&target=_top`;
+          finalSuccessUrl = `${finalSuccessUrl}${finalSuccessUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&step=completion&success=true&target=_top&iframe=0`;
         }
         
         // Add registration ID if we have one
@@ -430,22 +422,25 @@ serve(async (req) => {
           finalSuccessUrl += `${finalSuccessUrl.includes('?') ? '&' : '?'}regId=${tempRegistrationId}`;
         }
         
+        // Apply the enhanced success URL to the payment URL
         paymentUrl.searchParams.set('successRedirectUrl', finalSuccessUrl);
         
-        // Ensure error URL also includes the lowProfileId and target=_top
+        // Enhance the error URL as well
         let finalErrorUrl = errorRedirectUrl;
         try {
           const errorUrlObj = new URL(finalErrorUrl);
           errorUrlObj.searchParams.set('lpId', sessionResult.lowProfileId);
           errorUrlObj.searchParams.set('error', 'true');
           errorUrlObj.searchParams.set('target', '_top');
+          errorUrlObj.searchParams.set('iframe', '0');
           finalErrorUrl = errorUrlObj.toString();
         } catch (e) {
-          console.error('Error modifying error URL:', e);
+          console.error('Error enhancing error URL:', e);
           // Add parameters directly if URL parsing fails
-          finalErrorUrl += `${finalErrorUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&error=true&target=_top`;
+          finalErrorUrl = `${finalErrorUrl}${finalErrorUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&error=true&target=_top&iframe=0`;
         }
         
+        // Apply the enhanced error URL to the payment URL
         paymentUrl.searchParams.set('errorRedirectUrl', finalErrorUrl);
         
         // Extra parameters to ensure we break out of iframes
