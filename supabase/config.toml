@@ -1,7 +1,7 @@
 
 # A string used to distinguish different Supabase projects on the same host. Defaults to the working
 # directory name when running `supabase init`.
-project_id = "tradervue"
+project_id = "ndhakvhrrkczgylcmyoc"
 
 [api]
 # Port to use for the API URL.
@@ -44,20 +44,19 @@ file_size_limit = "50MiB"
 site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = ["https://localhost:3000"]
-# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 seconds (one
-# week).
+# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # Allow/disallow new user signups to your project.
 enable_signup = true
-# If enabled, a user will need to confirm any email change on both the old, and new email addresses.
-# If disabled, only the new email is required to confirm.
+# If enabled, a user will be required to confirm any email change on both the old, and new email
+# addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
 enable_confirmations = false
 
-# Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
-# `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin`, `notion`, `twitch`,
-# `twitter`, `slack`, `spotify`, `workos`, `zoom`.
+# Use an external OAuth provider. The full list of providers are: "apple", "azure", "bitbucket",
+# "discord", "facebook", "github", "gitlab", "google", "keycloak", "linkedin", "notion", "twitch",
+# "twitter", "slack", "spotify", "workos", "zoom".
 [auth.external.apple]
 enabled = false
 client_id = ""
@@ -68,119 +67,10 @@ redirect_uri = ""
 # or any other third-party OIDC providers.
 url = ""
 
-[auth.external.azure]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.bitbucket]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.discord]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.facebook]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.github]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.gitlab]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.google]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.keycloak]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.linkedin]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.notion]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.twitch]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.twitter]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.slack]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.spotify]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.workos]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-[auth.external.zoom]
-enabled = false
-client_id = ""
-secret = ""
-redirect_uri = ""
-url = ""
-
-# Configure Edge Functions
 [functions]
+# Port to use for Functions.
+port = 54321
+
+# This is a direct payment processing function
 [functions.direct-payment]
 verify_jwt = false
