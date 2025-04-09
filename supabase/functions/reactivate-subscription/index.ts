@@ -1,5 +1,5 @@
 
-import { serve } from "std/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
 // Configure CORS headers
@@ -9,14 +9,21 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
+// Handle CORS preflight requests
+function handleCors(req: Request) {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders,
       status: 204,
     });
   }
+  return null;
+}
+
+serve(async (req) => {
+  // Handle CORS
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
     const supabaseClient = createClient(
