@@ -69,7 +69,7 @@ const UserSubscription = () => {
 
   return (
     <SubscriptionCard
-      title={`מנוי ${details?.planName}`}
+      title={`מנוי ${details?.planName}${isCancelled ? ' (מבוטל)' : ''}`}
       description={`סטטוס: ${details?.statusText}`}
     >
       <>
@@ -81,6 +81,20 @@ const UserSubscription = () => {
           </TabsList>
           
           <TabsContent value="details" className="mt-4">
+            {/* If subscription is cancelled, show a notice */}
+            {isCancelled && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                <div className="flex">
+                  <div>
+                    <p className="text-sm text-yellow-700">
+                      המנוי שלך בוטל ויישאר פעיל עד {details?.nextBillingDate}.
+                      לאחר מכן, לא תחויב יותר והגישה למערכת תיחסם.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {subscription.status === 'trial' && details && (
               <SubscriptionStatus 
                 status={subscription.status} 
@@ -129,7 +143,11 @@ const UserSubscription = () => {
           </TabsContent>
         </Tabs>
       </>
-      <SubscriptionFooter planType={subscription.plan_type} />
+      <SubscriptionFooter 
+        planType={subscription.plan_type} 
+        endDate={subscription.current_period_ends_at}
+        isCancelled={isCancelled}
+      />
     </SubscriptionCard>
   );
 };

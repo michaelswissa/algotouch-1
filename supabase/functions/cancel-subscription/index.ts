@@ -19,6 +19,10 @@ serve(async (req) => {
   }
   
   try {
+    // Parse request body
+    const requestBody = await req.json().catch(() => ({}));
+    const { cancellationReason, feedback } = requestBody;
+    
     // Create a Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -51,11 +55,25 @@ serve(async (req) => {
     // Get the current subscription
     const { data: subscription, error: fetchError } = await supabaseClient
       .from('subscriptions')
-      .select('*')
+      .select('*, payment_tokens(token, card_last_four, card_brand)')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
     
-    if (fetchError || !subscription) {
+    if (fetchError) {
+      console.error('Error fetching subscription:', fetchError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to fetch subscription details',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+    
+    if (!subscription) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -68,15 +86,52 @@ serve(async (req) => {
       );
     }
     
-    // Check if subscription has a payment token that needs to be canceled with CardCom
+    // Check if subscription is already cancelled
+    if (subscription.cancelled_at) {
+      console.log('Subscription already cancelled at:', subscription.cancelled_at);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Subscription already cancelled',
+          cancellationDate: subscription.cancelled_at,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 409, // Conflict
+        }
+      );
+    }
+
+    // If subscription has a payment token that needs to be canceled with CardCom
+    let cardComStatus = null;
     if (subscription.payment_token_id) {
       // In a real implementation, you would call CardCom API to cancel recurring payments
       console.log('Would cancel token in CardCom:', subscription.payment_token_id);
       
       // For production, this is where you'd make the API call to CardCom to cancel the recurring payments
       // This depends on the CardCom API specifics for cancellation
+      
+      // Mark the payment token as inactive
+      const { error: tokenError } = await supabaseClient
+        .from('payment_tokens')
+        .update({ is_active: false })
+        .eq('id', subscription.payment_token_id);
+        
+      if (tokenError) {
+        console.warn('Error updating payment token:', tokenError);
+        // Continue with cancellation even if token update fails
+      } else {
+        cardComStatus = 'deactivated';
+      }
     }
     
+    // Get user profile information for email
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', user.id)
+      .single();
+      
     // Mark subscription as cancelled in the database
     const now = new Date().toISOString();
     const { error: updateError } = await supabaseClient
@@ -84,6 +139,15 @@ serve(async (req) => {
       .update({
         status: 'cancelled',
         cancelled_at: now,
+        // Store cancellation reason if provided
+        metadata: subscription.metadata ? {
+          ...subscription.metadata,
+          cancellation_reason: cancellationReason || 'not_provided',
+          cancellation_feedback: feedback || '',
+        } : {
+          cancellation_reason: cancellationReason || 'not_provided',
+          cancellation_feedback: feedback || '',
+        }
       })
       .eq('id', subscription.id);
       
@@ -101,27 +165,68 @@ serve(async (req) => {
     }
     
     // Add record to payment history
-    await supabaseClient
+    const { error: historyError } = await supabaseClient
       .from('payment_history')
       .insert({
         user_id: user.id,
         subscription_id: subscription.id,
         amount: 0,
         status: 'subscription_cancelled',
-        payment_date: now
+        payment_date: now,
+        metadata: {
+          cancellation_reason: cancellationReason || 'not_provided',
+          plan_type: subscription.plan_type,
+          card_com_status: cardComStatus
+        }
       });
+      
+    if (historyError) {
+      console.warn('Error adding cancellation to payment history:', historyError);
+      // Continue even if history recording fails
+    }
+    
+    // Send cancellation confirmation email
+    try {
+      const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : '';
+      
+      // Call the email sender edge function
+      await supabaseClient.functions.invoke('smtp-sender', {
+        body: {
+          to: user.email,
+          subject: 'אישור ביטול מנוי - AlgoTouch',
+          html: `
+          <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif;">
+            <h2>אישור ביטול מנוי</h2>
+            <p>שלום ${fullName || 'יקר'},</p>
+            <p>אנו מאשרים בזאת כי מנוי ה-${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'} שלך בוטל בהצלחה.</p>
+            <p>תוכל להמשיך להשתמש בשירות עד לתאריך ${new Date(subscription.current_period_ends_at || now).toLocaleDateString('he-IL')}.</p>
+            <p>אנו מקווים לראותך שוב בעתיד!</p>
+            <p>לכל שאלה, אנא צור קשר עם שירות הלקוחות שלנו.</p>
+            <p>בברכה,<br>צוות AlgoTouch</p>
+          </div>
+          `
+        }
+      });
+      
+      console.log('Cancellation confirmation email sent');
+    } catch (emailError) {
+      console.error('Failed to send cancellation email:', emailError);
+      // Continue even if email sending fails
+    }
     
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Subscription cancelled successfully'
+        message: 'Subscription cancelled successfully',
+        endDate: subscription.current_period_ends_at,
+        planType: subscription.plan_type
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error cancelling subscription:', error);
     
     return new Response(

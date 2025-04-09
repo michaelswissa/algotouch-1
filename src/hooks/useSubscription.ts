@@ -13,12 +13,13 @@ interface Subscription {
   status: string;
   trial_ends_at: string | null;
   current_period_ends_at: string | null;
+  cancelled_at: string | null;
   payment_method: {
     lastFourDigits: string;
     expiryMonth: string;
     expiryYear: string;
   } | Json | null;
-  contract_signed?: boolean | null; // Added contract_signed property
+  contract_signed?: boolean | null;
 }
 
 // Interface for processed subscription details
@@ -64,6 +65,7 @@ export const useSubscription = () => {
               status: data.status,
               trial_ends_at: data.trial_ends_at,
               current_period_ends_at: data.current_period_ends_at,
+              cancelled_at: data.cancelled_at,
               payment_method: data.payment_method
             };
             setSubscription(formattedSubscription);
@@ -88,22 +90,41 @@ export const useSubscription = () => {
   const getSubscriptionDetails = (sub: Subscription | null): SubscriptionDetails | null => {
     if (!sub) return null;
     
-    const planName = sub.plan_type === 'annual' ? 'שנתי' : 'חודשי';
-    const planPrice = sub.plan_type === 'annual' ? '899' : '99';
+    const planName = sub.plan_type === 'annual' ? 'שנתי' : 
+                     sub.plan_type === 'vip' ? 'VIP' : 'חודשי';
+    const planPrice = sub.plan_type === 'annual' ? '899' : 
+                      sub.plan_type === 'vip' ? '1499' : '99';
     
     let statusText = '';
     let nextBillingDate = '';
     let progressValue = 0;
     let daysLeft = 0;
     
-    if (sub.status === 'trial' && sub.trial_ends_at) {
+    // Handle cancelled subscription
+    if (sub.status === 'cancelled') {
+      statusText = 'מבוטל';
+      
+      if (sub.current_period_ends_at) {
+        const periodEndDate = parseISO(sub.current_period_ends_at);
+        nextBillingDate = format(periodEndDate, 'dd/MM/yyyy', { locale: he });
+        daysLeft = Math.max(0, differenceInDays(periodEndDate, new Date()));
+        progressValue = 100; // Show full progress for cancelled subscription
+      } else {
+        nextBillingDate = 'לא זמין';
+        progressValue = 100;
+      }
+    }
+    // Handle trial period
+    else if (sub.status === 'trial' && sub.trial_ends_at) {
       const trialEndDate = parseISO(sub.trial_ends_at);
       daysLeft = Math.max(0, differenceInDays(trialEndDate, new Date()));
       progressValue = Math.max(0, Math.min(100, (30 - daysLeft) / 30 * 100));
       
       statusText = 'בתקופת ניסיון';
       nextBillingDate = format(trialEndDate, 'dd/MM/yyyy', { locale: he });
-    } else if (sub.current_period_ends_at) {
+    }
+    // Handle active subscription
+    else if (sub.current_period_ends_at) {
       const periodEndDate = parseISO(sub.current_period_ends_at);
       const periodStartDate = addMonths(periodEndDate, -1);
       daysLeft = Math.max(0, differenceInDays(periodEndDate, new Date()));
