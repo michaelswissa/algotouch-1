@@ -9,7 +9,8 @@ import { useRegistrationData } from './useRegistrationData';
 import { 
   handleExistingUserPayment, 
   registerNewUser,
-  initiateExternalPayment
+  initiateExternalPayment,
+  verifyExternalPayment
 } from '../services/paymentService';
 import { UsePaymentProcessProps, PaymentError } from './types';
 import { usePaymentErrorHandling } from './usePaymentErrorHandling';
@@ -41,8 +42,10 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     onAlternativePayment: () => navigate('/subscription?step=alternative-payment')
   });
 
+  // Check for recovery data and URL params on component mount
   useEffect(() => {
     const checkRecovery = async () => {
+      // Check for recovery data from previous payment attempts
       const recoveryData = await checkForRecovery();
       if (recoveryData) {
         toast.info('נמצאו פרטים להשלמת התשלום');
@@ -51,10 +54,85 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           navigate(`/subscription?step=3&plan=${recoveryData.planId}&recover=${sessionId}`);
         }
       }
+      
+      // Check URL params for payment verification
+      const params = new URLSearchParams(window.location.search);
+      const lowProfileId = params.get('lpId');
+      const success = params.get('success');
+      
+      // If we have a lowProfileId, we need to verify the payment
+      if (lowProfileId && success === 'true') {
+        await verifyPaymentFromUrl(lowProfileId);
+      }
     };
     
     checkRecovery();
   }, []);
+
+  // New function to verify payment from URL parameters
+  const verifyPaymentFromUrl = async (lowProfileId: string) => {
+    try {
+      setIsProcessing(true);
+      
+      const result = await verifyExternalPayment(lowProfileId);
+      
+      if (!result.success) {
+        // Payment verification failed
+        toast.error('אימות התשלום נכשל: ' + (result.error || 'שגיאה לא ידועה'));
+        
+        // Create payment error object for recovery
+        const paymentError = new PaymentError(
+          result.error || 'אימות התשלום נכשל',
+          'payment_verification_failed'
+        );
+        
+        setPaymentError(paymentError);
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Payment verified successfully
+      toast.success('התשלום אומת בהצלחה!');
+      
+      // If we have registration data, process it
+      if (registrationData) {
+        const updatedData = {
+          ...registrationData,
+          paymentToken: result.tokenInfo || {
+            token: result.paymentDetails?.cardLastDigits || '',
+            expiry: result.paymentDetails?.cardExpiry || '',
+            last4Digits: result.paymentDetails?.cardLastDigits || '',
+            cardholderName: result.paymentDetails?.cardOwnerName || ''
+          }
+        };
+        
+        updateRegistrationData(updatedData);
+        
+        if (updatedData.email && updatedData.password) {
+          await registerNewUser(updatedData, updatedData.paymentToken);
+        }
+      }
+      
+      onPaymentComplete();
+    } catch (error: any) {
+      console.error("Payment verification error:", error);
+      
+      const errorInfo = await handleError(error, {
+        planId,
+        operationType: 3
+      });
+      
+      const paymentError = new PaymentError(
+        errorInfo?.message || 'שגיאה באימות התשלום'
+      );
+      paymentError.code = errorInfo?.code;
+      paymentError.details = errorInfo;
+      
+      setPaymentError(paymentError);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handlePaymentProcessing = async (tokenData: TokenData) => {
     // Define operationTypeValue at the beginning of the function to ensure it's available throughout
@@ -184,7 +262,19 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         localStorage.setItem('temp_registration_id', data.tempRegistrationId);
       }
       
-      window.location.href = data.url;
+      // Modify success URL to include lowProfileId for payment verification
+      const url = new URL(data.url);
+      const baseUrl = `${window.location.origin}/subscription`;
+      
+      // Add success=true and lpId parameters to the successRedirectUrl
+      url.searchParams.set('successRedirectUrl', 
+        `${baseUrl}?step=payment&success=true&lpId=${data.lowProfileId}`);
+      
+      // Update error redirect to include proper error parameters
+      url.searchParams.set('errorRedirectUrl', 
+        `${baseUrl}?step=payment&error=true&lpId=${data.lowProfileId}`);
+      
+      window.location.href = url.toString();
     } catch (error: any) {
       const errorInfo = await handleError(error, {
         planId,
@@ -213,4 +303,3 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     plan
   };
 };
-

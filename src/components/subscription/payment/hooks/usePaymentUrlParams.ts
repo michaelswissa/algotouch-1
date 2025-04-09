@@ -31,16 +31,21 @@ export const usePaymentUrlParams = (
       const error = params.get('error');
       const success = params.get('success');
       const regId = params.get('regId');
+      const lpId = params.get('lpId');
       
       if (error === 'true') {
         toast.error('התשלום נכשל, אנא נסה שנית');
       } else if (success === 'true') {
-        if (regId) {
-          console.log('Payment success with registration ID, verifying payment');
-          // Need to verify payment and complete registration
-          verifyPaymentAndCompleteRegistration(regId, onPaymentComplete, setIsLoading);
+        // If we have a lowProfileId, we need to verify the payment
+        if (lpId) {
+          console.log('Payment success with lowProfileId, verifying payment:', lpId);
+          verifyPaymentAndCompleteRegistration(lpId, regId || null, onPaymentComplete, setIsLoading);
+        } else if (regId) {
+          console.log('Payment success with registration ID, processing registration');
+          // Need to verify payment and complete registration with regId
+          retrieveAndProcessRegistrationData(regId, onPaymentComplete, setIsLoading);
         } else {
-          console.log('Payment success without registration ID, completing payment');
+          console.log('Payment success without verification parameters');
           toast.success('התשלום התקבל בהצלחה!');
           onPaymentComplete();
         }
@@ -53,7 +58,7 @@ export const usePaymentUrlParams = (
     const storedRegId = localStorage.getItem('temp_registration_id');
     if (storedRegId) {
       console.log('Found stored registration ID:', storedRegId);
-      retrieveAndProcessRegistrationData(storedRegId, onPaymentComplete);
+      retrieveAndProcessRegistrationData(storedRegId, onPaymentComplete, setIsLoading);
     }
   }, [onPaymentComplete]);
 };

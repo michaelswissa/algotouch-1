@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CardContent } from '@/components/ui/card';
 import { Shield, ShieldCheck } from 'lucide-react';
 
@@ -9,6 +9,7 @@ interface PaymentIframeProps {
 
 const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
   const [iframeHeight, setIframeHeight] = useState(650);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   
   useEffect(() => {
     const handleResize = () => {
@@ -22,7 +23,36 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     window.addEventListener('resize', handleResize);
     handleResize();
     
-    return () => window.removeEventListener('resize', handleResize);
+    // Handle iframe messages for payment status
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        // Handle payment status messages from the iframe
+        if (data.type === 'payment_status') {
+          console.log('Received payment status:', data);
+          
+          if (data.status === 'success') {
+            // Handle successful payment
+            console.log('Payment successful in iframe');
+            // We'll let the URL parameters handle the success redirect
+          } else if (data.status === 'error') {
+            // Handle payment error
+            console.error('Payment error in iframe:', data.error);
+            // We'll let the URL parameters handle the error redirect
+          }
+        }
+      } catch (error) {
+        // Not our message or not JSON, ignore
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('message', handleMessage);
+    };
   }, []);
 
   if (!paymentUrl) return null;
@@ -59,12 +89,14 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
           <div className="relative rounded-lg overflow-hidden border-2 border-primary/20 shadow-xl hover:shadow-2xl transition-shadow duration-300">
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/5 pointer-events-none"></div>
             <iframe 
+              ref={iframeRef}
               src={paymentUrl}
               width="100%"
               height={iframeHeight}
               frameBorder="0"
               title="Cardcom Payment Form"
               className="w-full"
+              onLoad={() => console.log('Payment iframe loaded')}
             />
           </div>
         </div>

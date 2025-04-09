@@ -144,6 +144,8 @@ async function verifyPayment(lowProfileId: string) {
       LowProfileId: lowProfileId
     };
     
+    console.log('Verifying payment for lowProfileId:', lowProfileId);
+    
     const response = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/GetLpResult`, {
       method: 'POST',
       headers: {
@@ -157,8 +159,9 @@ async function verifyPayment(lowProfileId: string) {
     }
     
     const result = await response.json();
+    console.log('CardCom verification result:', result);
     
-    // Payment is successful if ResponseCode is 0
+    // Payment is successful if ResponseCode is 0 AND we have a successful transaction
     if (result.ResponseCode !== 0) {
       return {
         success: false,
@@ -167,17 +170,33 @@ async function verifyPayment(lowProfileId: string) {
       };
     }
     
+    // Check if the transaction was actually successful
+    // The TranzactionInfo.TransactionStatus should be "Approved" if the payment succeeded
+    if (!result.TranzactionInfo?.TransactionStatus || 
+        result.TranzactionInfo.TransactionStatus !== "Approved") {
+      return {
+        success: false,
+        error: 'Transaction not approved',
+        details: {
+          transactionStatus: result.TranzactionInfo?.TransactionStatus,
+          responseMessage: result.TranzactionInfo?.ResponseMessage,
+          result
+        }
+      };
+    }
+    
     // Extract useful information from the response
     const paymentDetails = {
       transactionId: result.TranzactionId,
       amount: result.TranzactionInfo?.Amount,
-      cardLastDigits: result.TranzactionInfo?.Last4CardDigitsString || result.UIValues?.CardLastFourDigits,
+      cardLastDigits: result.TranzactionInfo?.Last4CardDigits || result.UIValues?.CardLastFourDigits,
       approvalNumber: result.TranzactionInfo?.ApprovalNumber,
       cardType: result.TranzactionInfo?.CardInfo,
       cardExpiry: `${result.UIValues?.CardMonth || ''}/${result.UIValues?.CardYear || ''}`,
       cardOwnerName: result.UIValues?.CardOwnerName,
       cardOwnerEmail: result.UIValues?.CardOwnerEmail,
       cardOwnerPhone: result.UIValues?.CardOwnerPhone,
+      transactionStatus: result.TranzactionInfo?.TransactionStatus
     };
     
     // Extract token information if available
@@ -374,8 +393,8 @@ serve(async (req) => {
           planId,
           amount,
           operationType,
-          successUrl: `${successRedirectUrl}${tempRegistrationId ? `&regId=${tempRegistrationId}` : ''}`,
-          errorUrl: errorRedirectUrl,
+          successUrl: `${successRedirectUrl}${tempRegistrationId ? `&regId=${tempRegistrationId}` : ''}&lpId=${sessionResult.lowProfileId}`,
+          errorUrl: `${errorRedirectUrl}&lpId=${sessionResult.lowProfileId}`,
           webHookUrl: webhookUrl,
           returnValue: tempRegistrationId || 'direct-payment',
           cardOwnerName: fullName,

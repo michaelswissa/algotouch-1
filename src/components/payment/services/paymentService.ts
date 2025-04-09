@@ -9,6 +9,47 @@ const importErrorHandling = async () => {
   return await import('../utils/errorHandling');
 };
 
+// Add verification function for external payments
+export const verifyExternalPayment = async (lowProfileId: string) => {
+  try {
+    console.log('Verifying payment with lowProfileId:', lowProfileId);
+    
+    const { data, error } = await supabase.functions.invoke('cardcom-payment/verify-payment', {
+      body: { lowProfileId }
+    });
+    
+    if (error) {
+      console.error('Error verifying payment:', error);
+      throw new Error(`שגיאה באימות התשלום: ${error.message}`);
+    }
+    
+    console.log('Payment verification result:', data);
+    
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'אימות התשלום נכשל',
+        details: data
+      };
+    }
+    
+    // If payment was successful, return the payment details
+    return {
+      success: true,
+      paymentDetails: data.paymentDetails,
+      tokenInfo: data.tokenInfo,
+      registrationId: data.registrationId
+    };
+  } catch (error: any) {
+    console.error('Payment verification error:', error);
+    return {
+      success: false,
+      error: error.message || 'שגיאה באימות התשלום',
+      details: error
+    };
+  }
+};
+
 export const handleExistingUserPayment = async (
   userId: string,
   planId: string,
@@ -214,13 +255,17 @@ export const initiateExternalPayment = async (
 
     const paymentSessionId = crypto.randomUUID();
 
+    // Create clear success and error URLs with proper parameters
+    const successUrl = `${window.location.origin}/subscription?step=payment&success=true`;
+    const errorUrl = `${window.location.origin}/subscription?step=payment&error=true`;
+
     const payload = {
       planId,
       ...userInfo,
       operationType,
       paymentSessionId,
-      successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${planId}`,
-      errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${planId}&session=${paymentSessionId}`
+      successRedirectUrl: successUrl,
+      errorRedirectUrl: errorUrl
     };
 
     const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {

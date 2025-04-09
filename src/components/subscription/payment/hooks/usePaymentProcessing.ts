@@ -48,7 +48,12 @@ export const usePaymentProcessing = () => {
     }
   };
 
-  const retrieveAndProcessRegistrationData = async (registrationId: string, onComplete: () => void) => {
+  const retrieveAndProcessRegistrationData = async (
+    registrationId: string,
+    onComplete: () => void,
+    setIsLoading?: (val: boolean) => void
+  ) => {
+    if (setIsLoading) setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('cardcom-payment/get-registration-data', {
         body: { registrationId }
@@ -56,6 +61,7 @@ export const usePaymentProcessing = () => {
       
       if (error || !data?.success) {
         console.error('Error retrieving registration data:', error || 'No success');
+        if (setIsLoading) setIsLoading(false);
         return;
       }
       
@@ -68,6 +74,7 @@ export const usePaymentProcessing = () => {
         // If data was already used, remove the ID from localStorage
         if (data.alreadyUsed) {
           localStorage.removeItem('temp_registration_id');
+          if (setIsLoading) setIsLoading(false);
           return;
         }
         
@@ -91,17 +98,54 @@ export const usePaymentProcessing = () => {
       }
     } catch (err) {
       console.error('Error processing registration data:', err);
+    } finally {
+      if (setIsLoading) setIsLoading(false);
     }
   };
 
   const verifyPaymentAndCompleteRegistration = async (
-    registrationId: string, 
-    onComplete: () => void, 
+    lowProfileId: string,
+    registrationId: string | null,
+    onComplete: () => void,
     setIsLoading: (val: boolean) => void
   ) => {
     setIsLoading(true);
     try {
-      // First, retrieve registration data
+      // First, verify the payment with Cardcom
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('cardcom-payment/verify-payment', {
+        body: { lowProfileId }
+      });
+      
+      if (paymentError || !paymentData?.success) {
+        throw new Error('שגיאה באימות התשלום: ' + (paymentError?.message || paymentData?.error || 'שגיאה לא ידועה'));
+      }
+      
+      console.log('Payment verified successfully:', paymentData);
+      
+      // Process registration data if available
+      if (registrationId) {
+        await processRegistrationWithPayment(registrationId, paymentData, onComplete);
+      } else {
+        // No registration ID, just complete the payment
+        toast.success('התשלום אומת בהצלחה!');
+        onComplete();
+      }
+    } catch (error: any) {
+      console.error('Error verifying payment:', error);
+      toast.error(error.message || 'שגיאה באימות התשלום');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to process registration with verified payment data
+  const processRegistrationWithPayment = async (
+    registrationId: string,
+    paymentData: any,
+    onComplete: () => void
+  ) => {
+    try {
+      // Retrieve registration data
       const { data: regData, error: regError } = await supabase.functions.invoke('cardcom-payment/get-registration-data', {
         body: { registrationId }
       });
@@ -110,32 +154,42 @@ export const usePaymentProcessing = () => {
         throw new Error('שגיאה בשחזור פרטי הרשמה');
       }
       
-      // Store registration data for form pre-population if needed
+      // Store registration data with payment info
       if (regData.registrationData) {
-        sessionStorage.setItem('registration_data', JSON.stringify(regData.registrationData));
+        const updatedData = {
+          ...regData.registrationData,
+          paymentVerified: true,
+          paymentToken: paymentData.tokenInfo || {
+            token: paymentData.paymentDetails?.cardLastDigits || '',
+            expiry: paymentData.paymentDetails?.cardExpiry || '',
+            last4Digits: paymentData.paymentDetails?.cardLastDigits || '',
+            cardholderName: paymentData.paymentDetails?.cardOwnerName || ''
+          }
+        };
+        
+        sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+        
+        // Auto-complete registration if we have all required data
+        if (updatedData.email && updatedData.password) {
+          const registerResult = await registerNewUser(updatedData);
+          
+          if (registerResult.success) {
+            toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
+            onComplete();
+          } else {
+            toast.error('ההרשמה נכשלה, אנא נסה שנית');
+          }
+        } else {
+          // Need more info from the user
+          toast.info('אנא השלם את פרטי ההרשמה');
+          // User will complete registration in the next step
+        }
       } else {
         throw new Error('חסרים פרטי הרשמה');
       }
-      
-      // Try to complete the registration process
-      if (regData.registrationData.email && regData.registrationData.password) {
-        const registerResult = await registerNewUser(regData.registrationData);
-        
-        if (registerResult.success) {
-          toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
-          onComplete();
-        } else {
-          toast.error(registerResult.error || 'ההרשמה נכשלה, אנא נסה שנית');
-        }
-      } else {
-        // We need more information from the user
-        toast.info('אנא השלם את פרטי ההרשמה');
-      }
     } catch (error: any) {
-      console.error('Error verifying payment and registration:', error);
-      toast.error(error.message || 'שגיאה בהשלמת תהליך ההרשמה והתשלום');
-    } finally {
-      setIsLoading(false);
+      console.error('Error processing registration with payment:', error);
+      throw error;
     }
   };
 
