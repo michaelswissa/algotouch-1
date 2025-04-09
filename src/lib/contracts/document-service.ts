@@ -51,34 +51,33 @@ export async function generateDocument(params: DocumentRequest): Promise<{ succe
  */
 export async function getUserDocuments(userId: string): Promise<{ success: boolean; documents?: any[]; error?: any }> {
   try {
-    // Check if the documents table exists first
-    const { error: checkError } = await supabase
+    // First check if the documents table exists and has RLS policies
+    // Use the check_row_exists RPC instead of directly querying the table
+    const { data: exists, error: checkError } = await supabase
       .rpc('check_row_exists', {
         p_table_name: 'documents',
         p_column_name: 'id', 
         p_value: 'any'
       });
       
-    if (checkError) {
-      console.warn('Documents table may not exist yet:', checkError.message);
+    if (checkError || !exists) {
+      console.warn('Documents table may not exist or has no records:', checkError?.message);
       return { 
         success: true, 
         documents: [] 
       };
     }
     
-    // If the table exists, query documents
-    const { data: documents, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-      
+    // If the table exists and has records, use edge function to get documents
+    const { data, error } = await supabase.functions.invoke('generate-document/list', {
+      body: { userId }
+    });
+    
     if (error) throw error;
     
     return { 
       success: true, 
-      documents: documents || [] 
+      documents: data?.documents || [] 
     };
   } catch (error: any) {
     console.error('Error fetching user documents:', error);
@@ -94,17 +93,16 @@ export async function getUserDocuments(userId: string): Promise<{ success: boole
  */
 export async function getDocumentById(documentId: string): Promise<{ success: boolean; document?: any; error?: any }> {
   try {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .maybeSingle();
-      
+    // Use the edge function to get document details
+    const { data, error } = await supabase.functions.invoke('generate-document/details', {
+      body: { documentId }
+    });
+    
     if (error) throw error;
     
     return { 
       success: true, 
-      document: data 
+      document: data?.document 
     };
   } catch (error: any) {
     console.error(`Error fetching document ${documentId}:`, error);
@@ -130,9 +128,12 @@ export async function handlePaymentDocumentGeneration(
       .from('profiles')
       .select('first_name, last_name, email, phone')
       .eq('id', userId)
-      .maybeSingle();
+      .single();
       
-    if (userError) throw userError;
+    if (userError) {
+      console.error('Error fetching user profile:', userError);
+      return { success: false, error: 'שגיאה בטעינת פרטי משתמש' };
+    }
     
     if (!userData) {
       console.warn('User profile not found for document generation', { userId });

@@ -1,4 +1,3 @@
-
 import { BaseDatabase } from './base';
 
 // Database extension for payment and subscription features
@@ -221,6 +220,45 @@ export interface PaymentsDatabase {
           expires_at?: string;
           used?: boolean;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      documents: {
+        Row: {
+          id: string;
+          user_id: string;
+          payment_id: string | null;
+          document_type: string;
+          document_number: string;
+          document_url: string;
+          document_date: string;
+          created_at: string;
+          updated_at: string;
+          metadata: any | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          payment_id?: string | null;
+          document_type: string;
+          document_number: string;
+          document_url: string;
+          document_date?: string;
+          created_at?: string;
+          updated_at?: string;
+          metadata?: any | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          payment_id?: string | null;
+          document_type?: string;
+          document_number?: string;
+          document_url?: string;
+          document_date?: string;
+          created_at?: string;
+          updated_at?: string;
+          metadata?: any | null;
         };
         Relationships: [];
       };

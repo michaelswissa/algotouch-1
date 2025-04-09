@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TokenData } from '../utils/paymentHelpers';
 import { RegistrationResult } from '../hooks/types';
+import { toast } from 'sonner'; 
 
 export const handleExistingUserPayment = async (
   userId: string,
@@ -73,10 +74,12 @@ export const handleExistingUserPayment = async (
       
     if (userError) {
       console.error('Error fetching user data for document:', userError);
+      // Continue despite the error, we'll use fallback values
     }
     
+    // Use optional chaining and nullish coalescing for safety
     const userEmail = userData?.email || '';
-    const userName = `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim();
+    const userName = userData ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() : '';
     
     // Generate invoice/receipt
     try {
@@ -211,46 +214,54 @@ export const generateDocument = async (
 ) => {
   try {
     // Fetch needed data
-    const [userResponse, paymentResponse] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('first_name, last_name, email, phone')
-        .eq('id', userId)
-        .single(),
-        
-      supabase
-        .from('payment_history')
-        .select('amount, subscription_id')
-        .eq('id', paymentId)
-        .single()
-    ]);
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, email, phone')
+      .eq('id', userId)
+      .single();
     
-    if (userResponse.error) throw userResponse.error;
-    if (paymentResponse.error) throw paymentResponse.error;
+    if (userError) {
+      console.error('Error fetching user data:', userError);
+      throw new Error('שגיאה בטעינת פרטי משתמש');
+    }
+    
+    const { data: paymentData, error: paymentError } = await supabase
+      .from('payment_history')
+      .select('amount, subscription_id')
+      .eq('id', paymentId)
+      .single();
+      
+    if (paymentError) {
+      console.error('Error fetching payment data:', paymentError);
+      throw new Error('שגיאה בטעינת פרטי תשלום');
+    }
     
     // Get subscription plan type
     const { data: subscriptionData, error: subError } = await supabase
       .from('subscriptions')
       .select('plan_type')
-      .eq('id', paymentResponse.data.subscription_id)
+      .eq('id', paymentData.subscription_id)
       .single();
       
-    if (subError) throw subError;
+    if (subError) {
+      console.error('Error fetching subscription data:', subError);
+      throw new Error('שגיאה בטעינת פרטי מנוי');
+    }
     
-    const userData = userResponse.data;
-    const userName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim();
+    // Safe access with optional chaining and nullish coalescing
+    const userName = userData ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() : '';
     
     // Call document generation
     const { data, error } = await supabase.functions.invoke('generate-document/generate', {
       body: {
         paymentId,
         userId,
-        amount: paymentResponse.data.amount,
+        amount: paymentData.amount,
         planType: subscriptionData.plan_type,
-        email: userData.email || '',
+        email: userData?.email || '',
         fullName: userName,
         documentType,
-        phone: userData.phone || ''
+        phone: userData?.phone || ''
       }
     });
     

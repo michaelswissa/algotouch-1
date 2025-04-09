@@ -3,16 +3,20 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText, ExternalLink, LoaderCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { getUserDocuments } from '@/lib/contracts/document-service';
 
 export interface Document {
   id: string;
   user_id: string;
-  payment_id: string;
+  payment_id: string | null;
   document_type: string;
   document_number: string;
   document_url: string;
   document_date: string;
   created_at: string;
+  updated_at: string;
+  metadata?: any;
 }
 
 interface DocumentsListProps {
@@ -26,36 +30,32 @@ const DocumentsList = ({ userId }: DocumentsListProps) => {
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        // First check if the documents table exists
-        const { error: checkError } = await supabase
-          .from('documents')
-          .select('count')
-          .limit(1)
-          .single();
-
-        if (checkError && checkError.message.includes('relation "documents" does not exist')) {
-          console.warn('Documents table does not exist yet. Creating it...');
+        setLoading(true);
+        // Use the document service function instead of direct queries
+        const { success, documents, error } = await getUserDocuments(userId);
+        
+        if (!success) {
+          console.error('Error fetching documents:', error);
           setDocuments([]);
-          setLoading(false);
           return;
         }
         
-        const { data, error } = await supabase
-          .from('documents')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-          
-        if (error) throw error;
-        setDocuments(data as Document[] || []);
+        setDocuments(documents as Document[] || []);
       } catch (error) {
-        console.error('Error fetching documents:', error);
+        console.error('Error in document fetch:', error);
+        toast.error('שגיאה בטעינת מסמכים');
+        setDocuments([]);
       } finally {
         setLoading(false);
       }
     };
     
-    fetchDocuments();
+    if (userId) {
+      fetchDocuments();
+    } else {
+      setLoading(false);
+      setDocuments([]);
+    }
   }, [userId]);
   
   if (loading) {
