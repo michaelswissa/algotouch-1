@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CardContent } from '@/components/ui/card';
 import { Shield, ShieldCheck, CreditCard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface PaymentIframeProps {
   paymentUrl: string | null;
@@ -10,6 +11,7 @@ interface PaymentIframeProps {
 const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
   const [iframeHeight, setIframeHeight] = useState(650);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const navigate = useNavigate();
   
   useEffect(() => {
     const handleResize = () => {
@@ -38,8 +40,13 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
               const parsedSession = JSON.parse(sessionData);
               if (currentUrl.includes('success=true')) {
                 parsedSession.step = 'completion';
+                sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+                
+                // Attempt to navigate to completion step
+                const url = new URL(window.location.href);
+                url.searchParams.set('step', 'completion');
+                navigate(`/subscription?step=completion&success=true&plan=${parsedSession.selectedPlan || ''}`, { replace: true });
               }
-              sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
             } catch (e) {
               console.error('Error updating session data:', e);
             }
@@ -67,41 +74,31 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
             // Handle successful payment
             console.log('Payment successful, redirecting window');
             
-            // Construct redirect URL
-            let redirectUrl = data.url;
-            if (!redirectUrl) {
-              const baseUrl = `${window.location.origin}/subscription`;
-              redirectUrl = `${baseUrl}?step=completion&success=true`;
-              
-              // Add lowProfileId if available
-              if (data.lowProfileId) {
-                redirectUrl += `&lpId=${data.lowProfileId}`;
-              }
-            }
-            
-            console.log('Redirecting to:', redirectUrl);
-            
-            // Update flow state before redirecting
-            try {
-              const sessionData = sessionStorage.getItem('subscription_flow');
-              if (sessionData) {
+            // Update session storage to completion step
+            const sessionData = sessionStorage.getItem('subscription_flow');
+            if (sessionData) {
+              try {
                 const parsedSession = JSON.parse(sessionData);
                 parsedSession.step = 'completion';
                 sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+                
+                // Redirect to completion step
+                navigate(`/subscription?step=completion&success=true&plan=${parsedSession.selectedPlan || ''}`, { replace: true });
+              } catch (e) {
+                console.error('Error updating session data:', e);
+                // Fallback redirect
+                navigate('/subscription?step=completion&success=true', { replace: true });
               }
-            } catch (e) {
-              console.error('Error updating session data:', e);
+            } else {
+              // Fallback redirect without session data
+              navigate('/subscription?step=completion&success=true', { replace: true });
             }
-            
-            // Redirect the top window
-            window.top.location.href = redirectUrl;
           } else if (data.status === 'error' || data.success === false) {
             // Handle payment error
             console.error('Payment error:', data.error);
             
             // Redirect to error page
-            const baseUrl = `${window.location.origin}/subscription`;
-            window.top.location.href = `${baseUrl}?step=payment&error=true`;
+            navigate('/subscription?step=payment&error=true', { replace: true });
           }
         }
       } catch (error) {
@@ -282,7 +279,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
+  }, [navigate]);
 
   if (!paymentUrl) return null;
 

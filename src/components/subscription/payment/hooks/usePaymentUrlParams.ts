@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { usePaymentProcessing } from './usePaymentProcessing';
 
@@ -8,6 +8,16 @@ export const usePaymentUrlParams = (
   setIsLoading: (val: boolean) => void
 ) => {
   const { verifyPaymentAndCompleteRegistration, retrieveAndProcessRegistrationData } = usePaymentProcessing();
+  const [paymentStatus, setPaymentStatus] = useState<{
+    success: boolean | null;
+    error: boolean | null;
+    errorMessage?: string;
+    regId?: string | null;
+    lpId?: string | null;
+  }>({
+    success: null,
+    error: null
+  });
 
   useEffect(() => {
     // Check if we're on the correct step before processing payment URL params
@@ -27,12 +37,33 @@ export const usePaymentUrlParams = (
       const error = params.get('error');
       const regId = params.get('regId');
       const lpId = params.get('lpId');
+      const forceRedirect = params.get('forceRedirect');
+      
+      console.log('Processing URL parameters:', {
+        stepParam,
+        success,
+        error,
+        regId,
+        lpId,
+        forceRedirect,
+        currentStep: parsedSession.step
+      });
       
       // Special case: Force completion step
       if (stepParam === 'completion') {
         console.log('Forcing completion step based on URL parameter');
         parsedSession.step = 'completion';
         sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        
+        // If success is also true, set payment status
+        if (success === 'true') {
+          setPaymentStatus({
+            success: true,
+            error: false,
+            regId,
+            lpId
+          });
+        }
       }
       
       // Check if we're in an iframe and handle breaking out
@@ -41,7 +72,7 @@ export const usePaymentUrlParams = (
         console.log('Detected we are in iframe, handling parent window navigation');
         
         // If success or error is detected in iframe, always redirect the parent window
-        if (success === 'true' || error === 'true') {
+        if (success === 'true' || error === 'true' || forceRedirect === 'true') {
           try {
             // Construct redirect URL for parent window
             const currentUrl = new URL(window.location.href);
@@ -69,7 +100,7 @@ export const usePaymentUrlParams = (
       }
       
       // Only process URL params if we're on the right step
-      if (parsedSession.step !== 'payment' && parsedSession.step !== 'completion') {
+      if (parsedSession.step !== 'payment' && parsedSession.step !== 'completion' && !forceRedirect) {
         console.log(`Current step is ${parsedSession.step}, not processing payment URL params`);
         return;
       }
@@ -79,10 +110,22 @@ export const usePaymentUrlParams = (
       
       if (error === 'true') {
         toast.error('התשלום נכשל, אנא נסה שנית');
+        setPaymentStatus({
+          success: false,
+          error: true,
+          errorMessage: 'התשלום נכשל, אנא נסה שנית'
+        });
       } else if (success === 'true') {
         // Force the step to completion to ensure we show the success page
         parsedSession.step = 'completion';
         sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        
+        setPaymentStatus({
+          success: true,
+          error: false,
+          regId,
+          lpId
+        });
         
         // If we have a lowProfileId, we need to verify the payment
         if (lpId) {
@@ -95,7 +138,10 @@ export const usePaymentUrlParams = (
         } else {
           console.log('Payment success without verification parameters');
           toast.success('התשלום התקבל בהצלחה!');
-          onPaymentComplete();
+          setPaymentStatus({
+            success: true,
+            error: false
+          });
         }
       }
     } catch (error) {
@@ -108,5 +154,7 @@ export const usePaymentUrlParams = (
       console.log('Found stored registration ID:', storedRegId);
       retrieveAndProcessRegistrationData(storedRegId, onPaymentComplete, setIsLoading);
     }
-  }, [onPaymentComplete]);
+  }, [onPaymentComplete, setIsLoading]);
+  
+  return paymentStatus;
 };

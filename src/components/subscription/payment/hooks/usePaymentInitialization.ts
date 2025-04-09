@@ -49,7 +49,8 @@ export const usePaymentInitialization = (
       // Create base URLs for success and error redirects
       const baseUrl = `${window.location.origin}/subscription`;
       
-      // Critical fix: Make sure the success redirect URL goes to completion step and breaks out of the iframe
+      // Critical: Make sure the success redirect URL goes to completion step and breaks out of the iframe
+      // Be absolutely explicit about the path to ensure no issues with redirection
       const successUrl = `${baseUrl}?step=completion&success=true&plan=${selectedPlan}&target=_top`;
       const errorUrl = `${baseUrl}?step=payment&error=true&plan=${selectedPlan}&target=_top`;
 
@@ -63,8 +64,26 @@ export const usePaymentInitialization = (
         successRedirectUrl: successUrl,
         errorRedirectUrl: errorUrl,
         // Include registration data for account creation after payment
-        registrationData: registrationData
+        registrationData: registrationData,
+        // Add indicator we're in payment step to ensure proper flow
+        paymentStep: true,
+        // Generate a session ID to track this payment attempt
+        paymentSessionId: crypto.randomUUID()
       };
+
+      // Store current step in session storage
+      const sessionData = sessionStorage.getItem('subscription_flow');
+      if (sessionData) {
+        const parsedSession = JSON.parse(sessionData);
+        parsedSession.selectedPlan = selectedPlan;
+        parsedSession.step = 'payment';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+      } else {
+        sessionStorage.setItem('subscription_flow', JSON.stringify({
+          selectedPlan,
+          step: 'payment'
+        }));
+      }
 
       const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
         body: payload

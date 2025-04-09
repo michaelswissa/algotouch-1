@@ -9,6 +9,7 @@ import PaymentIframe from './PaymentIframe';
 import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
 import PaymentError from './PaymentError';
+import { toast } from 'sonner';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -45,10 +46,15 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
           // Call the completion handler with a slight delay
           setTimeout(() => {
             console.log('Calling onPaymentComplete handler');
+            toast.success('התשלום התקבל בהצלחה!');
             onPaymentComplete();
           }, 100);
         } catch (error) {
           console.error('Error parsing session data:', error);
+          // Call completion handler anyway if parsing fails
+          setTimeout(() => {
+            onPaymentComplete();
+          }, 100);
         }
       } else {
         console.log('No session data found, creating new one');
@@ -61,6 +67,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         
         // Call completion handler
         setTimeout(() => {
+          toast.success('התשלום התקבל בהצלחה!');
           onPaymentComplete();
         }, 100);
       }
@@ -72,12 +79,14 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
       
       // Try to navigate the top window
       try {
-        window.top.location.href = window.location.href;
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('forceRedirect', 'true');
+        window.top.location.href = currentUrl.toString();
       } catch (e) {
         console.error('Could not navigate top window:', e);
       }
     }
-  }, []);
+  }, [onPaymentComplete, selectedPlan]);
   
   // Handle payment initialization
   const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
@@ -88,7 +97,32 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   );
   
   // Handle URL parameters for success/error redirects
-  usePaymentUrlParams(onPaymentComplete, setIsLoading);
+  const paymentStatus = usePaymentUrlParams(onPaymentComplete, setIsLoading);
+  
+  // If payment was successful (from URL params), call onPaymentComplete directly
+  useEffect(() => {
+    if (paymentStatus.success === true) {
+      console.log('Payment status indicates success, completing payment flow');
+      toast.success('התשלום התקבל בהצלחה!');
+      // Update session data to completion
+      const sessionData = sessionStorage.getItem('subscription_flow');
+      if (sessionData) {
+        try {
+          const parsedSession = JSON.parse(sessionData);
+          parsedSession.step = 'completion';
+          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        } catch (error) {
+          console.error('Error updating session data:', error);
+        }
+      }
+      
+      setTimeout(() => {
+        onPaymentComplete();
+      }, 100);
+    } else if (paymentStatus.error) {
+      toast.error('אירעה שגיאה בתהליך התשלום: ' + paymentStatus.errorMessage);
+    }
+  }, [paymentStatus, onPaymentComplete]);
   
   // Determine if this is a monthly plan (with trial)
   const isMonthlyPlan = selectedPlan === 'monthly';
