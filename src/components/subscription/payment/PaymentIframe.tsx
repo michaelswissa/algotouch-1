@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { CardContent } from '@/components/ui/card';
-import { Shield, ShieldCheck } from 'lucide-react';
+import { Shield, ShieldCheck, CreditCard } from 'lucide-react';
 
 interface PaymentIframeProps {
   paymentUrl: string | null;
@@ -26,7 +26,10 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     // Handle iframe messages for payment status
     const handleMessage = (event: MessageEvent) => {
       try {
+        // First, let's try to parse the data if it's a string
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        console.log('Received message from iframe:', data);
         
         // Handle payment status messages from the iframe
         if (data.type === 'payment_status') {
@@ -34,25 +37,116 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
           
           if (data.status === 'success') {
             // Handle successful payment
-            console.log('Payment successful in iframe');
-            // We'll let the URL parameters handle the success redirect
+            console.log('Payment successful in iframe, redirecting parent window');
+            
+            // If we have a lowProfileId, redirect to our success URL
             if (data.lowProfileId) {
-              // If we have a lowProfileId, redirect to our success URL
               const baseUrl = `${window.location.origin}/subscription`;
-              window.location.href = `${baseUrl}?step=completion&success=true&lpId=${data.lowProfileId}`;
+              const redirectUrl = `${baseUrl}?step=completion&success=true&lpId=${data.lowProfileId}`;
+              
+              console.log('Redirecting to:', redirectUrl);
+              window.top.location.href = redirectUrl; // Redirect the top window
             }
           } else if (data.status === 'error') {
             // Handle payment error
             console.error('Payment error in iframe:', data.error);
-            // We'll let the URL parameters handle the error redirect
+            
+            // Redirect to error page
+            const baseUrl = `${window.location.origin}/subscription`;
+            window.top.location.href = `${baseUrl}?step=payment&error=true`;
+          }
+        } else if (data.type === 'cardcom_redirect') {
+          // Handle redirection messages from the Cardcom iframe
+          console.log('Received redirect instruction from Cardcom:', data);
+          
+          if (data.url) {
+            console.log('Redirecting top window to:', data.url);
+            window.top.location.href = data.url;
           }
         }
       } catch (error) {
         // Not our message or not JSON, ignore
+        console.log('Error processing iframe message:', error);
       }
     };
 
     window.addEventListener('message', handleMessage);
+    
+    // Add a script to listen for navigation events inside the iframe
+    const injectIframeListener = () => {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        try {
+          // Create a script element to inject into the iframe
+          const script = document.createElement('script');
+          script.innerHTML = `
+            // Monitor URL changes in the iframe
+            let lastUrl = window.location.href;
+            const observer = new MutationObserver(() => {
+              if (window.location.href !== lastUrl) {
+                const newUrl = window.location.href;
+                lastUrl = newUrl;
+                
+                // Check if this is a success or error redirect
+                if (newUrl.includes('success=true')) {
+                  // Extract the lowProfileId if present
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const lpId = urlParams.get('lpId');
+                  
+                  // Send message to parent
+                  window.parent.postMessage(JSON.stringify({
+                    type: 'cardcom_redirect',
+                    url: newUrl,
+                    success: true,
+                    lowProfileId: lpId
+                  }), '*');
+                } else if (newUrl.includes('error=true')) {
+                  // Send error message to parent
+                  window.parent.postMessage(JSON.stringify({
+                    type: 'cardcom_redirect',
+                    url: newUrl,
+                    success: false
+                  }), '*');
+                }
+              }
+            });
+            
+            // Start observing
+            observer.observe(document, { subtree: true, childList: true });
+            
+            // Also listen for form submissions
+            document.addEventListener('submit', (e) => {
+              console.log('Form submitted in iframe');
+              // Tell the parent window about the form submission
+              window.parent.postMessage(JSON.stringify({
+                type: 'form_submit'
+              }), '*');
+            });
+          `;
+          
+          // Wait for iframe to load then inject the script
+          iframeRef.current.onload = () => {
+            try {
+              const iframeDocument = iframeRef.current?.contentWindow?.document;
+              if (iframeDocument && iframeDocument.body) {
+                const scriptElement = iframeDocument.createElement('script');
+                scriptElement.textContent = script.innerHTML;
+                iframeDocument.body.appendChild(scriptElement);
+                console.log('Script injected into iframe');
+              }
+            } catch (error) {
+              console.error('Error injecting script into iframe:', error);
+            }
+          };
+        } catch (error) {
+          console.error('Error setting up iframe listener:', error);
+        }
+      }
+    };
+    
+    // Try to inject the script
+    if (iframeRef.current) {
+      injectIframeListener();
+    }
     
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -109,7 +203,5 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     </CardContent>
   );
 };
-
-import { CreditCard } from 'lucide-react';
 
 export default PaymentIframe;

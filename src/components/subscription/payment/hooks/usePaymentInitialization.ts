@@ -49,9 +49,10 @@ export const usePaymentInitialization = (
       // Create base URLs for success and error redirects
       const baseUrl = `${window.location.origin}/subscription`;
       
-      // Critical fix: Make sure the success redirect URL goes to completion step, not step=4
-      const successUrl = `${baseUrl}?step=completion&success=true&plan=${selectedPlan}`;
-      const errorUrl = `${baseUrl}?step=payment&error=true&plan=${selectedPlan}`;
+      // Critical fix: Make sure the success redirect URL goes to completion step
+      // Using target=_top to force breaking out of the iframe
+      const successUrl = `${baseUrl}?step=completion&success=true&plan=${selectedPlan}&target=_top`;
+      const errorUrl = `${baseUrl}?step=payment&error=true&plan=${selectedPlan}&target=_top`;
 
       // Prepare payload based on whether user is logged in or not
       const payload = {
@@ -82,7 +83,13 @@ export const usePaymentInitialization = (
           localStorage.setItem('temp_registration_id', data.tempRegistrationId);
         }
         
-        setPaymentUrl(data.url);
+        // Add target=_top parameter to force the iframe to break out to the top window
+        const finalUrl = new URL(data.url);
+        
+        // Ensure we're always breaking out of the iframe on redirect
+        finalUrl.searchParams.set('target', '_top');
+        
+        setPaymentUrl(finalUrl.toString());
       } else {
         throw new Error('לא התקבלה כתובת תשלום מהשרת');
       }

@@ -404,6 +404,9 @@ serve(async (req) => {
           cardOwnerPhone: registrationData?.userData?.phone
         });
         
+        // Modify the payment URL to use our custom URL parameters
+        const paymentUrl = new URL(sessionResult.url);
+        
         // Add the lowProfileId to the success URL
         let finalSuccessUrl = successRedirectUrl;
         if (finalSuccessUrl.includes('?')) {
@@ -417,17 +420,26 @@ serve(async (req) => {
           finalSuccessUrl += `&regId=${tempRegistrationId}`;
         }
         
-        // Modify the payment URL to use our custom URL parameters
-        const paymentUrl = new URL(sessionResult.url);
+        // Make sure we have target=_top to break out of iframe
+        if (!finalSuccessUrl.includes('target=_top')) {
+          finalSuccessUrl += '&target=_top';
+        }
+        
         paymentUrl.searchParams.set('successRedirectUrl', finalSuccessUrl);
         
-        // Ensure error URL also includes the lowProfileId
+        // Ensure error URL also includes the lowProfileId and target=_top
         let finalErrorUrl = errorRedirectUrl;
         if (finalErrorUrl.includes('?')) {
           finalErrorUrl += `&lpId=${sessionResult.lowProfileId}`;
         } else {
           finalErrorUrl += `?lpId=${sessionResult.lowProfileId}`;
         }
+        
+        // Make sure we have target=_top to break out of iframe
+        if (!finalErrorUrl.includes('target=_top')) {
+          finalErrorUrl += '&target=_top';
+        }
+        
         paymentUrl.searchParams.set('errorRedirectUrl', finalErrorUrl);
         
         return new Response(

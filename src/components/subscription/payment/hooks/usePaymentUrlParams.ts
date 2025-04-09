@@ -19,6 +19,17 @@ export const usePaymentUrlParams = (
     
     try {
       const parsedSession = JSON.parse(sessionData);
+      
+      // Special case: if we have step=completion in the URL, force that step
+      const params = new URLSearchParams(window.location.search);
+      const stepParam = params.get('step');
+      
+      if (stepParam === 'completion') {
+        console.log('Forcing completion step based on URL parameter');
+        parsedSession.step = 'completion';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+      }
+      
       if (parsedSession.step !== 'payment' && parsedSession.step !== 'completion') {
         console.log(`Current step is ${parsedSession.step}, not processing payment URL params`);
         return;
@@ -27,7 +38,6 @@ export const usePaymentUrlParams = (
       // Only process URL params if we're on the payment or completion step
       console.log('Processing payment URL parameters');
       
-      const params = new URLSearchParams(window.location.search);
       const error = params.get('error');
       const success = params.get('success');
       const regId = params.get('regId');
@@ -51,6 +61,11 @@ export const usePaymentUrlParams = (
         } else {
           console.log('Payment success without verification parameters');
           toast.success('התשלום התקבל בהצלחה!');
+          
+          // Force to completion step
+          parsedSession.step = 'completion';
+          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          
           onPaymentComplete();
         }
       }
