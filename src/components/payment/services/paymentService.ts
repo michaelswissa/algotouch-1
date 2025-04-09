@@ -66,20 +66,23 @@ export const handleExistingUserPayment = async (
     }
     
     // Get user information for document generation
-    const { data: userData, error: userError } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('first_name, last_name, email, phone')
+      .select('first_name, last_name, phone')
       .eq('id', userId)
       .single();
-      
-    if (userError) {
-      console.error('Error fetching user data for document:', userError);
+    
+    // Get user email from auth
+    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+    
+    if (profileError) {
+      console.error('Error fetching profile data for document:', profileError);
       // Continue despite the error, we'll use fallback values
     }
     
     // Use optional chaining and nullish coalescing for safety
-    const userEmail = userData?.email || '';
-    const userName = userData ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() : '';
+    const userEmail = authData?.user?.email || '';
+    const userName = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : '';
     
     // Generate invoice/receipt
     try {
@@ -92,7 +95,7 @@ export const handleExistingUserPayment = async (
           email: userEmail,
           fullName: userName,
           documentType: 'invoice', // For initial payment we generate invoice
-          phone: userData?.phone || ''
+          phone: profileData?.phone || ''
         }
       });
     } catch (docError) {
@@ -214,14 +217,22 @@ export const generateDocument = async (
 ) => {
   try {
     // Fetch needed data
-    const { data: userData, error: userError } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('first_name, last_name, email, phone')
+      .select('first_name, last_name, phone')
       .eq('id', userId)
       .single();
     
-    if (userError) {
-      console.error('Error fetching user data:', userError);
+    // Get user email from auth
+    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+    
+    if (profileError) {
+      console.error('Error fetching profile data:', profileError);
+      throw new Error('שגיאה בטעינת פרטי משתמש');
+    }
+    
+    if (authError) {
+      console.error('Error fetching user data:', authError);
       throw new Error('שגיאה בטעינת פרטי משתמש');
     }
     
@@ -249,7 +260,10 @@ export const generateDocument = async (
     }
     
     // Safe access with optional chaining and nullish coalescing
-    const userName = userData ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() : '';
+    const userEmail = authData?.user?.email || '';
+    const userName = profileData 
+      ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() 
+      : '';
     
     // Call document generation
     const { data, error } = await supabase.functions.invoke('generate-document/generate', {
@@ -258,10 +272,10 @@ export const generateDocument = async (
         userId,
         amount: paymentData.amount,
         planType: subscriptionData.plan_type,
-        email: userData?.email || '',
+        email: userEmail,
         fullName: userName,
         documentType,
-        phone: userData?.phone || ''
+        phone: profileData?.phone || ''
       }
     });
     

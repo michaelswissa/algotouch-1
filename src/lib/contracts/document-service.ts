@@ -140,7 +140,9 @@ export async function handlePaymentDocumentGeneration(
       return { success: false, error: 'פרופיל משתמש לא נמצא' };
     }
     
-    const email = userData?.email || '';
+    // Get user email from auth table if not in profile
+    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+    const email = userData?.email || authData?.user?.email || '';
     const fullName = `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim();
     
     // Generate appropriate document based on plan type
@@ -154,7 +156,7 @@ export async function handlePaymentDocumentGeneration(
       email,
       fullName,
       documentType,
-      phone: userData?.phone
+      phone: userData?.phone || ''
     });
     
     if (!success) throw error;
