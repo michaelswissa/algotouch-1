@@ -411,10 +411,13 @@ serve(async (req) => {
         let finalSuccessUrl = successRedirectUrl;
         try {
           const successUrlObj = new URL(finalSuccessUrl);
+          
+          // Always set these critical parameters for proper redirection
           successUrlObj.searchParams.set('lpId', sessionResult.lowProfileId);
           successUrlObj.searchParams.set('step', 'completion');
           successUrlObj.searchParams.set('success', 'true');
           successUrlObj.searchParams.set('target', '_top');
+          
           finalSuccessUrl = successUrlObj.toString();
         } catch (e) {
           console.error('Error modifying success URL:', e);

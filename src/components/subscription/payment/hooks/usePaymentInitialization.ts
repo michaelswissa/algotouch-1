@@ -49,10 +49,22 @@ export const usePaymentInitialization = (
       // Create base URLs for success and error redirects with absolute paths
       const baseUrl = `${window.location.origin}/subscription`;
       
-      // Critical: Make sure the success redirect URL goes to completion step and breaks out of the iframe
-      // Be absolutely explicit about the path to ensure no issues with redirection
-      const successUrl = `${baseUrl}?step=completion&success=true&plan=${selectedPlan}&target=_top`;
-      const errorUrl = `${baseUrl}?step=payment&error=true&plan=${selectedPlan}&target=_top`;
+      // Ensure success redirect URL forces completion step and breaks out of iframe
+      const successUrl = new URL(baseUrl);
+      successUrl.searchParams.set('step', 'completion');
+      successUrl.searchParams.set('success', 'true');
+      successUrl.searchParams.set('plan', selectedPlan);
+      successUrl.searchParams.set('target', '_top');
+      
+      // Add a query parameter to identify this is a redirect from payment
+      successUrl.searchParams.set('from', 'payment');
+      
+      // Error redirect URL
+      const errorUrl = new URL(baseUrl);
+      errorUrl.searchParams.set('step', 'payment');
+      errorUrl.searchParams.set('error', 'true');
+      errorUrl.searchParams.set('plan', selectedPlan);
+      errorUrl.searchParams.set('target', '_top');
 
       // Prepare payload based on whether user is logged in or not
       const payload = {
@@ -61,8 +73,8 @@ export const usePaymentInitialization = (
         fullName: fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName || '',
         email: email || user?.email || registrationData?.email || '',
         operationType,
-        successRedirectUrl: successUrl,
-        errorRedirectUrl: errorUrl,
+        successRedirectUrl: successUrl.toString(),
+        errorRedirectUrl: errorUrl.toString(),
         // Include registration data for account creation after payment
         registrationData: registrationData,
         // Add indicator we're in payment step to ensure proper flow
@@ -106,31 +118,43 @@ export const usePaymentInitialization = (
           sessionStorage.setItem('payment_lowprofile_id', data.lowProfileId);
         }
         
-        // Ensure the target=_top parameter is present to force the iframe to break out to the top window
+        // Ensure the URL has all required parameters for proper redirection
         const finalUrl = new URL(data.url);
         
-        // Ensure we're always breaking out of the iframe on redirect
+        // Make sure breaking out of iframe parameters are added
         finalUrl.searchParams.set('target', '_top');
+        finalUrl.searchParams.set('iframe', '0');
+        finalUrl.searchParams.set('PopUp', '0');
         
-        // Also ensure the success and error redirect URLs have target=_top and include lpId
+        // Add the lowProfileId to the success URL
         let successRedirectUrl = finalUrl.searchParams.get('successRedirectUrl') || '';
         let errorRedirectUrl = finalUrl.searchParams.get('errorRedirectUrl') || '';
         
-        // Add lowProfileId to success URL
-        const successUrlObj = new URL(successRedirectUrl);
-        successUrlObj.searchParams.set('lpId', data.lowProfileId);
-        successUrlObj.searchParams.set('target', '_top');
-        finalUrl.searchParams.set('successRedirectUrl', successUrlObj.toString());
+        // Update the success redirect URL to include the lowProfileId
+        try {
+          const successUrlObj = new URL(successRedirectUrl);
+          successUrlObj.searchParams.set('lpId', data.lowProfileId);
+          successUrlObj.searchParams.set('target', '_top');
+          finalUrl.searchParams.set('successRedirectUrl', successUrlObj.toString());
+        } catch (e) {
+          console.error('Error processing success URL:', e);
+          // Fallback to adding query parameters directly
+          successRedirectUrl += `${successRedirectUrl.includes('?') ? '&' : '?'}lpId=${data.lowProfileId}&target=_top`;
+          finalUrl.searchParams.set('successRedirectUrl', successRedirectUrl);
+        }
         
-        // Add lowProfileId to error URL
-        const errorUrlObj = new URL(errorRedirectUrl);
-        errorUrlObj.searchParams.set('lpId', data.lowProfileId);
-        errorUrlObj.searchParams.set('target', '_top');
-        finalUrl.searchParams.set('errorRedirectUrl', errorUrlObj.toString());
-        
-        // Add extra parameters to ensure we break out of any iframes
-        finalUrl.searchParams.set('iframe', '0');
-        finalUrl.searchParams.set('PopUp', '0');
+        // Update the error redirect URL
+        try {
+          const errorUrlObj = new URL(errorRedirectUrl);
+          errorUrlObj.searchParams.set('lpId', data.lowProfileId);
+          errorUrlObj.searchParams.set('target', '_top');
+          finalUrl.searchParams.set('errorRedirectUrl', errorUrlObj.toString());
+        } catch (e) {
+          console.error('Error processing error URL:', e);
+          // Fallback to adding query parameters directly
+          errorRedirectUrl += `${errorRedirectUrl.includes('?') ? '&' : '?'}lpId=${data.lowProfileId}&target=_top`;
+          finalUrl.searchParams.set('errorRedirectUrl', errorRedirectUrl);
+        }
         
         setPaymentUrl(finalUrl.toString());
       } else {

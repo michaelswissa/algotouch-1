@@ -20,9 +20,6 @@ export const usePaymentUrlParams = (
   });
 
   useEffect(() => {
-    // Check if we're on the correct step before processing payment URL params
-    const sessionData = sessionStorage.getItem('subscription_flow');
-    
     // Get URL parameters immediately regardless of session status
     const params = new URLSearchParams(window.location.search);
     const stepParam = params.get('step');
@@ -38,43 +35,54 @@ export const usePaymentUrlParams = (
       error,
       regId,
       lpId,
-      forceRedirect,
-      sessionData: sessionData ? JSON.parse(sessionData) : null
+      forceRedirect
     });
     
-    // Immediately check if success=true is in the URL and force completion
+    // CRITICAL: Immediately check if success=true is in the URL and force completion
     if (success === 'true') {
       console.log('Success=true detected in URL, forcing completion step');
       
       // Create or update session data to completion step
-      let parsedSession = sessionData 
-        ? JSON.parse(sessionData) 
-        : { step: 'plan-selection' };
-      
-      parsedSession.step = 'completion';
-      sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-      
-      // Set payment as successful in state
-      setPaymentStatus({
-        success: true,
-        error: false,
-        regId,
-        lpId
-      });
-      
-      // If we have a lowProfileId, we need to verify the payment
-      if (lpId) {
-        console.log('Payment success with lowProfileId, verifying payment:', lpId);
-        verifyPaymentAndCompleteRegistration(lpId, regId || null, onPaymentComplete, setIsLoading);
-      } else if (regId) {
-        console.log('Payment success with registration ID, processing registration');
-        // Need to verify payment and complete registration with regId
-        retrieveAndProcessRegistrationData(regId, onPaymentComplete, setIsLoading);
-      } else {
-        console.log('Payment success without verification parameters');
-        toast.success('התשלום התקבל בהצלחה!');
+      try {
+        // Get session data if available
+        const sessionData = sessionStorage.getItem('subscription_flow');
+        let parsedSession = sessionData 
+          ? JSON.parse(sessionData) 
+          : { step: 'completion' };
         
-        // Call payment complete with a small delay to ensure state is updated
+        // Always force to completion step when success=true
+        parsedSession.step = 'completion';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        
+        // Set payment as successful in state
+        setPaymentStatus({
+          success: true,
+          error: false,
+          regId,
+          lpId
+        });
+        
+        // If we have a lowProfileId, we need to verify the payment
+        if (lpId) {
+          console.log('Payment success with lowProfileId, verifying payment:', lpId);
+          verifyPaymentAndCompleteRegistration(lpId, regId || null, onPaymentComplete, setIsLoading);
+        } else if (regId) {
+          console.log('Payment success with registration ID, processing registration');
+          // Need to verify payment and complete registration with regId
+          retrieveAndProcessRegistrationData(regId, onPaymentComplete, setIsLoading);
+        } else {
+          console.log('Payment success without verification parameters');
+          toast.success('התשלום התקבל בהצלחה!');
+          
+          // Call payment complete with a small delay to ensure state is updated
+          setTimeout(() => {
+            onPaymentComplete();
+          }, 300);
+        }
+      } catch (e) {
+        console.error('Error processing success URL parameters:', e);
+        // Still attempt to complete payment even if session data processing fails
+        toast.success('התשלום התקבל בהצלחה!');
         setTimeout(() => {
           onPaymentComplete();
         }, 300);
@@ -83,8 +91,11 @@ export const usePaymentUrlParams = (
       return; // Exit early after handling success=true
     }
     
+    // Check session data for other URL parameter processing
+    const sessionData = sessionStorage.getItem('subscription_flow');
+    
     if (!sessionData) {
-      console.log('No session data found, skipping payment URL parameter processing');
+      console.log('No session data found, skipping additional URL parameter processing');
       return;
     }
     
@@ -96,7 +107,7 @@ export const usePaymentUrlParams = (
         params: Object.fromEntries(params.entries())
       });
       
-      // Special case: Force completion step
+      // Special case: Force completion step if specified in URL
       if (stepParam === 'completion') {
         console.log('Forcing completion step based on URL parameter');
         parsedSession.step = 'completion';
@@ -114,8 +125,7 @@ export const usePaymentUrlParams = (
       }
       
       // Check if we're in an iframe and handle breaking out
-      const isIframe = window !== window.top;
-      if (isIframe) {
+      if (window !== window.top) {
         console.log('Detected we are in iframe, handling parent window navigation');
         
         // If success or error is detected in iframe, always redirect the parent window
@@ -135,7 +145,8 @@ export const usePaymentUrlParams = (
               type: 'cardcom_redirect',
               url: currentUrl.toString(),
               success: success === 'true',
-              forceRedirect: true
+              forceRedirect: true,
+              lpId
             }, '*');
             
             // Also attempt direct navigation
@@ -147,7 +158,6 @@ export const usePaymentUrlParams = (
             }
             
             console.log('Sent redirect message to parent window:', currentUrl.toString());
-            return; // Stop processing to avoid duplicate calls
           } catch (err) {
             console.error('Error redirecting parent window:', err);
           }
@@ -162,7 +172,6 @@ export const usePaymentUrlParams = (
           error: true,
           errorMessage: 'התשלום נכשל, אנא נסה שנית'
         });
-        return; // Exit early after handling error
       }
       
     } catch (error) {
