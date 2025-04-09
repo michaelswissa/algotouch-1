@@ -5,21 +5,19 @@ import PlanDetailsSummary from './PlanDisplay';
 import { Diamond } from 'lucide-react';
 
 interface PaymentSectionHeaderProps {
-  selectedPlan: string;
-  getPlanDetails: () => {
-    name: string;
-    price: string;
-    description: string;
-    info: string;
-  };
+  planName: string;
+  planDescription: string;
+  planPrice: string;
+  onBack: () => void;
 }
 
 const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({ 
-  selectedPlan,
-  getPlanDetails 
+  planName,
+  planDescription,
+  planPrice,
+  onBack
 }) => {
-  const planDetails = getPlanDetails();
-  const isMonthlyPlan = selectedPlan === 'monthly';
+  const isMonthlyPlan = planName === 'חודשי';
 
   return (
     <CardHeader className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pt-6 pb-4 border-b border-primary/20" dir="rtl">
@@ -41,7 +39,15 @@ const PaymentSectionHeader: React.FC<PaymentSectionHeaderProps> = ({
       </div>
       
       {/* Premium plan summary with improved value proposition */}
-      <PlanDetailsSummary planDetails={planDetails} isMonthlyPlan={isMonthlyPlan} />
+      <PlanDetailsSummary 
+        planDetails={{
+          name: planName,
+          price: planPrice,
+          description: planDescription,
+          info: isMonthlyPlan ? 'החיוב הראשון לאחר 30 יום' : 'חיוב מיידי'
+        }} 
+        isMonthlyPlan={isMonthlyPlan} 
+      />
     </CardHeader>
   );
 };

@@ -6,16 +6,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ShieldCheck, ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface PaymentSectionFooterProps {
-  isLoading: boolean;
-  isMonthlyPlan: boolean;
+  planName: string;
   onBack: () => void;
 }
 
 const PaymentSectionFooter: React.FC<PaymentSectionFooterProps> = ({ 
-  isLoading, 
-  isMonthlyPlan, 
+  planName, 
   onBack 
 }) => {
+  const isMonthlyPlan = planName === 'חודשי';
+  
   return (
     <CardFooter className="flex flex-col sm:flex-row justify-between py-4 px-5 border-t border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
       <Button 
@@ -43,7 +43,6 @@ const PaymentSectionFooter: React.FC<PaymentSectionFooterProps> = ({
         <Button 
           size="lg"
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-95 hover:scale-[1.03] shadow-[0_4px_16px_-4px_rgba(0,102,255,0.4)] transition-all group"
-          disabled={isLoading}
         >
           <span>{isMonthlyPlan ? 'התחל תקופת ניסיון' : 'המשך לתשלום'}</span>
           <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
