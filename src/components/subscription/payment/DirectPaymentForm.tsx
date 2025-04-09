@@ -111,6 +111,8 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         console.error('Error parsing registration data:', e);
       }
       
+      console.log('Calling direct-payment/process edge function...');
+      
       // Process payment via server-side Edge function
       const { data, error } = await supabase.functions.invoke('direct-payment/process', {
         body: {
@@ -127,10 +129,12 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       
       if (error) {
         console.error('Payment processing error:', error);
-        toast.error('אירעה שגיאה בעיבוד התשלום');
+        toast.error(`אירעה שגיאה בעיבוד התשלום: ${error.message}`);
         setIsProcessing(false);
         return;
       }
+      
+      console.log('Payment process response:', data);
       
       if (!data.success) {
         toast.error(data.error || 'אירעה שגיאה בעיבוד התשלום');

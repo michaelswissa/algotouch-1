@@ -25,17 +25,15 @@ function handleCors(req: Request) {
 
 // CardCom API configuration
 const API_CONFIG = {
-  TERMINAL: Deno.env.get('CARDCOM_TERMINAL'),
-  USERNAME: Deno.env.get('CARDCOM_USERNAME'),
-  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD'),
+  TERMINAL: "160138", // Your terminal number
+  USERNAME: "bLaocQRMSnwphQRUVG3b", // Your API username
+  PASSWORD: "i9nr6caGbgheTdYfQbo6", // Your API password
   BASE_URL: 'https://secure.cardcom.solutions/api/v11',
 };
 
 // Log configuration for debugging (without exposing sensitive values)
-console.log('CardCom API configuration initialized with terminal:', 
-  API_CONFIG.TERMINAL ? '[terminal configured]' : '[terminal missing]');
-console.log('CardCom API credentials status:',
-  (API_CONFIG.USERNAME && API_CONFIG.PASSWORD) ? '[credentials configured]' : '[credentials missing]');
+console.log('CardCom API configuration initialized with terminal:', API_CONFIG.TERMINAL);
+console.log('CardCom API credentials status: [credentials configured]');
 
 // CardCom operation types
 enum OperationType {
@@ -57,11 +55,6 @@ async function processDirectPayment(params: any) {
     customAmount,
     registrationData
   } = params;
-  
-  // Validate required configuration
-  if (!API_CONFIG.TERMINAL || !API_CONFIG.USERNAME || !API_CONFIG.PASSWORD) {
-    throw new Error('Missing CardCom configuration. Please check environment variables.');
-  }
   
   // Validate required card details
   if (!cardDetails || !cardDetails.cardNumber || !cardDetails.expiryDate || !cardDetails.cvv) {
@@ -155,7 +148,7 @@ async function processDirectPayment(params: any) {
     
     // Call Cardcom API to process the transaction directly
     const payload = {
-      TerminalNumber: parseInt(API_CONFIG.TERMINAL!),
+      TerminalNumber: parseInt(API_CONFIG.TERMINAL),
       ApiName: API_CONFIG.USERNAME,
       ApiPassword: API_CONFIG.PASSWORD,
       Amount: amount,
@@ -191,13 +184,18 @@ async function processDirectPayment(params: any) {
       body: JSON.stringify(payload),
     });
     
+    // Log the request result status
+    console.log('CardCom API response status:', response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`CardCom API error: ${response.status}`, errorText);
       throw new Error(`CardCom API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
     // Parse the response
     const result = await response.json();
+    console.log('CardCom API response data:', result);
     
     // Check for API errors
     if (result.ResponseCode !== 0) {
