@@ -123,27 +123,41 @@ export async function handlePaymentDocumentGeneration(
   planType: string
 ): Promise<{ success: boolean; documentUrl?: string; error?: any }> {
   try {
-    // Get user information
-    const { data: userData, error: userError } = await supabase
+    // Get user information - we'll properly handle possible errors here
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('first_name, last_name, email, phone')
+      .select('first_name, last_name, phone')
       .eq('id', userId)
       .single();
       
-    if (userError) {
-      console.error('Error fetching user profile:', userError);
+    // Get user email from auth table regardless of profile error
+    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+    
+    if (authError) {
+      console.error('Error fetching user auth data:', authError);
       return { success: false, error: 'שגיאה בטעינת פרטי משתמש' };
     }
     
-    if (!userData) {
-      console.warn('User profile not found for document generation', { userId });
-      return { success: false, error: 'פרופיל משתמש לא נמצא' };
+    // Initialize email and name with safe defaults
+    let email = '';
+    let fullName = '';
+    let phone = '';
+    
+    // If we have auth data, use the email from there
+    if (authData?.user) {
+      email = authData.user.email || '';
     }
     
-    // Get user email from auth table if not in profile
-    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
-    const email = userData?.email || authData?.user?.email || '';
-    const fullName = `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim();
+    // If we have profile data, use names from there
+    if (profileData && !profileError) {
+      fullName = `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim();
+      phone = profileData.phone || '';
+    }
+    
+    // If we don't have a profile or there was an error, we still try to proceed with what we have
+    if (profileError) {
+      console.warn('Could not fetch profile data, continuing with limited information:', profileError.message);
+    }
     
     // Generate appropriate document based on plan type
     const documentType = planType === 'vip' ? 'receipt' : 'invoice';
@@ -156,7 +170,7 @@ export async function handlePaymentDocumentGeneration(
       email,
       fullName,
       documentType,
-      phone: userData?.phone || ''
+      phone
     });
     
     if (!success) throw error;
