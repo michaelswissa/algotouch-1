@@ -57,18 +57,18 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   }, []);
 
   const handlePaymentProcessing = async (tokenData: TokenData) => {
+    // Define operationTypeValue at the beginning of the function to ensure it's available throughout
+    let operationTypeValue = 3; // Default: token creation only (for monthly subscription with free trial)
+    
+    if (planId === 'annual') {
+      operationTypeValue = 2; // Charge and create token for recurring annual payments
+    } else if (planId === 'vip') {
+      operationTypeValue = 1; // Charge only - one-time payment
+    }
+    
     try {
       setIsProcessing(true);
       setPaymentError(null);
-      
-      // Define operationTypeValue here before using it
-      let operationTypeValue = 3; // Default: token creation only (for monthly subscription with free trial)
-      
-      if (planId === 'annual') {
-        operationTypeValue = 2; // Charge and create token for recurring annual payments
-      } else if (planId === 'vip') {
-        operationTypeValue = 1; // Charge only - one-time payment
-      }
       
       if (user) {
         await handleExistingUserPayment(user.id, planId, tokenData, operationTypeValue, planDetails);
@@ -165,6 +165,15 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   };
 
   const handleExternalPayment = async () => {
+    // Define operationTypeValue at the beginning of this function for its scope
+    let operationTypeValue = 3; // Default: token creation only
+    
+    if (planId === 'annual') {
+      operationTypeValue = 2; // Charge and create token for recurring payments
+    } else if (planId === 'vip') {
+      operationTypeValue = 1; // Charge only - one-time payment
+    }
+    
     setIsProcessing(true);
     try {
       const data = await initiateExternalPayment(planId, user, registrationData);
@@ -175,15 +184,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       window.location.href = data.url;
     } catch (error: any) {
-      // Define operationTypeValue for this scope as well
-      let operationTypeValue = 3; // Default: token creation only
-      
-      if (planId === 'annual') {
-        operationTypeValue = 2; // Charge and create token for recurring payments
-      } else if (planId === 'vip') {
-        operationTypeValue = 1; // Charge only - one-time payment
-      }
-      
       const errorInfo = await handleError(error, {
         planId,
         operationType: operationTypeValue,
