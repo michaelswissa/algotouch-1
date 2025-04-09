@@ -3,8 +3,6 @@ import React from 'react';
 import ContractSection from '@/components/subscription/ContractSection';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-import { downloadContract } from '@/lib/contracts/izidoc-service';
-import { saveContractToLocalStorage, sendContractConfirmationEmail } from '@/lib/contracts/email-service';
 
 interface ContractViewProps {
   selectedPlan: string;
@@ -44,8 +42,7 @@ const ContractView: React.FC<ContractViewProps> = ({
     console.log('Contract signing initiated', { 
       hasUserId: !!user?.id, 
       isRegistering, 
-      planId: selectedPlan,
-      hasContractHtml: !!contractData.contractHtml
+      planId: selectedPlan 
     });
     
     // Add the plan ID to the contract data
@@ -70,63 +67,16 @@ const ContractView: React.FC<ContractViewProps> = ({
       try {
         // Parse registration data to update with contract info
         const parsedRegistrationData = JSON.parse(registrationData);
-        
-        // Save contract locally in localStorage as backup
-        if (enhancedContractData.contractHtml) {
-          saveContractToLocalStorage(enhancedContractData.tempContractId, enhancedContractData.contractHtml);
-          
-          // For registering users, also send the contract via email right away as a backup
-          if (parsedRegistrationData.email) {
-            console.log('Sending immediate contract confirmation email for registering user');
-            sendContractConfirmationEmail(
-              parsedRegistrationData.email, 
-              fullName, 
-              new Date().toISOString(),
-              enhancedContractData.contractHtml,
-              enhancedContractData.tempContractId
-            );
-          }
-        }
-        
         parsedRegistrationData.contractDetails = enhancedContractData;
         parsedRegistrationData.planId = selectedPlan;
-        parsedRegistrationData.contractSigned = true;
-        parsedRegistrationData.contractSignedAt = new Date().toISOString();
-        
-        // Store updated registration data
         sessionStorage.setItem('registration_data', JSON.stringify(parsedRegistrationData));
         console.log('Updated registration data with contract details');
-        
-        // Offer to download the contract
-        if (enhancedContractData.contractHtml) {
-          const shouldDownload = window.confirm('האם ברצונך להוריד עותק של החוזה החתום?');
-          if (shouldDownload) {
-            downloadContract(enhancedContractData.contractHtml, fullName);
-          }
-        }
       } catch (error) {
         console.error('Error updating registration data with contract:', error);
         // Continue with the flow even if this fails
-        
-        // Still try to download the contract
-        if (enhancedContractData.contractHtml) {
-          const shouldDownload = window.confirm('האם ברצונך להוריד עותק של החוזה החתום?');
-          if (shouldDownload) {
-            downloadContract(enhancedContractData.contractHtml, fullName);
-          }
-        }
       }
-    } else if (user && enhancedContractData.contractHtml) {
+    } else {
       console.log('User is authenticated, using regular contract flow');
-      
-      // For authenticated users, save locally as backup
-      saveContractToLocalStorage(`user_${user.id}_${Date.now()}`, enhancedContractData.contractHtml);
-      
-      // Also offer to download right away
-      const shouldDownload = window.confirm('האם ברצונך להוריד עותק של החוזה החתום?');
-      if (shouldDownload) {
-        downloadContract(enhancedContractData.contractHtml, fullName);
-      }
     }
     
     console.log('Contract signed, sending data to parent component', { 
