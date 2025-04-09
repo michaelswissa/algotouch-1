@@ -36,6 +36,10 @@ export const usePaymentUrlParams = (
       if (error === 'true') {
         toast.error('התשלום נכשל, אנא נסה שנית');
       } else if (success === 'true') {
+        // Force the step to payment while we verify
+        parsedSession.step = 'payment';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        
         // If we have a lowProfileId, we need to verify the payment
         if (lpId) {
           console.log('Payment success with lowProfileId, verifying payment:', lpId);

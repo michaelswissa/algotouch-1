@@ -90,6 +90,15 @@ export const usePaymentProcessing = () => {
           
           if (registerResult.success) {
             toast.success('ההרשמה והתשלום הושלמו בהצלחה!');
+            
+            // Ensure we move to completion step in the session flow
+            const sessionData = sessionStorage.getItem('subscription_flow');
+            if (sessionData) {
+              const parsedSession = JSON.parse(sessionData);
+              parsedSession.step = 'completion';
+              sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+            }
+            
             onComplete();
           } else {
             toast.error('ההרשמה נכשלה, אנא נסה שנית');
@@ -122,6 +131,19 @@ export const usePaymentProcessing = () => {
       
       console.log('Payment verified successfully:', paymentData);
       
+      // Check if the transaction was actually approved
+      if (!paymentData.paymentDetails?.transactionStatus || paymentData.paymentDetails.transactionStatus !== "Approved") {
+        throw new Error('העסקה לא אושרה: ' + (paymentData.paymentDetails?.transactionStatus || 'Unknown status'));
+      }
+      
+      // Ensure session data reflects completion step
+      const sessionData = sessionStorage.getItem('subscription_flow');
+      if (sessionData) {
+        const parsedSession = JSON.parse(sessionData);
+        parsedSession.step = 'completion';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+      }
+      
       // Process registration data if available
       if (registrationId) {
         await processRegistrationWithPayment(registrationId, paymentData, onComplete);
@@ -133,6 +155,14 @@ export const usePaymentProcessing = () => {
     } catch (error: any) {
       console.error('Error verifying payment:', error);
       toast.error(error.message || 'שגיאה באימות התשלום');
+      
+      // Make sure we stay on payment step if verification failed
+      const sessionData = sessionStorage.getItem('subscription_flow');
+      if (sessionData) {
+        const parsedSession = JSON.parse(sessionData);
+        parsedSession.step = 'payment';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+      }
     } finally {
       setIsLoading(false);
     }

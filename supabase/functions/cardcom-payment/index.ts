@@ -342,7 +342,9 @@ serve(async (req) => {
         planId, 
         userId: userId || (user?.id || 'anonymous'), 
         email: email || user?.email || 'anonymous',
-        hasRegistrationData: !!registrationData
+        hasRegistrationData: !!registrationData,
+        successRedirectUrl,
+        errorRedirectUrl
       });
       
       // Store registration data temporarily if provided
@@ -393,8 +395,8 @@ serve(async (req) => {
           planId,
           amount,
           operationType,
-          successUrl: `${successRedirectUrl}${tempRegistrationId ? `&regId=${tempRegistrationId}` : ''}&lpId=${sessionResult.lowProfileId}`,
-          errorUrl: `${errorRedirectUrl}&lpId=${sessionResult.lowProfileId}`,
+          successUrl: successRedirectUrl,
+          errorUrl: errorRedirectUrl,
           webHookUrl: webhookUrl,
           returnValue: tempRegistrationId || 'direct-payment',
           cardOwnerName: fullName,
@@ -402,11 +404,37 @@ serve(async (req) => {
           cardOwnerPhone: registrationData?.userData?.phone
         });
         
+        // Add the lowProfileId to the success URL
+        let finalSuccessUrl = successRedirectUrl;
+        if (finalSuccessUrl.includes('?')) {
+          finalSuccessUrl += `&lpId=${sessionResult.lowProfileId}`;
+        } else {
+          finalSuccessUrl += `?lpId=${sessionResult.lowProfileId}`;
+        }
+        
+        // Add registration ID if we have one
+        if (tempRegistrationId) {
+          finalSuccessUrl += `&regId=${tempRegistrationId}`;
+        }
+        
+        // Modify the payment URL to use our custom URL parameters
+        const paymentUrl = new URL(sessionResult.url);
+        paymentUrl.searchParams.set('successRedirectUrl', finalSuccessUrl);
+        
+        // Ensure error URL also includes the lowProfileId
+        let finalErrorUrl = errorRedirectUrl;
+        if (finalErrorUrl.includes('?')) {
+          finalErrorUrl += `&lpId=${sessionResult.lowProfileId}`;
+        } else {
+          finalErrorUrl += `?lpId=${sessionResult.lowProfileId}`;
+        }
+        paymentUrl.searchParams.set('errorRedirectUrl', finalErrorUrl);
+        
         return new Response(
           JSON.stringify({
             success: true,
             lowProfileId: sessionResult.lowProfileId,
-            url: sessionResult.url,
+            url: paymentUrl.toString(),
             tempRegistrationId
           }),
           {

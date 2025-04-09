@@ -30,12 +30,17 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
         
         // Handle payment status messages from the iframe
         if (data.type === 'payment_status') {
-          console.log('Received payment status:', data);
+          console.log('Received payment status from iframe:', data);
           
           if (data.status === 'success') {
             // Handle successful payment
             console.log('Payment successful in iframe');
             // We'll let the URL parameters handle the success redirect
+            if (data.lowProfileId) {
+              // If we have a lowProfileId, redirect to our success URL
+              const baseUrl = `${window.location.origin}/subscription`;
+              window.location.href = `${baseUrl}?step=completion&success=true&lpId=${data.lowProfileId}`;
+            }
           } else if (data.status === 'error') {
             // Handle payment error
             console.error('Payment error in iframe:', data.error);

@@ -46,6 +46,13 @@ export const usePaymentInitialization = (
         return;
       }
 
+      // Create base URLs for success and error redirects
+      const baseUrl = `${window.location.origin}/subscription`;
+      
+      // Critical fix: Make sure the success redirect URL goes to completion step, not step=4
+      const successUrl = `${baseUrl}?step=completion&success=true&plan=${selectedPlan}`;
+      const errorUrl = `${baseUrl}?step=payment&error=true&plan=${selectedPlan}`;
+
       // Prepare payload based on whether user is logged in or not
       const payload = {
         planId: selectedPlan,
@@ -53,8 +60,8 @@ export const usePaymentInitialization = (
         fullName: fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName || '',
         email: email || user?.email || registrationData?.email || '',
         operationType,
-        successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${selectedPlan}`,
-        errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${selectedPlan}`,
+        successRedirectUrl: successUrl,
+        errorRedirectUrl: errorUrl,
         // Include registration data for account creation after payment
         registrationData: registrationData
       };
@@ -68,6 +75,8 @@ export const usePaymentInitialization = (
       }
 
       if (data?.url) {
+        console.log('Payment URL created:', data);
+        
         // Store temporary registration ID if available
         if (data.tempRegistrationId) {
           localStorage.setItem('temp_registration_id', data.tempRegistrationId);
