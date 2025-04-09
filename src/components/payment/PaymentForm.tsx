@@ -5,6 +5,7 @@ import { CreditCard, ShieldCheck } from 'lucide-react';
 import { usePaymentProcess } from './hooks/usePaymentProcess';
 import PaymentErrorCard from './PaymentErrorCard';
 import PaymentCardForm from './PaymentCardForm';
+import ErrorRecoveryInfo from './ErrorRecoveryInfo';
 
 interface PaymentFormProps {
   planId: string;
@@ -16,9 +17,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     isProcessing,
     registrationData,
     registrationError,
+    paymentError,
     loadRegistrationData,
     handleSubmit,
     handleExternalPayment,
+    isRecovering,
     plan
   } = usePaymentProcess({ planId, onPaymentComplete });
 
@@ -49,6 +52,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
           </div>
         </div>
       </CardHeader>
+      
+      <ErrorRecoveryInfo 
+        error={paymentError?.message}
+        isRecovering={isRecovering}
+      />
       
       <PaymentCardForm
         plan={plan}

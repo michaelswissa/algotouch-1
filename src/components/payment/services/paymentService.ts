@@ -1,8 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { TokenData } from '../utils/paymentHelpers';
 import { RegistrationResult } from '../hooks/types';
 import { toast } from 'sonner'; 
+import { handlePaymentError, logPaymentError } from '../utils/errorHandling';
 
 export const handleExistingUserPayment = async (
   userId: string,
@@ -23,97 +23,113 @@ export const handleExistingUserPayment = async (
     periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
   }
   
-  const { error: subscriptionError } = await supabase
-    .from('subscriptions')
-    .upsert({
-      user_id: userId,
-      plan_type: planId,
-      status: planId === 'monthly' ? 'trial' : 'active',
-      trial_ends_at: trialEndsAt?.toISOString() || null,
-      current_period_ends_at: periodEndsAt?.toISOString() || null,
-      payment_method: tokenData,
-      contract_signed: true,
-      contract_signed_at: now.toISOString()
-    });
-  
-  if (subscriptionError) {
-    throw new Error(`שגיאה בעדכון מנוי: ${subscriptionError.message}`);
-  }
-  
-  const price = planDetails[planId as keyof typeof planDetails]?.price || 0;
-  
-  if (planId !== 'monthly' || operationType !== 3) {
-    // Create payment history record
-    const { data: paymentData, error: paymentError } = await supabase
-      .from('payment_history')
-      .insert({
+  try {
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .upsert({
         user_id: userId,
-        subscription_id: userId,
-        amount: price,
-        currency: 'USD',
-        status: 'completed',
-        payment_method: {
-          ...tokenData,
-          simulated: false 
-        }
-      })
-      .select()
-      .single();
-      
-    if (paymentError) {
-      console.error('Payment record creation error:', paymentError);
-      throw paymentError;
+        plan_type: planId,
+        status: planId === 'monthly' ? 'trial' : 'active',
+        trial_ends_at: trialEndsAt?.toISOString() || null,
+        current_period_ends_at: periodEndsAt?.toISOString() || null,
+        payment_method: tokenData,
+        contract_signed: true,
+        contract_signed_at: now.toISOString()
+      });
+    
+    if (subscriptionError) {
+      throw new Error(`שגיאה בעדכון מנוי: ${subscriptionError.message}`);
     }
     
-    // Get user information for document generation
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('first_name, last_name, phone')
-      .eq('id', userId)
-      .single();
+    const price = planDetails[planId as keyof typeof planDetails]?.price || 0;
     
-    // Get user email from auth
-    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
-    
-    if (profileError) {
-      console.error('Error fetching profile data for document:', profileError);
-      // Continue despite the error, we'll use fallback values
-    }
-    
-    // Use optional chaining and nullish coalescing for safety
-    const userEmail = authData?.user?.email || '';
-    const userName = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : '';
-    
-    // Generate invoice/receipt
-    try {
-      await supabase.functions.invoke('generate-document/generate', {
-        body: {
-          paymentId: paymentData.id,
-          userId: userId,
+    if (planId !== 'monthly' || operationType !== 3) {
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: userId,
           amount: price,
-          planType: planId,
-          email: userEmail,
-          fullName: userName,
-          documentType: 'invoice', // For initial payment we generate invoice
-          phone: profileData?.phone || ''
+          currency: 'USD',
+          status: 'completed',
+          payment_method: {
+            ...tokenData,
+            simulated: false 
+          }
+        })
+        .select()
+        .single();
+        
+      if (paymentError) {
+        console.error('Payment record creation error:', paymentError);
+        throw paymentError;
+      }
+      
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, phone')
+        .eq('id', userId)
+        .single();
+      
+      const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+      
+      let userEmail = '';
+      let userName = '';
+      let userPhone = '';
+      
+      if (profileError) {
+        console.error('Error fetching profile data for document:', profileError);
+        if (authData?.user?.email) {
+          userEmail = authData.user.email;
         }
-      });
-    } catch (docError) {
-      console.error('Error generating document:', docError);
-      // Continue with the flow even if document generation fails
-      // We can implement retry logic or queue mechanism in a production app
+      } else {
+        userEmail = authData?.user?.email || '';
+        userName = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : '';
+        userPhone = profileData?.phone || '';
+      }
+      
+      try {
+        await supabase.functions.invoke('generate-document/generate', {
+          body: {
+            paymentId: paymentData.id,
+            userId: userId,
+            amount: price,
+            planType: planId,
+            email: userEmail,
+            fullName: userName,
+            documentType: 'invoice',
+            phone: userPhone
+          }
+        });
+      } catch (docError) {
+        console.error('Error generating document:', docError);
+        logPaymentError(docError, userId, 'document-generation', { 
+          paymentId: paymentData.id,
+          userId: userId 
+        });
+      }
+    } else {
+      await supabase
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: userId,
+          amount: 0,
+          currency: 'USD',
+          status: 'trial_started',
+          payment_method: tokenData
+        });
     }
-  } else {
-    await supabase
-      .from('payment_history')
-      .insert({
-        user_id: userId,
-        subscription_id: userId,
-        amount: 0,
-        currency: 'USD',
-        status: 'trial_started',
-        payment_method: tokenData
-      });
+  } catch (error) {
+    await handlePaymentError(error, userId, undefined, undefined, {
+      paymentDetails: {
+        userId,
+        planId,
+        operationType
+      }
+    });
+    
+    throw error;
   }
 };
 
@@ -168,62 +184,88 @@ export const initiateExternalPayment = async (
   user: any, 
   registrationData: any
 ) => {
-  let operationType = 3; // Default: token creation only (for monthly with free trial)
-  
-  if (planId === 'annual') {
-    operationType = 2; // Charge and create token for recurring payments
-  } else if (planId === 'vip') {
-    operationType = 1; // Charge only for one-time payment
+  try {
+    let operationType = 3; // Default: token creation only (for monthly with free trial)
+    
+    if (planId === 'annual') {
+      operationType = 2; // Charge and create token for recurring payments
+    } else if (planId === 'vip') {
+      operationType = 1; // Charge only for one-time payment
+    }
+
+    const userInfo = user 
+      ? { userId: user.id, email: user.email }
+      : registrationData
+        ? { 
+            fullName: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim(),
+            email: registrationData.email,
+            registrationData
+          }
+        : { fullName: '', email: '' };
+
+    const paymentSessionId = crypto.randomUUID();
+
+    const payload = {
+      planId,
+      ...userInfo,
+      operationType,
+      paymentSessionId,
+      successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${planId}`,
+      errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${planId}&session=${paymentSessionId}`
+    };
+
+    const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
+      body: payload
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.url) {
+      throw new Error('לא התקבלה כתובת תשלום מהשרת');
+    }
+    
+    if (user?.id || registrationData) {
+      await supabase.from('payment_sessions').insert({
+        id: paymentSessionId,
+        user_id: user?.id || null,
+        email: user?.email || registrationData?.email || null,
+        plan_id: planId,
+        payment_details: payload,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      });
+    }
+    
+    return {
+      ...data,
+      sessionId: paymentSessionId
+    };
+  } catch (error) {
+    await handlePaymentError(error, user?.id, user?.email, undefined, {
+      paymentDetails: {
+        planId, 
+        userId: user?.id,
+        hasRegistrationData: !!registrationData
+      }
+    });
+    
+    throw error;
   }
-
-  const userInfo = user 
-    ? { userId: user.id, email: user.email }
-    : registrationData
-      ? { 
-          fullName: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim(),
-          email: registrationData.email,
-          registrationData
-        }
-      : { fullName: '', email: '' };
-
-  const payload = {
-    planId,
-    ...userInfo,
-    operationType,
-    successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${planId}`,
-    errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${planId}`
-  };
-
-  const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
-    body: payload
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data?.url) {
-    throw new Error('לא התקבלה כתובת תשלום מהשרת');
-  }
-  
-  return data;
 };
 
-// New function to request document generation manually
 export const generateDocument = async (
   userId: string,
   paymentId: string,
   documentType: 'invoice' | 'receipt' = 'receipt'
 ) => {
   try {
-    // Fetch needed data
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('first_name, last_name, phone')
       .eq('id', userId)
       .single();
     
-    // Get user email from auth
     const { data: authData, error: authError } = await supabase.auth.getUser(userId);
     
     if (profileError) {
@@ -247,7 +289,6 @@ export const generateDocument = async (
       throw new Error('שגיאה בטעינת פרטי תשלום');
     }
     
-    // Get subscription plan type
     const { data: subscriptionData, error: subError } = await supabase
       .from('subscriptions')
       .select('plan_type')
@@ -259,13 +300,11 @@ export const generateDocument = async (
       throw new Error('שגיאה בטעינת פרטי מנוי');
     }
     
-    // Safe access with optional chaining and nullish coalescing
     const userEmail = authData?.user?.email || '';
     const userName = profileData 
       ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() 
       : '';
     
-    // Call document generation
     const { data, error } = await supabase.functions.invoke('generate-document/generate', {
       body: {
         paymentId,
@@ -288,7 +327,6 @@ export const generateDocument = async (
   }
 };
 
-// Function to list user's documents
 export const listUserDocuments = async (userId: string) => {
   try {
     const { data, error } = await supabase.functions.invoke('generate-document/list', {
@@ -300,6 +338,98 @@ export const listUserDocuments = async (userId: string) => {
     return { success: true, documents: data?.documents || [] };
   } catch (error: any) {
     console.error('Error listing documents:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const getPaymentSystemHealth = async () => {
+  try {
+    const { data, error } = await supabase.functions.invoke('payment-system-health', {
+      body: {}
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error checking payment system health:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const retryFailedPayment = async (paymentId: string, userId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('retry-payment', {
+      body: { paymentId, userId }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error) {
+    await handlePaymentError(error, userId, undefined, undefined, {
+      paymentDetails: { paymentId }
+    });
+    
+    return { success: false, error: error.message };
+  }
+};
+
+export const checkForExpiringCards = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('payment_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+    
+    if (error) throw error;
+    
+    if (data) {
+      const expiryDate = new Date(data.token_expiry);
+      const today = new Date();
+      const daysUntilExpiry = Math.round((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilExpiry <= 30) {
+        return {
+          isExpiring: true,
+          daysUntilExpiry,
+          cardLastFour: data.card_last_four,
+          expiryDate: data.token_expiry
+        };
+      }
+    }
+    
+    return { isExpiring: false };
+  } catch (error) {
+    console.error('Error checking for expiring cards:', error);
+    return { isExpiring: false, error: error.message };
+  }
+};
+
+export const addAlternativePaymentMethod = async (userId: string, tokenData: TokenData) => {
+  try {
+    const { data, error } = await supabase
+      .from('payment_tokens')
+      .insert({
+        user_id: userId,
+        token: tokenData.token || `fallback_${Date.now()}`,
+        token_expiry: `${tokenData.expiryYear}-${tokenData.expiryMonth}-01`,
+        card_last_four: tokenData.lastFourDigits,
+        is_active: true
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    return { success: true, tokenId: data.id };
+  } catch (error) {
+    await handlePaymentError(error, userId, undefined, undefined, {
+      paymentDetails: { action: 'add-alternative-payment' }
+    });
+    
     return { success: false, error: error.message };
   }
 };

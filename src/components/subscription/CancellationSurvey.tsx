@@ -12,7 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const CANCELLATION_REASONS = [
   { id: 'too_expensive', label: 'המחיר גבוה מדי' },
@@ -28,13 +29,15 @@ interface CancellationSurveyProps {
   onOpenChange: (open: boolean) => void;
   onCancel: (reason: string, feedback: string) => Promise<void>;
   isProcessing: boolean;
+  error?: string | null;
 }
 
 const CancellationSurvey = ({ 
   open, 
   onOpenChange, 
   onCancel, 
-  isProcessing 
+  isProcessing,
+  error
 }: CancellationSurveyProps) => {
   const [reason, setReason] = useState<string>('');
   const [feedback, setFeedback] = useState<string>('');
@@ -47,6 +50,12 @@ const CancellationSurvey = ({
     // Only allow closing if we're not processing
     if (!isProcessing) {
       onOpenChange(newOpen);
+      
+      // Reset form if closing
+      if (!newOpen) {
+        setReason('');
+        setFeedback('');
+      }
     }
   };
 
@@ -61,6 +70,13 @@ const CancellationSurvey = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        
           <RadioGroup value={reason} onValueChange={setReason} className="space-y-2">
             {CANCELLATION_REASONS.map((item) => (
               <div key={item.id} className="flex items-center space-x-2 space-x-reverse">

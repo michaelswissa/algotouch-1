@@ -50,7 +50,7 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { subscriptionId, userId, reason, feedback } = await req.json();
+    const { subscriptionId, userId } = await req.json();
     
     if (!subscriptionId || !userId) {
       return new Response(
@@ -65,7 +65,7 @@ serve(async (req) => {
     // Verify that the requesting user owns the subscription
     if (userId !== user.id) {
       return new Response(
-        JSON.stringify({ error: 'You can only cancel your own subscription' }),
+        JSON.stringify({ error: 'You can only reactivate your own subscription' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 403,
@@ -76,7 +76,7 @@ serve(async (req) => {
     // Get the subscription
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
-      .select('*')
+      .select('*, payment_tokens(*)')
       .eq('id', subscriptionId)
       .eq('user_id', userId)
       .single();
@@ -91,24 +91,47 @@ serve(async (req) => {
       );
     }
     
-    // If the subscription is already cancelled, return success
-    if (subscription.status === 'cancelled') {
+    // Check if the subscription can be reactivated
+    // Only cancelled subscriptions that haven't expired yet can be reactivated
+    const now = new Date();
+    const periodEndsAt = subscription.current_period_ends_at ? 
+      new Date(subscription.current_period_ends_at) : null;
+    
+    if (!periodEndsAt || now > periodEndsAt) {
       return new Response(
-        JSON.stringify({ success: true, message: 'Subscription already cancelled' }),
+        JSON.stringify({ 
+          error: 'Subscription has already expired and cannot be reactivated' 
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
+          status: 400,
         }
       );
     }
     
-    // Update subscription status to cancelled
-    const now = new Date().toISOString();
+    // Check if the subscription was cancelled
+    if (subscription.status !== 'cancelled') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Only cancelled subscriptions can be reactivated' 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+    
+    // Determine the status to set
+    const newStatus = subscription.trial_ends_at && 
+      now < new Date(subscription.trial_ends_at) ? 'trial' : 'active';
+    
+    // Reactivate the subscription
     const { error: updateError } = await supabaseClient
       .from('subscriptions')
       .update({
-        status: 'cancelled',
-        cancelled_at: now
+        status: newStatus,
+        cancelled_at: null
       })
       .eq('id', subscriptionId)
       .eq('user_id', userId);
@@ -116,7 +139,7 @@ serve(async (req) => {
     if (updateError) {
       console.error('Error updating subscription:', updateError);
       return new Response(
-        JSON.stringify({ error: 'Failed to update subscription' }),
+        JSON.stringify({ error: 'Failed to reactivate subscription' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -124,59 +147,40 @@ serve(async (req) => {
       );
     }
     
-    // Store cancellation reason and feedback
-    if (reason) {
-      const { error: reasonError } = await supabaseClient
-        .from('subscription_cancellations')
-        .insert({
-          subscription_id: subscriptionId,
-          user_id: userId,
-          reason,
-          feedback: feedback || null,
-          cancelled_at: now
-        });
-        
-      if (reasonError) {
-        console.error('Error saving cancellation reason:', reasonError);
-        // Don't fail the whole operation if this fails
-      }
-    }
-    
-    // If there's a payment token, deactivate it
+    // If there's a payment token, reactivate it
     if (subscription.payment_token_id) {
-      const { error: tokenError } = await supabaseClient
+      await supabaseClient
         .from('payment_tokens')
-        .update({ is_active: false })
+        .update({ is_active: true })
         .eq('id', subscription.payment_token_id);
-        
-      if (tokenError) {
-        console.error('Error deactivating payment token:', tokenError);
-        // Continue even if this fails
-      }
     }
     
-    // Get user email for sending notification
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('first_name, last_name')
-      .eq('id', userId)
-      .single();
+    // Delete the cancellation record
+    await supabaseClient
+      .from('subscription_cancellations')
+      .delete()
+      .eq('subscription_id', subscriptionId);
     
-    // Send cancellation email
+    // Send reactivation confirmation email
     try {
+      // Get user details
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', userId)
+        .single();
+      
       const fullName = profile ? 
         `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 
         'שלום';
-        
-      const emailSubject = 'אישור ביטול המנוי';
+      
+      const emailSubject = 'המנוי שלך הופעל מחדש';
       const emailContent = `
         <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif;">
-          <h2>ביטול מנוי - אישור</h2>
+          <h2>המנוי שלך הופעל מחדש</h2>
           <p>שלום ${fullName},</p>
-          <p>קיבלנו את בקשתך לביטול המנוי.</p>
-          <p>המנוי יישאר פעיל עד לסיום תקופת התשלום הנוכחית.</p>
-          <p>אם ברצונך להפעיל מחדש את המנוי בתוך 30 ימים, תוכל לעשות זאת דרך אזור החשבון האישי.</p>
-          <p>אנו מקווים לראות אותך שוב בקרוב!</p>
+          <p>המנוי שלך הופעל מחדש בהצלחה.</p>
+          <p>אנו שמחים שבחרת להמשיך להשתמש בשירות שלנו!</p>
           <p>בברכה,<br>צוות התמיכה</p>
         </div>
       `;
@@ -190,7 +194,7 @@ serve(async (req) => {
         }
       });
     } catch (emailError) {
-      console.error('Error sending cancellation email:', emailError);
+      console.error('Error sending reactivation email:', emailError);
       // Continue even if email sending fails
     }
     
@@ -206,7 +210,7 @@ serve(async (req) => {
     console.error('Error processing request:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message || 'An error occurred during subscription cancellation' }),
+      JSON.stringify({ error: error.message || 'An error occurred during subscription reactivation' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth';
 import { format, addMonths, parseISO, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Json } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
 
 // Interface for Subscription from Supabase
 interface Subscription {
@@ -35,6 +36,8 @@ export interface SubscriptionDetails {
     expiryMonth: string;
     expiryYear: string;
   } | null;
+  cancellationReason?: string;
+  cancellationFeedback?: string;
 }
 
 export const useSubscription = () => {
@@ -42,18 +45,27 @@ export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSubscription = async () => {
       if (user?.id) {
         try {
+          setError(null);
           const { data, error } = await supabase
             .from('subscriptions')
-            .select('*')
+            .select('*, cancellation_data:subscription_cancellations(*)')
             .eq('user_id', user.id)
             .single();
           
           if (error) {
+            if (error.code === 'PGRST116') {
+              // No subscription found for user, this is not an error, just no subscription
+              setSubscription(null);
+              setDetails(null);
+              setLoading(false);
+              return;
+            }
             throw error;
           }
           
@@ -66,16 +78,20 @@ export const useSubscription = () => {
               trial_ends_at: data.trial_ends_at,
               current_period_ends_at: data.current_period_ends_at,
               cancelled_at: data.cancelled_at,
-              payment_method: data.payment_method
+              payment_method: data.payment_method,
+              contract_signed: data.contract_signed
             };
             setSubscription(formattedSubscription);
             
             // Process the subscription details
-            const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
+            const subscriptionDetails = getSubscriptionDetails(formattedSubscription, data.cancellation_data);
             setDetails(subscriptionDetails);
           }
         } catch (error) {
           console.error('Error fetching subscription:', error);
+          setError('שגיאה בטעינת נתוני המנוי');
+          // Show toast for unexpected errors
+          toast.error('שגיאה בטעינת נתוני המנוי');
         } finally {
           setLoading(false);
         }
@@ -87,7 +103,7 @@ export const useSubscription = () => {
     fetchSubscription();
   }, [user]);
 
-  const getSubscriptionDetails = (sub: Subscription | null): SubscriptionDetails | null => {
+  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: any): SubscriptionDetails | null => {
     if (!sub) return null;
     
     const planName = sub.plan_type === 'annual' ? 'שנתי' : 
@@ -149,6 +165,10 @@ export const useSubscription = () => {
       }
     }
     
+    // Add cancellation reason and feedback if available
+    const cancellationReason = cancellationData?.[0]?.reason;
+    const cancellationFeedback = cancellationData?.[0]?.feedback;
+    
     return {
       planName,
       planPrice,
@@ -156,9 +176,136 @@ export const useSubscription = () => {
       nextBillingDate,
       progressValue,
       daysLeft,
-      paymentMethod: paymentMethodDetails
+      paymentMethod: paymentMethodDetails,
+      cancellationReason,
+      cancellationFeedback
     };
   };
 
-  return { subscription, loading, details };
+  // Function to cancel subscription with enhanced error handling
+  const cancelSubscription = async (reason: string, feedback: string) => {
+    try {
+      if (!user?.id || !subscription?.id) {
+        throw new Error('לא ניתן לבטל מנוי, אנא התחבר מחדש');
+      }
+      
+      const { error } = await supabase.functions.invoke('cancel-subscription', {
+        body: {
+          subscriptionId: subscription.id,
+          userId: user.id,
+          reason,
+          feedback
+        }
+      });
+      
+      if (error) {
+        throw new Error(`אירעה שגיאה בביטול המנוי: ${error.message}`);
+      }
+      
+      // Refresh the subscription data
+      const { data: updatedData, error: fetchError } = await supabase
+        .from('subscriptions')
+        .select('*, cancellation_data:subscription_cancellations(*)')
+        .eq('id', subscription.id)
+        .single();
+        
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      if (updatedData) {
+        // Update local state with cancelled subscription
+        const updatedSubscription: Subscription = {
+          ...subscription,
+          status: updatedData.status,
+          cancelled_at: updatedData.cancelled_at
+        };
+        
+        setSubscription(updatedSubscription);
+        
+        // Update details with cancellation info
+        const updatedDetails = getSubscriptionDetails(updatedSubscription, updatedData.cancellation_data);
+        setDetails(updatedDetails);
+      }
+      
+      toast.success('המנוי בוטל בהצלחה');
+      return true;
+    } catch (error: any) {
+      console.error('Error cancelling subscription:', error);
+      
+      // Use error message from the error object if available
+      const errorMessage = error.message || 'אירעה שגיאה בביטול המנוי';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      
+      return false;
+    }
+  };
+
+  // Function to reactivate cancelled subscription
+  const reactivateSubscription = async () => {
+    try {
+      if (!user?.id || !subscription?.id) {
+        throw new Error('לא ניתן להפעיל מחדש את המנוי, אנא התחבר מחדש');
+      }
+      
+      const { error } = await supabase.functions.invoke('reactivate-subscription', {
+        body: {
+          subscriptionId: subscription.id,
+          userId: user.id
+        }
+      });
+      
+      if (error) {
+        throw new Error(`אירעה שגיאה בהפעלה מחדש של המנוי: ${error.message}`);
+      }
+      
+      // Refresh the subscription data
+      const { data: updatedData, error: fetchError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('id', subscription.id)
+        .single();
+        
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      if (updatedData) {
+        // Update local state with reactivated subscription
+        const updatedSubscription: Subscription = {
+          ...subscription,
+          status: updatedData.status,
+          cancelled_at: null
+        };
+        
+        setSubscription(updatedSubscription);
+        
+        // Update details
+        const updatedDetails = getSubscriptionDetails(updatedSubscription);
+        setDetails(updatedDetails);
+      }
+      
+      toast.success('המנוי הופעל מחדש בהצלחה');
+      return true;
+    } catch (error: any) {
+      console.error('Error reactivating subscription:', error);
+      
+      // Use error message from the error object if available
+      const errorMessage = error.message || 'אירעה שגיאה בהפעלה מחדש של המנוי';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      
+      return false;
+    }
+  };
+
+  return { 
+    subscription, 
+    loading, 
+    details, 
+    error,
+    cancelSubscription,
+    reactivateSubscription
+  };
 };

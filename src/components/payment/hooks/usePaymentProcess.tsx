@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import {
   initiateExternalPayment
 } from '../services/paymentService';
 import { UsePaymentProcessProps, PaymentError } from './types';
+import { usePaymentErrorHandling } from './usePaymentErrorHandling';
 
 export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProcessProps) => {
   const navigate = useNavigate();
@@ -34,8 +35,34 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       ? planDetails.vip 
       : planDetails.monthly;
 
+  // Use our new error handling hook
+  const { handleError, checkForRecovery, isRecovering, sessionId } = usePaymentErrorHandling({
+    planId,
+    onCardUpdate: () => navigate('/subscription?step=update-card'),
+    onAlternativePayment: () => navigate('/subscription?step=alternative-payment')
+  });
+
+  // Check for recovery data on mount
+  useEffect(() => {
+    const checkRecovery = async () => {
+      const recoveryData = await checkForRecovery();
+      if (recoveryData) {
+        // We have recovered data, prefill it
+        toast.info('נמצאו פרטים להשלמת התשלום');
+        
+        if (recoveryData.planId && recoveryData.planId !== planId) {
+          // Redirect to the right plan if needed
+          navigate(`/subscription?step=3&plan=${recoveryData.planId}&recover=${sessionId}`);
+        }
+      }
+    };
+    
+    checkRecovery();
+  }, []);
+
   const handlePaymentProcessing = async (tokenData: TokenData) => {
     try {
+      setIsProcessing(true);
       setPaymentError(null);
       
       let operationType = 3; // Default: token creation only (for monthly subscription with free trial)
@@ -90,12 +117,20 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     } catch (error: any) {
       console.error("Payment processing error:", error);
       
-      const paymentError: PaymentError = new Error(error.message || 'שגיאה לא ידועה בתהליך התשלום');
-      paymentError.code = error.code;
-      paymentError.details = error.details;
+      // Use our new error handling system
+      const errorInfo = await handleError(error, {
+        tokenData,
+        planId,
+        operationType
+      });
+      
+      const paymentError: PaymentError = new Error(errorInfo?.errorMessage || 'שגיאה לא ידועה בתהליך התשלום');
+      paymentError.code = errorInfo?.errorCode;
+      paymentError.details = errorInfo;
       
       setPaymentError(paymentError);
-      toast.error(error.message || 'שגיאה בתהליך התשלום. אנא נסה שנית.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -127,8 +162,8 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       await handlePaymentProcessing(tokenData);
     } catch (error: any) {
+      // This is already handled in handlePaymentProcessing, but adding as a safety net
       console.error('Payment processing error:', error);
-      toast.error(error.message || 'אירעה שגיאה בתהליך התשלום. נסה שנית.');
     } finally {
       setIsProcessing(false);
     }
@@ -145,12 +180,15 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       window.location.href = data.url;
     } catch (error: any) {
-      console.error('Error initiating external payment:', error);
+      // Use our new error handling system
+      const errorInfo = await handleError(error, {
+        planId,
+        userInfo: user ? { userId: user.id, email: user.email } : null
+      });
       
-      const paymentError: PaymentError = new Error(error.message || 'שגיאה ביצירת עסקה');
+      const paymentError: PaymentError = new Error(errorInfo?.errorMessage || 'שגיאה ביצירת עסקה');
       setPaymentError(paymentError);
       
-      toast.error(error.message || 'שגיאה ביצירת עסקה');
       setIsProcessing(false);
     }
   };
@@ -163,6 +201,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     loadRegistrationData,
     handleSubmit,
     handleExternalPayment,
+    isRecovering,
     plan
   };
 };
