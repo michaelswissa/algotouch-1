@@ -120,8 +120,10 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         operationType: operationTypeValue
       });
       
-      const paymentError: PaymentError = new Error(errorInfo?.errorMessage || 'שגיאה לא ידועה בתהליך התשלום');
-      paymentError.code = errorInfo?.errorCode;
+      const paymentError = new PaymentError(
+        errorInfo?.message || 'שגיאה לא ידועה בתהליך התשלום'
+      );
+      paymentError.code = errorInfo?.code;
       paymentError.details = errorInfo;
       
       setPaymentError(paymentError);
@@ -190,7 +192,9 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         userInfo: user ? { userId: user.id, email: user.email } : null
       });
       
-      const paymentError: PaymentError = new Error(errorInfo?.errorMessage || 'שגיאה ביצירת עסקה');
+      const paymentError = new PaymentError(
+        errorInfo?.message || 'שגיאה ביצירת עסקה'
+      );
       setPaymentError(paymentError);
       
       setIsProcessing(false);
@@ -209,3 +213,4 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     plan
   };
 };
+
