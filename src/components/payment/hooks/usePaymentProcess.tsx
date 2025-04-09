@@ -175,8 +175,18 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       window.location.href = data.url;
     } catch (error: any) {
+      // Define operationTypeValue for this scope as well
+      let operationTypeValue = 3; // Default: token creation only
+      
+      if (planId === 'annual') {
+        operationTypeValue = 2; // Charge and create token for recurring payments
+      } else if (planId === 'vip') {
+        operationTypeValue = 1; // Charge only - one-time payment
+      }
+      
       const errorInfo = await handleError(error, {
         planId,
+        operationType: operationTypeValue,
         userInfo: user ? { userId: user.id, email: user.email } : null
       });
       
