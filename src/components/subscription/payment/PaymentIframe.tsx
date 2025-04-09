@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CardContent } from '@/components/ui/card';
 import { Shield, ShieldCheck, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface PaymentIframeProps {
   paymentUrl: string | null;
@@ -12,6 +13,40 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
   const [iframeHeight, setIframeHeight] = useState(650);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const navigate = useNavigate();
+  
+  // Function to handle successful payment detection
+  const handleSuccessfulPayment = (url?: string, lpId?: string) => {
+    console.log('Payment successful, handling navigation', { url, lpId });
+    
+    // Update session storage to completion step
+    const sessionData = sessionStorage.getItem('subscription_flow');
+    if (sessionData) {
+      try {
+        const parsedSession = JSON.parse(sessionData);
+        parsedSession.step = 'completion';
+        sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        
+        // Attempt to navigate to completion step with required parameters
+        const urlParams = new URLSearchParams();
+        urlParams.set('step', 'completion');
+        urlParams.set('success', 'true');
+        urlParams.set('plan', parsedSession.selectedPlan || '');
+        
+        if (lpId) {
+          urlParams.set('lpId', lpId);
+        }
+        
+        navigate(`/subscription?${urlParams.toString()}`, { replace: true });
+        toast.success('התשלום התקבל בהצלחה!');
+      } catch (e) {
+        console.error('Error updating session data:', e);
+        navigate('/subscription?step=completion&success=true', { replace: true });
+      }
+    } else {
+      // Fallback redirect without session data
+      navigate('/subscription?step=completion&success=true', { replace: true });
+    }
+  };
   
   useEffect(() => {
     const handleResize = () => {
@@ -31,26 +66,10 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
       if (currentUrl.includes('success=true') || currentUrl.includes('error=true')) {
         console.log('Detected success/error params in URL, processing redirect');
         
-        // Only redirect if we're the top window (not inside iframe)
-        if (window === window.top) {
-          // Update subscription flow step in session storage
-          const sessionData = sessionStorage.getItem('subscription_flow');
-          if (sessionData) {
-            try {
-              const parsedSession = JSON.parse(sessionData);
-              if (currentUrl.includes('success=true')) {
-                parsedSession.step = 'completion';
-                sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-                
-                // Attempt to navigate to completion step
-                const url = new URL(window.location.href);
-                url.searchParams.set('step', 'completion');
-                navigate(`/subscription?step=completion&success=true&plan=${parsedSession.selectedPlan || ''}`, { replace: true });
-              }
-            } catch (e) {
-              console.error('Error updating session data:', e);
-            }
-          }
+        if (currentUrl.includes('success=true')) {
+          handleSuccessfulPayment(currentUrl);
+        } else if (currentUrl.includes('error=true')) {
+          toast.error('התשלום נכשל, אנא נסה שנית');
         }
       }
     };
@@ -71,34 +90,16 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
           console.log('Received payment status/redirect message:', data);
           
           if (data.status === 'success' || data.success === true) {
-            // Handle successful payment
-            console.log('Payment successful, redirecting window');
+            // Extract the lowProfileId if present
+            const lpId = data.lowProfileId || 
+              (data.url && new URL(data.url).searchParams.get('lpId'));
             
-            // Update session storage to completion step
-            const sessionData = sessionStorage.getItem('subscription_flow');
-            if (sessionData) {
-              try {
-                const parsedSession = JSON.parse(sessionData);
-                parsedSession.step = 'completion';
-                sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-                
-                // Redirect to completion step
-                navigate(`/subscription?step=completion&success=true&plan=${parsedSession.selectedPlan || ''}`, { replace: true });
-              } catch (e) {
-                console.error('Error updating session data:', e);
-                // Fallback redirect
-                navigate('/subscription?step=completion&success=true', { replace: true });
-              }
-            } else {
-              // Fallback redirect without session data
-              navigate('/subscription?step=completion&success=true', { replace: true });
-            }
+            // Handle successful payment
+            handleSuccessfulPayment(data.url, lpId);
           } else if (data.status === 'error' || data.success === false) {
             // Handle payment error
             console.error('Payment error:', data.error);
-            
-            // Redirect to error page
-            navigate('/subscription?step=payment&error=true', { replace: true });
+            toast.error('התשלום נכשל, אנא נסה שנית');
           }
         }
       } catch (error) {
@@ -113,50 +114,55 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     const injectIframeListener = () => {
       if (iframeRef.current && iframeRef.current.contentWindow) {
         try {
-          const iframeDocument = iframeRef.current.contentDocument;
-          if (iframeDocument) {
-            // Create a script element to inject into the iframe
-            const script = document.createElement('script');
-            script.innerHTML = `
-              // Monitor URL changes
-              let lastUrl = window.location.href;
-              
-              // Check URL immediately
-              if (lastUrl.includes('success=true') || lastUrl.includes('error=true')) {
-                console.log('Found success/error in URL on load: ' + lastUrl);
+          setTimeout(() => {
+            if (!iframeRef.current) return;
+            
+            const iframeDocument = iframeRef.current.contentDocument;
+            if (iframeDocument) {
+              // Create a script element to inject into the iframe
+              const script = document.createElement('script');
+              script.innerHTML = `
+                // Monitor URL changes
+                let lastUrl = window.location.href;
+                console.log('Iframe URL monitor initialized:', lastUrl);
                 
-                // Add target=_top if not present
-                if (!lastUrl.includes('target=_top')) {
-                  const url = new URL(lastUrl);
-                  url.searchParams.set('target', '_top');
-                  lastUrl = url.toString();
-                }
-                
-                // Send message to parent window
-                window.parent.postMessage(JSON.stringify({
-                  type: 'cardcom_redirect',
-                  url: lastUrl,
-                  success: lastUrl.includes('success=true'),
-                  forceRedirect: true
-                }), '*');
-                
-                // Try direct navigation
-                try {
-                  if (window.top) {
-                    window.top.location.href = lastUrl;
-                  }
-                } catch(e) {
-                  console.error('Failed to redirect top window', e);
-                }
-              }
-              
-              // Observe DOM changes to detect navigation
-              const observer = new MutationObserver(() => {
-                if (window.location.href !== lastUrl) {
-                  const newUrl = window.location.href;
-                  lastUrl = newUrl;
+                // Check URL immediately
+                if (lastUrl.includes('success=true') || lastUrl.includes('error=true')) {
+                  console.log('Found success/error in URL on load:', lastUrl);
                   
-                  console.log('URL changed in iframe: ' + newUrl);
+                  // Add target=_top if not present
+                  if (!lastUrl.includes('target=_top')) {
+                    const url = new URL(lastUrl);
+                    url.searchParams.set('target', '_top');
+                    lastUrl = url.toString();
+                  }
+                  
+                  // Extract the lowProfileId if present
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const lpId = urlParams.get('lpId');
+                  
+                  // Send message to parent window
+                  window.parent.postMessage(JSON.stringify({
+                    type: 'cardcom_redirect',
+                    url: lastUrl,
+                    success: lastUrl.includes('success=true'),
+                    forceRedirect: true,
+                    lowProfileId: lpId
+                  }), '*');
+                  
+                  // Try direct navigation
+                  try {
+                    if (window.top && window !== window.top) {
+                      window.top.location.href = lastUrl;
+                    }
+                  } catch(e) {
+                    console.error('Failed to redirect top window', e);
+                  }
+                }
+                
+                // Function to handle URL changes
+                function handleUrlChange(newUrl) {
+                  console.log('URL changed in iframe:', newUrl);
                   
                   if (newUrl.includes('success=true') || newUrl.includes('error=true')) {
                     console.log('Detected success/error in iframe URL');
@@ -169,8 +175,9 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
                       finalUrl = url.toString();
                     }
                     
-                    // Extract the lowProfileId if present
-                    const urlParams = new URLSearchParams(window.location.search);
+                    // Extract parameters
+                    const url = new URL(newUrl);
+                    const urlParams = new URLSearchParams(url.search);
                     const lpId = urlParams.get('lpId');
                     
                     // Send message to parent window
@@ -192,87 +199,129 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
                     }
                   }
                 }
-              });
+                
+                // Observe DOM changes to detect navigation
+                const observer = new MutationObserver(() => {
+                  if (window.location.href !== lastUrl) {
+                    const newUrl = window.location.href;
+                    const oldUrl = lastUrl;
+                    lastUrl = newUrl;
+                    handleUrlChange(newUrl, oldUrl);
+                  }
+                });
+                
+                // Check URL every 500ms as a fallback
+                setInterval(() => {
+                  if (window.location.href !== lastUrl) {
+                    const newUrl = window.location.href;
+                    const oldUrl = lastUrl;
+                    lastUrl = newUrl;
+                    handleUrlChange(newUrl, oldUrl);
+                  }
+                }, 500);
+                
+                // Start observing
+                observer.observe(document, { subtree: true, childList: true });
+                
+                // Listen for form submissions
+                document.addEventListener('submit', (e) => {
+                  console.log('Form submitted in iframe');
+                  window.parent.postMessage(JSON.stringify({
+                    type: 'form_submit'
+                  }), '*');
+                });
+                
+                // Watch for card success page
+                setInterval(() => {
+                  // Look for common success indicators
+                  const successIndicators = [
+                    document.querySelector('.payment-success'),
+                    document.querySelector('.success-message'),
+                    document.querySelector('[data-payment-status="success"]'),
+                    document.querySelector('.transaction-approved'),
+                    document.querySelector('.approved-transaction')
+                  ];
+                  
+                  if (successIndicators.some(el => el !== null)) {
+                    console.log('Detected success indicator in DOM');
+                    handleUrlChange(window.location.href + '&success=true');
+                  }
+                }, 1000);
+              `;
               
-              // Start observing
-              observer.observe(document, { subtree: true, childList: true });
-              
-              // Listen for form submissions
-              document.addEventListener('submit', (e) => {
-                console.log('Form submitted in iframe');
-                window.parent.postMessage(JSON.stringify({
-                  type: 'form_submit'
-                }), '*');
-              });
-            `;
-            
-            iframeDocument.body.appendChild(script);
-            console.log('Script injected into iframe');
-          }
+              iframeDocument.body.appendChild(script);
+              console.log('Script injected into iframe');
+            }
+          }, 1000);
         } catch (error) {
           console.error('Error injecting script into iframe:', error);
           
           // Fallback method: Try to inject when iframe loads
-          iframeRef.current.onload = () => {
-            try {
-              const iframeDoc = iframeRef.current?.contentWindow?.document;
-              if (iframeDoc && iframeDoc.body) {
-                const scriptEl = iframeDoc.createElement('script');
-                scriptEl.textContent = `
-                  console.log('Iframe observer initialized');
+          if (iframeRef.current) {
+            iframeRef.current.onload = () => {
+              try {
+                setTimeout(() => {
+                  if (!iframeRef.current) return;
                   
-                  // Check URL immediately
-                  if (window.location.href.includes('success=true') || window.location.href.includes('error=true')) {
-                    console.log('Success/error detected in URL: ' + window.location.href);
-                    
-                    // Send message to parent
-                    window.parent.postMessage(JSON.stringify({
-                      type: 'cardcom_redirect',
-                      url: window.location.href,
-                      success: window.location.href.includes('success=true'),
-                      forceRedirect: true
-                    }), '*');
-                    
-                    // Try to break out
-                    if (window.top && window !== window.top) {
-                      window.top.location.href = window.location.href;
-                    }
-                  }
-                  
-                  // Monitor URL changes
-                  setInterval(function() {
-                    const currentHref = window.location.href;
-                    if (currentHref.includes('success=true') || currentHref.includes('error=true')) {
-                      console.log('Success/error detected in URL: ' + currentHref);
+                  const iframeDoc = iframeRef.current.contentWindow?.document;
+                  if (iframeDoc && iframeDoc.body) {
+                    const scriptEl = iframeDoc.createElement('script');
+                    scriptEl.textContent = `
+                      console.log('Iframe observer initialized');
                       
-                      window.parent.postMessage(JSON.stringify({
-                        type: 'cardcom_redirect',
-                        url: currentHref,
-                        success: currentHref.includes('success=true'),
-                        forceRedirect: true
-                      }), '*');
-                      
-                      if (window.top && window !== window.top) {
-                        window.top.location.href = currentHref;
+                      // Check URL immediately
+                      if (window.location.href.includes('success=true') || window.location.href.includes('error=true')) {
+                        console.log('Success/error detected in URL: ' + window.location.href);
+                        
+                        // Send message to parent
+                        window.parent.postMessage(JSON.stringify({
+                          type: 'cardcom_redirect',
+                          url: window.location.href,
+                          success: window.location.href.includes('success=true'),
+                          forceRedirect: true
+                        }), '*');
+                        
+                        // Try to break out
+                        if (window.top && window !== window.top) {
+                          window.top.location.href = window.location.href;
+                        }
                       }
-                    }
-                  }, 500);
-                `;
-                iframeDoc.body.appendChild(scriptEl);
-                console.log('Fallback script injected into iframe');
+                      
+                      // Monitor URL changes
+                      setInterval(function() {
+                        const currentHref = window.location.href;
+                        if (currentHref.includes('success=true') || currentHref.includes('error=true')) {
+                          console.log('Success/error detected in URL: ' + currentHref);
+                          
+                          window.parent.postMessage(JSON.stringify({
+                            type: 'cardcom_redirect',
+                            url: currentHref,
+                            success: currentHref.includes('success=true'),
+                            forceRedirect: true
+                          }), '*');
+                          
+                          if (window.top && window !== window.top) {
+                            window.top.location.href = currentHref;
+                          }
+                        }
+                      }, 500);
+                    `;
+                    iframeDoc.body.appendChild(scriptEl);
+                    console.log('Fallback script injected into iframe');
+                  }
+                }, 1000);
+              } catch (e) {
+                console.error('Fallback script injection failed:', e);
               }
-            } catch (e) {
-              console.error('Fallback script injection failed:', e);
-            }
-          };
+            };
+          }
         }
       }
     };
     
     // Try to inject the script
     if (iframeRef.current) {
-      // Small delay to make sure iframe is loaded
-      setTimeout(injectIframeListener, 1000);
+      injectIframeListener();
     }
     
     return () => {
@@ -288,6 +337,12 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
   if (!updatedPaymentUrl.includes('target=_top')) {
     updatedPaymentUrl = updatedPaymentUrl + (updatedPaymentUrl.includes('?') ? '&' : '?') + 'target=_top';
   }
+  
+  // Add additional parameters to ensure breaking out of iframe
+  const enhancedUrl = new URL(updatedPaymentUrl);
+  enhancedUrl.searchParams.set('iframe', '0');
+  enhancedUrl.searchParams.set('PopUp', '0');
+  enhancedUrl.searchParams.set('forceRedirect', 'true');
 
   return (
     <CardContent className="p-0">
@@ -322,7 +377,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/5 pointer-events-none"></div>
             <iframe 
               ref={iframeRef}
-              src={updatedPaymentUrl}
+              src={enhancedUrl.toString()}
               width="100%"
               height={iframeHeight}
               frameBorder="0"

@@ -10,6 +10,7 @@ import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
 import PaymentError from './PaymentError';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -23,70 +24,104 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   onBack
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
   
-  // Effect to check for completion step in URL
+  // Effect to check for completion step in URL immediately on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const step = params.get('step');
-    const success = params.get('success');
-    
-    console.log('Checking URL parameters:', { step, success });
-    
-    if (step === 'completion' && success === 'true') {
-      console.log('Detected completion step with success=true in URL');
+    const checkUrlForCompletion = () => {
+      const params = new URLSearchParams(window.location.search);
+      const step = params.get('step');
+      const success = params.get('success');
+      const lpId = params.get('lpId');
       
-      // Update session data
-      const sessionData = sessionStorage.getItem('subscription_flow');
-      if (sessionData) {
-        try {
-          const parsedSession = JSON.parse(sessionData);
-          parsedSession.step = 'completion';
-          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+      console.log('Checking URL parameters on mount:', { step, success, lpId });
+      
+      // If success=true is present, immediately go to completion step
+      if (success === 'true') {
+        console.log('Success=true detected in URL on mount, forcing completion');
+        
+        // Update session data
+        const sessionData = sessionStorage.getItem('subscription_flow');
+        if (sessionData) {
+          try {
+            const parsedSession = JSON.parse(sessionData);
+            parsedSession.step = 'completion';
+            sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+            
+            // Call the completion handler immediately
+            setTimeout(() => {
+              console.log('Calling onPaymentComplete handler due to success=true in URL');
+              toast.success('התשלום התקבל בהצלחה!');
+              onPaymentComplete();
+            }, 300);
+          } catch (error) {
+            console.error('Error parsing session data:', error);
+            // Call completion handler anyway if parsing fails
+            setTimeout(() => {
+              onPaymentComplete();
+            }, 300);
+          }
+        } else {
+          console.log('No session data found, creating new one');
+          // Create new session data if none exists
+          const newSession = {
+            step: 'completion',
+            selectedPlan
+          };
+          sessionStorage.setItem('subscription_flow', JSON.stringify(newSession));
           
-          // Call the completion handler with a slight delay
+          // Call completion handler
           setTimeout(() => {
-            console.log('Calling onPaymentComplete handler');
             toast.success('התשלום התקבל בהצלחה!');
             onPaymentComplete();
-          }, 100);
-        } catch (error) {
-          console.error('Error parsing session data:', error);
-          // Call completion handler anyway if parsing fails
-          setTimeout(() => {
-            onPaymentComplete();
-          }, 100);
+          }, 300);
         }
-      } else {
-        console.log('No session data found, creating new one');
-        // Create new session data if none exists
-        const newSession = {
-          step: 'completion',
-          selectedPlan
-        };
-        sessionStorage.setItem('subscription_flow', JSON.stringify(newSession));
         
-        // Call completion handler
-        setTimeout(() => {
-          toast.success('התשלום התקבל בהצלחה!');
-          onPaymentComplete();
-        }, 100);
+        // If we're in an iframe and success is detected, break out to parent
+        if (window !== window.top) {
+          console.log('We are in an iframe with success=true, attempting to break out');
+          
+          try {
+            // Navigate the parent window to the completion step
+            const redirectUrl = `${window.location.origin}/subscription?step=completion&success=true&plan=${selectedPlan}`;
+            window.top.location.href = redirectUrl;
+          } catch (e) {
+            console.error('Could not navigate top window:', e);
+          }
+        }
       }
-    }
-    
-    // Also check if we're in an iframe and need to break out
-    if ((step === 'completion' || success === 'true') && window !== window.top) {
-      console.log('We are in an iframe with completion/success parameters, breaking out');
       
-      // Try to navigate the top window
-      try {
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('forceRedirect', 'true');
-        window.top.location.href = currentUrl.toString();
-      } catch (e) {
-        console.error('Could not navigate top window:', e);
+      // If explicit completion step is requested, honor it
+      if (step === 'completion') {
+        console.log('Explicit step=completion detected in URL');
+        
+        // Update session data to force completion step
+        const sessionData = sessionStorage.getItem('subscription_flow');
+        if (sessionData) {
+          try {
+            const parsedSession = JSON.parse(sessionData);
+            parsedSession.step = 'completion';
+            sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          } catch (error) {
+            console.error('Error updating session data:', error);
+          }
+        } else {
+          sessionStorage.setItem('subscription_flow', JSON.stringify({
+            step: 'completion',
+            selectedPlan
+          }));
+        }
+        
+        // Call the completion handler
+        setTimeout(() => {
+          onPaymentComplete();
+        }, 300);
       }
-    }
-  }, [onPaymentComplete, selectedPlan]);
+    };
+    
+    // Run the URL check immediately
+    checkUrlForCompletion();
+  }, [selectedPlan, onPaymentComplete]);
   
   // Handle payment initialization
   const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
@@ -103,7 +138,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   useEffect(() => {
     if (paymentStatus.success === true) {
       console.log('Payment status indicates success, completing payment flow');
-      toast.success('התשלום התקבל בהצלחה!');
+      
       // Update session data to completion
       const sessionData = sessionStorage.getItem('subscription_flow');
       if (sessionData) {
@@ -111,18 +146,55 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
           const parsedSession = JSON.parse(sessionData);
           parsedSession.step = 'completion';
           sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          
+          // Notify user of success
+          toast.success('התשלום התקבל בהצלחה!');
+          
+          // Complete payment
+          setTimeout(() => {
+            onPaymentComplete();
+          }, 300);
         } catch (error) {
           console.error('Error updating session data:', error);
+          // Still complete payment if JSON parse fails
+          setTimeout(() => {
+            toast.success('התשלום התקבל בהצלחה!');
+            onPaymentComplete();
+          }, 300);
         }
+      } else {
+        // No session data, still complete payment
+        setTimeout(() => {
+          toast.success('התשלום התקבל בהצלחה!');
+          onPaymentComplete();
+        }, 300);
       }
-      
-      setTimeout(() => {
-        onPaymentComplete();
-      }, 100);
     } else if (paymentStatus.error) {
       toast.error('אירעה שגיאה בתהליך התשלום: ' + paymentStatus.errorMessage);
     }
   }, [paymentStatus, onPaymentComplete]);
+  
+  // Listen for storage changes to detect completion from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'subscription_flow') {
+        try {
+          const newData = JSON.parse(event.newValue || '{}');
+          if (newData.step === 'completion') {
+            console.log('Detected completion step in storage event');
+            onPaymentComplete();
+          }
+        } catch (e) {
+          console.error('Error handling storage event:', e);
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [onPaymentComplete]);
   
   // Determine if this is a monthly plan (with trial)
   const isMonthlyPlan = selectedPlan === 'monthly';

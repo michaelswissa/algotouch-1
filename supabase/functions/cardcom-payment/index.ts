@@ -82,12 +82,12 @@ async function createPaymentSession(params: any) {
       
       // UI settings for collecting customer info
       UIDefinition: {
-        ShowCardOwnerName: true,
-        ShowCardOwnerEmail: true,
-        ShowCardOwnerPhone: true,
-        CardOwnerName: cardOwnerName || "",
-        CardOwnerEmail: cardOwnerEmail || "",
-        CardOwnerPhone: cardOwnerPhone || "",
+        IsHideCardOwnerName: false,
+        CardOwnerNameValue: cardOwnerName || "",
+        IsHideCardOwnerEmail: false,
+        CardOwnerEmailValue: cardOwnerEmail || "",
+        IsHideCardOwnerPhone: false,
+        CardOwnerPhoneValue: cardOwnerPhone || "",
       }
     };
 
@@ -407,40 +407,47 @@ serve(async (req) => {
         // Modify the payment URL to use our custom URL parameters
         const paymentUrl = new URL(sessionResult.url);
         
-        // Add the lowProfileId to the success URL
+        // Add the lowProfileId and completion step to the success URL
         let finalSuccessUrl = successRedirectUrl;
-        if (finalSuccessUrl.includes('?')) {
-          finalSuccessUrl += `&lpId=${sessionResult.lowProfileId}`;
-        } else {
-          finalSuccessUrl += `?lpId=${sessionResult.lowProfileId}`;
+        try {
+          const successUrlObj = new URL(finalSuccessUrl);
+          successUrlObj.searchParams.set('lpId', sessionResult.lowProfileId);
+          successUrlObj.searchParams.set('step', 'completion');
+          successUrlObj.searchParams.set('success', 'true');
+          successUrlObj.searchParams.set('target', '_top');
+          finalSuccessUrl = successUrlObj.toString();
+        } catch (e) {
+          console.error('Error modifying success URL:', e);
+          // Add parameters directly if URL parsing fails
+          finalSuccessUrl += `${finalSuccessUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&step=completion&success=true&target=_top`;
         }
         
         // Add registration ID if we have one
         if (tempRegistrationId) {
-          finalSuccessUrl += `&regId=${tempRegistrationId}`;
-        }
-        
-        // Make sure we have target=_top to break out of iframe
-        if (!finalSuccessUrl.includes('target=_top')) {
-          finalSuccessUrl += '&target=_top';
+          finalSuccessUrl += `${finalSuccessUrl.includes('?') ? '&' : '?'}regId=${tempRegistrationId}`;
         }
         
         paymentUrl.searchParams.set('successRedirectUrl', finalSuccessUrl);
         
         // Ensure error URL also includes the lowProfileId and target=_top
         let finalErrorUrl = errorRedirectUrl;
-        if (finalErrorUrl.includes('?')) {
-          finalErrorUrl += `&lpId=${sessionResult.lowProfileId}`;
-        } else {
-          finalErrorUrl += `?lpId=${sessionResult.lowProfileId}`;
-        }
-        
-        // Make sure we have target=_top to break out of iframe
-        if (!finalErrorUrl.includes('target=_top')) {
-          finalErrorUrl += '&target=_top';
+        try {
+          const errorUrlObj = new URL(finalErrorUrl);
+          errorUrlObj.searchParams.set('lpId', sessionResult.lowProfileId);
+          errorUrlObj.searchParams.set('error', 'true');
+          errorUrlObj.searchParams.set('target', '_top');
+          finalErrorUrl = errorUrlObj.toString();
+        } catch (e) {
+          console.error('Error modifying error URL:', e);
+          // Add parameters directly if URL parsing fails
+          finalErrorUrl += `${finalErrorUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&error=true&target=_top`;
         }
         
         paymentUrl.searchParams.set('errorRedirectUrl', finalErrorUrl);
+        
+        // Extra parameters to ensure we break out of iframes
+        paymentUrl.searchParams.set('iframe', '0');
+        paymentUrl.searchParams.set('PopUp', '0');
         
         return new Response(
           JSON.stringify({

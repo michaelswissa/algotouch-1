@@ -46,7 +46,7 @@ export const usePaymentInitialization = (
         return;
       }
 
-      // Create base URLs for success and error redirects
+      // Create base URLs for success and error redirects with absolute paths
       const baseUrl = `${window.location.origin}/subscription`;
       
       // Critical: Make sure the success redirect URL goes to completion step and breaks out of the iframe
@@ -101,25 +101,32 @@ export const usePaymentInitialization = (
           localStorage.setItem('temp_registration_id', data.tempRegistrationId);
         }
         
+        // Store the lowProfileId for later verification
+        if (data.lowProfileId) {
+          sessionStorage.setItem('payment_lowprofile_id', data.lowProfileId);
+        }
+        
         // Ensure the target=_top parameter is present to force the iframe to break out to the top window
         const finalUrl = new URL(data.url);
         
         // Ensure we're always breaking out of the iframe on redirect
         finalUrl.searchParams.set('target', '_top');
         
-        // Also ensure the success and error redirect URLs have target=_top
+        // Also ensure the success and error redirect URLs have target=_top and include lpId
         let successRedirectUrl = finalUrl.searchParams.get('successRedirectUrl') || '';
         let errorRedirectUrl = finalUrl.searchParams.get('errorRedirectUrl') || '';
         
-        if (successRedirectUrl && !successRedirectUrl.includes('target=_top')) {
-          successRedirectUrl += (successRedirectUrl.includes('?') ? '&' : '?') + 'target=_top';
-          finalUrl.searchParams.set('successRedirectUrl', successRedirectUrl);
-        }
+        // Add lowProfileId to success URL
+        const successUrlObj = new URL(successRedirectUrl);
+        successUrlObj.searchParams.set('lpId', data.lowProfileId);
+        successUrlObj.searchParams.set('target', '_top');
+        finalUrl.searchParams.set('successRedirectUrl', successUrlObj.toString());
         
-        if (errorRedirectUrl && !errorRedirectUrl.includes('target=_top')) {
-          errorRedirectUrl += (errorRedirectUrl.includes('?') ? '&' : '?') + 'target=_top';
-          finalUrl.searchParams.set('errorRedirectUrl', errorRedirectUrl);
-        }
+        // Add lowProfileId to error URL
+        const errorUrlObj = new URL(errorRedirectUrl);
+        errorUrlObj.searchParams.set('lpId', data.lowProfileId);
+        errorUrlObj.searchParams.set('target', '_top');
+        finalUrl.searchParams.set('errorRedirectUrl', errorUrlObj.toString());
         
         // Add extra parameters to ensure we break out of any iframes
         finalUrl.searchParams.set('iframe', '0');
