@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -60,7 +61,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       setIsProcessing(true);
       setPaymentError(null);
       
-      // Define operationTypeValue here
+      // Define operationTypeValue here before using it
       let operationTypeValue = 3; // Default: token creation only (for monthly subscription with free trial)
       
       if (planId === 'annual') {
