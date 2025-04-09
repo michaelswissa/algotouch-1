@@ -29,22 +29,52 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     const step = params.get('step');
     const success = params.get('success');
     
+    console.log('Checking URL parameters:', { step, success });
+    
     if (step === 'completion' && success === 'true') {
-      const sessionData = sessionStorage.getItem('subscription_flow');
+      console.log('Detected completion step with success=true in URL');
       
+      // Update session data
+      const sessionData = sessionStorage.getItem('subscription_flow');
       if (sessionData) {
         try {
           const parsedSession = JSON.parse(sessionData);
           parsedSession.step = 'completion';
           sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
           
-          // Call the completion handler with a slight delay to ensure state is updated
+          // Call the completion handler with a slight delay
           setTimeout(() => {
+            console.log('Calling onPaymentComplete handler');
             onPaymentComplete();
           }, 100);
         } catch (error) {
           console.error('Error parsing session data:', error);
         }
+      } else {
+        console.log('No session data found, creating new one');
+        // Create new session data if none exists
+        const newSession = {
+          step: 'completion',
+          selectedPlan
+        };
+        sessionStorage.setItem('subscription_flow', JSON.stringify(newSession));
+        
+        // Call completion handler
+        setTimeout(() => {
+          onPaymentComplete();
+        }, 100);
+      }
+    }
+    
+    // Also check if we're in an iframe and need to break out
+    if ((step === 'completion' || success === 'true') && window !== window.top) {
+      console.log('We are in an iframe with completion/success parameters, breaking out');
+      
+      // Try to navigate the top window
+      try {
+        window.top.location.href = window.location.href;
+      } catch (e) {
+        console.error('Could not navigate top window:', e);
       }
     }
   }, []);

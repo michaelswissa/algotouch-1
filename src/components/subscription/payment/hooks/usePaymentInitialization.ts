@@ -102,6 +102,10 @@ export const usePaymentInitialization = (
           finalUrl.searchParams.set('errorRedirectUrl', errorRedirectUrl);
         }
         
+        // Add extra parameters to ensure we break out of any iframes
+        finalUrl.searchParams.set('iframe', '0');
+        finalUrl.searchParams.set('PopUp', '0');
+        
         setPaymentUrl(finalUrl.toString());
       } else {
         throw new Error('לא התקבלה כתובת תשלום מהשרת');

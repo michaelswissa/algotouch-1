@@ -35,14 +35,36 @@ export const usePaymentUrlParams = (
         sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
       }
       
-      // If we detect success parameter and we're in an iframe, attempt to break out
+      // Check if we're in an iframe and handle breaking out
       const isIframe = window !== window.top;
-      if (isIframe && (success === 'true' || error === 'true')) {
-        console.log('Detected success/error in iframe, redirecting top window');
-        const currentUrl = window.location.href;
-        if (currentUrl.includes('target=_top')) {
-          window.top.location.href = currentUrl;
-          return; // Stop processing to avoid duplicate calls
+      if (isIframe) {
+        console.log('Detected we are in iframe, handling parent window navigation');
+        
+        // If success or error is detected in iframe, always redirect the parent window
+        if (success === 'true' || error === 'true') {
+          try {
+            // Construct redirect URL for parent window
+            const currentUrl = new URL(window.location.href);
+            
+            // Always add target=_top parameter
+            currentUrl.searchParams.set('target', '_top');
+            
+            // Inform parent window to redirect
+            window.top.postMessage({
+              type: 'cardcom_redirect',
+              url: currentUrl.toString(),
+              success: success === 'true',
+              forceRedirect: true
+            }, '*');
+            
+            // Also attempt direct navigation
+            window.top.location.href = currentUrl.toString();
+            
+            console.log('Sent redirect message to parent window:', currentUrl.toString());
+            return; // Stop processing to avoid duplicate calls
+          } catch (err) {
+            console.error('Error redirecting parent window:', err);
+          }
         }
       }
       

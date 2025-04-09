@@ -22,185 +22,265 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     
     window.addEventListener('resize', handleResize);
     handleResize();
-    
-    // Force top redirection for any success or error URL parameters
+
+    // Force parent window navigation for any success or error URL parameters
     const checkForSuccessOrError = () => {
       const currentUrl = window.location.href;
       if (currentUrl.includes('success=true') || currentUrl.includes('error=true')) {
-        console.log('Detected success/error params in iframe URL, redirecting top window');
-        window.top.location.href = currentUrl; // Force top window redirection
+        console.log('Detected success/error params in URL, processing redirect');
+        
+        // Only redirect if we're the top window (not inside iframe)
+        if (window === window.top) {
+          // Update subscription flow step in session storage
+          const sessionData = sessionStorage.getItem('subscription_flow');
+          if (sessionData) {
+            try {
+              const parsedSession = JSON.parse(sessionData);
+              if (currentUrl.includes('success=true')) {
+                parsedSession.step = 'completion';
+              }
+              sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+            } catch (e) {
+              console.error('Error updating session data:', e);
+            }
+          }
+        }
       }
     };
 
-    // Run check immediately and every 1 second
+    // Run check immediately
     checkForSuccessOrError();
-    const intervalCheck = setInterval(checkForSuccessOrError, 1000);
     
     // Handle iframe messages for payment status
     const handleMessage = (event: MessageEvent) => {
       try {
-        // First, let's try to parse the data if it's a string
+        // Parse the data if it's a string
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         
-        console.log('Received message from iframe:', data);
+        console.log('Received message:', data);
         
         // Handle payment status messages from the iframe
-        if (data.type === 'payment_status') {
-          console.log('Received payment status from iframe:', data);
+        if (data.type === 'payment_status' || data.type === 'cardcom_redirect') {
+          console.log('Received payment status/redirect message:', data);
           
-          if (data.status === 'success') {
+          if (data.status === 'success' || data.success === true) {
             // Handle successful payment
-            console.log('Payment successful in iframe, redirecting parent window');
+            console.log('Payment successful, redirecting window');
             
-            // If we have a lowProfileId, redirect to our success URL
-            if (data.lowProfileId) {
+            // Construct redirect URL
+            let redirectUrl = data.url;
+            if (!redirectUrl) {
               const baseUrl = `${window.location.origin}/subscription`;
-              const redirectUrl = `${baseUrl}?step=completion&success=true&lpId=${data.lowProfileId}`;
+              redirectUrl = `${baseUrl}?step=completion&success=true`;
               
-              console.log('Redirecting to:', redirectUrl);
-              window.top.location.href = redirectUrl; // Redirect the top window
+              // Add lowProfileId if available
+              if (data.lowProfileId) {
+                redirectUrl += `&lpId=${data.lowProfileId}`;
+              }
             }
-          } else if (data.status === 'error') {
+            
+            console.log('Redirecting to:', redirectUrl);
+            
+            // Update flow state before redirecting
+            try {
+              const sessionData = sessionStorage.getItem('subscription_flow');
+              if (sessionData) {
+                const parsedSession = JSON.parse(sessionData);
+                parsedSession.step = 'completion';
+                sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+              }
+            } catch (e) {
+              console.error('Error updating session data:', e);
+            }
+            
+            // Redirect the top window
+            window.top.location.href = redirectUrl;
+          } else if (data.status === 'error' || data.success === false) {
             // Handle payment error
-            console.error('Payment error in iframe:', data.error);
+            console.error('Payment error:', data.error);
             
             // Redirect to error page
             const baseUrl = `${window.location.origin}/subscription`;
             window.top.location.href = `${baseUrl}?step=payment&error=true`;
           }
-        } else if (data.type === 'cardcom_redirect') {
-          // Handle redirection messages from the Cardcom iframe
-          console.log('Received redirect instruction from Cardcom:', data);
-          
-          if (data.url) {
-            console.log('Redirecting top window to:', data.url);
-            window.top.location.href = data.url;
-          }
         }
       } catch (error) {
         // Not our message or not JSON, ignore
-        console.log('Error processing iframe message:', error);
+        console.log('Error processing message:', error);
       }
     };
 
     window.addEventListener('message', handleMessage);
     
-    // Add a script to listen for navigation events inside the iframe
+    // Add a script to detect navigation events inside the iframe
     const injectIframeListener = () => {
       if (iframeRef.current && iframeRef.current.contentWindow) {
         try {
-          // Create a script element to inject into the iframe
-          const script = document.createElement('script');
-          script.innerHTML = `
-            // Monitor URL changes in the iframe
-            let lastUrl = window.location.href;
-            
-            // Check the URL immediately for any success/error parameters
-            if (lastUrl.includes('success=true') || lastUrl.includes('error=true')) {
-              console.log('Found success/error in iframe URL on load: ' + lastUrl);
-              // Force redirection to the parent window
-              window.parent.postMessage(JSON.stringify({
-                type: 'cardcom_redirect',
-                url: lastUrl,
-                forceRedirect: true
-              }), '*');
-            }
-            
-            const observer = new MutationObserver(() => {
-              if (window.location.href !== lastUrl) {
-                const newUrl = window.location.href;
-                lastUrl = newUrl;
+          const iframeDocument = iframeRef.current.contentDocument;
+          if (iframeDocument) {
+            // Create a script element to inject into the iframe
+            const script = document.createElement('script');
+            script.innerHTML = `
+              // Monitor URL changes
+              let lastUrl = window.location.href;
+              
+              // Check URL immediately
+              if (lastUrl.includes('success=true') || lastUrl.includes('error=true')) {
+                console.log('Found success/error in URL on load: ' + lastUrl);
                 
-                console.log('URL changed in iframe: ' + newUrl);
+                // Add target=_top if not present
+                if (!lastUrl.includes('target=_top')) {
+                  const url = new URL(lastUrl);
+                  url.searchParams.set('target', '_top');
+                  lastUrl = url.toString();
+                }
                 
-                // Check if this is a success or error redirect
-                if (newUrl.includes('success=true')) {
-                  console.log('Detected success=true in iframe URL');
-                  // Extract the lowProfileId if present
-                  const urlParams = new URLSearchParams(window.location.search);
-                  const lpId = urlParams.get('lpId');
-                  
-                  // Send message to parent
-                  window.parent.postMessage(JSON.stringify({
-                    type: 'cardcom_redirect',
-                    url: newUrl,
-                    success: true,
-                    forceRedirect: true,
-                    lowProfileId: lpId
-                  }), '*');
-                  
-                  // Also attempt a direct top window redirect
+                // Send message to parent window
+                window.parent.postMessage(JSON.stringify({
+                  type: 'cardcom_redirect',
+                  url: lastUrl,
+                  success: lastUrl.includes('success=true'),
+                  forceRedirect: true
+                }), '*');
+                
+                // Try direct navigation
+                try {
                   if (window.top) {
-                    try {
-                      window.top.location.href = newUrl + '&target=_top';
-                    } catch(e) {
-                      console.error('Failed to redirect top window', e);
-                    }
+                    window.top.location.href = lastUrl;
                   }
-                } else if (newUrl.includes('error=true')) {
-                  console.log('Detected error=true in iframe URL');
-                  // Send error message to parent
-                  window.parent.postMessage(JSON.stringify({
-                    type: 'cardcom_redirect',
-                    url: newUrl,
-                    success: false,
-                    forceRedirect: true
-                  }), '*');
+                } catch(e) {
+                  console.error('Failed to redirect top window', e);
+                }
+              }
+              
+              // Observe DOM changes to detect navigation
+              const observer = new MutationObserver(() => {
+                if (window.location.href !== lastUrl) {
+                  const newUrl = window.location.href;
+                  lastUrl = newUrl;
                   
-                  // Also attempt a direct top window redirect
-                  if (window.top) {
+                  console.log('URL changed in iframe: ' + newUrl);
+                  
+                  if (newUrl.includes('success=true') || newUrl.includes('error=true')) {
+                    console.log('Detected success/error in iframe URL');
+                    
+                    // Ensure URL has target=_top
+                    let finalUrl = newUrl;
+                    if (!finalUrl.includes('target=_top')) {
+                      const url = new URL(finalUrl);
+                      url.searchParams.set('target', '_top');
+                      finalUrl = url.toString();
+                    }
+                    
+                    // Extract the lowProfileId if present
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const lpId = urlParams.get('lpId');
+                    
+                    // Send message to parent window
+                    window.parent.postMessage(JSON.stringify({
+                      type: 'cardcom_redirect',
+                      url: finalUrl,
+                      success: newUrl.includes('success=true'),
+                      forceRedirect: true,
+                      lowProfileId: lpId
+                    }), '*');
+                    
+                    // Try direct top window redirect
                     try {
-                      window.top.location.href = newUrl + '&target=_top';
+                      if (window.top) {
+                        window.top.location.href = finalUrl;
+                      }
                     } catch(e) {
                       console.error('Failed to redirect top window', e);
                     }
                   }
                 }
-              }
-            });
+              });
+              
+              // Start observing
+              observer.observe(document, { subtree: true, childList: true });
+              
+              // Listen for form submissions
+              document.addEventListener('submit', (e) => {
+                console.log('Form submitted in iframe');
+                window.parent.postMessage(JSON.stringify({
+                  type: 'form_submit'
+                }), '*');
+              });
+            `;
             
-            // Start observing
-            observer.observe(document, { subtree: true, childList: true });
-            
-            // Also listen for form submissions
-            document.addEventListener('submit', (e) => {
-              console.log('Form submitted in iframe');
-              // Tell the parent window about the form submission
-              window.parent.postMessage(JSON.stringify({
-                type: 'form_submit'
-              }), '*');
-            });
-          `;
+            iframeDocument.body.appendChild(script);
+            console.log('Script injected into iframe');
+          }
+        } catch (error) {
+          console.error('Error injecting script into iframe:', error);
           
-          // Wait for iframe to load then inject the script
+          // Fallback method: Try to inject when iframe loads
           iframeRef.current.onload = () => {
             try {
-              const iframeDocument = iframeRef.current?.contentWindow?.document;
-              if (iframeDocument && iframeDocument.body) {
-                const scriptElement = iframeDocument.createElement('script');
-                scriptElement.textContent = script.innerHTML;
-                iframeDocument.body.appendChild(scriptElement);
-                console.log('Script injected into iframe');
+              const iframeDoc = iframeRef.current?.contentWindow?.document;
+              if (iframeDoc && iframeDoc.body) {
+                const scriptEl = iframeDoc.createElement('script');
+                scriptEl.textContent = `
+                  console.log('Iframe observer initialized');
+                  
+                  // Check URL immediately
+                  if (window.location.href.includes('success=true') || window.location.href.includes('error=true')) {
+                    console.log('Success/error detected in URL: ' + window.location.href);
+                    
+                    // Send message to parent
+                    window.parent.postMessage(JSON.stringify({
+                      type: 'cardcom_redirect',
+                      url: window.location.href,
+                      success: window.location.href.includes('success=true'),
+                      forceRedirect: true
+                    }), '*');
+                    
+                    // Try to break out
+                    if (window.top && window !== window.top) {
+                      window.top.location.href = window.location.href;
+                    }
+                  }
+                  
+                  // Monitor URL changes
+                  setInterval(function() {
+                    const currentHref = window.location.href;
+                    if (currentHref.includes('success=true') || currentHref.includes('error=true')) {
+                      console.log('Success/error detected in URL: ' + currentHref);
+                      
+                      window.parent.postMessage(JSON.stringify({
+                        type: 'cardcom_redirect',
+                        url: currentHref,
+                        success: currentHref.includes('success=true'),
+                        forceRedirect: true
+                      }), '*');
+                      
+                      if (window.top && window !== window.top) {
+                        window.top.location.href = currentHref;
+                      }
+                    }
+                  }, 500);
+                `;
+                iframeDoc.body.appendChild(scriptEl);
+                console.log('Fallback script injected into iframe');
               }
-            } catch (error) {
-              console.error('Error injecting script into iframe:', error);
+            } catch (e) {
+              console.error('Fallback script injection failed:', e);
             }
           };
-        } catch (error) {
-          console.error('Error setting up iframe listener:', error);
         }
       }
     };
     
     // Try to inject the script
     if (iframeRef.current) {
-      injectIframeListener();
+      // Small delay to make sure iframe is loaded
+      setTimeout(injectIframeListener, 1000);
     }
     
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('message', handleMessage);
-      clearInterval(intervalCheck);
     };
   }, []);
 
