@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -35,23 +34,19 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Use our new error handling hook
   const { handleError, checkForRecovery, isRecovering, sessionId } = usePaymentErrorHandling({
     planId,
     onCardUpdate: () => navigate('/subscription?step=update-card'),
     onAlternativePayment: () => navigate('/subscription?step=alternative-payment')
   });
 
-  // Check for recovery data on mount
   useEffect(() => {
     const checkRecovery = async () => {
       const recoveryData = await checkForRecovery();
       if (recoveryData) {
-        // We have recovered data, prefill it
         toast.info('נמצאו פרטים להשלמת התשלום');
         
         if (recoveryData.planId && recoveryData.planId !== planId) {
-          // Redirect to the right plan if needed
           navigate(`/subscription?step=3&plan=${recoveryData.planId}&recover=${sessionId}`);
         }
       }
@@ -117,7 +112,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     } catch (error: any) {
       console.error("Payment processing error:", error);
       
-      // Use our new error handling system
       const errorInfo = await handleError(error, {
         tokenData,
         planId,
@@ -162,7 +156,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       await handlePaymentProcessing(tokenData);
     } catch (error: any) {
-      // This is already handled in handlePaymentProcessing, but adding as a safety net
       console.error('Payment processing error:', error);
     } finally {
       setIsProcessing(false);
@@ -180,7 +173,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       
       window.location.href = data.url;
     } catch (error: any) {
-      // Use our new error handling system
       const errorInfo = await handleError(error, {
         planId,
         userInfo: user ? { userId: user.id, email: user.email } : null

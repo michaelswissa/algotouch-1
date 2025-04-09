@@ -26,3 +26,15 @@ verify_jwt = true
 [functions.generate-document]
 verify_jwt = true
 
+[functions.get-cancellation-data]
+verify_jwt = true
+
+[functions.recover-payment-session]
+verify_jwt = false
+
+[functions."recover-payment-session/get-session"]
+verify_jwt = false
+
+[functions."recover-payment-session/save-session"]
+verify_jwt = false
+

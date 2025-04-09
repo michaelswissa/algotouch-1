@@ -28,26 +28,58 @@ serve(async (req) => {
       }
     );
 
-    // Get request body
-    const { email, errorInfo, sessionId, recoveryUrl } = await req.json();
+    // Get session data from request body
+    const { 
+      sessionId, 
+      userId, 
+      email, 
+      planId, 
+      paymentDetails,
+      expiresAt
+    } = await req.json();
 
-    // Ensure payment_sessions table exists
+    if (!sessionId || !planId || !expiresAt) {
+      throw new Error('Session ID, plan ID, and expiry date are required');
+    }
+
+    // Check if payment_sessions table exists and create it if not
     await createPaymentSessionsTableIfNeeded(supabase);
     
-    // Store recovery attempt
-    await supabase.from('payment_recovery_logs').insert({
-      email,
-      session_id: sessionId,
-      error_info: errorInfo,
-      recovery_url: recoveryUrl
+    // Insert the session data
+    const { data, error } = await supabase.rpc('execute_sql', {
+      sql_query: `
+        INSERT INTO public.payment_sessions (
+          id, 
+          user_id, 
+          email, 
+          plan_id, 
+          payment_details, 
+          expires_at
+        ) VALUES (
+          '${sessionId}',
+          ${userId ? `'${userId}'` : 'null'},
+          ${email ? `'${email}'` : 'null'},
+          '${planId}',
+          '${JSON.stringify(paymentDetails || {})}'::jsonb,
+          '${expiresAt}'
+        )
+        ON CONFLICT (id) DO UPDATE
+        SET 
+          user_id = ${userId ? `'${userId}'` : 'null'},
+          email = ${email ? `'${email}'` : 'null'},
+          plan_id = '${planId}',
+          payment_details = '${JSON.stringify(paymentDetails || {})}'::jsonb,
+          expires_at = '${expiresAt}'
+        RETURNING id
+      `
     });
 
-    // Send recovery email - this is just a placeholder
-    // In a real implementation, you would call an email service here
-    console.log(`Recovery email would be sent to ${email} with recovery URL: ${recoveryUrl}`);
+    if (error) {
+      throw new Error(`Error saving session: ${error.message}`);
+    }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, sessionId }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -55,10 +87,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in recover-payment-session function:', error);
+    console.error('Error in save-session function:', error);
     
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
@@ -91,19 +123,8 @@ async function createPaymentSessionsTableIfNeeded(supabase: any) {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
           );
 
-          -- Create payment_recovery_logs table
-          CREATE TABLE IF NOT EXISTS public.payment_recovery_logs (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            email TEXT NOT NULL,
-            session_id UUID,
-            error_info JSONB,
-            recovery_url TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-          );
-
           -- Add RLS policies
           ALTER TABLE public.payment_sessions ENABLE ROW LEVEL SECURITY;
-          ALTER TABLE public.payment_recovery_logs ENABLE ROW LEVEL SECURITY;
 
           -- Allow users to access their own payment sessions
           CREATE POLICY "Users can access their own payment sessions"
@@ -111,20 +132,6 @@ async function createPaymentSessionsTableIfNeeded(supabase: any) {
             FOR ALL
             USING (
               auth.uid() = user_id OR 
-              auth.uid() = '00000000-0000-0000-0000-000000000000'
-            );
-
-          -- Allow anyone to insert payment recovery logs (no auth required)
-          CREATE POLICY "Anyone can insert recovery logs"
-            ON public.payment_recovery_logs
-            FOR INSERT
-            WITH CHECK (true);
-            
-          -- Only admins can read recovery logs
-          CREATE POLICY "Only admins can read recovery logs"
-            ON public.payment_recovery_logs
-            FOR SELECT
-            USING (
               auth.uid() = '00000000-0000-0000-0000-000000000000'
             );
         `
