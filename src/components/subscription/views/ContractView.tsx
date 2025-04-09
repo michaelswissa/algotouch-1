@@ -3,6 +3,7 @@ import React from 'react';
 import ContractSection from '@/components/subscription/ContractSection';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
+import { sendContractConfirmationEmail } from '@/lib/contracts/email-service';
 
 interface ContractViewProps {
   selectedPlan: string;
@@ -71,12 +72,32 @@ const ContractView: React.FC<ContractViewProps> = ({
         parsedRegistrationData.planId = selectedPlan;
         sessionStorage.setItem('registration_data', JSON.stringify(parsedRegistrationData));
         console.log('Updated registration data with contract details');
+        
+        // Send contract confirmation email if we have user email
+        if (parsedRegistrationData.email) {
+          sendContractConfirmationEmail(
+            parsedRegistrationData.email,
+            parsedRegistrationData.userData?.firstName + ' ' + parsedRegistrationData.userData?.lastName,
+            new Date().toISOString()
+          ).catch(error => {
+            console.error('Error sending confirmation email:', error);
+            // Non-critical error, we can continue
+          });
+        }
       } catch (error) {
         console.error('Error updating registration data with contract:', error);
         // Continue with the flow even if this fails
       }
-    } else {
-      console.log('User is authenticated, using regular contract flow');
+    } else if (user?.email) {
+      // Send contract confirmation email for authenticated users
+      sendContractConfirmationEmail(
+        user.email,
+        fullName,
+        new Date().toISOString()
+      ).catch(error => {
+        console.error('Error sending confirmation email:', error);
+        // Non-critical error, we can continue
+      });
     }
     
     console.log('Contract signed, sending data to parent component', { 

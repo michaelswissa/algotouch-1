@@ -46,7 +46,13 @@ serve(async (req) => {
       );
     }
 
-    console.log('Cancelling subscription for user:', user.id);
+    // Get cancellation details from request
+    const { reason, feedback, subscriptionId } = await req.json();
+    
+    console.log('Cancelling subscription for user:', user.id, {
+      reason,
+      subscriptionId
+    });
     
     // Get the current subscription
     const { data: subscription, error: fetchError } = await supabaseClient
@@ -111,10 +117,50 @@ serve(async (req) => {
         payment_date: now
       });
     
+    // Store cancellation feedback if provided
+    if (reason || feedback) {
+      try {
+        await supabaseClient
+          .from('subscription_cancellations')
+          .insert({
+            user_id: user.id,
+            subscription_id: subscription.id,
+            reason,
+            feedback,
+            cancelled_at: now
+          });
+      } catch (feedbackError) {
+        console.error('Error storing cancellation feedback:', feedbackError);
+        // Non-critical error, continue with cancellation
+      }
+    }
+    
+    // Send cancellation notification email (could be implemented with another edge function)
+    // try {
+    //   await supabaseClient.functions.invoke('send-email', {
+    //     body: {
+    //       to: user.email,
+    //       subject: 'Subscription Cancellation Confirmation',
+    //       template: 'subscription_cancelled',
+    //       data: {
+    //         fullName: user.user_metadata?.full_name || user.email,
+    //         subscriptionDetails: {
+    //           planType: subscription.plan_type,
+    //           endDate: subscription.current_period_ends_at || now
+    //         }
+    //       }
+    //     }
+    //   });
+    // } catch (emailError) {
+    //   console.error('Error sending cancellation email:', emailError);
+    //   // Non-critical error, continue with cancellation
+    // }
+    
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Subscription cancelled successfully'
+        message: 'Subscription cancelled successfully',
+        effectiveDate: subscription.current_period_ends_at
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
