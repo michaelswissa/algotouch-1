@@ -51,6 +51,23 @@ export async function generateDocument(params: DocumentRequest): Promise<{ succe
  */
 export async function getUserDocuments(userId: string): Promise<{ success: boolean; documents?: any[]; error?: any }> {
   try {
+    // Check if the documents table exists first
+    const { error: checkError } = await supabase
+      .rpc('check_row_exists', {
+        p_table_name: 'documents',
+        p_column_name: 'id', 
+        p_value: 'any'
+      });
+      
+    if (checkError) {
+      console.warn('Documents table may not exist yet:', checkError.message);
+      return { 
+        success: true, 
+        documents: [] 
+      };
+    }
+    
+    // If the table exists, query documents
     const { data: documents, error } = await supabase
       .from('documents')
       .select('*')
@@ -81,7 +98,7 @@ export async function getDocumentById(documentId: string): Promise<{ success: bo
       .from('documents')
       .select('*')
       .eq('id', documentId)
-      .single();
+      .maybeSingle();
       
     if (error) throw error;
     
@@ -106,16 +123,21 @@ export async function handlePaymentDocumentGeneration(
   userId: string,
   amount: number,
   planType: string
-): Promise<{ success: boolean; error?: any }> {
+): Promise<{ success: boolean; documentUrl?: string; error?: any }> {
   try {
     // Get user information
     const { data: userData, error: userError } = await supabase
       .from('profiles')
       .select('first_name, last_name, email, phone')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
       
     if (userError) throw userError;
+    
+    if (!userData) {
+      console.warn('User profile not found for document generation', { userId });
+      return { success: false, error: 'פרופיל משתמש לא נמצא' };
+    }
     
     const email = userData?.email || '';
     const fullName = `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim();

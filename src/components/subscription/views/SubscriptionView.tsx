@@ -52,7 +52,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({
       );
     case 'completion':
       return (
-        <CompletionView />
+        <CompletionView planId={selectedPlan} />
       );
     default:
       return <PlanSelectionView 
