@@ -1,7 +1,6 @@
 
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { sendRecoveryEmail } from '../services/recoveryService';
 
 // Common CardCom and payment provider error codes mapped to user-friendly messages
 export const ERROR_CODES = {
@@ -79,10 +78,9 @@ export const logPaymentError = async (
     // Log to console for development
     console.error('Payment Error:', errorInfo);
     
-    // Store in Supabase for monitoring
-    if (userId) {
-      await supabase.from('payment_errors').insert(errorInfo);
-    }
+    // Since the payment_errors table doesn't exist, just return the error info without storing it
+    // We'll log this in the console instead
+    console.warn('Payment error occurred, but cannot store in database (table not found):', errorInfo);
 
     return errorInfo;
   } catch (loggingError) {
@@ -168,8 +166,11 @@ export const handlePaymentError = async (
       }
       
       // Send recovery email for persistent errors
-      if (email && userId) {
-        sendRecoveryEmail(email, errorInfo, sessionId);
+      if (email && userId && sessionId) {
+        // Import the function here to avoid circular dependencies
+        import('../services/recoveryService').then(({ sendRecoveryEmail }) => {
+          sendRecoveryEmail(email, errorInfo, sessionId);
+        });
       }
   }
   

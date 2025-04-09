@@ -54,7 +54,7 @@ export const useSubscription = () => {
           setError(null);
           const { data, error } = await supabase
             .from('subscriptions')
-            .select('*, cancellation_data:subscription_cancellations(*)')
+            .select('*')
             .eq('user_id', user.id)
             .single();
           
@@ -83,8 +83,24 @@ export const useSubscription = () => {
             };
             setSubscription(formattedSubscription);
             
+            // Try to fetch cancellation data if available
+            let cancellationData = null;
+            try {
+              // Check if subscription_cancellations table exists and has data for this subscription
+              const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
+                body: { subscriptionId: data.id }
+              });
+              
+              if (cancelData && cancelData.length > 0) {
+                cancellationData = cancelData;
+              }
+            } catch (cancelError) {
+              console.error('Error fetching cancellation data:', cancelError);
+              // Continue even if this fails
+            }
+            
             // Process the subscription details
-            const subscriptionDetails = getSubscriptionDetails(formattedSubscription, data.cancellation_data);
+            const subscriptionDetails = getSubscriptionDetails(formattedSubscription, cancellationData);
             setDetails(subscriptionDetails);
           }
         } catch (error) {
@@ -166,8 +182,13 @@ export const useSubscription = () => {
     }
     
     // Add cancellation reason and feedback if available
-    const cancellationReason = cancellationData?.[0]?.reason;
-    const cancellationFeedback = cancellationData?.[0]?.feedback;
+    let cancellationReason = undefined;
+    let cancellationFeedback = undefined;
+    
+    if (cancellationData && cancellationData[0]) {
+      cancellationReason = cancellationData[0].reason;
+      cancellationFeedback = cancellationData[0].feedback;
+    }
     
     return {
       planName,
@@ -205,7 +226,7 @@ export const useSubscription = () => {
       // Refresh the subscription data
       const { data: updatedData, error: fetchError } = await supabase
         .from('subscriptions')
-        .select('*, cancellation_data:subscription_cancellations(*)')
+        .select('*')
         .eq('id', subscription.id)
         .single();
         
@@ -223,8 +244,22 @@ export const useSubscription = () => {
         
         setSubscription(updatedSubscription);
         
+        // Try to fetch cancellation data
+        let cancellationData = null;
+        try {
+          const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
+            body: { subscriptionId: subscription.id }
+          });
+          
+          if (cancelData && cancelData.length > 0) {
+            cancellationData = cancelData;
+          }
+        } catch (cancelError) {
+          console.error('Error fetching cancellation data:', cancelError);
+        }
+        
         // Update details with cancellation info
-        const updatedDetails = getSubscriptionDetails(updatedSubscription, updatedData.cancellation_data);
+        const updatedDetails = getSubscriptionDetails(updatedSubscription, cancellationData);
         setDetails(updatedDetails);
       }
       

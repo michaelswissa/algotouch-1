@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { handlePaymentError, savePaymentSession } from '../services/recoveryService';
+import { savePaymentSession } from '../services/recoveryService';
+import { getErrorMessage, mapErrorCode, isTransientError, logPaymentError } from '../utils/errorHandling';
 import { useAuth } from '@/contexts/auth';
 
 interface UsePaymentErrorHandlingProps {
@@ -32,7 +33,8 @@ export const usePaymentErrorHandling = ({
       setSessionId(recoveryId);
       
       try {
-        // Get session data
+        // Get session data - import dynamically to avoid circular deps
+        const { getRecoverySession } = await import('../services/recoveryService');
         const sessionData = await getRecoverySession(recoveryId);
         
         if (!sessionData) {
@@ -73,19 +75,50 @@ export const usePaymentErrorHandling = ({
     }
     
     // Process the error
-    return handlePaymentError(
-      error,
-      user?.id,
-      user?.email,
-      newSessionId || sessionId,
-      {
-        shouldRetry: true,
-        maxRetries: 2,
-        paymentDetails,
-        onCardUpdate,
-        onAlternativePayment
-      }
+    const errorCode = mapErrorCode(error);
+    const errorMessage = getErrorMessage(errorCode);
+    
+    // Log the error
+    const errorInfo = await logPaymentError(
+      error, 
+      user?.id, 
+      'payment-processing', 
+      paymentDetails
     );
+    
+    // Display user-friendly message
+    toast.error(errorMessage);
+    
+    // Handle specific error cases
+    switch (errorCode) {
+      case 'INSUFFICIENT_FUNDS':
+        if (onAlternativePayment) {
+          onAlternativePayment();
+        }
+        break;
+        
+      case 'EXPIRED_CARD':
+        if (onCardUpdate) {
+          onCardUpdate();
+        }
+        break;
+        
+      case 'SESSION_EXPIRED':
+        toast.error('פג תוקף החיבור, אנא התחבר מחדש');
+        // Redirect to login page
+        setTimeout(() => {
+          window.location.href = '/auth';
+        }, 1500);
+        break;
+    }
+    
+    // Send recovery email for persistent errors
+    if (user?.email && user?.id) {
+      const { sendRecoveryEmail } = await import('../services/recoveryService');
+      sendRecoveryEmail(user.email, errorInfo, newSessionId || sessionId);
+    }
+    
+    return errorInfo;
   };
   
   return {

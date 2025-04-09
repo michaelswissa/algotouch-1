@@ -65,16 +65,16 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       setIsProcessing(true);
       setPaymentError(null);
       
-      let operationType = 3; // Default: token creation only (for monthly subscription with free trial)
+      let operationTypeValue = 3; // Default: token creation only (for monthly subscription with free trial)
       
       if (planId === 'annual') {
-        operationType = 2; // Charge and create token for recurring annual payments
+        operationTypeValue = 2; // Charge and create token for recurring annual payments
       } else if (planId === 'vip') {
-        operationType = 1; // Charge only - one-time payment
+        operationTypeValue = 1; // Charge only - one-time payment
       }
       
       if (user) {
-        await handleExistingUserPayment(user.id, planId, tokenData, operationType, planDetails);
+        await handleExistingUserPayment(user.id, planId, tokenData, operationTypeValue, planDetails);
       } else if (registrationData) {
         const updatedData = {
           ...registrationData,
@@ -121,7 +121,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       const errorInfo = await handleError(error, {
         tokenData,
         planId,
-        operationType
+        operationType: operationTypeValue
       });
       
       const paymentError: PaymentError = new Error(errorInfo?.errorMessage || 'שגיאה לא ידועה בתהליך התשלום');

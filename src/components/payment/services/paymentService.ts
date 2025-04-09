@@ -1,8 +1,13 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { TokenData } from '../utils/paymentHelpers';
+import { TokenData } from '@/types/payment';
 import { RegistrationResult } from '../hooks/types';
 import { toast } from 'sonner'; 
-import { handlePaymentError, logPaymentError } from '../utils/errorHandling';
+
+// Import using a dynamic import to avoid circular dependencies
+const importErrorHandling = async () => {
+  return await import('../utils/errorHandling');
+};
 
 export const handleExistingUserPayment = async (
   userId: string,
@@ -103,6 +108,8 @@ export const handleExistingUserPayment = async (
         });
       } catch (docError) {
         console.error('Error generating document:', docError);
+        // Use dynamic import to avoid circular dependency
+        const { logPaymentError } = await importErrorHandling();
         logPaymentError(docError, userId, 'document-generation', { 
           paymentId: paymentData.id,
           userId: userId 
@@ -121,6 +128,8 @@ export const handleExistingUserPayment = async (
         });
     }
   } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
     await handlePaymentError(error, userId, undefined, undefined, {
       paymentDetails: {
         userId,
@@ -226,14 +235,17 @@ export const initiateExternalPayment = async (
       throw new Error('לא התקבלה כתובת תשלום מהשרת');
     }
     
+    // Instead of directly accessing the payment_sessions table, use an edge function
     if (user?.id || registrationData) {
-      await supabase.from('payment_sessions').insert({
-        id: paymentSessionId,
-        user_id: user?.id || null,
-        email: user?.email || registrationData?.email || null,
-        plan_id: planId,
-        payment_details: payload,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      await supabase.functions.invoke('recover-payment-session/save-session', {
+        body: {
+          sessionId: paymentSessionId,
+          userId: user?.id || null,
+          email: user?.email || registrationData?.email || null,
+          planId: planId,
+          paymentDetails: payload,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        }
       });
     }
     
@@ -242,6 +254,8 @@ export const initiateExternalPayment = async (
       sessionId: paymentSessionId
     };
   } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
     await handlePaymentError(error, user?.id, user?.email, undefined, {
       paymentDetails: {
         planId, 
@@ -367,6 +381,8 @@ export const retryFailedPayment = async (paymentId: string, userId: string) => {
     
     return { success: true, data };
   } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
     await handlePaymentError(error, userId, undefined, undefined, {
       paymentDetails: { paymentId }
     });
@@ -410,11 +426,14 @@ export const checkForExpiringCards = async (userId: string) => {
 
 export const addAlternativePaymentMethod = async (userId: string, tokenData: TokenData) => {
   try {
+    // Cast tokenData.token to ensure it's a string 
+    const token = String(tokenData.token || `fallback_${Date.now()}`);
+    
     const { data, error } = await supabase
       .from('payment_tokens')
       .insert({
         user_id: userId,
-        token: tokenData.token || `fallback_${Date.now()}`,
+        token: token,
         token_expiry: `${tokenData.expiryYear}-${tokenData.expiryMonth}-01`,
         card_last_four: tokenData.lastFourDigits,
         is_active: true
@@ -426,6 +445,8 @@ export const addAlternativePaymentMethod = async (userId: string, tokenData: Tok
     
     return { success: true, tokenId: data.id };
   } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
     await handlePaymentError(error, userId, undefined, undefined, {
       paymentDetails: { action: 'add-alternative-payment' }
     });

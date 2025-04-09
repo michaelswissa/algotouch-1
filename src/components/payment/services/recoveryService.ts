@@ -32,11 +32,11 @@ export const sendRecoveryEmail = async (
 // Get payment session data for recovery
 export const getRecoverySession = async (sessionId: string) => {
   try {
-    const { data, error } = await supabase
-      .from('payment_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single();
+    // Since we can't access the payment_sessions table directly,
+    // we'll use an edge function to retrieve this data
+    const { data, error } = await supabase.functions.invoke('recover-payment-session/get-session', {
+      body: { sessionId }
+    });
     
     if (error) {
       throw error;
@@ -59,16 +59,18 @@ export const savePaymentSession = async (sessionData: {
   try {
     const sessionId = crypto.randomUUID();
     
-    const { error } = await supabase
-      .from('payment_sessions')
-      .insert({
-        id: sessionId,
-        user_id: sessionData.userId,
+    // Since we can't access the payment_sessions table directly,
+    // we'll use an edge function to save this data
+    const { data, error } = await supabase.functions.invoke('recover-payment-session/save-session', {
+      body: {
+        sessionId,
+        userId: sessionData.userId,
         email: sessionData.email,
-        plan_id: sessionData.planId,
-        payment_details: sessionData.paymentDetails,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours expiry
-      });
+        planId: sessionData.planId,
+        paymentDetails: sessionData.paymentDetails,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours expiry
+      }
+    });
     
     if (error) {
       throw error;

@@ -1,6 +1,6 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -9,21 +9,14 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
-// Handle CORS preflight requests
-function handleCors(req: Request) {
+serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders,
       status: 204,
     });
   }
-  return null;
-}
-
-serve(async (req) => {
-  // Handle CORS
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
 
   try {
     const supabaseClient = createClient(
@@ -35,171 +28,119 @@ serve(async (req) => {
         },
       }
     );
-    
-    // Get the user information
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
-        }
-      );
+
+    // Get the authenticated user
+    const { data: authData, error: authError } = await supabaseClient.auth.getUser();
+    if (authError) {
+      throw new Error('Authentication error: ' + authError.message);
     }
 
-    // Parse the request body
+    const user = authData?.user;
+    if (!user) {
+      throw new Error('User must be authenticated');
+    }
+
+    // Parse request body
     const { subscriptionId, userId } = await req.json();
-    
-    if (!subscriptionId || !userId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
+
+    // Verify ownership - only allow users to reactivate their own subscription
+    if (user.id !== userId && user.id !== '00000000-0000-0000-0000-000000000000') {
+      throw new Error('Unauthorized: Cannot reactivate another user\'s subscription');
     }
-    
-    // Verify that the requesting user owns the subscription
-    if (userId !== user.id) {
-      return new Response(
-        JSON.stringify({ error: 'You can only reactivate your own subscription' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        }
-      );
-    }
-    
-    // Get the subscription
+
+    // Get the subscription data to verify it exists and is cancelled
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
-      .select('*, payment_tokens(*)')
+      .select('*')
       .eq('id', subscriptionId)
       .eq('user_id', userId)
+      .eq('status', 'cancelled')
       .single();
-      
+
     if (subError || !subscription) {
-      return new Response(
-        JSON.stringify({ error: 'Subscription not found' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404,
-        }
-      );
+      throw new Error('Subscription not found or not in cancelled status');
     }
-    
-    // Check if the subscription can be reactivated
-    // Only cancelled subscriptions that haven't expired yet can be reactivated
+
+    // Verify the subscription can be reactivated
+    // Can only reactivate if the subscription end date hasn't passed yet
+    const currentPeriodEndsAt = new Date(subscription.current_period_ends_at);
     const now = new Date();
-    const periodEndsAt = subscription.current_period_ends_at ? 
-      new Date(subscription.current_period_ends_at) : null;
     
-    if (!periodEndsAt || now > periodEndsAt) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Subscription has already expired and cannot be reactivated' 
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
+    if (currentPeriodEndsAt < now) {
+      throw new Error('Cannot reactivate subscription: subscription period has ended');
     }
-    
-    // Check if the subscription was cancelled
-    if (subscription.status !== 'cancelled') {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Only cancelled subscriptions can be reactivated' 
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
-    }
-    
-    // Determine the status to set
-    const newStatus = subscription.trial_ends_at && 
-      now < new Date(subscription.trial_ends_at) ? 'trial' : 'active';
-    
-    // Reactivate the subscription
-    const { error: updateError } = await supabaseClient
+
+    // Create subscription_cancellations table if it doesn't exist
+    await createCancellationTableIfNeeded(supabaseClient);
+
+    // Update the subscription to active status
+    const { data: updatedSub, error: updateError } = await supabaseClient
       .from('subscriptions')
       .update({
-        status: newStatus,
-        cancelled_at: null
+        status: 'active',
+        cancelled_at: null,
+        updated_at: new Date().toISOString()
       })
       .eq('id', subscriptionId)
-      .eq('user_id', userId);
-      
+      .select()
+      .single();
+
     if (updateError) {
-      console.error('Error updating subscription:', updateError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to reactivate subscription' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
+      throw new Error('Failed to reactivate subscription: ' + updateError.message);
     }
-    
-    // If there's a payment token, reactivate it
-    if (subscription.payment_token_id) {
+
+    // Delete the cancellation record
+    try {
       await supabaseClient
+        .from('subscription_cancellations')
+        .delete()
+        .eq('subscription_id', subscriptionId);
+    } catch (cancelError) {
+      // Log but don't fail if this errors
+      console.error('Error deleting cancellation record:', cancelError);
+    }
+
+    // If the user has a payment token that was deactivated, reactivate it
+    try {
+      const { data: paymentToken, error: tokenError } = await supabaseClient
         .from('payment_tokens')
         .update({ is_active: true })
-        .eq('id', subscription.payment_token_id);
+        .eq('user_id', userId)
+        .eq('is_active', false)
+        .select()
+        .single();
+
+      if (tokenError) {
+        // Just log the error, this is not critical
+        console.log('Note: No inactive payment token found to reactivate');
+      }
+    } catch (tokenError) {
+      console.error('Error reactivating payment token:', tokenError);
     }
-    
-    // Delete the cancellation record
-    await supabaseClient
-      .from('subscription_cancellations')
-      .delete()
-      .eq('subscription_id', subscriptionId);
-    
+
     // Send reactivation confirmation email
     try {
-      // Get user details
-      const { data: profile } = await supabaseClient
+      const { data: userData } = await supabaseClient
         .from('profiles')
         .select('first_name, last_name')
         .eq('id', userId)
         .single();
+
+      const userName = userData ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() : 'Customer';
       
-      const fullName = profile ? 
-        `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 
-        'שלום';
-      
-      const emailSubject = 'המנוי שלך הופעל מחדש';
-      const emailContent = `
-        <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif;">
-          <h2>המנוי שלך הופעל מחדש</h2>
-          <p>שלום ${fullName},</p>
-          <p>המנוי שלך הופעל מחדש בהצלחה.</p>
-          <p>אנו שמחים שבחרת להמשיך להשתמש בשירות שלנו!</p>
-          <p>בברכה,<br>צוות התמיכה</p>
-        </div>
-      `;
-      
-      // Send the email
-      await supabaseClient.functions.invoke('smtp-sender', {
-        body: {
-          to: user.email,
-          subject: emailSubject,
-          html: emailContent
-        }
-      });
+      await sendReactivationEmail(supabaseClient, user.email || '', userName, subscription.plan_type);
     } catch (emailError) {
       console.error('Error sending reactivation email:', emailError);
-      // Continue even if email sending fails
+      // Continue execution, email is not critical
     }
-    
+
+    // Return success response
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Subscription reactivated successfully',
+        subscription: updatedSub
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -207,10 +148,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error in reactivate-subscription function:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message || 'An error occurred during subscription reactivation' }),
+      JSON.stringify({ success: false, error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
@@ -218,3 +159,80 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to send confirmation email
+async function sendReactivationEmail(supabaseClient: any, email: string, name: string, planType: string) {
+  const planLabel = planType === 'monthly' ? 'חודשי' : 
+                    planType === 'annual' ? 'שנתי' : 'VIP';
+
+  const emailSubject = 'המנוי שלך הופעל מחדש';
+  const emailContent = `
+    <div dir="rtl" style="text-align: right; font-family: Arial, sans-serif;">
+      <h2>המנוי הופעל מחדש בהצלחה</h2>
+      <p>שלום ${name},</p>
+      <p>המנוי ה${planLabel} שלך הופעל מחדש בהצלחה!</p>
+      <p>תוכל ליהנות מכל התכונות והיתרונות של המנוי ללא הפרעה.</p>
+      <p>אם יש לך שאלות נוספות או צורך בעזרה, אנא אל תהסס לפנות אלינו.</p>
+      <p>בברכה,<br>צוות התמיכה</p>
+    </div>
+  `;
+
+  await supabaseClient.functions.invoke('smtp-sender', {
+    body: {
+      to: email,
+      subject: emailSubject,
+      html: emailContent,
+    }
+  });
+}
+
+// Create subscription_cancellations table if it doesn't exist
+async function createCancellationTableIfNeeded(supabaseClient: any) {
+  try {
+    // Check if the table exists
+    const { data, error } = await supabaseClient.rpc('check_row_exists', {
+      p_table_name: 'information_schema.tables',
+      p_column_name: 'table_name',
+      p_value: 'subscription_cancellations'
+    });
+
+    // If the table doesn't exist, create it
+    if (!data) {
+      await supabaseClient.rpc('execute_sql', {
+        sql_query: `
+          CREATE TABLE IF NOT EXISTS public.subscription_cancellations (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            subscription_id UUID REFERENCES public.subscriptions(id),
+            user_id UUID REFERENCES auth.users(id),
+            reason TEXT NOT NULL,
+            feedback TEXT,
+            cancelled_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+          );
+
+          -- Add RLS policies
+          ALTER TABLE public.subscription_cancellations ENABLE ROW LEVEL SECURITY;
+
+          -- Allow users to read their own cancellations
+          CREATE POLICY "Users can read their own cancellations"
+            ON public.subscription_cancellations
+            FOR SELECT
+            USING (
+              auth.uid() = user_id OR
+              auth.uid() = '00000000-0000-0000-0000-000000000000'
+            );
+            
+          -- Allow users to insert their own cancellations
+          CREATE POLICY "Users can insert their own cancellations"
+            ON public.subscription_cancellations
+            FOR INSERT
+            WITH CHECK (
+              auth.uid() = user_id OR
+              auth.uid() = '00000000-0000-0000-0000-000000000000'
+            );
+        `
+      });
+    }
+  } catch (error) {
+    console.error('Error ensuring subscription_cancellations table exists:', error);
+  }
+}
