@@ -28,7 +28,7 @@ export const usePaymentUrlParams = (
       const error = params.get('error');
       const regId = params.get('regId');
       const lpId = params.get('lpId');
-      const forceRedirect = params.get('forceRedirect');
+      const forceTop = params.get('force_top');
       
       console.log('Processing URL parameters:', {
         stepParam,
@@ -36,12 +36,12 @@ export const usePaymentUrlParams = (
         error,
         regId,
         lpId,
-        forceRedirect
+        forceTop
       });
       
-      // TOP PRIORITY: Check for success parameter - this takes precedence over all other logic
-      if (success === 'true') {
-        console.log('Success=true detected in URL, forcing completion step');
+      // TOP PRIORITY: Check for success parameter with force_top - this means we're already broken out of the iframe
+      if (success === 'true' && forceTop === 'true') {
+        console.log('Success=true and force_top=true detected, this means we are already in the top window');
         
         // Force session data to completion step
         try {
@@ -92,9 +92,63 @@ export const usePaymentUrlParams = (
         }
       }
       
+      // Secondary priority: Check for success without force_top
+      if (success === 'true') {
+        console.log('Success=true detected in URL, attempting to break out of iframe');
+        
+        // This could be inside an iframe, try to break out
+        try {
+          // Construct a new URL with force_top=true to ensure we get to the right handler
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set('force_top', 'true');
+          
+          // Try to navigate top window directly
+          if (window !== window.top) {
+            console.log('Detected we are in iframe, attempting to navigate parent window');
+            
+            // Notify parent window to navigate
+            window.parent.postMessage({
+              type: 'cardcom_redirect',
+              url: currentUrl.toString(),
+              success: true,
+              forceRedirect: true,
+              lpId
+            }, '*');
+            
+            // Also try direct navigation
+            try {
+              window.top.location.href = currentUrl.toString();
+            } catch (navErr) {
+              console.error('Direct navigation failed:', navErr);
+              
+              // Try window.open as fallback
+              window.open(currentUrl.toString(), '_top');
+            }
+          } else {
+            // We're already in top window, just update the URL and trigger a re-process
+            window.history.replaceState({}, '', currentUrl.toString());
+            
+            // Set payment as successful
+            setPaymentStatus({
+              success: true,
+              error: false,
+              regId,
+              lpId
+            });
+            
+            // Force refresh the page to ensure proper processing
+            window.location.href = currentUrl.toString();
+          }
+        } catch (e) {
+          console.error('Error breaking out of iframe:', e);
+        }
+        
+        return; // Exit early after handling
+      }
+      
       // Process step parameter if available
-      if (stepParam === 'completion') {
-        console.log('Forcing completion step based on URL parameter');
+      if (stepParam === 'completion' && forceTop === 'true') {
+        console.log('Forcing completion step based on URL parameter with force_top');
         
         try {
           const sessionData = sessionStorage.getItem('subscription_flow');
@@ -104,46 +158,13 @@ export const usePaymentUrlParams = (
           
           parsedSession.step = 'completion';
           sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          
+          // Call payment complete
+          onPaymentComplete();
         } catch (e) {
           console.error('Error updating session for completion step:', e);
-        }
-      }
-      
-      // Check if we're in an iframe and handle breaking out
-      if (window !== window.top) {
-        console.log('Detected we are in iframe, handling parent window navigation');
-        
-        // If success or error is detected in iframe, always redirect the parent window
-        if (success === 'true' || error === 'true' || forceRedirect === 'true') {
-          try {
-            // Construct redirect URL for parent window
-            const currentUrl = new URL(window.location.href);
-            
-            // Always add target=_top parameter
-            currentUrl.searchParams.set('target', '_top');
-            
-            // Always add iframe=0 to prevent iframe behavior
-            currentUrl.searchParams.set('iframe', '0');
-            
-            // Inform parent window to redirect
-            window.parent.postMessage({
-              type: 'cardcom_redirect',
-              url: currentUrl.toString(),
-              success: success === 'true',
-              forceRedirect: true,
-              lpId
-            }, '*');
-            
-            // Also attempt direct navigation
-            try {
-              window.top.location.href = currentUrl.toString();
-              console.log('Sent direct navigation command to parent window');
-            } catch (navErr) {
-              console.error('Direct navigation failed:', navErr);
-            }
-          } catch (err) {
-            console.error('Error redirecting parent window:', err);
-          }
+          // Still try to complete
+          onPaymentComplete();
         }
       }
       
@@ -173,9 +194,10 @@ export const usePaymentUrlParams = (
     const checkIntervalId = setInterval(() => {
       const currentParams = new URLSearchParams(window.location.search);
       const currentSuccess = currentParams.get('success');
+      const currentForceTop = currentParams.get('force_top');
       
-      if (currentSuccess === 'true' && paymentStatus.success !== true) {
-        console.log('Success parameter detected during interval check');
+      if (currentSuccess === 'true' && currentForceTop === 'true' && paymentStatus.success !== true) {
+        console.log('Success and force_top parameters detected during interval check');
         processUrlParams();
       }
     }, 1000);

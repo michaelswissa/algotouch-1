@@ -398,7 +398,7 @@ serve(async (req) => {
         // Enhance payment URL with better success URL parameters
         const paymentUrl = new URL(sessionResult.url);
         
-        // Create an enhanced success URL that will always break out of iframes
+        // Create a better success URL with proper iframe breakout parameters
         let finalSuccessUrl = successRedirectUrl;
         try {
           const successUrlObj = new URL(finalSuccessUrl);
@@ -409,19 +409,20 @@ serve(async (req) => {
           successUrlObj.searchParams.set('success', 'true');
           successUrlObj.searchParams.set('target', '_top');
           successUrlObj.searchParams.set('iframe', '0');
+          successUrlObj.searchParams.set('force_top', 'true'); // Add force_top parameter
           
           finalSuccessUrl = successUrlObj.toString();
         } catch (e) {
           console.error('Error enhancing success URL:', e);
           // Add parameters directly if URL parsing fails
-          finalSuccessUrl = `${finalSuccessUrl}${finalSuccessUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&step=completion&success=true&target=_top&iframe=0`;
+          finalSuccessUrl = `${finalSuccessUrl}${finalSuccessUrl.includes('?') ? '&' : '?'}lpId=${sessionResult.lowProfileId}&step=completion&success=true&target=_top&iframe=0&force_top=true`;
         }
-        
+
         // Add registration ID if we have one
         if (tempRegistrationId) {
           finalSuccessUrl += `${finalSuccessUrl.includes('?') ? '&' : '?'}regId=${tempRegistrationId}`;
         }
-        
+
         // Apply the enhanced success URL to the payment URL
         paymentUrl.searchParams.set('successRedirectUrl', finalSuccessUrl);
         

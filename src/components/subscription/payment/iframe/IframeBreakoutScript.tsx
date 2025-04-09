@@ -24,49 +24,104 @@ function containsSuccessPattern(url) {
   return SUCCESS_PATTERNS.some(pattern => url.includes(pattern));
 }
 
+// Force break out of all iframes to parent window
+function breakoutToParentWindow(url, lpId) {
+  console.log('Breaking out of iframe to parent window with URL:', url);
+  
+  // Create the final destination URL with all necessary parameters
+  const finalUrl = new URL(window.location.origin + '/subscription');
+  finalUrl.searchParams.set('step', 'completion');
+  finalUrl.searchParams.set('success', 'true');
+  finalUrl.searchParams.set('force_top', 'true');
+  
+  // Add the lowProfileId if present
+  if (lpId) {
+    finalUrl.searchParams.set('lpId', lpId);
+  }
+  
+  // Try multiple approaches to break out of iframe
+  
+  // Approach 1: Post message to parent window
+  window.parent.postMessage(JSON.stringify({
+    type: 'cardcom_redirect',
+    url: finalUrl.toString(),
+    success: true,
+    forceRedirect: true,
+    lowProfileId: lpId
+  }), '*');
+  
+  // Approach 2: Try direct top location change
+  try {
+    if (window.top) {
+      window.top.location.href = finalUrl.toString();
+    }
+  } catch(e) {
+    console.error('Failed to redirect top window', e);
+  }
+  
+  // Approach 3: Use window.open with _top
+  try {
+    window.open(finalUrl.toString(), '_top');
+  } catch(e) {
+    console.error('Failed window.open approach', e);
+  }
+  
+  // Approach 4: Create and click a link element
+  try {
+    const link = document.createElement('a');
+    link.href = finalUrl.toString();
+    link.target = '_top';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch(e) {
+    console.error('Failed link click approach', e);
+  }
+  
+  return true;
+}
+
 // Check URL immediately
-const checkUrl = (url) => {
-  if (containsSuccessPattern(url) || url.includes('success=true') || url.includes('error=true')) {
-    console.log('Found success/error in URL:', url);
+function checkUrl(url) {
+  // Extract lowProfileId if present
+  let lpId = null;
+  try {
+    const urlObj = new URL(url);
+    lpId = urlObj.searchParams.get('lpId');
+  } catch(e) {
+    console.error('Failed to parse URL:', e);
+  }
+  
+  // Check for success patterns
+  if (containsSuccessPattern(url) || url.includes('success=true')) {
+    console.log('Found success pattern in URL:', url);
+    return breakoutToParentWindow(url, lpId);
+  }
+  
+  // Check for error patterns
+  if (url.includes('error=true')) {
+    console.log('Found error in URL:', url);
     
-    // Add target=_top if not present
-    const finalUrl = new URL(url);
-    finalUrl.searchParams.set('target', '_top');
-    finalUrl.searchParams.set('success', 'true'); // Force success flag
+    // Handle error case similarly but with error flag
+    const finalUrl = new URL(window.location.origin + '/subscription');
+    finalUrl.searchParams.set('step', 'payment');
+    finalUrl.searchParams.set('error', 'true');
+    finalUrl.searchParams.set('force_top', 'true');
     
-    // Extract the lowProfileId if present
-    const urlParams = new URLSearchParams(finalUrl.search);
-    const lpId = urlParams.get('lpId');
-    
-    // Send message to parent window
-    window.parent.postMessage(JSON.stringify({
-      type: 'cardcom_redirect',
-      url: finalUrl.toString(),
-      success: true,
-      forceRedirect: true,
-      lowProfileId: lpId
-    }), '*');
-    
-    // Try direct navigation to break out of iframe
+    // Try to break out with error URL
     try {
-      if (window.top && window !== window.top) {
-        window.top.location.href = finalUrl.toString();
-      }
+      window.top.location.href = finalUrl.toString();
     } catch(e) {
-      console.error('Failed to redirect top window', e);
-      
-      // Try alternate approach to break out
-      const topUrl = window.location.origin + '/subscription?step=completion&success=true';
-      const link = document.createElement('a');
-      link.href = topUrl;
-      link.target = '_top'; 
-      link.click();
+      console.error('Failed to redirect on error', e);
+      window.open(finalUrl.toString(), '_top');
     }
     
     return true;
   }
+  
   return false;
-};
+}
 
 // Check URL immediately
 checkUrl(lastUrl);
@@ -85,6 +140,9 @@ const observer = new MutationObserver(() => {
     handleUrlChange(newUrl);
   }
 });
+
+// Start observing
+observer.observe(document, { subtree: true, childList: true });
 
 // Check URL every 500ms as a fallback
 setInterval(() => {
@@ -105,25 +163,29 @@ setInterval(() => {
   
   if (successElements.some(el => el !== null)) {
     console.log('Success element found in DOM!');
-    // Force success redirect
-    const topUrl = window.location.origin + '/subscription?step=completion&success=true';
-    window.parent.postMessage(JSON.stringify({
-      type: 'cardcom_redirect',
-      url: topUrl,
-      success: true,
-      forceRedirect: true
-    }), '*');
-    
-    try {
-      window.top.location.href = topUrl;
-    } catch(e) {
-      console.error('Failed to redirect top window from success element', e);
-    }
+    breakoutToParentWindow(window.location.href);
+  }
+  
+  // Check for form submissions with successful results
+  const forms = document.querySelectorAll('form[action*="success"]');
+  if (forms.length > 0) {
+    console.log('Success form detected!');
+    breakoutToParentWindow(window.location.href);
   }
 }, 500);
 
-// Start observing
-observer.observe(document, { subtree: true, childList: true });
+// Add event listener for messages from Cardcom script
+window.addEventListener('message', function(event) {
+  try {
+    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (data && (data.success === true || data.status === 'success')) {
+      console.log('Success message received:', data);
+      breakoutToParentWindow(window.location.href, data.lowProfileId);
+    }
+  } catch(e) {
+    // Not our message or not JSON, ignore
+  }
+});
 `;
 
 export default getIframeBreakoutScript;

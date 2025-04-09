@@ -35,43 +35,100 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
       const urlParams = new URLSearchParams();
       urlParams.set('step', 'completion');
       urlParams.set('success', 'true');
+      urlParams.set('force_top', 'true'); // New parameter to ensure top-level handling
       urlParams.set('plan', parsedSession.selectedPlan || '');
       
       if (lpId) {
         urlParams.set('lpId', lpId);
       }
       
-      // Navigate to completion step with all parameters - use replace to prevent back button issues
+      // Complete URL for redirection
       const completeUrl = `/subscription?${urlParams.toString()}`;
       console.log('Navigating to:', completeUrl);
       
-      // Force redirect to break out of any potential iframe
-      window.top.location.href = `${window.location.origin}${completeUrl}`;
+      // Multiple approaches to break out of iframe
       
-      // Also try the React navigate as a fallback
+      // Approach 1: Force redirect to break out of any potential iframe
+      try {
+        window.top.location.href = `${window.location.origin}${completeUrl}`;
+      } catch (e) {
+        console.error('Direct top location navigation error:', e);
+      }
+      
+      // Approach 2: Use window.open with _top target
+      try {
+        window.open(`${window.location.origin}${completeUrl}`, '_top');
+      } catch (e) {
+        console.error('Window open navigation error:', e);
+      }
+      
+      // Approach 3: React router navigation as fallback
       try {
         navigate(completeUrl, { replace: true });
       } catch (e) {
-        console.error('Navigation error:', e);
+        console.error('React navigation error:', e);
       }
       
       toast.success('התשלום התקבל בהצלחה!');
     } catch (e) {
       console.error('Error updating session data:', e);
       // Fallback redirect without session data
-      window.top.location.href = `${window.location.origin}/subscription?step=completion&success=true`;
+      window.top.location.href = `${window.location.origin}/subscription?step=completion&success=true&force_top=true`;
     }
   };
+  
+  // Set up parent window listener for iframe breakout messages
+  useEffect(() => {
+    const handleIframeMessage = (event: MessageEvent) => {
+      try {
+        // Parse the message data
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        console.log('Received message from iframe:', data);
+        
+        // Process specific message types
+        if (data && data.type === 'cardcom_redirect' && data.success === true) {
+          console.log('Received cardcom_redirect success message, breaking out of iframe');
+          handleSuccessfulPayment(data.url, data.lowProfileId);
+        }
+      } catch (err) {
+        // Not our message or not JSON, ignore
+      }
+    };
+    
+    // Add message listener to parent window
+    window.addEventListener('message', handleIframeMessage);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('message', handleIframeMessage);
+    };
+  }, [navigate]);
   
   // Set up periodic iframe breakout check
   useEffect(() => {
     const checkUrlForBreakout = () => {
       // Check current URL for success or completion parameters
       const currentUrl = window.location.href;
-      if (currentUrl.includes('success=true') || currentUrl.includes('step=completion')) {
-        handleSuccessfulPayment(currentUrl, new URLSearchParams(window.location.search).get('lpId'));
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const forceTop = urlParams.get('force_top');
+      const lpId = urlParams.get('lpId');
+      
+      // If we have success=true and force_top=true, we should process the breakout
+      if (success === 'true' && forceTop === 'true') {
+        console.log('Detected success=true and force_top=true in URL, processing redirect');
+        handleSuccessfulPayment(currentUrl, lpId || undefined);
         return true;
       }
+      
+      // Also check for completion step
+      if (urlParams.get('step') === 'completion' && forceTop === 'true') {
+        console.log('Detected completion step with force_top=true in URL');
+        handleSuccessfulPayment(currentUrl, lpId || undefined);
+        return true;
+      }
+      
       return false;
     };
     
@@ -110,35 +167,6 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     // Run check immediately
     checkForSuccessOrError();
     
-    // Handle iframe messages for payment status
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        // Parse the data if it's a string
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        
-        // Handle payment status messages from the iframe
-        if (data.type === 'payment_status' || data.type === 'cardcom_redirect') {
-          console.log('Received payment status/redirect message:', data);
-          
-          if (data.status === 'success' || data.success === true) {
-            // Extract the lowProfileId if present
-            const lpId = data.lowProfileId || 
-              (data.url && new URL(data.url).searchParams.get('lpId'));
-            
-            // Handle successful payment
-            handleSuccessfulPayment(data.url, lpId);
-          } else if (data.status === 'error' || data.success === false) {
-            console.error('Payment error:', data.error);
-            toast.error('התשלום נכשל, אנא נסה שנית');
-          }
-        }
-      } catch (error) {
-        // Not our message or not JSON, ignore
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    
     // Add a script to detect navigation events inside the iframe
     const injectIframeListener = () => {
       if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -175,29 +203,34 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('message', handleMessage);
     };
   }, [navigate]);
 
   // Don't render if no URL is provided
   if (!paymentUrl) return null;
 
-  // Ensure target=_top is in the URL and add breaking parameters
+  // Enhance the payment URL with proper breakout parameters
   const enhancedUrl = new URL(paymentUrl);
+  
+  // Force target=_top and add breaking parameters
   enhancedUrl.searchParams.set('target', '_top');
   enhancedUrl.searchParams.set('iframe', '0');
   enhancedUrl.searchParams.set('PopUp', '0');
   enhancedUrl.searchParams.set('forceRedirect', 'true');
 
-  // Add success URL parameters for clearer processing
+  // Modify success URL to ensure proper breakout
   const successUrl = enhancedUrl.searchParams.get('successRedirectUrl');
   if (successUrl) {
     try {
       const successUrlObj = new URL(successUrl);
-      // Force these parameters in the success URL
+      
+      // Add essential parameters to ensure breakout works
       successUrlObj.searchParams.set('target', '_top');  
       successUrlObj.searchParams.set('success', 'true');
       successUrlObj.searchParams.set('step', 'completion');
+      successUrlObj.searchParams.set('force_top', 'true');
+      
+      // Replace the success URL with our enhanced version
       enhancedUrl.searchParams.set('successRedirectUrl', successUrlObj.toString());
     } catch (e) {
       console.error('Error enhancing success URL:', e);
