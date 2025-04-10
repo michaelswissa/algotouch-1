@@ -1,3 +1,4 @@
+
 // Require the framework and instantiate it
 const fastify = require('fastify')({ logger: true })
 const cors = require('@fastify/cors');
@@ -26,10 +27,10 @@ const CreateLPRequest = {
     FailedRedirectUrl: "https://www.google.com/",
     SuccessRedirectUrl: "https://www.google.com/",
     Document: {
-        Name: "Dima",
+        Name: "User",
         Products: [{ ProductID: "123", Description: "Description", Quantity: 1, UnitCost: 3, TotalLineCost: 3, }],
         IsAllowEditDocument: false,
-        IsShowOnlyDocument: true,
+        IsShowOnlyDocument: false,
         Language: 'he'
     }
 }
@@ -51,10 +52,45 @@ fastify.get('/init', async function handler(request, reply) {
         return json;
     }catch(e){
         console.error(e)
+        return { error: e.message }
     }
-   
 })
 
+// Check the transaction status
+fastify.post('/check-transaction', async function handler(request, reply) {
+    try {
+        const { lowProfileCode } = request.body;
+        
+        if (!lowProfileCode) {
+            return reply.status(400).send({ error: 'Missing lowProfileCode' });
+        }
+        
+        const getLowProfileRequest = {
+            TerminalNumber: configs.terminalNumber,
+            ApiName: configs.apiName,
+            LowProfileId: lowProfileCode
+        };
+        
+        const body = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            strictSSL: false,
+            body: JSON.stringify(getLowProfileRequest),
+        }
+        
+        const results = await fetch(`${configs.cardcomUrl}/api/v11/LowProfile/GetLpResult`, body);
+        const json = await results.json();
+        
+        console.log('Transaction status check:', { lowProfileCode, status: json.ResponseCode });
+        
+        return json;
+    } catch(e) {
+        console.error(e);
+        return { error: e.message };
+    }
+});
 
 // Run the server!
 fastify.listen({ port: 8000 }, (err) => {
@@ -62,4 +98,5 @@ fastify.listen({ port: 8000 }, (err) => {
         fastify.log.error(err)
         process.exit(1)
     }
+    console.log('Server is running on port 8000');
 })
