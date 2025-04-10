@@ -24,6 +24,19 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const { user } = useAuth();
   const { fullName, email } = useSubscriptionContext();
   const [paymentMethod, setPaymentMethod] = useState<'direct' | 'openfields'>('openfields');
+  const [registrationData, setRegistrationData] = useState<any>(null);
+
+  // Check for registration data in session storage on component mount
+  useEffect(() => {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
+      try {
+        setRegistrationData(JSON.parse(storedData));
+      } catch (error) {
+        console.error('Error parsing registration data:', error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -38,7 +51,12 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     }
   }, [onPaymentComplete]);
 
-  if (!user) {
+  // User is considered "valid" if they are either:
+  // 1. Logged in (authenticated) OR
+  // 2. In the registration process with valid data in sessionStorage
+  const isValidUser = user || registrationData;
+
+  if (!isValidUser) {
     return (
       <Alert className="max-w-lg mx-auto">
         <AlertCircle className="h-4 w-4" />

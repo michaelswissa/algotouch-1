@@ -1,12 +1,12 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Handle CORS preflight requests
@@ -20,136 +20,155 @@ function handleCors(req: Request) {
   return null;
 }
 
-// Function to fetch configuration
-function getConfig() {
-  return {
-    apiName: Deno.env.get('CARDCOM_USERNAME') || '',
-    cardcomUrl: 'https://secure.cardcom.solutions',
-    terminalNumber: Number(Deno.env.get('CARDCOM_TERMINAL') || '0'),
-  };
-}
-
 serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const url = new URL(req.url);
-    const path = url.pathname.split('/').pop();
-    const config = getConfig();
-    
-    // Validate config
-    if (!config.apiName || !config.terminalNumber) {
-      throw new Error('Missing Cardcom configuration. Please set CARDCOM_USERNAME and CARDCOM_TERMINAL in Supabase secrets.');
-    }
+    const {
+      planId,
+      planName,
+      amount,
+      userEmail,
+      userName,
+      isRegistration,
+      registrationData
+    } = await req.json();
 
-    // Create a Low Profile deal with Cardcom
-    if (path === 'create-deal') {
-      const { amount, planId, productName, language, operation, successUrl, errorUrl } = await req.json();
-      
-      console.log('Creating Low Profile deal:', { amount, planId, operation });
-      
-      const createLPRequest = {
-        TerminalNumber: config.terminalNumber,
-        ApiName: config.apiName,
-        Operation: operation || "ChargeOnly",
-        Amount: amount,
-        WebHookUrl: "https://webhook.site/your-webhook-id", // Replace with your actual webhook URL in production
-        ProductName: productName || 'Subscription Payment',
-        Language: language || 'he',
-        ISOCoinId: 1, // ILS
-        FailedRedirectUrl: errorUrl || "https://example.com/payment-failed",
-        SuccessRedirectUrl: successUrl || "https://example.com/payment-success",
-        Document: {
-          Name: "User",
-          Products: [{ 
-            ProductID: planId || "subscription", 
-            Description: productName || "Subscription", 
-            Quantity: 1, 
-            UnitCost: amount, 
-            TotalLineCost: amount 
-          }],
-          IsAllowEditDocument: false,
-          IsShowOnlyDocument: false,
-          Language: language || 'he'
-        }
-      };
-      
-      const body = {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createLPRequest),
-      };
-      
-      console.log('Sending request to Cardcom:', createLPRequest);
-      
-      const results = await fetch(`${config.cardcomUrl}/api/v11/LowProfile/create`, body);
-      const json = await results.json();
-      
-      console.log('Response from Cardcom:', json);
-      
+    // Validate required fields
+    if (!planId) {
       return new Response(
-        JSON.stringify(json),
+        JSON.stringify({ error: 'Missing required field: planId' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
+          status: 400,
         }
       );
     }
-    
-    // Check transaction status
-    if (path === 'check-status') {
-      const { lowProfileCode } = await req.json();
+
+    console.log('Creating payment session for plan:', planId);
+
+    // Get the Cardcom API credentials from environment variables
+    const terminalNumber = Deno.env.get('CARDCOM_TERMINAL');
+    const apiUsername = Deno.env.get('CARDCOM_USERNAME');
+    const apiPassword = Deno.env.get('CARDCOM_API_PASSWORD');
+
+    if (!terminalNumber || !apiUsername) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Cardcom API credentials' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    // If this is a registration payment, store the registration data temporarily
+    if (isRegistration && registrationData) {
+      console.log('Processing registration data for new user');
       
-      if (!lowProfileCode) {
-        return new Response(
-          JSON.stringify({ error: 'Missing lowProfileCode' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        );
+      // Initialize Supabase client
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      );
+      
+      // Create an expiry date (30 minutes from now)
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 30);
+      
+      // Store registration data in a temporary table
+      const { error } = await supabaseClient
+        .from('temp_registration_data')
+        .insert({
+          registration_data: registrationData,
+          expires_at: expiresAt.toISOString(),
+          used: false
+        });
+      
+      if (error) {
+        console.error('Error storing temporary registration data:', error);
       }
-      
-      const getLowProfileRequest = {
-        TerminalNumber: config.terminalNumber,
-        ApiName: config.apiName,
-        LowProfileId: lowProfileCode
-      };
-      
-      const body = {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(getLowProfileRequest),
-      };
-      
-      console.log('Checking transaction status:', { lowProfileCode });
-      
-      const results = await fetch(`${config.cardcomUrl}/api/v11/LowProfile/GetLpResult`, body);
-      const json = await results.json();
-      
-      console.log('Transaction status response:', json);
-      
+    }
+
+    // Create Cardcom payment session (Low Profile)
+    const webhookUrl = new URL(req.url).origin + "/functions/cardcom-webhook";
+    const successUrl = new URL(req.url).origin + "/subscription?step=4&success=true";
+    const failureUrl = new URL(req.url).origin + "/subscription?step=3&error=true";
+
+    const productDescription = `מנוי ${planName || planId}`;
+
+    // Create the Low Profile payment session
+    const cardcomResponse = await fetch('https://secure.cardcom.solutions/Interface/LowProfile.aspx', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        'TerminalNumber': terminalNumber,
+        'UserName': apiUsername,
+        'CodePage': '65001',
+        'Operation': '1', // ChargeOnly
+        'Language': 'he',
+        'CoinID': '1', // ILS
+        'SumToBill': amount.toString(),
+        'ProductName': productDescription,
+        'SuccessRedirectUrl': successUrl,
+        'ErrorRedirectUrl': failureUrl,
+        'IndicatorUrl': webhookUrl,
+        'ReturnValue': planId,
+        'APILevel': '10',
+        'CardOwnerName': userName || '',
+        'CardOwnerEmail': userEmail || '',
+        'ShowCardOwnerEmail': userEmail ? 'true' : 'false',
+        'IsVirtualTerminalMode': 'false',
+        'HideCardOwnerName': Boolean(userName) ? 'false' : 'true',
+        'MaxNumOfPayments': '1',
+      }).toString(),
+    });
+
+    if (!cardcomResponse.ok) {
+      const errorText = await cardcomResponse.text();
+      console.error('Error from Cardcom API:', errorText);
       return new Response(
-        JSON.stringify(json),
+        JSON.stringify({ error: 'Error creating Cardcom payment session' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
+          status: 500,
         }
       );
     }
 
-    // If no valid path is provided
+    const responseText = await cardcomResponse.text();
+    
+    // Parse the response - Cardcom returns a URL-encoded string
+    const responseParams = new URLSearchParams(responseText);
+    const responseCode = responseParams.get('ResponseCode');
+    const lowProfileId = responseParams.get('LowProfileCode');
+    
+    if (responseCode !== '0' || !lowProfileId) {
+      console.error('Error in Cardcom response:', responseText);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid response from Cardcom', 
+          details: responseText 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: 'Invalid endpoint' }),
+      JSON.stringify({
+        success: true,
+        lowProfileId,
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 200,
       }
     );
   } catch (error) {

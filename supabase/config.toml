@@ -50,3 +50,5 @@ scopes = ""
 verify_jwt = false
 [functions.cardcom-payment]
 verify_jwt = false
+[functions.cardcom-webhook]
+verify_jwt = false
