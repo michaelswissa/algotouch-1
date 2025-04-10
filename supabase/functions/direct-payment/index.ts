@@ -54,7 +54,8 @@ async function processDirectPayment(params: any) {
     userId,
     email,
     customAmount,
-    registrationData
+    registrationData,
+    customerInfo
   } = params;
   
   // Validate required card details
@@ -96,6 +97,13 @@ async function processDirectPayment(params: any) {
       }
     }
     
+    // Define product name and description based on plan
+    const productName = planId === 'monthly' 
+      ? 'מנוי חודשי - תקופת ניסיון' 
+      : planId === 'annual' 
+        ? 'מנוי שנתי' 
+        : 'מנוי VIP';
+    
     // For security, log only non-sensitive data
     console.log('Processing direct payment:', {
       planId,
@@ -103,7 +111,8 @@ async function processDirectPayment(params: any) {
       operationType,
       hasUserId: !!userId,
       hasEmail: !!email,
-      hasRegistrationData: !!registrationData
+      hasRegistrationData: !!registrationData,
+      hasCustomerInfo: !!customerInfo
     });
     
     // Prepare unique transaction ID for reference
@@ -115,7 +124,7 @@ async function processDirectPayment(params: any) {
                            ? `${registrationData.userData.firstName} ${registrationData.userData.lastName || ''}` 
                            : '');
     const cardholderEmail = email || registrationData?.email || '';
-    const cardholderPhone = registrationData?.userData?.phone || '';
+    const cardholderPhone = customerInfo?.phone || registrationData?.userData?.phone || '';
     
     // Store registration data temporarily if provided
     let tempRegistrationId = null;
@@ -149,24 +158,67 @@ async function processDirectPayment(params: any) {
       }
     }
     
+    // Extract customer information for invoice
+    const address = customerInfo?.address || '';
+    const city = customerInfo?.city || '';
+    const zipCode = customerInfo?.zipCode || '';
+    const companyId = customerInfo?.companyId || '';
+    
+    // Prepare document data if needed
+    const documentData = {
+      Name: cardholderName || 'Customer',
+      Email: cardholderEmail || '',
+      Phone: cardholderPhone || '',
+      AddressLine1: address || '',
+      City: city || '',
+      Mobile: cardholderPhone || '',
+      TaxId: companyId || '',
+      Products: [
+        {
+          Description: productName,
+          UnitCost: amount,
+          Quantity: 1
+        }
+      ]
+    };
+    
     // Call Cardcom API to process the transaction directly
     const payload = {
       TerminalNumber: parseInt(API_CONFIG.TERMINAL),
       ApiName: API_CONFIG.USERNAME,
-      ApiPassword: API_CONFIG.PASSWORD,
+      ApiPassword: API_CONFIG.PASSWORD, // Only included for direct API calls, not for frontend
       Amount: amount,
       CardNumber: cardDetails.cardNumber,
       CardExpirationMMYY: cardDetails.expiryDate,
       CVV2: cardDetails.cvv,
-      Operation: operationType.toString(),
       ExternalUniqTranId: externalTransId,
       ReturnValue: tempRegistrationId || userId || 'direct-payment',
       CardOwnerInformation: {
         FullName: cardholderName,
         CardOwnerEmail: cardholderEmail,
-        Phone: cardholderPhone
+        Phone: cardholderPhone,
+        Address: address,
+        City: city,
+        ZipCode: zipCode
       },
-      ISOCoinId: 1 // ILS
+      ISOCoinId: 1, // ILS
+      SumOfPayments: 1, // Default to single payment
+      Language: "he", // Hebrew interface
+      ProductName: productName, // Product description
+      MoreInfo: `רכישת ${productName} באמצעות כרטיס אשראי`,
+      ExtCompanyId: companyId || '',
+      // Include document info if we're charging (not just token creation)
+      Document: (operationType !== OperationType.TOKEN_ONLY) ? documentData : undefined,
+      CustomFields: [
+        { 
+          Id: 1, 
+          Value: planId 
+        },
+        { 
+          Id: 2, 
+          Value: tempRegistrationId || userId || '' 
+        }
+      ]
     };
     
     // For security, create a sanitized payload for logging (without card details)
@@ -221,6 +273,13 @@ async function processDirectPayment(params: any) {
         approvalNumber: result.ApprovalNumber
       };
     }
+
+    // Extract document information if available
+    const documentInfo = result.DocumentNumber ? {
+      documentNumber: result.DocumentNumber,
+      documentType: result.DocumentType,
+      documentUrl: result.DocumentUrl
+    } : null;
     
     // Return successful result
     return {
@@ -229,6 +288,7 @@ async function processDirectPayment(params: any) {
       amount: result.Amount,
       cardLastDigits: result.Last4CardDigits,
       tokenInfo,
+      documentInfo,
       registrationId: tempRegistrationId
     };
   } catch (error: any) {
@@ -271,7 +331,8 @@ serve(async (req) => {
     
     // Process direct payment
     if (path === 'process') {
-      const { planId, cardDetails, registrationData } = await req.json();
+      const requestData = await req.json();
+      const { planId, cardDetails, registrationData, customerInfo } = requestData;
       
       if (!planId || !cardDetails) {
         return new Response(
@@ -293,7 +354,8 @@ serve(async (req) => {
           cardDetails,
           userId: user?.id,
           email: user?.email,
-          registrationData
+          registrationData,
+          customerInfo
         });
         
         return new Response(
