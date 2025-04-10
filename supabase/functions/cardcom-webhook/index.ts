@@ -6,226 +6,192 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
-  try {
-    console.log('Webhook called with URL:', req.url);
-    
-    // Get URL parameters from Cardcom callback
-    const url = new URL(req.url);
-    const params = Object.fromEntries(url.searchParams);
-    
-    console.log('Received webhook from Cardcom', {
-      operationResponse: params.OperationResponse,
-      lowProfileId: params.LowProfileCode,
-      dealResponse: params.DealResponse,
-      transactionId: params.InternalDealNumber,
-      fullParams: params
+// Handle CORS preflight requests
+function handleCors(req: Request) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 204,
     });
+  }
+  return null;
+}
 
-    // Initialize Supabase client with service role key (needs admin access)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
+serve(async (req) => {
+  // Handle CORS
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
-    // Check if payment was successful
-    if (params.OperationResponse === '0') {
-      // Get the transaction details
-      const transactionId = params.InternalDealNumber;
-      const planId = params.ReturnValue;
-      
-      console.log(`Payment successful - Plan: ${planId}, Transaction: ${transactionId}`);
+  try {
+    // Parse webhook data
+    const webhookData = await req.json();
+    console.log('Received Cardcom webhook data:', JSON.stringify(webhookData));
 
-      // Check for any pending registration data
-      const { data: registrationData } = await supabaseAdmin
-        .from('temp_registration_data')
-        .select('*')
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (registrationData) {
-        await processRegistrationPayment(supabaseAdmin, registrationData, planId, transactionId, params);
-      } else {
-        console.log('No registration data found, assuming authenticated user payment');
-        // Handle standard authenticated payment - no need to do anything here
-        // as the frontend will update the subscription record
-      }
-      
-      // Log payment for future reference
-      await supabaseAdmin.from('user_payment_logs').insert({
-        transaction_details: params,
-        amount: parseInt(params.SumToBill || '0') || 0,
-        token: params.LowProfileCode || '',
-        approval_code: params.ApprovalNumber || '',
-        status: 'success'
-      });
-    } else {
-      console.error('Payment failed', params);
-      
-      // Log failed payment
-      await supabaseAdmin.from('user_payment_logs').insert({
-        transaction_details: params,
-        amount: parseInt(params.SumToBill || '0') || 0,
-        token: params.LowProfileCode || '',
-        status: 'failed'
-      });
+    // Check if the transaction was successful
+    if (webhookData.ResponseCode !== 0) {
+      console.error('Transaction failed:', webhookData.Description);
+      return new Response(
+        JSON.stringify({ success: false, error: webhookData.Description }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200, // Still return 200 to acknowledge receipt
+        }
+      );
     }
 
-    // We always return OK to Cardcom to acknowledge the webhook
-    // even if we had errors processing it
-    return new Response('OK', {
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
-      status: 200,
-    });
+    // Transaction was successful, process it
+    console.log('Processing successful transaction:', webhookData.TranzactionInfo?.TranzactionId);
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase credentials');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check if this is for a registration (ReturnValue should contain the plan ID)
+    const planId = webhookData.ReturnValue;
+    
+    if (!planId) {
+      console.warn('No plan ID found in ReturnValue');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing plan ID' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200, // Still return 200 to acknowledge receipt
+        }
+      );
+    }
+
+    // Check if we have registration data stored for this transaction
+    const { data: registrationData, error: fetchError } = await supabase
+      .from('temp_registration_data')
+      .select('*')
+      .eq('used', false)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error fetching registration data:', fetchError);
+    }
+
+    // If we have registration data, process the registration
+    if (registrationData && registrationData.length > 0) {
+      const userData = registrationData[0].registration_data;
+      
+      console.log('Found registration data:', {
+        email: userData.email,
+        planId
+      });
+
+      // Extract user information
+      const { email, userData: { firstName, lastName, phone }, contractDetails } = userData;
+      
+      try {
+        // Create the user in Supabase Auth
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password: userData.password || Math.random().toString(36).slice(-8), // Generate random password if none provided
+          email_confirm: true,
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            is_new_user: true
+          }
+        });
+
+        if (authError) {
+          throw authError;
+        }
+
+        // If user created successfully, update the registration data as used
+        if (authUser.user) {
+          // Mark the registration data as used
+          await supabase
+            .from('temp_registration_data')
+            .update({ used: true })
+            .eq('id', registrationData[0].id);
+          
+          // Create subscription record
+          const now = new Date();
+          let periodEndsAt = null;
+          let trialEndsAt = null;
+          
+          if (planId === 'monthly') {
+            trialEndsAt = new Date(now);
+            trialEndsAt.setMonth(trialEndsAt.getMonth() + 1);
+          } else if (planId === 'annual') {
+            periodEndsAt = new Date(now);
+            periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+          }
+          
+          // Create subscription record
+          await supabase
+            .from('subscriptions')
+            .insert({
+              user_id: authUser.user.id,
+              plan_type: planId,
+              status: planId === 'monthly' ? 'trial' : 'active',
+              trial_ends_at: trialEndsAt?.toISOString() || null,
+              current_period_ends_at: periodEndsAt?.toISOString() || null,
+              payment_method: {
+                type: 'card', 
+                provider: 'cardcom',
+                last_transaction_id: webhookData.TranzactionInfo?.TranzactionId
+              },
+              contract_signed: Boolean(contractDetails),
+              contract_signed_at: contractDetails ? now.toISOString() : null
+            });
+
+          // Create user profile if needed
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.user.id)
+            .single();
+
+          if (profileError || !profile) {
+            // Create profile
+            await supabase
+              .from('profiles')
+              .insert({
+                id: authUser.user.id,
+                first_name: firstName,
+                last_name: lastName,
+                phone,
+                email
+              });
+          }
+          
+          console.log('Successfully created user and subscription for registration');
+        }
+      } catch (error) {
+        console.error('Error processing registration:', error);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error('Error processing webhook:', error);
-    
-    // We still return OK to Cardcom, but log the error
-    return new Response('OK', {
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
+    );
   }
 });
-
-async function processRegistrationPayment(
-  supabaseAdmin: any,
-  registrationData: any,
-  planId: string,
-  transactionId: string,
-  params: Record<string, string>
-) {
-  try {
-    console.log('Processing registration payment with data');
-
-    const userData = registrationData.registration_data;
-    
-    if (!userData || !userData.email || !userData.password) {
-      throw new Error('Invalid registration data');
-    }
-
-    // Create the user account using admin privileges
-    const { data: authData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-      email: userData.email,
-      password: userData.password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: userData.userData?.firstName || '',
-        last_name: userData.userData?.lastName || '',
-        registration_complete: true,
-        signup_step: 'completed',
-        signup_date: new Date().toISOString(),
-        plan_id: planId
-      }
-    });
-    
-    if (userError) {
-      throw new Error(`Failed to create user: ${userError.message}`);
-    }
-    
-    const userId = authData.user.id;
-    
-    // Add a delay to ensure the user is created before proceeding
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const now = new Date();
-    let periodEndsAt = null;
-    let trialEndsAt = null;
-    let status = 'active';
-    
-    if (planId === 'monthly') {
-      trialEndsAt = new Date(now);
-      trialEndsAt.setMonth(trialEndsAt.getMonth() + 1);
-      status = 'trial';
-    } else if (planId === 'annual') {
-      periodEndsAt = new Date(now);
-      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
-    }
-    
-    // Create the subscription record
-    const { error: subscriptionError } = await supabaseAdmin
-      .from('subscriptions')
-      .insert({
-        user_id: userId,
-        plan_type: planId,
-        status: status,
-        trial_ends_at: trialEndsAt?.toISOString() || null,
-        current_period_ends_at: periodEndsAt?.toISOString() || null,
-        payment_method: {
-          type: 'card',
-          provider: 'cardcom',
-          last_transaction_id: transactionId
-        },
-        contract_signed: Boolean(userData.contractSigned),
-        contract_signed_at: userData.contractSignedAt || now.toISOString()
-      });
-    
-    if (subscriptionError) {
-      console.error('Error creating subscription:', subscriptionError);
-    }
-    
-    // Create payment history record
-    const amount = planId === 'monthly' ? 99 : planId === 'annual' ? 899 : 3499;
-    await supabaseAdmin.from('payment_history').insert({
-      user_id: userId,
-      subscription_id: userId,
-      amount: amount,
-      status: 'completed',
-      currency: 'ILS',
-      provider: 'cardcom',
-      transaction_id: transactionId,
-      payment_method: {
-        type: 'card',
-        provider: 'cardcom'
-      }
-    });
-    
-    // Store contract signature if available
-    if (userData.contractDetails && userData.contractDetails.contractHtml && userData.contractDetails.signature) {
-      await supabaseAdmin
-        .from('contract_signatures')
-        .insert({
-          user_id: userId,
-          plan_id: planId,
-          full_name: `${userData.userData?.firstName || ''} ${userData.userData?.lastName || ''}`.trim(),
-          email: userData.email,
-          phone: userData.userData?.phone || null,
-          signature: userData.contractDetails.signature,
-          contract_html: userData.contractDetails.contractHtml,
-          user_agent: userData.contractDetails.browserInfo?.userAgent || null,
-          browser_info: userData.contractDetails.browserInfo || null,
-          contract_version: userData.contractDetails.contractVersion || "1.0",
-          agreed_to_terms: userData.contractDetails.agreedToTerms || false,
-          agreed_to_privacy: userData.contractDetails.agreedToPrivacy || false,
-        });
-    }
-    
-    // Update profile information
-    await supabaseAdmin
-      .from('profiles')
-      .update({
-        first_name: userData.userData?.firstName || null,
-        last_name: userData.userData?.lastName || null,
-        phone: userData.userData?.phone || null
-      })
-      .eq('id', userId);
-    
-    // Mark the registration data as used
-    await supabaseAdmin
-      .from('temp_registration_data')
-      .update({ used: true })
-      .eq('id', registrationData.id);
-    
-    console.log('Successfully processed registration payment for user:', userId);
-    return true;
-    
-  } catch (error) {
-    console.error('Error processing registration payment:', error);
-    return false;
-  }
-}

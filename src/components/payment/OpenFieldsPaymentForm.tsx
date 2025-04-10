@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Spinner } from '@/components/ui/spinner';
 
 interface OpenFieldsPaymentFormProps {
   planId: string;
@@ -46,29 +47,53 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     }
   }, []);
 
-  const handlePaymentSuccess = async (transactionId: string) => {
-    // If registering (not logged in), create the user first
-    if (registrationData && !user) {
-      await handleRegistrationPaymentSuccess(transactionId);
-    } 
-    // User is already authenticated, just update subscription
-    else if (user) {
-      await handleAuthenticatedPaymentSuccess(transactionId);
+  // Check URL parameters for success/error redirects from Cardcom
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const errorParam = urlParams.get('error');
+    
+    if (success === 'true') {
+      toast.success('התשלום התקבל בהצלחה!');
+      // The actual handling will happen in CardcomOpenFields component
     }
-    // Something is wrong, we don't have either user or registration data
-    else {
-      toast.error('שגיאה בעיבוד התשלום - מידע משתמש חסר');
+  }, []);
+
+  const handlePaymentSuccess = async (transactionId: string) => {
+    if (!transactionId) {
+      toast.error('חסר מזהה עסקה');
       return;
+    }
+    
+    setProcessing(true);
+    
+    try {
+      // If registering (not logged in), create the user first
+      if (registrationData && !user) {
+        await handleRegistrationPaymentSuccess(transactionId);
+      } 
+      // User is already authenticated, just update subscription
+      else if (user) {
+        await handleAuthenticatedPaymentSuccess(transactionId);
+      }
+      // Something is wrong, we don't have either user or registration data
+      else {
+        toast.error('שגיאה בעיבוד התשלום - מידע משתמש חסר');
+        return;
+      }
+    } catch (error) {
+      console.error('Error processing payment success:', error);
+      toast.error('שגיאה בעיבוד התשלום');
+    } finally {
+      setProcessing(false);
     }
   };
 
   const handleRegistrationPaymentSuccess = async (transactionId: string) => {
-    setProcessing(true);
+    console.log('Processing registration payment success for transaction:', transactionId);
     
     try {
-      console.log('Processing registration payment success for transaction:', transactionId);
-      
-      // The cardcom-webhook edge function already stored the registration data
+      // The cardcom-webhook edge function should already have stored the registration data
       // Now we just need to notify the user and move them to the success screen
       toast.success('ההרשמה הושלמה בהצלחה!');
       
@@ -82,19 +107,17 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
       console.error('Error completing registration:', error);
       toast.error(error.message || 'שגיאה בהשלמת תהליך ההרשמה');
       setError(error.message || 'שגיאה בהשלמת תהליך ההרשמה');
-    } finally {
-      setProcessing(false);
+      throw error;
     }
   };
 
   const handleAuthenticatedPaymentSuccess = async (transactionId: string) => {
     if (!user) {
-      toast.error('נדרש להיות מחובר כדי לסיים את התהליך');
-      return;
+      const error = new Error('נדרש להיות מחובר כדי לסיים את התהליך');
+      toast.error(error.message);
+      throw error;
     }
 
-    setProcessing(true);
-    
     try {
       // Update user's subscription in the database
       const now = new Date();
@@ -121,6 +144,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           payment_method: {
             type: 'card', 
             provider: 'cardcom',
+            lastFourDigits: "****", // We don't have this info from the redirect flow
             last_transaction_id: transactionId
           },
           contract_signed: true,
@@ -161,8 +185,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
       console.error('Error processing successful payment:', error);
       toast.error(error.message || 'שגיאה בעיבוד התשלום');
       setError(error.message || 'שגיאה בעיבוד התשלום');
-    } finally {
-      setProcessing(false);
+      throw error;
     }
   };
 
@@ -182,14 +205,21 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           </Alert>
         )}
         
-        <CardcomOpenFields
-          planId={planId}
-          planName={plan.name}
-          amount={plan.price}
-          onSuccess={handlePaymentSuccess}
-          onError={handlePaymentError}
-          onCancel={onCancel}
-        />
+        {processing ? (
+          <div className="flex flex-col items-center justify-center p-8">
+            <Spinner className="h-8 w-8 text-primary" />
+            <p className="mt-4">מעבד את התשלום...</p>
+          </div>
+        ) : (
+          <CardcomOpenFields
+            planId={planId}
+            planName={plan.name}
+            amount={plan.price}
+            onSuccess={handlePaymentSuccess}
+            onError={handlePaymentError}
+            onCancel={onCancel}
+          />
+        )}
         
         {error && (
           <div className="p-4 text-center">

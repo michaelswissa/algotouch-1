@@ -49,10 +49,9 @@ serve(async (req) => {
 
     console.log('Creating payment session for plan:', planId);
 
-    // Get the Cardcom API credentials from environment variables
+    // Get the Cardcom API credentials from environment variables or hardcoded values
     const terminalNumber = "160138";  // Hard-coded from provided details
-    const apiUsername = "bLaocQRMSnwphQRUVG3b";  // Hard-coded from provided details
-    const apiPassword = "i9nr6caGbgheTdYfQbo6"; // For specific operations
+    const apiName = "bLaocQRMSnwphQRUVG3b";  // Hard-coded from provided details
 
     // If this is a registration payment, store the registration data temporarily
     if (isRegistration && registrationData) {
@@ -82,16 +81,26 @@ serve(async (req) => {
       }
     }
 
+    // Create request URL for dynamic origin detection
+    const requestUrl = new URL(req.url);
+    const origin = requestUrl.origin.includes('localhost') || requestUrl.origin.includes('127.0.0.1') 
+      ? 'http://localhost:3000' 
+      : requestUrl.origin;
+    
+    const successUrl = `${origin}/subscription?success=true`;
+    const failureUrl = `${origin}/subscription?error=true`;
+    const webhookUrl = `${origin}/functions/cardcom-webhook`;
+
     // Create a Low Profile request to Cardcom
     const createLPRequest = {
       TerminalNumber: terminalNumber,
-      ApiName: apiUsername,
+      ApiName: apiName,
       Operation: "ChargeOnly", // Default operation
       Amount: amount,
       ReturnValue: planId, // Store plan ID for reference
-      SuccessRedirectUrl: new URL(req.url).origin + "/subscription?success=true",
-      FailedRedirectUrl: new URL(req.url).origin + "/subscription?error=true",
-      WebHookUrl: new URL(req.url).origin + "/functions/cardcom-webhook",
+      SuccessRedirectUrl: successUrl,
+      FailedRedirectUrl: failureUrl,
+      WebHookUrl: webhookUrl,
       ProductName: planName || 'Subscription Plan',
       Language: 'he',
       ISOCoinId: 1, // ILS
@@ -126,61 +135,55 @@ serve(async (req) => {
     
     console.log('Sending request to Cardcom API');
     
-    try {
-      // Call Cardcom API to create a Low Profile payment page
-      const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createLPRequest),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
-      }
-      
-      const cardcomResponse = await response.json();
-      console.log('Cardcom response received:', JSON.stringify(cardcomResponse));
-      
-      if (cardcomResponse.ResponseCode !== 0) {
-        throw new Error(`Cardcom error: ${cardcomResponse.Description}`);
-      }
-      
-      // Return success with necessary data for frontend
-      return new Response(
-        JSON.stringify({
-          success: true,
-          terminalNumber,
-          apiUsername,
-          lowProfileId: cardcomResponse.LowProfileId,
-          url: cardcomResponse.Url,
-          planId,
-          planName,
-          amount,
-          userEmail,
-          userName,
-          webhookUrl: new URL(req.url).origin + "/functions/cardcom-webhook"
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } catch (apiError) {
-      console.error('Error calling Cardcom API:', apiError);
-      return new Response(
-        JSON.stringify({ error: `Failed to create payment session: ${apiError.message}` }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
+    // Call Cardcom API to create a Low Profile payment page
+    const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(createLPRequest),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Cardcom API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
     }
+    
+    const cardcomResponse = await response.json();
+    console.log('Cardcom response received:', JSON.stringify(cardcomResponse));
+    
+    if (cardcomResponse.ResponseCode !== 0) {
+      throw new Error(`Cardcom error: ${cardcomResponse.Description}`);
+    }
+    
+    // Return success with necessary data for frontend
+    return new Response(
+      JSON.stringify({
+        success: true,
+        terminalNumber,
+        apiUsername: apiName,
+        lowProfileId: cardcomResponse.LowProfileId,
+        url: cardcomResponse.Url,
+        planId,
+        planName,
+        amount,
+        userEmail,
+        userName,
+        webhookUrl
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error('Error processing request:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,

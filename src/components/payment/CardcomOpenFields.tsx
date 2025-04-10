@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CardcomOpenFieldsProps {
   planId: string;
@@ -45,6 +46,22 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       }
     }
   }, []);
+
+  // Check URL parameters for success/error redirects from Cardcom
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const errorParam = urlParams.get('error');
+    
+    if (success === 'true') {
+      toast.success('התשלום התקבל בהצלחה!');
+      // We'll check for the transaction ID in a separate effect
+    } else if (errorParam === 'true') {
+      toast.error('התשלום נכשל, אנא נסה שנית');
+      setError('התשלום נכשל, אנא נסה שנית');
+      onError('התשלום נכשל, אנא נסה שנית');
+    }
+  }, [onError]);
 
   useEffect(() => {
     const initializePayment = async () => {
@@ -113,29 +130,26 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     setIsCheckingStatus(true);
     
     try {
-      // Use fetch directly to call the backend (similar to example.js)
-      const response = await fetch(`${window.location.origin}/functions/cardcom-check-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ lowProfileId }),
+      // Call the edge function to check transaction status
+      const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
+        body: { lowProfileId }
       });
 
-      if (!response.ok) {
-        throw new Error(`Error checking status: ${response.statusText}`);
+      if (error) {
+        throw error;
       }
 
-      const data = await response.json();
-      
       console.log('Transaction status check result:', data);
       
       // Check if transaction was successful
-      if (data.ResponseCode === 0 && data.TranzactionId) {
-        onSuccess(data.TranzactionId.toString());
+      if (data.ResponseCode === 0 && data.TranzactionInfo?.TranzactionId) {
+        onSuccess(data.TranzactionInfo.TranzactionId.toString());
+        return true;
       }
+      return false;
     } catch (error: any) {
       console.error('Error checking transaction status:', error);
+      return false;
     } finally {
       setIsCheckingStatus(false);
     }
@@ -152,8 +166,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     window.open(paymentUrl, '_blank');
     
     // Start checking the status periodically
-    const checkInterval = setInterval(() => {
-      checkTransactionStatus();
+    const checkInterval = setInterval(async () => {
+      const success = await checkTransactionStatus();
+      if (success) {
+        clearInterval(checkInterval);
+        setIsProcessing(false);
+      }
     }, 5000); // Check every 5 seconds
     
     // Stop checking after 5 minutes
@@ -163,25 +181,23 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }, 5 * 60 * 1000);
   };
 
-  // Handle success/error from URL params after redirection
+  // Check for redirect from Cardcom payment page when URL has success=true
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
-    const errorParam = urlParams.get('error');
     
-    if (success === 'true') {
-      // Transaction was successful, check for transaction ID
+    if (success === 'true' && lowProfileId) {
       checkTransactionStatus();
-    } else if (errorParam === 'true') {
-      setError('התשלום נכשל, אנא נסה שנית');
-      onError('התשלום נכשל, אנא נסה שנית');
     }
-  }, []);
+  }, [lowProfileId]);
 
   if (error) {
     return (
-      <div className="p-6 text-center">
-        <div className="text-red-500 mb-4">{error}</div>
+      <div className="p-6 text-center" dir="rtl">
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
         <div className="flex space-x-4 justify-center">
           <Button onClick={handleRetry}>נסה שנית</Button>
           <Button variant="outline" onClick={onCancel}>בחר אמצעי תשלום אחר</Button>

@@ -29,7 +29,7 @@ serve(async (req) => {
 
     if (!lowProfileId) {
       return new Response(
-        JSON.stringify({ error: 'Missing lowProfileId parameter' }),
+        JSON.stringify({ error: 'Missing lowProfileId parameter', success: false }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -60,6 +60,8 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Cardcom API error: ${response.status} ${response.statusText}`, errorText);
       throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
     }
 
@@ -76,7 +78,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error checking transaction status:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, success: false }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
