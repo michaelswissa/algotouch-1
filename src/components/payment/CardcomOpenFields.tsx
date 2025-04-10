@@ -4,8 +4,7 @@ import { TokenData } from "@/types/payment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Lock } from "lucide-react";
 
 type CardcomOpenFieldsProps = {
   onTokenReceived: (tokenData: TokenData) => void;
@@ -27,84 +26,41 @@ declare global {
   }
 }
 
-// Cardcom SDK URL - עדכון URL בהתאם למה שמוסופק על-ידי Cardcom
-const CARDCOM_SDK_URLS = [
-  "https://secure.cardcom.solutions/js/openfields.js",            // URL מקורי
-  "https://secure.cardcom.co.il/js/openfields.js",                // URL חלופי 1
-  "https://services.cardcom.co.il/js/openfields.js",              // URL חלופי 2
-  "https://cdn.cardcom.co.il/js/tokenization/openfields.js"       // URL חלופי 3
-];
-
 const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   onTokenReceived,
   onError,
   isProcessing
 }) => {
   const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [scriptLoading, setScriptLoading] = useState(false);
   const [cardholderName, setCardholderName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const loadScript = (index = 0) => {
-    if (index >= CARDCOM_SDK_URLS.length) {
-      console.error("כל ניסיונות טעינת ה-SDK נכשלו");
-      setErrorMsg("לא ניתן לטעון את מערכת התשלום. אנא נסה שוב מאוחר יותר או פנה לתמיכה.");
-      onError(new Error("All Cardcom SDK load attempts failed"));
-      return;
-    }
-
-    // בדיקה אם הסקריפט כבר נטען
-    if (document.getElementById('cardcom-sdk')) {
-      return;
-    }
-
-    setScriptLoading(true);
-    const script = document.createElement('script');
-    script.id = 'cardcom-sdk';
-    script.src = CARDCOM_SDK_URLS[index];
-    script.async = true;
-    
-    script.onload = () => {
-      console.log("Cardcom SDK loaded successfully from:", CARDCOM_SDK_URLS[index]);
-      setScriptLoaded(true);
-      setScriptLoading(false);
-      setErrorMsg("");
-    };
-    
-    script.onerror = () => {
-      console.error(`Failed to load Cardcom SDK from: ${CARDCOM_SDK_URLS[index]}`);
-      // נסה URL הבא
-      setCurrentUrlIndex(index + 1);
-      loadScript(index + 1);
-    };
-    
-    document.body.appendChild(script);
-  };
-
   useEffect(() => {
-    loadScript(0);
-    
-    return () => {
-      // Cleanup function
-      const script = document.getElementById('cardcom-sdk');
-      if (script) {
-        script.remove();
-      }
-    };
-  }, []);
-
-  const handleRetry = () => {
-    // מסיר את הסקריפט הקיים ומנסה שוב
-    const script = document.getElementById('cardcom-sdk');
-    if (script) {
-      script.remove();
+    // Load Cardcom SDK if not already loaded
+    if (!document.getElementById('cardcom-sdk')) {
+      const script = document.createElement('script');
+      script.id = 'cardcom-sdk';
+      script.src = 'https://secure.cardcom.solutions/js/openfields.js';
+      script.async = true;
+      script.onload = () => {
+        console.log("Cardcom SDK loaded successfully");
+        setScriptLoaded(true);
+      };
+      script.onerror = () => {
+        console.error("Failed to load Cardcom SDK");
+        setErrorMsg("שגיאה בטעינת מערכת התשלום");
+        onError(new Error("Failed to load Cardcom SDK"));
+      };
+      document.body.appendChild(script);
+    } else {
+      setScriptLoaded(true);
     }
-    setScriptLoaded(false);
-    setErrorMsg("");
-    loadScript(0);
-  };
+
+    return () => {
+      // Cleanup function if needed
+    };
+  }, [onError]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,12 +74,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       return;
     }
 
-    // בדיקה שהשדה של שם בעל הכרטיס מולא
-    if (!cardholderName || cardholderName.trim().length < 2) {
-      setErrorMsg("נא להזין שם בעל כרטיס תקין");
-      return;
-    }
-
     // Perform tokenization
     window.Cardcom.tokenize({
       cardNumberSelector: "#card-number",
@@ -133,23 +83,20 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         console.log("Tokenization successful", result);
         
         // Parse the expiry date (MM/YY format)
-        let expMonth = 0;
-        let expYear = 0;
+        let expiryMonth = 0;
+        let expiryYear = 0;
         
         if (result.CardMonth && result.CardYear) {
-          expMonth = parseInt(result.CardMonth, 10);
-          expYear = parseInt(result.CardYear, 10);
-          // אם השנה מגיעה בפורמט קצר (YY), המר ל-YYYY
-          if (expYear < 100) {
-            expYear += 2000;
-          }
+          expiryMonth = parseInt(result.CardMonth, 10);
+          expiryYear = parseInt(result.CardYear, 10);
         }
         
         const tokenData: TokenData = {
           token: result.Token,
-          cardLast4: result.LastFourDigits || "****",
-          expMonth,
-          expYear
+          lastFourDigits: result.LastFourDigits || "****",
+          expiryMonth,
+          expiryYear,
+          cardholderName
         };
         
         onTokenReceived(tokenData);
@@ -174,25 +121,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     });
   };
 
-  // אם יש שגיאה בטעינה, הצג הודעת שגיאה וכפתור לניסיון מחדש
-  if (errorMsg && errorMsg.includes("לא ניתן לטעון את מערכת התשלום")) {
-    return (
-      <div className="w-full p-6 border border-red-300 rounded-md bg-red-50">
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errorMsg}</AlertDescription>
-        </Alert>
-        <div className="text-sm text-gray-600 mb-4">
-          <p>אירעה שגיאה בטעינת מערכת התשלום. אנא נסה שוב או פנה לתמיכה.</p>
-        </div>
-        <Button onClick={handleRetry} className="w-full">נסה שוב</Button>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full">
-      {scriptLoading && !scriptLoaded && (
+      {!scriptLoaded && (
         <div className="flex flex-col items-center justify-center py-6">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
           <p className="mt-2 text-sm text-muted-foreground">טוען מערכת תשלומים...</p>

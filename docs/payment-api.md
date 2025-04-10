@@ -12,9 +12,10 @@ Represents a tokenized credit card for secure payment processing.
 ```typescript
 export type TokenData = {
   token: string;               // Secure token representing the card (from payment processor)
-  cardLast4: string;           // Last four digits of the credit card
-  expMonth: number;            // Card expiry month (1-12)
-  expYear: number;             // Card expiry year (4 digits)
+  lastFourDigits: string;      // Last four digits of the credit card
+  expiryMonth: number;         // Card expiry month (1-12)
+  expiryYear: number;          // Card expiry year (4 digits)
+  cardholderName?: string;     // Optional cardholder name
 };
 ```
 
@@ -23,13 +24,16 @@ export type TokenData = {
 Represents a subscription plan that users can purchase.
 
 ```typescript
-export type SubscriptionPlan = {
+export interface SubscriptionPlan {
   id: string;                  // Unique identifier
   name: string;                // Display name
   price: number;               // Price in cents/agorot
-  interval: "monthly" | "yearly"; // Billing frequency
   description?: string;        // Plan description
-};
+  features?: string[];         // List of features included
+  trialDays?: number;          // Number of trial days (0 = no trial)
+  billingCycle: 'monthly' | 'annual'; // Billing frequency
+  currency?: string;           // Currency code (default: USD)
+}
 ```
 
 ### PaymentError
@@ -37,11 +41,11 @@ export type SubscriptionPlan = {
 Represents an error that occurred during payment processing.
 
 ```typescript
-export type PaymentError = {
+export interface PaymentError {
   code: string;                // Error code
   message: string;             // User-friendly error message
   raw?: any;                   // Raw error data
-};
+}
 ```
 
 ### PaymentSessionData
@@ -49,14 +53,14 @@ export type PaymentError = {
 Represents a saved payment session for recovery.
 
 ```typescript
-export type PaymentSessionData = {
-  userId: string;              // User ID
-  planId: string;              // Selected plan ID
-  tokenData: TokenData;        // Payment token data
-  amount: number;              // Payment amount
-  status: "pending" | "approved" | "failed"; // Session status
-  createdAt: string;           // Session creation timestamp
-};
+export interface PaymentSessionData {
+  sessionId?: string;          // Unique session identifier
+  userId?: string;             // User ID if authenticated
+  email?: string;              // User email for recovery
+  planId?: string;             // Selected plan ID
+  paymentDetails?: any;        // Payment details
+  expiresAt?: string;          // Session expiry timestamp
+}
 ```
 
 ### CardcomChargeResponse
@@ -64,12 +68,12 @@ export type PaymentSessionData = {
 Represents a response from the Cardcom payment gateway.
 
 ```typescript
-export type CardcomChargeResponse = {
+export interface CardcomChargeResponse {
   IsApproved: "1" | "0";       // Success (1) or failure (0)
-  ReturnValue: number;         // Return code
-  Message: string;             // Response message
+  ReturnValue?: number;        // Return code
+  Message?: string;            // Response message
   TokenApprovalNumber?: string; // Approval number for successful charges
-};
+}
 ```
 
 ### UserSubscription
@@ -77,7 +81,7 @@ export type CardcomChargeResponse = {
 Represents a user's subscription in the database.
 
 ```typescript
-export type UserSubscription = {
+export interface UserSubscription {
   user_id: string;             // User ID (foreign key)
   plan_id: string;             // Plan ID
   status: "active" | "suspended" | "cancelled"; // Subscription status
@@ -85,7 +89,7 @@ export type UserSubscription = {
   created_at: string;          // Creation date
   fail_count?: number;         // Number of failed payment attempts
   last_attempt_at?: string;    // Last payment attempt date
-};
+}
 ```
 
 ## Schemas
@@ -97,9 +101,10 @@ The system uses Zod schemas for runtime validation.
 ```typescript
 const tokenDataSchema = z.object({
   token: z.string().min(5),
-  cardLast4: z.string().length(4),
-  expMonth: z.number().min(1).max(12),
-  expYear: z.number().min(2024),
+  lastFourDigits: z.string().length(4),
+  expiryMonth: z.number().min(1).max(12),
+  expiryYear: z.number().min(2023),
+  cardholderName: z.string().optional(),
 });
 ```
 
@@ -107,46 +112,16 @@ const tokenDataSchema = z.object({
 
 ```typescript
 const subscriptionPlanSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string(),
   name: z.string(),
-  price: z.number().int().min(100),
-  interval: z.enum(["monthly", "yearly"]),
+  price: z.number().int().min(0),
   description: z.string().optional(),
+  features: z.array(z.string()).optional(),
+  trialDays: z.number().int().min(0).optional(),
+  billingCycle: z.enum(["monthly", "annual"]),
+  currency: z.string().optional(),
 });
 ```
-
-## Error Handling
-
-The system includes comprehensive error handling for payment processing:
-
-### Error Codes
-
-- `card_declined`: Card was declined by the issuing bank
-- `expired_card`: Card is expired
-- `insufficient_funds`: Not enough funds on the card
-- `network_error`: Network connectivity issues
-- `timeout`: Request took too long
-- `sdk_load_failed`: Failed to load the Cardcom SDK
-- `service_unavailable`: Payment service is currently unavailable
-
-### SDK Loading Issues
-
-The payment system attempts to load the Cardcom SDK from multiple URLs:
-1. Primary URL: `https://secure.cardcom.solutions/js/openfields.js`
-2. Fallback URLs if primary fails
-
-If all SDK loading attempts fail:
-1. User is shown a friendly error message
-2. A retry button is provided
-3. The error is logged for tracking
-
-## Payment Processing Flow
-
-1. Load and initialize the Cardcom SDK
-2. User enters payment information
-3. Card is tokenized on the client side (no raw card data is sent to server)
-4. Token is verified and used for payment processing 
-5. User gets redirected based on payment success/failure
 
 ## Components
 
@@ -159,19 +134,25 @@ A React component that implements the Cardcom SDK for secure tokenization. It ha
 3. Tokenizing card information securely
 4. Error handling and validation
 
-### Error Recovery
+### Payment Flow
 
-The system includes a recovery mechanism for payment errors:
+1. User enters payment information in `CardcomOpenFields`
+2. Card is tokenized by Cardcom SDK in the browser
+3. Token (not card data) is sent to the server
+4. Server processes payment with token through Edge Functions
+5. Subscription is activated for the user
 
-1. Transient errors like network issues can be retried
-2. Payment sessions are saved for recovery
-3. Users can resume interrupted payments
-4. Detailed error logging helps identify and resolve issues
+## Edge Functions
+
+The system uses Supabase Edge Functions for secure server-side processing:
+
+1. **direct-payment**: Processes new credit card payments
+2. **recover-payment-session**: Handles payment recovery after failures
+3. **cardcom-payment/verify-payment**: Verifies payments from external sources
 
 ## Best Practices
 
 - Never send raw card data to the server (use tokenization)
 - Always validate payment data on both client and server
 - Implement proper error handling with recovery options
-- Log payment errors for debugging and analysis
-- Provide clear feedback to users when errors occur
+- Follow PCI DSS compliance guidelines

@@ -3,9 +3,10 @@
 
 export type TokenData = {
   token: string;
-  cardLast4: string;
-  expMonth: number;
-  expYear: number;
+  lastFourDigits: string;
+  expiryMonth: number;
+  expiryYear: number;
+  cardholderName?: string;
 };
 
 // Define the steps for the subscription flow
@@ -43,10 +44,11 @@ export interface SubscriptionPlan {
   id: string;
   name: string;
   price: number;
-  interval: "monthly" | "yearly";
   description?: string;
   features?: string[];
   trialDays?: number;
+  billingCycle: 'monthly' | 'annual';
+  currency?: string;
 }
 
 export interface PaymentError {
@@ -56,18 +58,18 @@ export interface PaymentError {
 }
 
 export interface PaymentSessionData {
-  userId: string;
-  planId: string;
-  tokenData: TokenData;
-  amount: number;
-  status: "pending" | "approved" | "failed"; 
-  createdAt: string;
+  sessionId?: string;
+  userId?: string;
+  email?: string;
+  planId?: string;
+  paymentDetails?: any;
+  expiresAt?: string;
 }
 
 export interface CardcomChargeResponse {
   IsApproved: "1" | "0";
-  ReturnValue: number;
-  Message: string;
+  ReturnValue?: number;
+  Message?: string;
   TokenApprovalNumber?: string;
 }
 
