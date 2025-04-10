@@ -15,6 +15,7 @@ body {
   width: 100%;
   font-size: 0.875rem;
   background-color: white;
+  color: #000000; /* Dark text color for better readability */
   direction: rtl;
 }
 

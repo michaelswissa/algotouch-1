@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -182,6 +183,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             width: 100%;
             font-size: 0.875rem;
             background-color: white;
+            color: #000; /* Dark text color for better readability */
             direction: rtl;
           }
           
@@ -205,12 +207,55 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             -moz-appearance: textfield;
           }
         `;
+
+        // Update card number CSS to ensure text is readable
+        const updatedCardNumberCss = `
+          body {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            direction: rtl;
+          }
+          
+          .cardNumberField {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            height: 40px;
+            margin: 0;
+            padding: 0 10px;
+            width: 100%;
+            font-size: 0.875rem;
+            background-color: white;
+            color: #000; /* Dark text color for better readability */
+            direction: rtl;
+          }
+          
+          .cardNumberField:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 1px #3182ce;
+          }
+          
+          .cardNumberField.invalid {
+            border: 1px solid #e53e3e;
+          }
+          
+          input::-webkit-outer-spin-button,
+          input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+          
+          input[type=number] {
+            -moz-appearance: textfield;
+          }
+        `;
         
         // Post message to master iframe with initialization data
         const message = {
           action: 'init',
           lowProfileCode: profileCode,
-          cardFieldCSS: cardNumberCss,
+          cardFieldCSS: updatedCardNumberCss, // Use updated CSS with readable text
           cvvFieldCSS: cvvCss,
           placeholder: "0000 0000 0000 0000",
           cvvPlaceholder: "123",
@@ -493,7 +538,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               type="text"
               value={cardOwnerName}
               onChange={(e) => setCardOwnerName(e.target.value)}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary"
+              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="שם מלא כפי שמופיע על הכרטיס"
               disabled={processingPayment}
               required
@@ -509,7 +554,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               type="email"
               value={cardOwnerEmail}
               onChange={(e) => setCardOwnerEmail(e.target.value)}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary"
+              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="your@email.com"
               disabled={processingPayment}
             />
@@ -524,7 +569,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             id="CardComCardNumber"
             ref={cardNumberFrameRef}
             src={`${CARDCOM_IFRAME_URL}/cardNumber`}
-            style={{ width: '100%', height: '40px', border: 'none' }}
+            style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
             title="Card Number"
           />
         </div>
@@ -542,7 +587,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
                 const value = e.target.value.replace(/\D/g, '').slice(0, 2);
                 setExpirationMonth(value);
               }}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary"
+              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="MM"
               disabled={processingPayment}
               required
@@ -562,7 +607,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
                 const value = e.target.value.replace(/\D/g, '').slice(0, 2);
                 setExpirationYear(value);
               }}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary"
+              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="YY"
               disabled={processingPayment}
               required
@@ -578,7 +623,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               id="CardComCvv"
               ref={cvvFrameRef}
               src={`${CARDCOM_IFRAME_URL}/CVV`}
-              style={{ width: '100%', height: '40px', border: 'none' }}
+              style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
               title="CVV"
             />
           </div>
@@ -593,7 +638,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <Button 
             type="submit" 
             className="w-full md:w-auto px-8"
-            disabled={processingPayment || !fieldsInitialized}
+            disabled={processingPayment}
           >
             {processingPayment ? (
               <>
