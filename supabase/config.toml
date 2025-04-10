@@ -1,28 +1,33 @@
 
-project_id = "ndhakvhrrkczgylcmyoc"
+project_id = "algotouch-trader"
 
 [api]
+enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "storage"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
 port = 54322
+shadow_port = 54320
 major_version = 15
 
 [studio]
+enabled = true
 port = 54323
+api_url = "http://localhost"
 
 [inbucket]
+enabled = true
 port = 54324
-smtp_port = 54325
-pop3_port = 54326
 
 [storage]
+enabled = true
 file_size_limit = "50MiB"
 
 [auth]
+enabled = true
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
@@ -35,20 +40,17 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
 
-[auth.external.facebook]
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+
+[auth.external.github]
 enabled = false
 client_id = ""
 secret = ""
-# These need to match URLs in the Facebook developer console
 redirect_uri = ""
 url = ""
-# Space-separated scopes, e.g. "email, user_birthday"
-scopes = ""
 
 [functions]
-[functions.cardcom-openfields]
-verify_jwt = false
-[functions.cardcom-payment]
-verify_jwt = false
 [functions.cardcom-webhook]
 verify_jwt = false

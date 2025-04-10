@@ -7,7 +7,6 @@ import CardcomOpenFields from './CardcomOpenFields';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { useNavigate } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -23,11 +22,9 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   onCancel
 }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
   const [registrationData, setRegistrationData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [useDirectPayment, setUseDirectPayment] = useState(false);
   
   // Get plan details from helper
   const planDetails = getSubscriptionPlans();
@@ -175,15 +172,11 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     setError(errorMsg);
   };
 
-  const switchToDirectPayment = () => {
-    setUseDirectPayment(true);
-  };
-
   return (
     <Card className="w-full shadow-sm overflow-hidden">
       <CardContent className="p-0">
         {error && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive" className="m-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>

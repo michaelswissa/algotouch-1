@@ -20,6 +20,7 @@ serve(async (req) => {
       operationResponse: params.OperationResponse,
       lowProfileId: params.LowProfileCode,
       dealResponse: params.DealResponse,
+      transactionId: params.InternalDealNumber,
       fullParams: params
     });
 

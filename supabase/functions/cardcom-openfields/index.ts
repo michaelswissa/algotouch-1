@@ -47,12 +47,12 @@ serve(async (req) => {
       );
     }
 
-    console.log('Creating payment session for plan:', planId);
+    console.log('Creating OpenFields payment session for plan:', planId);
 
     // Get the Cardcom API credentials from environment variables
-    const terminalNumber = "160138";  // Hard-coded from your provided details
-    const apiUsername = "bLaocQRMSnwphQRUVG3b";  // Hard-coded from your provided details
-    const apiPassword = "i9nr6caGbgheTdYfQbo6"; // Only needed for specific operations
+    const terminalNumber = "160138";  // Hard-coded from provided details
+    const apiUsername = "bLaocQRMSnwphQRUVG3b";  // Hard-coded from provided details
+    const apiPassword = "i9nr6caGbgheTdYfQbo6"; // For specific operations
 
     // If this is a registration payment, store the registration data temporarily
     if (isRegistration && registrationData) {
@@ -82,91 +82,22 @@ serve(async (req) => {
       }
     }
 
-    // Create Cardcom payment session (Low Profile)
+    // Set up webhook URL for payment notifications
     const webhookUrl = new URL(req.url).origin + "/functions/cardcom-webhook";
-    const successUrl = new URL(req.url).origin + "/subscription?step=4&success=true";
-    const failureUrl = new URL(req.url).origin + "/subscription?step=3&error=true";
-
-    const productDescription = `מנוי ${planName || planId}`;
-
-    // Create the URL search params for the request
-    const params = new URLSearchParams({
-      'TerminalNumber': terminalNumber,
-      'UserName': apiUsername,
-      'CodePage': '65001',
-      'Operation': '1', // ChargeOnly
-      'Language': 'he',
-      'CoinID': '1', // ILS
-      'SumToBill': amount.toString(),
-      'ProductName': productDescription,
-      'SuccessRedirectUrl': successUrl,
-      'ErrorRedirectUrl': failureUrl,
-      'IndicatorUrl': webhookUrl,
-      'ReturnValue': planId,
-      'APILevel': '10',
-      'CardOwnerName': userName || '',
-      'CardOwnerEmail': userEmail || '',
-      'ShowCardOwnerEmail': userEmail ? 'true' : 'false',
-      'IsVirtualTerminalMode': 'false',
-      'HideCardOwnerName': Boolean(userName) ? 'false' : 'true',
-      'MaxNumOfPayments': '1',
-    });
-
-    console.log('Sending request to Cardcom with params:', Object.fromEntries(params));
-
-    // Create the Low Profile payment session
-    const cardcomResponse = await fetch('https://secure.cardcom.solutions/Interface/LowProfile.aspx', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-
-    // Get the full response text for debugging
-    const responseText = await cardcomResponse.text();
-    console.log('Cardcom raw response:', responseText);
-
-    if (!cardcomResponse.ok) {
-      console.error('Error from Cardcom API:', responseText);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Error creating Cardcom payment session',
-          details: responseText 
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
-    }
     
-    // Parse the response - Cardcom returns a URL-encoded string
-    const responseParams = new URLSearchParams(responseText);
-    const responseCode = responseParams.get('ResponseCode');
-    const description = responseParams.get('Description');
-    const lowProfileId = responseParams.get('LowProfileCode');
-    const url = responseParams.get('url');
-    
-    if (responseCode !== '0' || !lowProfileId) {
-      console.error('Error in Cardcom response:', responseText);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid response from Cardcom', 
-          details: { responseCode, description, responseText } 
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
-    }
-
+    // Create response with required data for OpenFields integration
     return new Response(
       JSON.stringify({
         success: true,
-        lowProfileId,
-        url,
+        terminalNumber,
+        apiUsername,
+        apiPassword,
+        planId,
+        planName,
+        amount,
+        userEmail,
+        userName,
+        webhookUrl
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
