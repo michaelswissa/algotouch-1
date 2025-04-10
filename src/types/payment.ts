@@ -1,3 +1,4 @@
+
 // Types for payment processing
 
 export type TokenData = {

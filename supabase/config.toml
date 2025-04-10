@@ -126,6 +126,8 @@ redirect_uri = ""
 verify_jwt = false
 [functions.charge-token]
 verify_jwt = false
+[functions.create-lowprofile-deal]
+verify_jwt = false
 
 [analytics]
 enabled = false
