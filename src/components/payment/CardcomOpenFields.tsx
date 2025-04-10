@@ -74,8 +74,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               setCardOwnerName(`${firstName} ${lastName}`.trim());
             }
             
-            // Set email from profile or user data
-            setCardOwnerEmail(profile.email || data.user.email || '');
+            // Always use email from auth user data, since profile doesn't have an email field
+            setCardOwnerEmail(data.user.email || '');
           } else {
             // Fallback to user email from auth
             setCardOwnerEmail(data.user.email || '');
