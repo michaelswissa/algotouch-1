@@ -1,62 +1,69 @@
 
-import React, { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import React, { useEffect, useState } from "react";
 import { TokenData } from "@/types/payment";
 import { supabase } from "@/integrations/supabase/client";
+import { Lock } from "lucide-react";
+import CardcomIframeHandler from "./CardcomIframeHandler";
 
-interface CardcomLowProfileFrameProps {
+type CardcomLowProfileFrameProps = {
   onTokenReceived: (tokenData: TokenData) => void;
   onError: (error: any) => void;
   isProcessing: boolean;
-}
+};
 
-const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
-  onTokenReceived,
-  onError,
-  isProcessing
-}) => {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [iframeUrl, setIframeUrl] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+export default function CardcomLowProfileFrame({ 
+  onTokenReceived, 
+  onError, 
+  isProcessing 
+}: CardcomLowProfileFrameProps) {
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lowProfileId, setLowProfileId] = useState<string | null>(null);
 
-  // Generate LowProfile deal when component mounts
+  // Create a LowProfile deal to get the iframe URL
   useEffect(() => {
     async function createLowProfileDeal() {
       try {
         setLoading(true);
-        setError(null);
+        setErrorMsg(null);
         
-        // Call the Edge Function to create a LowProfile deal
+        // Get current user session (if any)
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id || crypto.randomUUID();
+        
+        // Call the Edge function to create a low profile deal
         const { data, error } = await supabase.functions.invoke('create-lowprofile-deal', {
-          body: { 
-            amount: 100, // Will be replaced with actual amount in production
-            returnUrl: window.location.origin + "/payment/success",
-            cancelUrl: window.location.origin + "/payment/cancel",
-            language: "he" // Hebrew
+          body: {
+            amount: 100, // Sample amount, will be replaced with actual amount in production
+            returnUrl: window.location.origin + "/payment/token-received",
+            cancelUrl: window.location.origin + "/payment/token-received?status=fail",
+            language: "he", // Hebrew
+            customerId: userId,
+            fullName: session?.user?.user_metadata?.full_name || "",
+            email: session?.user?.email || "",
           }
         });
         
         if (error) {
-          console.error("Error creating low profile deal:", error);
-          setError("שגיאה ביצירת עסקה. אנא נסה שוב מאוחר יותר.");
-          onError(new Error(`Failed to create low profile deal: ${error.message}`));
+          console.error("Failed to create payment session:", error);
+          setErrorMsg("שגיאה ביצירת עסקה. אנא נסה שוב מאוחר יותר.");
+          onError(error);
           return;
         }
         
         if (!data?.lowProfileUrl || !data?.lowProfileId) {
-          setError("לא התקבלה כתובת תקינה לטופס התשלום.");
+          setErrorMsg("לא התקבלה כתובת תקינה לטופס התשלום");
           onError(new Error("No valid iframe URL or LowProfile ID received"));
           return;
         }
         
-        console.log("Low Profile data received:", data);
+        console.log("Low profile data received:", data);
         setIframeUrl(data.lowProfileUrl);
         setLowProfileId(data.lowProfileId);
       } catch (err) {
         console.error("Exception creating low profile deal:", err);
-        setError("שגיאת תקשורת. אנא נסה שוב מאוחר יותר.");
+        setErrorMsg("שגיאת תקשורת. אנא נסה שוב מאוחר יותר.");
         onError(err);
       } finally {
         setLoading(false);
@@ -64,109 +71,40 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
     }
     
     createLowProfileDeal();
+  }, [onError]);
+
+  // Handle token received from the iframe via postMessage
+  const handleTokenReceived = (token: string) => {
+    console.log("Token received in CardcomLowProfileFrame:", token);
     
-    // Setup message listener for the token from Cardcom iframe
-    const handleMessage = (event: MessageEvent) => {
-      // Make sure message is from Cardcom domain
-      if (!event.origin.includes("cardcom.solutions")) {
-        return;
-      }
-      
-      console.log("Received message from iframe:", event.data);
-      
-      try {
-        // Check if we received a token
-        if (event.data?.Token) {
-          const token = event.data.Token;
-          const lastFourDigits = event.data.CardNumber || "****";
-          const expiryMonth = parseInt(event.data.CardMonth || "0", 10);
-          const expiryYear = parseInt(event.data.CardYear || "0", 10);
-          const cardholderName = event.data.CardOwnerName || "";
-          
-          console.log("Token received:", { token, lastFourDigits });
-          
-          // Verify payment status with server
-          if (lowProfileId) {
-            verifyPaymentStatus(lowProfileId, token, {
-              token,
-              lastFourDigits,
-              expiryMonth,
-              expiryYear,
-              cardholderName
-            });
-          } else {
-            // Direct token handling if we don't have lowProfileId for some reason
-            onTokenReceived({
-              token,
-              lastFourDigits,
-              expiryMonth,
-              expiryYear,
-              cardholderName
-            });
-          }
-        } 
-        // Handle errors
-        else if (event.data?.Error) {
-          setError(`שגיאה בעיבוד כרטיס האשראי: ${event.data.Error}`);
-          onError(new Error(event.data.Error));
-        }
-      } catch (err) {
-        console.error("Error handling postMessage:", err);
-        setError("שגיאה בעיבוד תשובת מערכת התשלום.");
-        onError(err);
-      }
+    // Create token data object
+    const tokenData: TokenData = {
+      token,
+      lastFourDigits: "****", // Will be updated after payment processing
+      expiryMonth: 0,         // Will be updated after payment processing
+      expiryYear: 0,          // Will be updated after payment processing
     };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [onTokenReceived, onError]);
-
-  // Verify payment status with server
-  const verifyPaymentStatus = async (lowProfileId: string, token: string, tokenData: TokenData) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-lowprofile-payment', {
-        body: { lowProfileId }
-      });
-      
-      if (error) {
-        console.error("Error verifying payment:", error);
-        onError(error);
-        return;
-      }
-      
-      console.log("Payment verification result:", data);
-      
-      if (data.success) {
-        // Payment successful, pass token data to parent
-        onTokenReceived(tokenData);
-      } else {
-        // Payment failed
-        setError(`שגיאה בעיבוד התשלום: ${data.message}`);
-        onError(new Error(data.message));
-      }
-    } catch (err) {
-      console.error("Exception verifying payment:", err);
-      onError(err);
-    }
+    
+    // Pass the token back to parent component
+    onTokenReceived(tokenData);
   };
 
-  // Display a loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-8">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
-        <p className="mt-4 text-muted-foreground">טוען טופס תשלום מאובטח...</p>
+        <p className="mt-4 text-sm text-muted-foreground">טוען טופס תשלום מאובטח...</p>
       </div>
     );
   }
 
-  // Display an error message if something went wrong
-  if (error) {
+  if (errorMsg) {
     return (
-      <div className="bg-red-50 border-r-4 border-red-500 p-4 rounded mb-4">
-        <p className="text-red-700">{error}</p>
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+        <h3 className="text-red-700 dark:text-red-400 font-medium mb-2">שגיאה בטעינת טופס התשלום</h3>
+        <p className="text-red-600 dark:text-red-300 text-sm mb-3">{errorMsg}</p>
         <button 
-          className="mt-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded"
+          className="px-4 py-1 text-sm bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
           onClick={() => window.location.reload()}
         >
           נסה שוב
@@ -175,47 +113,36 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
     );
   }
 
-  // Display an error if no iframe URL was returned
-  if (!iframeUrl) {
-    return (
-      <div className="bg-yellow-50 border-r-4 border-yellow-500 p-4 rounded">
-        <p className="text-yellow-700">לא התקבלה כתובת תקינה לטופס התשלום.</p>
-      </div>
-    );
-  }
-
-  // Render the iframe with Cardcom payment form
   return (
     <div className="w-full">
-      <div className="relative overflow-hidden rounded-md border border-gray-200" style={{ height: "400px" }}>
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ height: "500px" }}>
         {isProcessing && (
-          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 flex items-center justify-center z-10 backdrop-blur-sm">
             <div className="flex flex-col items-center">
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
-              <p className="mt-4 text-muted-foreground">מעבד תשלום...</p>
+              <p className="mt-4 text-sm font-medium">מעבד תשלום...</p>
             </div>
           </div>
         )}
         
-        <iframe
-          ref={iframeRef}
-          src={iframeUrl}
-          width="100%"
-          height="100%"
-          className="border-0"
-          title="Cardcom Payment Form"
-          sandbox="allow-forms allow-scripts allow-same-origin allow-top-navigation allow-popups"
-        />
+        {iframeUrl && (
+          <iframe
+            src={iframeUrl}
+            width="100%"
+            height="100%"
+            className="border-0"
+            title="Cardcom Payment Form"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-top-navigation allow-popups"
+          />
+        )}
+        
+        <CardcomIframeHandler onTokenReceived={handleTokenReceived} onError={() => onError(new Error('תהליך התשלום נכשל'))} />
       </div>
       
       <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground bg-primary/5 p-2 px-3 rounded-md border border-primary/10">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-        </svg>
+        <Lock className="h-4 w-4 text-green-600 flex-shrink-0" />
         <span>פרטי הכרטיס מאובטחים באמצעות הצפנת SSL ולא נשמרים במערכת</span>
       </div>
     </div>
   );
-};
-
-export default CardcomLowProfileFrame;
+}

@@ -19,13 +19,6 @@ interface LowProfileRequest {
   fullName?: string;
 }
 
-interface LowProfileResponse {
-  lowProfileUrl?: string;
-  lowProfileId?: string;
-  error?: string;
-  details?: any;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -35,8 +28,8 @@ serve(async (req) => {
   try {
     // Get Cardcom credentials from environment variables
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL");
-    const apiName = Deno.env.get("CARDCOM_USERNAME");
-    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD");
+    const apiName = Deno.env.get("CARDCOM_USER");
+    const projectDomain = Deno.env.get("PROJECT_DOMAIN") || "https://algotouch.lovable.app";
 
     if (!terminalNumber || !apiName) {
       console.error("Missing required Cardcom credentials");
@@ -57,18 +50,20 @@ serve(async (req) => {
     try {
       requestData = await req.json();
     } catch (e) {
-      console.warn("Failed to parse request body, using defaults");
+      console.error("Failed to parse request body:", e);
+      return new Response(
+        JSON.stringify({ error: "Invalid request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Set default values if not provided
     const amount = requestData.amount || 100; // 1 ILS
-    const returnUrl = requestData.returnUrl || "https://example.com/success";
-    const cancelUrl = requestData.cancelUrl || "https://example.com/cancel";
+    const returnUrl = requestData.returnUrl || `${projectDomain}/payment/token-received`;
+    const cancelUrl = requestData.cancelUrl || `${projectDomain}/payment/token-received?status=fail`;
     const language = requestData.language || "he"; // Hebrew
-    const productName = requestData.productName || "Test Payment";
-
-    // Determine origin for postMessage
-    const origin = new URL(returnUrl).origin;
+    const productName = requestData.productName || "AlgoTouch Payment";
+    const customerId = requestData.customerId || crypto.randomUUID();
     
     // Create the request payload for Cardcom LowProfile API
     const payload = {
@@ -83,9 +78,11 @@ serve(async (req) => {
       ProductName: productName,
       APILevel: "10",
       ISOCoinId: "1", // ILS
-      ReturnValue: new Date().getTime().toString(), // Unique ID for this transaction
+      ReturnValue: customerId, // Unique ID for tracking this transaction
+      SendTokenInRedirect: "1", // This ensures the token is included in the redirect
     };
 
+    // Add customer information if provided
     if (requestData.email) {
       payload.CardOwnerEmail = requestData.email;
       payload.ShowCardOwnerEmail = "true";
@@ -100,9 +97,6 @@ serve(async (req) => {
       payload.CardOwnerPhone = requestData.phone;
       payload.ShowCardOwnerPhone = "true";
     }
-
-    // Add configuration to inject a postMessage script to the LowProfile page
-    payload.CSSUrl = `${origin}/js/cardcom-bridge.js?origin=${encodeURIComponent(origin)}`;
 
     console.log("Sending LowProfile request:", payload);
 
@@ -122,7 +116,7 @@ serve(async (req) => {
           details: errorText 
         }),
         { 
-          status: 400, 
+          status: response.status, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
@@ -146,13 +140,11 @@ serve(async (req) => {
     }
 
     // Return the LowProfile URL and ID
-    const result: LowProfileResponse = {
-      lowProfileUrl: cardcomResponse.Url,
-      lowProfileId: cardcomResponse.LowProfileId
-    };
-
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        lowProfileUrl: cardcomResponse.Url,
+        lowProfileId: cardcomResponse.LowProfileId
+      }),
       { 
         status: 200, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 

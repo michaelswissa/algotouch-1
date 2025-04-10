@@ -1,17 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 
 // CORS headers for browser requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// Create Supabase client
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -20,64 +14,64 @@ serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response("Method Not Allowed", { 
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), { 
       status: 405, 
-      headers: corsHeaders 
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 
   try {
-    const { token, amount, userId } = await req.json();
-
-    if (!token || !amount) {
-      return new Response(JSON.stringify({ status: "error", message: "Missing required fields" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { token, amount, userId, planId } = await req.json();
+    
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Missing token" }), { 
+        status: 400, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    const terminal = Deno.env.get("CARDCOM_TERMINAL");
+    console.log("Processing payment with token:", { tokenPresent: !!token, amount, userId });
+
+    // Get Cardcom credentials
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL");
     const apiName = Deno.env.get("CARDCOM_USER");
-    const apiPassword = Deno.env.get("CARDCOM_PASSWORD");
-
-    if (!terminal || !apiName || !apiPassword) {
-      console.error("Missing required environment variables");
-      return new Response(JSON.stringify({ status: "error", message: "Server configuration error" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    
+    if (!terminalNumber || !apiName) {
+      console.error("Missing required Cardcom credentials");
+      return new Response(JSON.stringify({ error: "Missing Cardcom configuration" }), { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // Create payload for ChargeToken API
+    // Create a unique transaction ID to prevent duplicates
+    const externalUniqTranId = crypto.randomUUID();
+
+    // Create the request payload for Cardcom ChargeToken API
     const payload = {
-      TerminalNumber: terminal,
-      ApiName: apiName,
-      ApiPassword: apiPassword,
+      TerminalNumber: terminalNumber,
+      UserName: apiName,
       TokenToCharge: {
         Token: token,
-        SumToBill: amount,
-        APILevel: "10",
-        UniqAsmachta: crypto.randomUUID(),
+        SumToBill: amount || 100, // Default to 100 (1 NIS) if no amount provided
+        UniqAsmachta: externalUniqTranId,
+        ApiLevel: "10",
+        CardOwnerName: "", // Can be filled with user name if available
       }
     };
 
-    console.log("Sending charge request to Cardcom:", { ...payload, ApiPassword: "***" });
-
-    // Convert payload to form data format
-    const formData = new URLSearchParams();
-    formData.append("TerminalNumber", terminal);
-    formData.append("ApiName", apiName);
-    formData.append("ApiPassword", apiPassword);
-    formData.append("TokenToCharge.Token", token);
-    formData.append("TokenToCharge.SumToBill", amount.toString());
-    formData.append("TokenToCharge.APILevel", "10");
-    formData.append("TokenToCharge.UniqAsmachta", crypto.randomUUID());
+    console.log("Sending ChargeToken request");
 
     // Call Cardcom API to charge the token
     const response = await fetch("https://secure.cardcom.solutions/Interface/ChargeToken.aspx", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData.toString()
+      body: new URLSearchParams(Object.entries(payload).flatMap(([key, value]) => {
+        if (typeof value === 'object' && value !== null) {
+          return Object.entries(value).map(([innerKey, innerValue]) => [`${key}.${innerKey}`, String(innerValue)]);
+        }
+        return [[key, String(value)]];
+      })).toString()
     });
 
     if (!response.ok) {
@@ -85,80 +79,83 @@ serve(async (req) => {
       console.error("Cardcom API error:", response.status, errorText);
       return new Response(JSON.stringify({ 
         status: "error", 
-        message: "Payment provider error", 
+        message: "Failed to process payment", 
         details: errorText 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }), { 
+        status: response.status, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // Parse response text as key=value pairs
-    const responseText = await response.text();
-    console.log("Cardcom API raw response:", responseText);
-    
-    const responseData: Record<string, string> = {};
-    responseText.split('&').forEach(pair => {
-      const [key, value] = pair.split('=');
-      if (key && value) {
-        responseData[key] = decodeURIComponent(value);
+    // Parse the API response
+    const cardcomResponse = await response.json();
+    console.log("Cardcom API response:", cardcomResponse);
+
+    // Check if the payment was successful
+    if (cardcomResponse.ResponseCode === 0) {
+      // If we have userId and Supabase credentials, we can log the transaction
+      if (userId) {
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE");
+          
+          if (supabaseUrl && supabaseKey) {
+            // Log the successful payment
+            await fetch(`${supabaseUrl}/rest/v1/payment_transactions`, {
+              method: "POST",
+              headers: {
+                "apikey": supabaseKey,
+                "Authorization": `Bearer ${supabaseKey}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+              },
+              body: JSON.stringify({
+                user_id: userId,
+                plan_id: planId || null,
+                amount,
+                payment_method: "credit_card",
+                transaction_id: cardcomResponse.InternalDealNumber || externalUniqTranId,
+                approval_code: cardcomResponse.ApprovalNumber || "",
+                status: "completed",
+                last_digits: cardcomResponse.CardNumber5 || "****"
+              })
+            });
+          }
+        } catch (logError) {
+          console.error("Error logging payment transaction:", logError);
+          // Continue with the success response even if logging fails
+        }
       }
-    });
 
-    console.log("Parsed Cardcom response:", responseData);
-
-    // Check if charge was successful
-    const isApproved = responseData.ResponseCode === "0";
-    const approvalNumber = responseData.ApprovalNumber || null;
-
-    // Log the transaction in the database
-    try {
-      const { error: dbError } = await supabase
-        .from('user_payment_logs')
-        .insert({
-          user_id: userId,
-          token: token,
-          amount: parseInt(amount),
-          approval_code: approvalNumber,
-          status: isApproved ? "success" : "failed",
-          transaction_details: responseData
-        });
-
-      if (dbError) {
-        console.error("Error logging transaction to database:", dbError);
-      }
-    } catch (dbError) {
-      console.error("Exception logging transaction to database:", dbError);
-    }
-
-    if (isApproved) {
-      return new Response(JSON.stringify({ 
+      // Return success response
+      return new Response(JSON.stringify({
         status: "approved",
-        approvalNumber: approvalNumber,
-        transactionId: responseData.InternalDealNumber || null 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        transactionId: cardcomResponse.InternalDealNumber,
+        approvalNumber: cardcomResponse.ApprovalNumber || "",
+        message: "Payment successful"
+      }), { 
+        status: 200, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     } else {
-      return new Response(JSON.stringify({ 
-        status: "declined", 
-        reason: responseData.Description || "Payment declined",
-        errorCode: responseData.ResponseCode 
-      }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Return declined response with reason
+      return new Response(JSON.stringify({
+        status: "declined",
+        reason: cardcomResponse.Description || "Payment declined",
+        errorCode: cardcomResponse.ResponseCode
+      }), { 
+        status: 402, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
   } catch (err) {
-    console.error("Error charging token:", err);
+    console.error("Payment processing error:", err);
     return new Response(JSON.stringify({ 
       status: "error", 
-      message: "Internal server error",
-      details: err.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      message: err.message || "Internal server error" 
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
