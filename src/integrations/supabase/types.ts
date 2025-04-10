@@ -654,39 +654,6 @@ export type Database = {
           },
         ]
       }
-      user_payment_logs: {
-        Row: {
-          amount: number
-          approval_code: string | null
-          created_at: string | null
-          id: string
-          status: string
-          token: string
-          transaction_details: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          amount: number
-          approval_code?: string | null
-          created_at?: string | null
-          id?: string
-          status: string
-          token: string
-          transaction_details?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          approval_code?: string | null
-          created_at?: string | null
-          id?: string
-          status?: string
-          token?: string
-          transaction_details?: Json | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       user_streaks: {
         Row: {
           created_at: string

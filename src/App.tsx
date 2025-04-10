@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard';
 import Subscription from './pages/Subscription';
 import MySubscriptionPage from './pages/MySubscriptionPage'; // Changed from MySubscription to MySubscriptionPage
 import ContractDetails from './pages/ContractDetails';
-import TokenReceived from './pages/payment/token-received';
 
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/auth/AuthProvider';
@@ -30,8 +29,7 @@ function App() {
           <Route path="/my-subscription" element={<MySubscriptionPage />} />
           <Route path="/contract/:contractId" element={<ContractDetails />} />
           
-          {/* Payment routes */}
-          <Route path="/payment/token-received" element={<TokenReceived />} />
+          {/* Add any other routes you have */}
           
           {/* Catch-all route */}
           <Route path="*" element={<h1>Page not found</h1>} />

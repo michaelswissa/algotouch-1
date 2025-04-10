@@ -1,15 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { CreditCard, ShieldCheck } from 'lucide-react';
 import { usePaymentProcess } from './hooks/usePaymentProcess';
 import PaymentErrorCard from './PaymentErrorCard';
 import PaymentCardForm from './PaymentCardForm';
 import ErrorRecoveryInfo from './ErrorRecoveryInfo';
-import PaymentDiagnostics from './PaymentDiagnostics';
-
-// Import the LowProfile frame component instead of CardcomOpenFields
-import CardcomLowProfileFrame from './CardcomLowProfileFrame';
 
 interface PaymentFormProps {
   planId: string;
@@ -17,16 +13,14 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) => {
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  
   const {
     isProcessing,
     registrationData,
     registrationError,
     paymentError,
-    diagnosticInfo,
     loadRegistrationData,
     handleSubmit,
+    handleExternalPayment,
     isRecovering,
     plan
   } = usePaymentProcess({ planId, onPaymentComplete });
@@ -36,41 +30,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     loadRegistrationData();
   }, []);
 
-  // Show diagnostics if there's an error or if we've enabled it
-  useEffect(() => {
-    if (paymentError) {
-      // Show diagnostics automatically when there's an error
-      setShowDiagnostics(true);
-    }
-  }, [paymentError]);
-
-  // Check for dev mode to show diagnostics
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('mode') === 'dev') {
-      setShowDiagnostics(true);
-    }
-    
-    // Secret key combination for diagnostics
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Alt+Shift+D to toggle diagnostics
-      if (e.altKey && e.shiftKey && e.key === 'D') {
-        setShowDiagnostics(prev => !prev);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // If registration data is invalid, show an error and options to go back
   if (registrationError && !registrationData) {
     return <PaymentErrorCard errorMessage={registrationError} />;
   }
-
-  const refreshDiagnostics = () => {
-    window.location.reload();
-  };
 
   return (
     <Card className="max-w-2xl mx-auto shadow-lg border-2 border-primary/20 hover-glow" dir="rtl">
@@ -90,42 +53,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         </div>
       </CardHeader>
       
-      {/* Display diagnostics if enabled */}
-      <PaymentDiagnostics 
-        diagnosticInfo={diagnosticInfo}
-        onRefresh={refreshDiagnostics}
-        isVisible={showDiagnostics} 
-      />
-      
       <ErrorRecoveryInfo 
         error={paymentError?.message}
         isRecovering={isRecovering}
       />
       
-      {/* Replace PaymentCardForm with the LowProfile component */}
-      <div className="p-6">
-        {plan && (
-          <div className="bg-muted p-4 rounded-lg space-y-2 mb-6">
-            <h3 className="font-medium">{plan.name}</h3>
-            <p className="text-sm text-muted-foreground">{plan.description}</p>
-            <div className="flex justify-between items-center mt-2">
-              <span>מחיר:</span>
-              <span className="font-semibold">
-                {new Intl.NumberFormat('he-IL', {
-                  style: 'currency',
-                  currency: plan.currency || 'ILS'
-                }).format(plan.price / 100)}
-              </span>
-            </div>
-          </div>
-        )}
-        
-        <CardcomLowProfileFrame 
-          onTokenReceived={(tokenData) => handleSubmit(new Event("submit") as unknown as React.FormEvent, tokenData)}
-          onError={(error) => console.error("Payment error:", error)}
-          isProcessing={isProcessing}
-        />
-      </div>
+      <PaymentCardForm
+        plan={plan}
+        isProcessing={isProcessing}
+        onSubmit={handleSubmit}
+        onExternalPayment={handleExternalPayment}
+        planId={planId}
+      />
     </Card>
   );
 };

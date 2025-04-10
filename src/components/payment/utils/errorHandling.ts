@@ -1,109 +1,193 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentError } from '@/types/payment';
+import { PaymentErrorData } from '../hooks/types';
 
 /**
- * Maps error codes from different sources to standardized error codes
+ * Map error codes to user-friendly messages
  */
-export function mapErrorCode(error: any): string {
-  // If we already have a code, return it
-  if (typeof error?.code === 'string') {
-    return error.code;
-  }
-
-  // Handle Cardcom specific error codes
-  if (error?.ReturnValue) {
-    switch (error.ReturnValue) {
-      case 605: return 'card_declined';
-      case 513: return 'expired_card';
-      case 607: return 'insufficient_funds';
-      case 400: return 'invalid_request';
-      default: return `cardcom_${error.ReturnValue}`;
-    }
-  }
-
-  // Handle network errors
-  if (error?.name === 'NetworkError' || error?.message?.includes('network')) {
-    return 'network_error';
-  }
-
-  if (error?.message?.includes('timeout') || error?.name?.includes('Timeout')) {
-    return 'timeout';
-  }
-
-  // Generic error fallback
-  return 'payment_error';
-}
-
-/**
- * Gets a user-friendly error message based on error code
- */
-export function getErrorMessage(code: string): string {
-  switch (code) {
+export const mapErrorCode = (error: any): string => {
+  const errorCode = error?.code || error?.errorCode || 'UNKNOWN_ERROR';
+  
+  switch (errorCode) {
     case 'card_declined':
-      return 'כרטיס האשראי נדחה. נסה כרטיס אחר.';
+      return 'CARD_DECLINED';
     case 'expired_card':
-      return 'כרטיס האשראי שהזנת פג תוקף. נא להזין כרטיס תקף.';
+      return 'EXPIRED_CARD';
+    case 'incorrect_cvc':
+      return 'INCORRECT_CVC';
     case 'insufficient_funds':
-      return 'אין מספיק יתרה בכרטיס. נסה כרטיס אחר או אמצעי תשלום חלופי.';
-    case 'network_error':
-      return 'אירעה שגיאת תקשורת. נסה שנית.';
+      return 'INSUFFICIENT_FUNDS';
+    case 'invalid_number':
+      return 'INVALID_NUMBER';
+    case 'rate_limit':
+      return 'RATE_LIMIT';
     case 'timeout':
-      return 'פעולת התשלום נמשכה זמן רב מדי. נסה שנית.';
-    case 'invalid_iframe':
-      return 'שגיאה בטעינת טופס התשלום. נסה לרענן את הדף.';
-    case 'token_creation_failed':
-      return 'שגיאה ביצירת אסימון תשלום. נא לנסות שוב.';
-    case 'payment_verification_failed':
-      return 'אימות התשלום נכשל. אנא פנה לשירות לקוחות.';
+      return 'TIMEOUT';
+    case 'network_error':
+      return 'NETWORK_ERROR';
+    case '605':
+      return 'CARD_DECLINED';
+    case '513':
+      return 'EXPIRED_CARD';
+    case '607':
+      return 'INSUFFICIENT_FUNDS';
+    case 'card_error':
+      return 'CARD_ERROR';
+    case 'SESSION_EXPIRED':
+      return 'SESSION_EXPIRED';
     default:
-      return 'אירעה שגיאה בתהליך התשלום. נסה שנית.';
+      return 'UNKNOWN_ERROR';
   }
-}
+};
 
 /**
- * Checks if an error is transient (temporary) and can be retried
+ * Get user-friendly error message based on error code
  */
-export function isTransientError(code: string): boolean {
-  return ['network_error', 'timeout', 'server_error'].includes(code);
-}
+export const getErrorMessage = (errorCode: string): string => {
+  switch (errorCode) {
+    case 'CARD_DECLINED':
+      return 'כרטיס האשראי נדחה. אנא נסה כרטיס אחר או צור קשר עם חברת האשראי שלך.';
+    case 'EXPIRED_CARD':
+      return 'כרטיס האשראי פג תוקף. אנא עדכן את פרטי התשלום שלך.';
+    case 'INCORRECT_CVC':
+      return 'קוד ה-CVC שהזנת שגוי. אנא נסה שוב.';
+    case 'INSUFFICIENT_FUNDS':
+      return 'אין מספיק כסף בכרטיס. אנא השתמש בכרטיס אחר או נסה אמצעי תשלום חלופי.';
+    case 'INVALID_NUMBER':
+      return 'מספר כרטיס האשראי אינו חוקי. אנא בדוק את המספר ונסה שוב.';
+    case 'RATE_LIMIT':
+      return 'חריגה ממגבלת הפעולות. אנא נסה שוב מאוחר יותר.';
+    case 'TIMEOUT':
+      return 'זמן התשלום הסתיים. אנא נסה שוב.';
+    case 'NETWORK_ERROR':
+      return 'שגיאת רשת. אנא בדוק את החיבור שלך ונסה שוב.';
+    case 'CARD_ERROR':
+      return 'אירעה שגיאה עם הכרטיס. אנא נסה כרטיס אחר או פנה לתמיכה.';
+    case 'SESSION_EXPIRED':
+      return 'פג תוקף החיבור, אנא התחבר מחדש';
+    default:
+      return 'אירעה שגיאה לא ידועה. אנא נסה שוב או פנה לתמיכה.';
+  }
+};
 
 /**
- * Logs payment errors to the database for tracking
+ * Check if the error is transient and can be retried
  */
-export async function logPaymentError(
+export const isTransientError = (error: any): boolean => {
+  const errorCode = error?.code || error?.errorCode || 'UNKNOWN_ERROR';
+  
+  switch (errorCode) {
+    case 'timeout':
+    case 'network_error':
+      return true;
+    default:
+      return false;
+  }
+};
+
+/**
+ * Log payment error to database for tracking and analysis
+ */
+export const logPaymentError = async (
   error: any,
   userId?: string,
   context?: string,
-  additionalData?: Record<string, any>
-): Promise<void> {
+  paymentDetails?: any
+): Promise<PaymentErrorData> => {
+  // Extract error info
+  const errorCode = mapErrorCode(error);
+  const errorMessage = getErrorMessage(errorCode);
+  const errorDetails = {
+    originalError: error?.message || 'Unknown error',
+    stack: error?.stack,
+    code: error?.code,
+    details: error?.details
+  };
+  
+  // Prepare error data
+  const errorData: PaymentErrorData = {
+    errorCode,
+    errorMessage,
+    context,
+    paymentDetails
+  };
+  
   try {
-    if (!userId) {
-      console.error('Payment error (anonymous):', error);
-      return;
-    }
-
-    const errorToLog = {
-      user_id: userId,
-      error_code: typeof error?.code === 'string' ? error.code : mapErrorCode(error),
-      error_message: error?.message || JSON.stringify(error),
-      context: context || 'payment_processing',
-      additional_data: additionalData || {},
-      created_at: new Date().toISOString()
-    };
-
-    // Log to console in all cases
-    console.error('Payment error:', errorToLog);
-
-    // If Supabase is available, log to database
-    const { error: dbError } = await supabase
-      .from('payment_errors')
-      .insert(errorToLog);
+    // Log to edge function instead of direct DB access
+    await supabase.functions.invoke('recover-payment-session/log-error', {
+      body: {
+        userId: userId || 'anonymous',
+        errorCode,
+        errorMessage,
+        errorDetails,
+        context,
+        paymentDetails
+      }
+    });
     
-    if (dbError) {
-      console.error('Failed to log payment error to database:', dbError);
-    }
-  } catch (loggingError) {
-    console.error('Error logging payment error:', loggingError);
+    console.log('Payment error logged to database');
+  } catch (dbError) {
+    console.error('Failed to log payment error to database:', dbError);
   }
-}
+  
+  // Return processed error data
+  return errorData;
+};
+
+/**
+ * Handle payment errors with consistent approach
+ */
+export const handlePaymentError = async (
+  error: any,
+  userId?: string,
+  email?: string | null,
+  tokenData?: any,
+  options?: {
+    recoveryUrl?: string;
+    paymentDetails?: any;
+  }
+): Promise<PaymentErrorData> => {
+  // Log error to database
+  const errorData = await logPaymentError(
+    error,
+    userId,
+    'payment-processing',
+    options?.paymentDetails || {}
+  );
+  
+  // Don't attempt recovery for certain error types
+  if (isTransientError(error)) {
+    console.log('Transient error, no recovery needed');
+    return errorData;
+  }
+  
+  try {
+    // Create a recovery session for this error if appropriate
+    const { savePaymentSession } = await import('../services/recoveryService');
+    
+    const sessionId = await savePaymentSession({
+      userId,
+      email: email || undefined,
+      planId: options?.paymentDetails?.planId || 'unknown',
+      paymentDetails: {
+        ...options?.paymentDetails,
+        tokenData,
+        errorInfo: errorData
+      }
+    });
+    
+    if (sessionId) {
+      console.log(`Created recovery session: ${sessionId}`);
+    }
+    
+    const result: PaymentErrorData = {
+      ...errorData,
+      recoverySessionId: sessionId || undefined
+    };
+    
+    return result;
+  } catch (recoveryError) {
+    console.error('Failed to create recovery session:', recoveryError);
+    return errorData;
+  }
+};

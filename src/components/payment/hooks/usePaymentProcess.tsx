@@ -3,24 +3,23 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { TokenData, RegistrationData, SubscriptionPlan } from '@/types/payment';
+import { TokenData } from '@/types/payment';
 import { getSubscriptionPlans } from '../utils/paymentHelpers';
 import { useRegistrationData } from './useRegistrationData';
 import { 
   handleExistingUserPayment, 
   registerNewUser,
+  initiateExternalPayment,
   verifyExternalPayment
 } from '../services/paymentService';
 import { UsePaymentProcessProps, PaymentError } from './types';
 import { usePaymentErrorHandling } from './usePaymentErrorHandling';
-import { supabase } from '@/integrations/supabase/client';
 
 export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProcessProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<PaymentError | null>(null);
-  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
   
   const { 
     registrationData, 
@@ -43,8 +42,10 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     onAlternativePayment: () => navigate('/subscription?step=alternative-payment')
   });
 
+  // Check for recovery data and URL params on component mount
   useEffect(() => {
     const checkRecovery = async () => {
+      // Check for recovery data from previous payment attempts
       const recoveryData = await checkForRecovery();
       if (recoveryData) {
         toast.info('נמצאו פרטים להשלמת התשלום');
@@ -54,56 +55,21 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         }
       }
       
+      // Check URL params for payment verification
       const params = new URLSearchParams(window.location.search);
       const lowProfileId = params.get('lpId');
       const success = params.get('success');
       
+      // If we have a lowProfileId, we need to verify the payment
       if (lowProfileId && success === 'true') {
         await verifyPaymentFromUrl(lowProfileId);
       }
     };
     
     checkRecovery();
-
-    // Diagnostic: Check if the edge function is accessible
-    const checkEdgeFunctionStatus = async () => {
-      try {
-        const functionName = 'direct-payment';
-        console.log(`Running diagnostic check for edge function: ${functionName}`);
-        
-        const { data: functionData, error: functionError } = await supabase
-          .functions
-          .invoke(functionName, {
-            body: { action: 'health-check' }
-          });
-        
-        if (functionError) {
-          console.error('Edge function diagnostic error:', functionError);
-          setDiagnosticInfo({ 
-            status: 'error', 
-            function: functionName,
-            error: functionError 
-          });
-        } else {
-          console.log('Edge function diagnostic result:', functionData);
-          setDiagnosticInfo({ 
-            status: 'success', 
-            function: functionName,
-            result: functionData 
-          });
-        }
-      } catch (error) {
-        console.error('Edge function diagnostic exception:', error);
-        setDiagnosticInfo({ 
-          status: 'exception', 
-          error 
-        });
-      }
-    };
-    
-    checkEdgeFunctionStatus();
   }, []);
 
+  // New function to verify payment from URL parameters
   const verifyPaymentFromUrl = async (lowProfileId: string) => {
     try {
       setIsProcessing(true);
@@ -111,8 +77,10 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       const result = await verifyExternalPayment(lowProfileId);
       
       if (!result.success) {
+        // Payment verification failed
         toast.error('אימות התשלום נכשל: ' + (result.error || 'שגיאה לא ידועה'));
         
+        // Create payment error object for recovery
         const paymentError = new PaymentError(
           result.error || 'אימות התשלום נכשל',
           'payment_verification_failed'
@@ -123,28 +91,25 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         return;
       }
       
+      // Payment verified successfully
       toast.success('התשלום אומת בהצלחה!');
       
+      // If we have registration data, process it
       if (registrationData) {
-        const tokenInfo = result.tokenInfo || {
-          token: result.paymentDetails?.cardLastDigits || '',
-          lastFourDigits: result.paymentDetails?.cardLastDigits || '',
-          expiryMonth: result.paymentDetails?.cardExpiry ? 
-            parseInt(result.paymentDetails.cardExpiry.split('/')[0], 10) : 0,
-          expiryYear: result.paymentDetails?.cardExpiry ? 
-            parseInt(result.paymentDetails.cardExpiry.split('/')[1], 10) : 0,
-          cardholderName: result.paymentDetails?.cardOwnerName || ''
-        };
-        
         const updatedData = {
           ...registrationData,
-          paymentToken: tokenInfo
+          paymentToken: result.tokenInfo || {
+            token: result.paymentDetails?.cardLastDigits || '',
+            expiry: result.paymentDetails?.cardExpiry || '',
+            last4Digits: result.paymentDetails?.cardLastDigits || '',
+            cardholderName: result.paymentDetails?.cardOwnerName || ''
+          }
         };
         
         updateRegistrationData(updatedData);
         
         if (updatedData.email && updatedData.password) {
-          await registerNewUser(updatedData, tokenInfo);
+          await registerNewUser(updatedData, updatedData.paymentToken);
         }
       }
       
@@ -170,12 +135,13 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   };
 
   const handlePaymentProcessing = async (tokenData: TokenData) => {
-    let operationTypeValue = 3;
+    // Define operationTypeValue at the beginning of the function to ensure it's available throughout
+    let operationTypeValue = 3; // Default: token creation only (for monthly subscription with free trial)
     
     if (planId === 'annual') {
-      operationTypeValue = 2;
+      operationTypeValue = 2; // Charge and create token for recurring annual payments
     } else if (planId === 'vip') {
-      operationTypeValue = 1;
+      operationTypeValue = 1; // Charge only - one-time payment
     }
     
     try {
@@ -185,9 +151,14 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       if (user) {
         await handleExistingUserPayment(user.id, planId, tokenData, operationTypeValue, planDetails);
       } else if (registrationData) {
-        const updatedData: Partial<RegistrationData> = {
+        const updatedData = {
           ...registrationData,
-          paymentToken: tokenData,
+          paymentToken: {
+            token: tokenData.token || tokenData.lastFourDigits,
+            expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
+            last4Digits: tokenData.lastFourDigits,
+            cardholderName: tokenData.cardholderName
+          },
           planId
         };
         
@@ -203,7 +174,12 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         
         const minimalRegData = {
           planId,
-          paymentToken: tokenData,
+          paymentToken: {
+            token: tokenData.token || tokenData.lastFourDigits,
+            expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
+            last4Digits: tokenData.lastFourDigits,
+            cardholderName: tokenData.cardholderName
+          },
           registrationTime: new Date().toISOString()
         };
         
@@ -234,21 +210,83 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent, tokenData: TokenData) => {
+  const handleSubmit = async (e: React.FormEvent, cardData: {
+    cardNumber: string;
+    cardholderName: string;
+    expiryDate: string;
+    cvv: string;
+  }) => {
     e.preventDefault();
     
-    if (!tokenData || !tokenData.token) {
-      toast.error('לא התקבלו פרטי תשלום מאובטחים');
+    const { cardNumber, cardholderName, expiryDate, cvv } = cardData;
+    
+    if (!cardNumber || !cardholderName || !expiryDate || !cvv) {
+      toast.error('נא למלא את כל פרטי התשלום');
       return;
     }
     
     setIsProcessing(true);
     
     try {
+      const tokenData: TokenData = {
+        token: `sim_${Date.now()}`,
+        lastFourDigits: cardNumber.replace(/\s/g, '').slice(-4),
+        expiryMonth: expiryDate.split('/')[0],
+        expiryYear: `20${expiryDate.split('/')[1]}`,
+        cardholderName
+      };
+      
       await handlePaymentProcessing(tokenData);
     } catch (error: any) {
       console.error('Payment processing error:', error);
     } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExternalPayment = async () => {
+    // Define operationTypeValue at the beginning of this function for its scope
+    let operationTypeValue = 3; // Default: token creation only
+    
+    if (planId === 'annual') {
+      operationTypeValue = 2; // Charge and create token for recurring payments
+    } else if (planId === 'vip') {
+      operationTypeValue = 1; // Charge only - one-time payment
+    }
+    
+    setIsProcessing(true);
+    try {
+      const data = await initiateExternalPayment(planId, user, registrationData);
+      
+      if (data.tempRegistrationId) {
+        localStorage.setItem('temp_registration_id', data.tempRegistrationId);
+      }
+      
+      // Modify success URL to include lowProfileId for payment verification
+      const url = new URL(data.url);
+      const baseUrl = `${window.location.origin}/subscription`;
+      
+      // Add success=true and lpId parameters to the successRedirectUrl
+      url.searchParams.set('successRedirectUrl', 
+        `${baseUrl}?step=payment&success=true&lpId=${data.lowProfileId}`);
+      
+      // Update error redirect to include proper error parameters
+      url.searchParams.set('errorRedirectUrl', 
+        `${baseUrl}?step=payment&error=true&lpId=${data.lowProfileId}`);
+      
+      window.location.href = url.toString();
+    } catch (error: any) {
+      const errorInfo = await handleError(error, {
+        planId,
+        operationType: operationTypeValue,
+        userInfo: user ? { userId: user.id, email: user.email } : null
+      });
+      
+      const paymentError = new PaymentError(
+        errorInfo?.message || 'שגיאה ביצירת עסקה'
+      );
+      setPaymentError(paymentError);
+      
       setIsProcessing(false);
     }
   };
@@ -258,9 +296,9 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     registrationData,
     registrationError,
     paymentError,
-    diagnosticInfo,
     loadRegistrationData,
     handleSubmit,
+    handleExternalPayment,
     isRecovering,
     plan
   };

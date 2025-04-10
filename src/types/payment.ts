@@ -1,141 +1,101 @@
 
-// Types for payment processing
-
-export type TokenData = {
-  token: string;
+export interface TokenData {
+  token?: string;
   lastFourDigits: string;
-  expiryMonth: number;
-  expiryYear: number;
-  cardholderName?: string;
-};
-
-export interface CardcomPaymentResult {
-  status: "approved" | "declined" | "error";
-  message?: string;
-  transactionId?: string;
-  approvalNumber?: string;
-  errorCode?: string;
-  errorDetails?: any;
-}
-
-export interface CardcomLowProfileResponse {
-  ResponseCode: number;
-  Description: string;
-  LowProfileId: string;
-  Url: string;
-}
-
-export interface CardcomChargeResponse {
-  ResponseCode: string;
-  Description: string;
-  InternalDealNumber?: string;
-  ApprovalNumber?: string;
-}
-
-export interface PaymentPageProps {
-  userId: string;
-  amount: number;
-  planId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  onSuccess: (result: { transactionId: string; approvalNumber: string }) => void;
-  onError: (error: any) => void;
-}
-
-// Define the steps for the subscription flow
-export type Steps = 'plan-selection' | 'contract' | 'payment' | 'completion';
-
-export interface RegistrationData {
-  email?: string;
-  password?: string;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-  };
-  planId?: string;
-  paymentToken?: TokenData;
-  contractSigned?: boolean;
-  contractDetails?: ContractSignatureData | null;
-  contractSignedAt?: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+  simulated?: boolean;
+  [key: string]: string | number | boolean | null | TokenData[] | undefined; // Adding index signature for Json compatibility
 }
 
 export interface ContractSignatureData {
-  tempContractId?: string;
-  fullName: string;
-  email: string;
-  phone?: string;
-  signature: string;
-  contractHtml: string;
-  browserInfo?: any;
+  contractHtml?: string;
+  signature?: string;
+  agreedToTerms: boolean;
+  agreedToPrivacy: boolean;
   contractVersion?: string;
-  agreedToTerms?: boolean;
-  agreedToPrivacy?: boolean;
+  browserInfo?: {
+    userAgent: string;
+    language: string;
+    platform: string;
+    screenSize: string;
+    timeZone: string;
+    [key: string]: any;
+  };
 }
 
 export interface SubscriptionPlan {
   id: string;
   name: string;
   price: number;
-  description?: string;
-  features?: string[];
-  trialDays?: number;
-  billingCycle: 'monthly' | 'annual';
+  description: string;
+  features: string[];
+  trialDays: number;
+  billingCycle: 'monthly' | 'annual' | 'one-time';
   currency?: string;
 }
 
-export interface PaymentError {
-  code: string;
-  message: string;
-  raw?: any;
-}
-
-export interface PaymentSessionData {
-  sessionId?: string;
-  userId?: string;
-  email?: string;
-  planId?: string;
-  paymentDetails?: any;
-  expiresAt?: string;
-}
-
-export interface LowProfileDealResponse {
-  ResponseCode: number;
-  Description: string;
-  LowProfileId?: string;
-  Url?: string;
-}
-
-export interface ChargeTokenRequest {
-  token: string;
+export interface PaymentHistoryItem {
+  id: string;
+  userId: string;
+  subscriptionId: string;
   amount: number;
-  userId?: string;
-  planId?: string;
-  customerId?: string;
-  paymentDescription?: string;
-  externalId?: string;
+  currency: string;
+  status: 'completed' | 'pending' | 'failed' | 'trial_started' | 'cancelled';
+  paymentMethod: TokenData | null;
+  paymentDate: string;
 }
 
-export interface ChargeTokenResponse {
+export interface RegistrationData {
+  email: string;
+  password: string;
+  planId: string;
+  contractSigned?: boolean;
+  contractSignedAt?: string;
+  contractDetails?: ContractSignatureData;
+  userData: {
+    firstName: string;
+    lastName: string;
+    phone?: string;
+  };
+  registrationTime: string;
+  paymentToken?: {
+    token?: string;
+    expiry?: string;
+    last4Digits?: string;
+    cardholderName?: string;
+  };
+}
+
+export interface CardcomPaymentResponse {
   success: boolean;
-  message: string;
-  transactionId?: string;
-  approvalNumber?: string;
-  errorCode?: string;
-  errorDetails?: any;
+  url?: string;
+  error?: string;
+  lowProfileId?: string; // Updated from transactionId to match the new API
+  tempRegistrationId?: string;
+  simulated?: boolean;
 }
 
-// Constructor for PaymentError class
-export class PaymentError extends Error {
-  code: string;
+export interface CardcomVerifyResponse {
+  success: boolean;
+  paymentDetails?: {
+    transactionId: number;
+    amount: number;
+    cardLastDigits: string;
+    approvalNumber: string;
+    cardType: string;
+    cardExpiry: string;
+    cardOwnerName: string;
+    cardOwnerEmail: string;
+    cardOwnerPhone: string;
+  };
+  tokenInfo?: {
+    token: string;
+    expiryDate: string;
+    approvalNumber: string;
+  };
+  registrationId?: string;
+  error?: string;
   details?: any;
-
-  constructor(message: string, code: string = 'payment_error', details?: any) {
-    super(message);
-    this.name = 'PaymentError';
-    this.code = code;
-    this.details = details;
-  }
 }

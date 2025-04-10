@@ -1,5 +1,5 @@
 
-import { TokenData } from '@/types/payment';
+import { ReactNode } from 'react';
 
 export interface UsePaymentProcessProps {
   planId: string;
@@ -11,33 +11,34 @@ export class PaymentError extends Error {
   details?: any;
   recoverySessionId?: string;
   recoveryAction?: 'update_card' | 'alternative_payment' | 'retry';
-  
+
   constructor(message: string, code?: string, details?: any) {
     super(message);
+    this.name = 'PaymentError';
     this.code = code;
     this.details = details;
-    this.name = 'PaymentError';
   }
 }
 
-export interface PaymentErrorHandlingProps {
-  planId?: string;
-  onCardUpdate?: () => void;
-  onAlternativePayment?: () => void;
-}
-
-export interface PaymentErrorContext {
-  tokenData?: TokenData;
-  planId?: string;
-  operationType?: number;
-  userInfo?: { userId?: string; email?: string } | null;
+export interface RegistrationResult {
+  success: boolean;
+  userId?: string;
+  error?: any;
 }
 
 export interface PaymentSessionData {
-  sessionId?: string;
+  sessionId: string;
   userId?: string;
   email?: string;
-  planId?: string;
+  planId: string;
   paymentDetails?: any;
-  expiresAt?: string;
+  expiresAt: string;
+}
+
+export interface PaymentErrorData {
+  errorCode: string;
+  errorMessage: string;
+  context?: string;
+  paymentDetails?: any;
+  recoverySessionId?: string;
 }

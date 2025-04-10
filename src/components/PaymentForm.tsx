@@ -9,8 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import PaymentDetails from './payment/PaymentDetails';
 import PlanSummary from './payment/PlanSummary';
 import SecurityNote from './payment/SecurityNote';
-import { getSubscriptionPlans } from './payment/utils/paymentHelpers';
-import { TokenData } from '@/types/payment';
+import { getSubscriptionPlans, createTokenData } from './payment/utils/paymentHelpers';
 import { registerUser } from './payment/RegisterUser';
 
 interface PaymentFormProps {
@@ -56,22 +55,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     try {
       setIsProcessing(true);
       
-      // Extract month and year from expiryDate
-      const [month, year] = expiryDate.split('/').map(part => part.trim());
-      const expiryMonth = parseInt(month, 10);
-      const expiryYear = parseInt(year, 10);
-      
-      if (isNaN(expiryMonth) || isNaN(expiryYear)) {
-        throw new Error('פורמט תאריך תוקף שגוי, נא להזין בפורמט MM/YY');
-      }
-      
-      const tokenData: TokenData = {
-        token: `simulated_token_${Date.now()}`,
-        lastFourDigits: cardNumber.replace(/\s/g, '').slice(-4),
-        expiryMonth,
-        expiryYear,
-        cardholderName
-      };
+      const tokenData = createTokenData(cardNumber, expiryDate, cardholderName);
       
       const result = await registerUser({
         registrationData,

@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { TokenData } from '@/types/payment';
+import { TokenData } from './utils/paymentHelpers';
 import { Json } from '@/integrations/supabase/types';
 
 interface RegisterUserParams {
@@ -55,13 +55,7 @@ export const registerUser = async ({ registrationData, tokenData, contractDetail
     trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
     
     // Convert TokenData to Json type for Supabase
-    const paymentMethodJson = {
-      token: tokenData.token,
-      lastFourDigits: tokenData.lastFourDigits,
-      expiryMonth: tokenData.expiryMonth,
-      expiryYear: tokenData.expiryYear,
-      cardholderName: tokenData.cardholderName
-    } as unknown as Json;
+    const paymentMethodJson = tokenData as unknown as Json;
     
     // Create the subscription record
     const { error: subscriptionError } = await supabase

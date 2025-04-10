@@ -1,9 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import { usePaymentInitialization } from './hooks/usePaymentInitialization';
 import { usePaymentUrlParams } from './hooks/usePaymentUrlParams';
 import { getPlanDetails } from './PlanUtilities';
-import DirectPaymentForm from './DirectPaymentForm';
+import PaymentSectionHeader from './PaymentSectionHeader';
+import PaymentIframe from './PaymentIframe';
+import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
 import PaymentError from './PaymentError';
 import { toast } from 'sonner';
@@ -23,6 +26,14 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const successCheckPerformed = React.useRef(false);
+  
+  // Initialize payment URL
+  const { isLoading: isLoadingPayment, paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
+    selectedPlan,
+    onPaymentComplete,
+    onBack,
+    setIsLoading
+  );
   
   // Process URL parameters for payment status
   const paymentStatus = usePaymentUrlParams(onPaymentComplete, setIsLoading);
@@ -69,7 +80,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   }, [selectedPlan, onPaymentComplete]);
 
   // Show loading state
-  if (isLoading) {
+  if (isLoading || isLoadingPayment) {
     return <PaymentLoading />;
   }
 
@@ -78,18 +89,30 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     return (
       <PaymentError 
         message={paymentStatus.errorMessage || 'אירעה שגיאה בתהליך התשלום'} 
-        onRetry={() => setIsLoading(false)}
+        onRetry={initiateCardcomPayment}
         onBack={onBack}
       />
     );
   }
 
+  const planDetails = getPlanDetails(selectedPlan);
+
   return (
-    <DirectPaymentForm
-      selectedPlan={selectedPlan}
-      onPaymentComplete={onPaymentComplete}
-      onBack={onBack}
-    />
+    <Card className="border-primary/20 hover-glow transition-shadow duration-300 relative overflow-hidden">
+      <PaymentSectionHeader 
+        planName={planDetails.name} 
+        planDescription={planDetails.description}
+        planPrice={planDetails.price}
+        onBack={onBack}
+      />
+      
+      <PaymentIframe paymentUrl={paymentUrl} />
+      
+      <PaymentSectionFooter 
+        planName={planDetails.name} 
+        onBack={onBack} 
+      />
+    </Card>
   );
 };
 

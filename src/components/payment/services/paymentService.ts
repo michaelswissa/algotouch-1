@@ -1,158 +1,501 @@
 
-import { TokenData } from '@/types/payment';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { TokenData } from '@/types/payment';
+import { RegistrationResult } from '../hooks/types';
+import { toast } from 'sonner'; 
 
-/**
- * Process payment for an existing user
- */
-export async function handleExistingUserPayment(
-  userId: string, 
-  planId: string, 
-  tokenData: TokenData, 
-  operationType: number,
-  planDetails: any
-) {
+// Import using a dynamic import to avoid circular dependencies
+const importErrorHandling = async () => {
+  return await import('../utils/errorHandling');
+};
+
+// Add verification function for external payments
+export const verifyExternalPayment = async (lowProfileId: string) => {
   try {
-    const { data, error } = await supabase.functions.invoke('direct-payment', {
-      body: {
-        token: tokenData.token,
-        userId,
-        planId,
-        operationType,
-        amount: operationType !== 3 ? getAmountForPlan(planId) : 0
-      }
+    console.log('Verifying payment with lowProfileId:', lowProfileId);
+    
+    const { data, error } = await supabase.functions.invoke('cardcom-payment/verify-payment', {
+      body: { lowProfileId }
     });
     
     if (error) {
-      console.error('Payment processing error:', error);
-      throw new Error(`שגיאה בעיבוד התשלום: ${error.message}`);
+      console.error('Error verifying payment:', error);
+      throw new Error(`שגיאה באימות התשלום: ${error.message}`);
     }
     
-    if (!data || !data.success) {
-      throw new Error(data?.error || 'אירעה שגיאה בעיבוד התשלום');
+    console.log('Payment verification result:', data);
+    
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'אימות התשלום נכשל',
+        details: data
+      };
     }
     
-    toast.success(`הרשמה לתוכנית ${planDetails[planId].name} בוצעה בהצלחה!`);
-    return data;
+    // If payment was successful, return the payment details
+    return {
+      success: true,
+      paymentDetails: data.paymentDetails,
+      tokenInfo: data.tokenInfo,
+      registrationId: data.registrationId
+    };
   } catch (error: any) {
-    console.error('Error in handleExistingUserPayment:', error);
+    console.error('Payment verification error:', error);
+    return {
+      success: false,
+      error: error.message || 'שגיאה באימות התשלום',
+      details: error
+    };
+  }
+};
+
+export const handleExistingUserPayment = async (
+  userId: string,
+  planId: string,
+  tokenData: TokenData,
+  operationType: number,
+  planDetails: any
+) => {
+  const now = new Date();
+  let trialEndsAt = null;
+  let periodEndsAt = null;
+  
+  if (planId === 'monthly') {
+    trialEndsAt = new Date(now);
+    trialEndsAt.setMonth(trialEndsAt.getMonth() + 1);
+  } else if (planId === 'annual') {
+    periodEndsAt = new Date(now);
+    periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+  }
+  
+  try {
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .upsert({
+        user_id: userId,
+        plan_type: planId,
+        status: planId === 'monthly' ? 'trial' : 'active',
+        trial_ends_at: trialEndsAt?.toISOString() || null,
+        current_period_ends_at: periodEndsAt?.toISOString() || null,
+        payment_method: tokenData,
+        contract_signed: true,
+        contract_signed_at: now.toISOString()
+      });
+    
+    if (subscriptionError) {
+      throw new Error(`שגיאה בעדכון מנוי: ${subscriptionError.message}`);
+    }
+    
+    const price = planDetails[planId as keyof typeof planDetails]?.price || 0;
+    
+    if (planId !== 'monthly' || operationType !== 3) {
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: userId,
+          amount: price,
+          currency: 'USD',
+          status: 'completed',
+          payment_method: {
+            ...tokenData,
+            simulated: false 
+          }
+        })
+        .select()
+        .single();
+        
+      if (paymentError) {
+        console.error('Payment record creation error:', paymentError);
+        throw paymentError;
+      }
+      
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, phone')
+        .eq('id', userId)
+        .single();
+      
+      const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+      
+      let userEmail = '';
+      let userName = '';
+      let userPhone = '';
+      
+      if (profileError) {
+        console.error('Error fetching profile data for document:', profileError);
+        if (authData?.user?.email) {
+          userEmail = authData.user.email;
+        }
+      } else {
+        userEmail = authData?.user?.email || '';
+        userName = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : '';
+        userPhone = profileData?.phone || '';
+      }
+      
+      try {
+        await supabase.functions.invoke('generate-document/generate', {
+          body: {
+            paymentId: paymentData.id,
+            userId: userId,
+            amount: price,
+            planType: planId,
+            email: userEmail,
+            fullName: userName,
+            documentType: 'invoice',
+            phone: userPhone
+          }
+        });
+      } catch (docError) {
+        console.error('Error generating document:', docError);
+        // Use dynamic import to avoid circular dependency
+        const { logPaymentError } = await importErrorHandling();
+        logPaymentError(docError, userId, 'document-generation', { 
+          paymentId: paymentData.id,
+          userId: userId 
+        });
+      }
+    } else {
+      await supabase
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: userId,
+          amount: 0,
+          currency: 'USD',
+          status: 'trial_started',
+          payment_method: tokenData
+        });
+    }
+  } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
+    await handlePaymentError(error, userId, undefined, undefined, {
+      paymentDetails: {
+        userId,
+        planId,
+        operationType
+      }
+    });
+    
     throw error;
   }
-}
+};
 
-/**
- * Register a new user with their payment information
- */
-export async function registerNewUser(registrationData: any, tokenData: TokenData) {
+export const registerNewUser = async (
+  registrationData: any,
+  tokenData: TokenData
+): Promise<RegistrationResult> => {
   try {
     const { data, error } = await supabase.functions.invoke('register-user', {
       body: {
-        registrationData: {
-          ...registrationData,
-          paymentToken: {
-            token: tokenData.token,
-            lastFourDigits: tokenData.lastFourDigits,
-            expiryMonth: tokenData.expiryMonth,
-            expiryYear: tokenData.expiryYear,
-            cardholderName: tokenData.cardholderName
-          }
-        }
+        registrationData,
+        tokenData: {
+          ...tokenData,
+          simulated: false
+        },
+        contractDetails: registrationData.contractDetails || null
       }
     });
     
     if (error) {
-      console.error('Registration error:', error);
-      throw new Error(`שגיאה בתהליך ההרשמה: ${error.message}`);
+      throw new Error(error.message);
     }
     
-    if (!data || !data.success) {
-      throw new Error(data?.error || 'אירעה שגיאה בתהליך ההרשמה');
+    if (!data?.success) {
+      throw new Error(data?.error || 'שגיאה לא ידועה בתהליך ההרשמה');
     }
     
-    // Clear registration data as it's been processed
+    if (registrationData.email && registrationData.password) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: registrationData.email,
+        password: registrationData.password
+      });
+      
+      if (signInError) {
+        console.error("Error signing in after registration:", signInError);
+      }
+    }
+    
     sessionStorage.removeItem('registration_data');
     
-    return data;
+    return { success: true, userId: data.userId };
   } catch (error: any) {
-    console.error('Error in registerNewUser:', error);
-    throw error;
+    console.error("Registration error:", error);
+    
+    const registrationError = new Error(error.message || 'שגיאה בתהליך ההרשמה');
+    throw registrationError;
   }
-}
+};
 
-/**
- * Verify a payment from an external payment gateway
- */
-export async function verifyExternalPayment(lowProfileId: string) {
+export const initiateExternalPayment = async (
+  planId: string, 
+  user: any, 
+  registrationData: any
+) => {
   try {
-    const { data, error } = await supabase.functions.invoke('verify-lowprofile-payment', {
-      body: {
-        lowProfileId
+    let operationType = 3; // Default: token creation only (for monthly with free trial)
+    
+    if (planId === 'annual') {
+      operationType = 2; // Charge and create token for recurring payments
+    } else if (planId === 'vip') {
+      operationType = 1; // Charge only for one-time payment
+    }
+
+    const userInfo = user 
+      ? { userId: user.id, email: user.email }
+      : registrationData
+        ? { 
+            fullName: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim(),
+            email: registrationData.email,
+            registrationData
+          }
+        : { fullName: '', email: '' };
+
+    const paymentSessionId = crypto.randomUUID();
+
+    // Create clear success and error URLs with proper parameters
+    const successUrl = `${window.location.origin}/subscription?step=payment&success=true`;
+    const errorUrl = `${window.location.origin}/subscription?step=payment&error=true`;
+
+    const payload = {
+      planId,
+      ...userInfo,
+      operationType,
+      paymentSessionId,
+      successRedirectUrl: successUrl,
+      errorRedirectUrl: errorUrl
+    };
+
+    const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
+      body: payload
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.url) {
+      throw new Error('לא התקבלה כתובת תשלום מהשרת');
+    }
+    
+    // Instead of directly accessing the payment_sessions table, use an edge function
+    if (user?.id || registrationData) {
+      await supabase.functions.invoke('recover-payment-session/save-session', {
+        body: {
+          sessionId: paymentSessionId,
+          userId: user?.id || null,
+          email: user?.email || registrationData?.email || null,
+          planId: planId,
+          paymentDetails: payload,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        }
+      });
+    }
+    
+    return {
+      ...data,
+      sessionId: paymentSessionId
+    };
+  } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
+    await handlePaymentError(error, user?.id, user?.email, undefined, {
+      paymentDetails: {
+        planId, 
+        userId: user?.id,
+        hasRegistrationData: !!registrationData
       }
     });
     
-    if (error) {
-      console.error('Payment verification error:', error);
-      return {
-        success: false,
-        error: `שגיאה באימות התשלום: ${error.message}`
-      };
-    }
-    
-    if (!data || !data.success) {
-      return {
-        success: false,
-        error: data?.error || 'אירעה שגיאה באימות התשלום'
-      };
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error('Error in verifyExternalPayment:', error);
-    return {
-      success: false,
-      error: error.message || 'שגיאה לא ידועה באימות התשלום'
-    };
+    throw error;
   }
-}
+};
 
-/**
- * Recover a failed payment session
- */
-export async function recoverPaymentSession(sessionId: string) {
+export const generateDocument = async (
+  userId: string,
+  paymentId: string,
+  documentType: 'invoice' | 'receipt' = 'receipt'
+) => {
   try {
-    const { data, error } = await supabase.functions.invoke('recover-payment-session', {
-      body: { sessionId }
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone')
+      .eq('id', userId)
+      .single();
+    
+    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+    
+    if (profileError) {
+      console.error('Error fetching profile data:', profileError);
+      throw new Error('שגיאה בטעינת פרטי משתמש');
+    }
+    
+    if (authError) {
+      console.error('Error fetching user data:', authError);
+      throw new Error('שגיאה בטעינת פרטי משתמש');
+    }
+    
+    const { data: paymentData, error: paymentError } = await supabase
+      .from('payment_history')
+      .select('amount, subscription_id')
+      .eq('id', paymentId)
+      .single();
+      
+    if (paymentError) {
+      console.error('Error fetching payment data:', paymentError);
+      throw new Error('שגיאה בטעינת פרטי תשלום');
+    }
+    
+    const { data: subscriptionData, error: subError } = await supabase
+      .from('subscriptions')
+      .select('plan_type')
+      .eq('id', paymentData.subscription_id)
+      .single();
+      
+    if (subError) {
+      console.error('Error fetching subscription data:', subError);
+      throw new Error('שגיאה בטעינת פרטי מנוי');
+    }
+    
+    const userEmail = authData?.user?.email || '';
+    const userName = profileData 
+      ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() 
+      : '';
+    
+    const { data, error } = await supabase.functions.invoke('generate-document/generate', {
+      body: {
+        paymentId,
+        userId,
+        amount: paymentData.amount,
+        planType: subscriptionData.plan_type,
+        email: userEmail,
+        fullName: userName,
+        documentType,
+        phone: profileData?.phone || ''
+      }
     });
     
-    if (error) {
-      console.error('Payment session recovery error:', error);
-      return null;
-    }
+    if (error) throw error;
     
-    if (!data || !data.success) {
-      return null;
-    }
-    
-    return data.paymentSession;
+    return { success: true, data };
   } catch (error: any) {
-    console.error('Error in recoverPaymentSession:', error);
-    return null;
+    console.error('Document generation error:', error);
+    return { success: false, error: error.message };
   }
-}
+};
 
-/**
- * Helper function to get the amount for a plan
- */
-function getAmountForPlan(planId: string): number {
-  switch (planId) {
-    case 'monthly':
-      return 9900; // 99.00 shekels
-    case 'annual':
-      return 89900; // 899.00 shekels
-    case 'vip':
-      return 349900; // 3499.00 shekels
-    default:
-      return 9900;
+export const listUserDocuments = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-document/list', {
+      body: { userId }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, documents: data?.documents || [] };
+  } catch (error: any) {
+    console.error('Error listing documents:', error);
+    return { success: false, error: error.message };
   }
-}
+};
+
+export const getPaymentSystemHealth = async () => {
+  try {
+    const { data, error } = await supabase.functions.invoke('payment-system-health', {
+      body: {}
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error checking payment system health:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const retryFailedPayment = async (paymentId: string, userId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('retry-payment', {
+      body: { paymentId, userId }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
+    await handlePaymentError(error, userId, undefined, undefined, {
+      paymentDetails: { paymentId }
+    });
+    
+    return { success: false, error: error.message };
+  }
+};
+
+export const checkForExpiringCards = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('payment_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+    
+    if (error) throw error;
+    
+    if (data) {
+      const expiryDate = new Date(data.token_expiry);
+      const today = new Date();
+      const daysUntilExpiry = Math.round((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilExpiry <= 30) {
+        return {
+          isExpiring: true,
+          daysUntilExpiry,
+          cardLastFour: data.card_last_four,
+          expiryDate: data.token_expiry
+        };
+      }
+    }
+    
+    return { isExpiring: false };
+  } catch (error) {
+    console.error('Error checking for expiring cards:', error);
+    return { isExpiring: false, error: error.message };
+  }
+};
+
+export const addAlternativePaymentMethod = async (userId: string, tokenData: TokenData) => {
+  try {
+    // Cast tokenData.token to ensure it's a string 
+    const token = String(tokenData.token || `fallback_${Date.now()}`);
+    
+    const { data, error } = await supabase
+      .from('payment_tokens')
+      .insert({
+        user_id: userId,
+        token: token,
+        token_expiry: `${tokenData.expiryYear}-${tokenData.expiryMonth}-01`,
+        card_last_four: tokenData.lastFourDigits,
+        is_active: true
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    return { success: true, tokenId: data.id };
+  } catch (error) {
+    // Use dynamic import to avoid circular dependency
+    const { handlePaymentError } = await importErrorHandling();
+    await handlePaymentError(error, userId, undefined, undefined, {
+      paymentDetails: { action: 'add-alternative-payment' }
+    });
+    
+    return { success: false, error: error.message };
+  }
+};
