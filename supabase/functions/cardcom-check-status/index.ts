@@ -40,8 +40,8 @@ serve(async (req) => {
     console.log('Checking transaction status for:', lowProfileId);
 
     // Get the Cardcom API credentials 
-    const terminalNumber = "160138";
-    const apiName = "bLaocQRMSnwphQRUVG3b";
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
+    const apiName = Deno.env.get("CARDCOM_USERNAME") || "bLaocQRMSnwphQRUVG3b";
 
     // Create request body for Cardcom API
     const getLowProfileRequest = {

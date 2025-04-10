@@ -58,4 +58,3 @@ verify_jwt = false
 verify_jwt = false
 [functions.cardcom-openfields]
 verify_jwt = false
-

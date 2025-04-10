@@ -50,8 +50,8 @@ serve(async (req) => {
     console.log('Creating payment session for plan:', planId);
 
     // Get the Cardcom API credentials from environment variables or hardcoded values
-    const terminalNumber = "160138";  // Hard-coded from provided details
-    const apiName = "bLaocQRMSnwphQRUVG3b";  // Hard-coded from provided details
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
+    const apiName = Deno.env.get("CARDCOM_USERNAME") || "bLaocQRMSnwphQRUVG3b";
 
     // If this is a registration payment, store the registration data temporarily
     if (isRegistration && registrationData) {
@@ -87,7 +87,7 @@ serve(async (req) => {
       ? 'http://localhost:3000' 
       : requestUrl.origin;
     
-    const successUrl = `${origin}/subscription?success=true`;
+    const successUrl = `${origin}/subscription?success=true&planId=${planId}`;
     const failureUrl = `${origin}/subscription?error=true`;
     const webhookUrl = `${origin}/functions/cardcom-webhook`;
 
@@ -157,20 +157,18 @@ serve(async (req) => {
       throw new Error(`Cardcom error: ${cardcomResponse.Description}`);
     }
     
-    // Return success with necessary data for frontend
+    // For OpenFields flow, we only need the LowProfileId
     return new Response(
       JSON.stringify({
         success: true,
+        lowProfileId: cardcomResponse.LowProfileId,
         terminalNumber,
         apiUsername: apiName,
-        lowProfileId: cardcomResponse.LowProfileId,
-        url: cardcomResponse.Url,
         planId,
         planName,
         amount,
         userEmail,
-        userName,
-        webhookUrl
+        userName
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

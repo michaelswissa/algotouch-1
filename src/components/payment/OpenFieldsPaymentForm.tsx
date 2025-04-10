@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -24,7 +24,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
 }) => {
   const { user } = useAuth();
   const [processing, setProcessing] = useState(false);
-  const [registrationData, setRegistrationData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Get plan details from helper
@@ -35,30 +34,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Check for registration data in session storage on component mount
-  useEffect(() => {
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        setRegistrationData(JSON.parse(storedData));
-      } catch (error) {
-        console.error('Error parsing registration data:', error);
-      }
-    }
-  }, []);
-
-  // Check URL parameters for success/error redirects from Cardcom
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const errorParam = urlParams.get('error');
-    
-    if (success === 'true') {
-      toast.success('התשלום התקבל בהצלחה!');
-      // The actual handling will happen in CardcomOpenFields component
-    }
-  }, []);
-
   const handlePaymentSuccess = async (transactionId: string) => {
     if (!transactionId) {
       toast.error('חסר מזהה עסקה');
@@ -68,46 +43,27 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     setProcessing(true);
     
     try {
-      // If registering (not logged in), create the user first
-      if (registrationData && !user) {
-        await handleRegistrationPaymentSuccess(transactionId);
-      } 
-      // User is already authenticated, just update subscription
-      else if (user) {
+      // If user is already authenticated, update subscription
+      if (user) {
         await handleAuthenticatedPaymentSuccess(transactionId);
-      }
-      // Something is wrong, we don't have either user or registration data
+      } 
+      // Registration was handled by the webhook, just show success
       else {
-        toast.error('שגיאה בעיבוד התשלום - מידע משתמש חסר');
-        return;
+        toast.success('ההרשמה הושלמה בהצלחה!');
+        
+        // Clear registration data from session storage since it's been processed
+        sessionStorage.removeItem('registration_data');
       }
+      
+      // Complete the payment process
+      onPaymentComplete();
+      
     } catch (error) {
       console.error('Error processing payment success:', error);
       toast.error('שגיאה בעיבוד התשלום');
+      setError(error instanceof Error ? error.message : 'שגיאה בעיבוד התשלום');
     } finally {
       setProcessing(false);
-    }
-  };
-
-  const handleRegistrationPaymentSuccess = async (transactionId: string) => {
-    console.log('Processing registration payment success for transaction:', transactionId);
-    
-    try {
-      // The cardcom-webhook edge function should already have stored the registration data
-      // Now we just need to notify the user and move them to the success screen
-      toast.success('ההרשמה הושלמה בהצלחה!');
-      
-      // Clear registration data from session storage since it's been processed
-      sessionStorage.removeItem('registration_data');
-      
-      // Complete the payment flow
-      onPaymentComplete();
-      
-    } catch (error: any) {
-      console.error('Error completing registration:', error);
-      toast.error(error.message || 'שגיאה בהשלמת תהליך ההרשמה');
-      setError(error.message || 'שגיאה בהשלמת תהליך ההרשמה');
-      throw error;
     }
   };
 
@@ -144,7 +100,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           payment_method: {
             type: 'card', 
             provider: 'cardcom',
-            lastFourDigits: "****", // We don't have this info from the redirect flow
             last_transaction_id: transactionId
           },
           contract_signed: true,
@@ -177,9 +132,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
         // Continue anyway since subscription was created
       }
       
-      // Complete the payment process
       toast.success('התשלום התקבל בהצלחה!');
-      onPaymentComplete();
       
     } catch (error: any) {
       console.error('Error processing successful payment:', error);
