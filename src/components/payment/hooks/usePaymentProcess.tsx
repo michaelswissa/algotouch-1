@@ -131,7 +131,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           paymentToken: result.tokenInfo || {
             token: result.paymentDetails?.cardLastDigits || '',
             expiry: result.paymentDetails?.cardExpiry || '',
-            last4Digits: result.paymentDetails?.cardLastDigits || '',
+            lastFourDigits: result.paymentDetails?.cardLastDigits || '',
             cardholderName: result.paymentDetails?.cardOwnerName || ''
           }
         };
@@ -185,7 +185,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           paymentToken: {
             token: tokenData.token || tokenData.lastFourDigits,
             expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
-            last4Digits: tokenData.lastFourDigits,
+            lastFourDigits: tokenData.lastFourDigits,
             cardholderName: tokenData.cardholderName
           },
           planId
@@ -206,7 +206,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           paymentToken: {
             token: tokenData.token || tokenData.lastFourDigits,
             expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
-            last4Digits: tokenData.lastFourDigits,
+            lastFourDigits: tokenData.lastFourDigits,
             cardholderName: tokenData.cardholderName
           },
           registrationTime: new Date().toISOString()

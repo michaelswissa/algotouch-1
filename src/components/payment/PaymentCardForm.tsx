@@ -3,12 +3,12 @@ import React from 'react';
 import { CardContent, CardFooter } from '@/components/ui/card';
 import CardcomOpenFields from './CardcomOpenFields';
 import { getPlanSummary } from './utils/paymentHelpers';
-import { SubscriptionPlan } from '@/types/payment';
+import { SubscriptionPlan, TokenData } from '@/types/payment';
 
 interface PaymentCardFormProps {
   plan: SubscriptionPlan;
   isProcessing: boolean;
-  onSubmit: (e: React.FormEvent, tokenData: any) => void;
+  onSubmit: (e: React.FormEvent, tokenData: TokenData) => void;
   planId: string;
 }
 
@@ -20,7 +20,7 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
 }) => {
   const { summary, isFreeTrialPlan } = getPlanSummary(plan);
 
-  const handleTokenReceived = (tokenData: any) => {
+  const handleTokenReceived = (tokenData: TokenData) => {
     onSubmit(new Event('submit') as unknown as React.FormEvent, tokenData);
   };
   

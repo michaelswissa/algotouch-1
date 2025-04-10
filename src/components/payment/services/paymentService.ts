@@ -16,10 +16,11 @@ export async function handleExistingUserPayment(
   try {
     const { data, error } = await supabase.functions.invoke('direct-payment', {
       body: {
-        action: 'process',
+        token: tokenData.token,
+        userId,
         planId,
-        tokenData,
-        userId
+        operationType,
+        amount: operationType !== 3 ? getAmountForPlan(planId) : 0
       }
     });
     
@@ -53,8 +54,8 @@ export async function registerNewUser(registrationData: any, tokenData: TokenDat
             token: tokenData.token || tokenData.lastFourDigits,
             expiry: tokenData.expiryMonth && tokenData.expiryYear 
               ? `${tokenData.expiryMonth}/${tokenData.expiryYear}` 
-              : tokenData.expiry,
-            last4Digits: tokenData.lastFourDigits,
+              : undefined,
+            lastFourDigits: tokenData.lastFourDigits,
             cardholderName: tokenData.cardholderName
           }
         }
@@ -138,5 +139,21 @@ export async function recoverPaymentSession(sessionId: string) {
   } catch (error: any) {
     console.error('Error in recoverPaymentSession:', error);
     return null;
+  }
+}
+
+/**
+ * Helper function to get the amount for a plan
+ */
+function getAmountForPlan(planId: string): number {
+  switch (planId) {
+    case 'monthly':
+      return 9900; // 99.00 shekels
+    case 'annual':
+      return 89900; // 899.00 shekels
+    case 'vip':
+      return 349900; // 3499.00 shekels
+    default:
+      return 9900;
   }
 }
