@@ -16,7 +16,12 @@ Instead of using the Cardcom OpenFields SDK directly from the client-side, we're
    - Listens for postMessage events from the iframe
    - Forwards the secure token to the payment processing logic
 
-2. **PaymentForm**
+2. **CardcomOpenFields**
+   - Enhanced component that provides a cleaner interface
+   - Uses the LowProfile iframe underneath
+   - Handles communication between the iframe and the application
+
+3. **PaymentForm**
    - Container component that integrates with the payment flow
    - Displays plan information and payment status
    - Handles errors and recovery
@@ -35,10 +40,6 @@ Instead of using the Cardcom OpenFields SDK directly from the client-side, we're
 3. **verify-lowprofile-payment**
    - Verifies the status of a LowProfile payment
    - Used for asynchronous payment verification
-
-4. **direct-payment**
-   - Handles direct payment processing with token
-   - Updates subscription status
 
 ## Database Tables
 

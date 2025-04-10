@@ -102,7 +102,7 @@ serve(async (req) => {
     }
 
     // Add configuration to inject a postMessage script to the LowProfile page
-    payload.CSSUrl = `https://example.com/cardcom-bridge.js?origin=${encodeURIComponent(origin)}`;
+    payload.CSSUrl = `${origin}/js/cardcom-bridge.js?origin=${encodeURIComponent(origin)}`;
 
     console.log("Sending LowProfile request:", payload);
 
