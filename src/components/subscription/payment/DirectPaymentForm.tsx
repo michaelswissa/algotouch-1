@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, ShieldCheck, CreditCard, Lock, AlarmClock, Building, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { TokenData } from '@/types/payment';
 import PaymentDetails from '@/components/payment/PaymentDetails';
@@ -27,15 +26,11 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
   onPaymentComplete,
   onBack
 }) => {
-  const navigate = useNavigate();
-  
-  // Card details state
   const [cardNumber, setCardNumber] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   
-  // Customer details state
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [zipCode, setZipCode] = useState('');
@@ -48,29 +43,22 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentTab, setCurrentTab] = useState('card');
 
-  /**
-   * Validate payment form fields
-   */
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    // Validate Card Number (remove spaces for validation)
     const cleanCardNumber = cardNumber.replace(/\s/g, '');
     if (!cleanCardNumber || cleanCardNumber.length < 14 || cleanCardNumber.length > 19) {
       newErrors.cardNumber = 'מספר כרטיס לא תקין';
     }
     
-    // Validate Cardholder Name
     if (!cardholderName || cardholderName.trim().length < 3) {
       newErrors.cardholderName = 'יש להזין שם מלא';
     }
     
-    // Validate Expiry Date (MM/YY format)
     const expiryRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
     if (!expiryDate || !expiryRegex.test(expiryDate)) {
       newErrors.expiryDate = 'תאריך תפוגה לא תקין';
     } else {
-      // Check if card is expired
       const [month, year] = expiryDate.split('/');
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear() % 100;
@@ -84,20 +72,16 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       }
     }
     
-    // Validate CVV
     const cvvRegex = /^\d{3,4}$/;
     if (!cvv || !cvvRegex.test(cvv)) {
       newErrors.cvv = 'קוד אבטחה לא תקין';
     }
     
-    // Only validate customer details if we're on that tab
     if (currentTab === 'customer') {
-      // Phone validation
       if (!phone || phone.length < 9) {
         newErrors.phone = 'נא להזין מספר טלפון תקין';
       }
       
-      // Check if it's a business customer
       if (isBusinessCustomer) {
         if (!companyId || companyId.length < 5) {
           newErrors.companyId = 'נא להזין מספר ע.מ / ח.פ תקין';
@@ -113,20 +97,14 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Process payment via server-side Edge function
-   */
   const handleProcessPayment = async () => {
-    // Set current tab to card details first
     setCurrentTab('card');
     
-    // Validate form first
     if (!validateForm()) {
       toast.error('אנא מלא את כל השדות הנדרשים');
       return;
     }
     
-    // Collect customer info if needed
     if (!phone) {
       setCurrentTab('customer');
       toast.info('אנא השלם את פרטי הלקוח לפני ביצוע התשלום');
@@ -136,14 +114,11 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
     setIsProcessing(true);
     
     try {
-      // Format expiry date for API
       const [month, year] = expiryDate.split('/');
       const formattedExpiryDate = `${month}/20${year}`;
       
-      // Clean card number (remove spaces)
       const cleanCardNumber = cardNumber.replace(/\s/g, '');
       
-      // Prepare customer info object
       const customerInfo = {
         phone,
         address,
@@ -154,7 +129,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         companyName: isBusinessCustomer ? companyName : ''
       };
       
-      // Get registration data from session storage (if exists)
       let registrationData = null;
       try {
         const storedData = sessionStorage.getItem('registration_data');
@@ -167,12 +141,14 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       
       console.log('Calling direct-payment edge function...');
       
-      // Adding more detailed error handling and debug information
       let response;
+      let data;
+      let error;
+      
       try {
         response = await supabase.functions.invoke('direct-payment', {
           body: {
-            action: 'process', // Explicitly set the action parameter
+            action: 'process',
             planId: selectedPlan,
             cardDetails: {
               cardNumber: cleanCardNumber,
@@ -185,86 +161,97 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
           }
         });
         
-        console.log('Edge function response status:', response.error ? 'ERROR' : 'SUCCESS');
-        
         if (response.error) {
-          console.error('Edge function error:', response.error);
+          console.error('First attempt error:', response.error);
           throw new Error(`Edge function error: ${response.error.message}`);
         }
         
-        const { data, error } = response;
+        data = response.data;
+      } catch (firstAttemptError) {
+        console.error('First attempt failed, trying fallback...', firstAttemptError);
         
-        if (error) {
-          throw error;
-        }
-
-        if (!data || !data.success) {
-          throw new Error(data?.error || 'אירעה שגיאה בעיבוד התשלום');
-        }
-        
-        // Extract payment details
-        const { tokenInfo, transactionId, documentInfo } = data;
-        
-        // Log successful payment
-        console.log('Payment successful:', { tokenInfo, transactionId, documentInfo });
-        
-        // Store token data
-        if (tokenInfo) {
-          const tokenData: TokenData = {
-            token: tokenInfo.token,
-            lastFourDigits: cleanCardNumber.slice(-4),
-            expiryMonth: month,
-            expiryYear: `20${year}`,
-            cardholderName
-          };
-          
-          // If we have registration data, update it with token
-          if (registrationData) {
-            registrationData.paymentToken = tokenData;
-            sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
-          }
-          
-          // Update session flow to mark payment complete
-          try {
-            const sessionData = sessionStorage.getItem('subscription_flow');
-            const parsedSession = sessionData 
-              ? JSON.parse(sessionData) 
-              : { step: 'completion' };
-            
-            parsedSession.step = 'completion';
-            parsedSession.selectedPlan = selectedPlan;
-            parsedSession.paymentComplete = true;
-            
-            sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-          } catch (e) {
-            console.error('Error updating session flow:', e);
-          }
-        }
-        
-        // Show success message with document info if available
-        if (documentInfo && documentInfo.documentUrl) {
-          toast.success('התשלום התקבל בהצלחה! מסמך נשלח לדוא"ל שלך',
-            {
-              action: {
-                label: 'הצג מסמך',
-                onClick: () => window.open(documentInfo.documentUrl, '_blank')
-              }
+        try {
+          response = await supabase.functions.invoke('cardcom-payment/process-payment', {
+            body: {
+              planId: selectedPlan,
+              cardDetails: {
+                cardNumber: cleanCardNumber,
+                expiryDate: formattedExpiryDate,
+                cvv,
+                cardholderName
+              },
+              customerInfo,
+              registrationData
             }
-          );
-        } else {
-          toast.success('התשלום התקבל בהצלחה!');
+          });
+          
+          if (response.error) {
+            console.error('Fallback attempt error:', response.error);
+            throw new Error(`Fallback error: ${response.error.message}`);
+          }
+          
+          data = response.data;
+        } catch (fallbackAttemptError) {
+          console.error('Both attempts failed:', fallbackAttemptError);
+          throw firstAttemptError;
+        }
+      }
+      
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'אירעה שגיאה בעיבוד התשלום');
+      }
+      
+      const { tokenInfo, transactionId, documentInfo } = data;
+      
+      console.log('Payment successful:', { tokenInfo, transactionId, documentInfo });
+      
+      if (tokenInfo) {
+        const tokenData: TokenData = {
+          token: tokenInfo.token,
+          lastFourDigits: cleanCardNumber.slice(-4),
+          expiryMonth: month,
+          expiryYear: `20${year}`,
+          cardholderName
+        };
+        
+        if (registrationData) {
+          registrationData.paymentToken = tokenData;
+          sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
         }
         
-        // Call payment complete callback
-        setTimeout(() => {
-          setIsProcessing(false);
-          onPaymentComplete();
-        }, 1000);
-        
-      } catch (apiError: any) {
-        console.error('API error details:', apiError);
-        throw new Error(`Failed to process payment: ${apiError.message}`);
+        try {
+          const sessionData = sessionStorage.getItem('subscription_flow');
+          const parsedSession = sessionData 
+            ? JSON.parse(sessionData) 
+            : { step: 'completion' };
+          
+          parsedSession.step = 'completion';
+          parsedSession.selectedPlan = selectedPlan;
+          parsedSession.paymentComplete = true;
+          
+          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+        } catch (e) {
+          console.error('Error updating session flow:', e);
+        }
       }
+      
+      if (documentInfo && documentInfo.documentUrl) {
+        toast.success('התשלום התקבל בהצלחה! מסמך נשלח לדוא"ל שלך',
+          {
+            action: {
+              label: 'הצג מסמך',
+              onClick: () => window.open(documentInfo.documentUrl, '_blank')
+            }
+          }
+        );
+      } else {
+        toast.success('התשלום התקבל בהצלחה!');
+      }
+      
+      setTimeout(() => {
+        setIsProcessing(false);
+        onPaymentComplete();
+      }, 1000);
       
     } catch (error: any) {
       console.error('Error processing payment:', error);
@@ -299,7 +286,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
 
   return (
     <Card className="border-primary/20 hover-glow transition-shadow duration-300 relative overflow-hidden">
-      {/* Payment Header */}
       <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-primary/10">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -317,7 +303,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
           <p className="text-xl font-semibold mt-1">${planDetails.price} USD</p>
         </div>
         
-        {/* Security badges */}
         <div className="flex flex-wrap gap-3 items-center mt-3">
           <div className="flex items-center gap-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-xs border border-green-200 dark:border-green-900/30">
             <ShieldCheck className="h-3 w-3" />
@@ -355,7 +340,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
           </TabsList>
           
           <TabsContent value="card">
-            {/* Card Details Form */}
             <div className="space-y-6">
               <PaymentDetails
                 cardNumber={cardNumber}
@@ -368,7 +352,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
                 setCvv={setCvv}
               />
 
-              {/* Error display */}
               {Object.keys(errors).length > 0 && errors.cardNumber && (
                 <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
                   <ul className="list-disc list-inside space-y-1">
@@ -388,7 +371,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
           
           <TabsContent value="customer">
             <div className="space-y-6">
-              {/* Basic Customer Information */}
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">מספר טלפון</Label>
@@ -437,7 +419,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
                   </div>
                 </div>
                 
-                {/* Business Customer Option */}
                 <div className="pt-2 space-y-4">
                   <div className="flex items-center space-x-2 space-x-reverse rtl:space-x-reverse">
                     <Checkbox 
@@ -485,7 +466,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
                 </div>
               </div>
               
-              {/* Error display */}
               {Object.keys(errors).length > 0 && errors.phone && (
                 <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
                   <ul className="list-disc list-inside space-y-1">
@@ -502,7 +482,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
             </div>
           </TabsContent>
           
-          {/* Payment submit button */}
           <Button 
             className="w-full mt-6"
             size="lg"
@@ -512,7 +491,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
             {isProcessing ? 'מעבד תשלום...' : 'בצע תשלום'}
           </Button>
           
-          {/* Secure payment notice */}
           <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1 mt-3">
             <Lock className="h-3 w-3" />
             <span>מאובטח על ידי Cardcom</span>
