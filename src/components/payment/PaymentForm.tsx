@@ -1,11 +1,12 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { CreditCard, ShieldCheck } from 'lucide-react';
 import { usePaymentProcess } from './hooks/usePaymentProcess';
 import PaymentErrorCard from './PaymentErrorCard';
 import PaymentCardForm from './PaymentCardForm';
 import ErrorRecoveryInfo from './ErrorRecoveryInfo';
+import PaymentDiagnostics from './PaymentDiagnostics';
 
 interface PaymentFormProps {
   planId: string;
@@ -13,11 +14,14 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) => {
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  
   const {
     isProcessing,
     registrationData,
     registrationError,
     paymentError,
+    diagnosticInfo,
     loadRegistrationData,
     handleSubmit,
     handleExternalPayment,
@@ -30,10 +34,41 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     loadRegistrationData();
   }, []);
 
+  // Show diagnostics if there's an error or if we've enabled it
+  useEffect(() => {
+    if (paymentError) {
+      // Show diagnostics automatically when there's an error
+      setShowDiagnostics(true);
+    }
+  }, [paymentError]);
+
+  // Check for dev mode to show diagnostics
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'dev') {
+      setShowDiagnostics(true);
+    }
+    
+    // Secret key combination for diagnostics
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Alt+Shift+D to toggle diagnostics
+      if (e.altKey && e.shiftKey && e.key === 'D') {
+        setShowDiagnostics(prev => !prev);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // If registration data is invalid, show an error and options to go back
   if (registrationError && !registrationData) {
     return <PaymentErrorCard errorMessage={registrationError} />;
   }
+
+  const refreshDiagnostics = () => {
+    window.location.reload();
+  };
 
   return (
     <Card className="max-w-2xl mx-auto shadow-lg border-2 border-primary/20 hover-glow" dir="rtl">
@@ -52,6 +87,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
           </div>
         </div>
       </CardHeader>
+      
+      {/* Display diagnostics if enabled */}
+      <PaymentDiagnostics 
+        diagnosticInfo={diagnosticInfo}
+        onRefresh={refreshDiagnostics}
+        isVisible={showDiagnostics} 
+      />
       
       <ErrorRecoveryInfo 
         error={paymentError?.message}

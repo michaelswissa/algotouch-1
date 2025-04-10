@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -20,6 +21,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<PaymentError | null>(null);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
   
   const { 
     registrationData, 
@@ -63,6 +65,44 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     };
     
     checkRecovery();
+
+    // Diagnostic: Check if the edge function is accessible
+    const checkEdgeFunctionStatus = async () => {
+      try {
+        const functionName = 'direct-payment';
+        console.log(`Running diagnostic check for edge function: ${functionName}`);
+        
+        const { data: functionData, error: functionError } = await supabase
+          .functions
+          .invoke(functionName, {
+            body: { action: 'health-check' }
+          });
+        
+        if (functionError) {
+          console.error('Edge function diagnostic error:', functionError);
+          setDiagnosticInfo({ 
+            status: 'error', 
+            function: functionName,
+            error: functionError 
+          });
+        } else {
+          console.log('Edge function diagnostic result:', functionData);
+          setDiagnosticInfo({ 
+            status: 'success', 
+            function: functionName,
+            result: functionData 
+          });
+        }
+      } catch (error) {
+        console.error('Edge function diagnostic exception:', error);
+        setDiagnosticInfo({ 
+          status: 'exception', 
+          error 
+        });
+      }
+    };
+    
+    checkEdgeFunctionStatus();
   }, []);
 
   const verifyPaymentFromUrl = async (lowProfileId: string) => {
@@ -245,64 +285,144 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     
     setIsProcessing(true);
     try {
+      // Detailed logging for debugging
+      console.log('Starting external payment process with planId:', planId);
+      
       try {
+        // First try with the payment service helper
+        console.log('Attempting payment with payment service helper...');
         const result = await initiateExternalPayment(planId, user, registrationData);
+        console.log('Payment service helper response:', result);
+        
         if (result && result.url) {
+          console.log('Success! Redirecting to payment URL:', result.url);
           window.location.href = result.url;
           return;
         }
+        console.log('Payment service helper did not return a URL, falling back to direct function call');
       } catch (helperError) {
         console.error('Error using payment service helper:', helperError);
       }
-
-      const { data, error } = await supabase.functions.invoke('direct-payment', {
-        body: {
-          action: 'initiate',
-          planId: planId,
-          userId: user?.id,
-          email: user?.email
-        }
+      
+      console.log('Falling back to direct supabase function invocation...');
+      console.log('Function parameters:', {
+        action: 'initiate',
+        planId: planId,
+        userId: user?.id,
+        email: user?.email,
+        diagnosticInfo
       });
-      
-      console.log('Direct payment function response:', data);
-      
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(`Edge Function error: ${error.message}`);
+
+      // Try multiple approaches, starting with direct function invocation
+      try {
+        console.time('direct-payment-function-call');
+        const { data, error } = await supabase.functions.invoke('direct-payment', {
+          body: {
+            action: 'initiate',
+            planId: planId,
+            userId: user?.id,
+            email: user?.email
+          }
+        });
+        console.timeEnd('direct-payment-function-call');
+        
+        console.log('Direct payment function response:', data);
+        
+        if (error) {
+          console.error('Supabase function error:', error);
+          throw new Error(`Edge Function error: ${error.message}`);
+        }
+        
+        if (!data || !data.url) {
+          console.error('Invalid response data:', data);
+          throw new Error('לא התקבלה כתובת תשלום מהשרת');
+        }
+        
+        if (data.tempRegistrationId) {
+          localStorage.setItem('temp_registration_id', data.tempRegistrationId);
+        }
+        
+        const url = new URL(data.url);
+        const baseUrl = `${window.location.origin}/subscription`;
+        
+        // Add detailed diagnostics as URL parameters
+        url.searchParams.set('diagnosticTime', new Date().toISOString());
+        
+        url.searchParams.set('successRedirectUrl', 
+          `${baseUrl}?step=payment&success=true&lpId=${data.lowProfileId}`);
+        
+        url.searchParams.set('errorRedirectUrl', 
+          `${baseUrl}?step=payment&error=true&lpId=${data.lowProfileId}`);
+        
+        console.log('Redirecting to payment URL:', url.toString());
+        window.location.href = url.toString();
+      } catch (directError) {
+        console.error('Direct function invocation failed:', directError);
+        
+        // Try fallback to cardcom-payment function if available
+        try {
+          console.log('Attempting fallback to cardcom-payment function...');
+          const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('cardcom-payment/create-payment', {
+            body: {
+              planId,
+              userInfo: user ? { userId: user.id, email: user.email } : null,
+              registrationData: registrationData
+            }
+          });
+          
+          console.log('Fallback function response:', fallbackData);
+          
+          if (fallbackError) {
+            throw fallbackError;
+          }
+          
+          if (fallbackData && fallbackData.url) {
+            console.log('Fallback successful! Redirecting to:', fallbackData.url);
+            window.location.href = fallbackData.url;
+            return;
+          }
+          
+          throw new Error('גם ניסיון גיבוי לא הצליח');
+        } catch (fallbackAttemptError) {
+          console.error('Fallback attempt failed:', fallbackAttemptError);
+          throw directError; // Throw the original error
+        }
       }
-      
-      if (!data || !data.url) {
-        console.error('Invalid response data:', data);
-        throw new Error('לא התקבלה כתובת תשלום מהשרת');
-      }
-      
-      if (data.tempRegistrationId) {
-        localStorage.setItem('temp_registration_id', data.tempRegistrationId);
-      }
-      
-      const url = new URL(data.url);
-      const baseUrl = `${window.location.origin}/subscription`;
-      
-      url.searchParams.set('successRedirectUrl', 
-        `${baseUrl}?step=payment&success=true&lpId=${data.lowProfileId}`);
-      
-      url.searchParams.set('errorRedirectUrl', 
-        `${baseUrl}?step=payment&error=true&lpId=${data.lowProfileId}`);
-      
-      console.log('Redirecting to payment URL:', url.toString());
-      window.location.href = url.toString();
     } catch (error: any) {
       console.error('Payment initialization error:', error);
+      
+      // Collect detailed diagnostic information
+      const diagnosticData = {
+        timestamp: new Date().toISOString(),
+        route: window.location.pathname + window.location.search,
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform
+        },
+        error: {
+          message: error.message,
+          stack: error.stack
+        },
+        functionDiagnostics: diagnosticInfo
+      };
+      
+      // Log detailed diagnostic information
+      console.error('Payment diagnostic data:', diagnosticData);
       
       const errorInfo = await handleError(error, {
         planId,
         operationType: operationTypeValue,
-        userInfo: user ? { userId: user.id, email: user.email } : null
+        userInfo: user ? { userId: user.id, email: user.email } : null,
+        diagnosticData
       });
       
       const paymentError = new PaymentError(
         errorInfo?.message || 'שגיאה ביצירת עסקה'
       );
+      paymentError.code = errorInfo?.code;
+      paymentError.details = { ...errorInfo, diagnostics: diagnosticData };
+      
       setPaymentError(paymentError);
       
       setIsProcessing(false);
@@ -316,6 +436,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     registrationData,
     registrationError,
     paymentError,
+    diagnosticInfo,
     loadRegistrationData,
     handleSubmit,
     handleExternalPayment,

@@ -44,6 +44,61 @@ enum OperationType {
 }
 
 /**
+ * Check the health/status of the function and API configuration
+ */
+async function checkHealth() {
+  try {
+    // Verify the function itself is running
+    const functionStatus = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      env: {
+        CARDCOM_TERMINAL_CONFIGURED: !!Deno.env.get('CARDCOM_TERMINAL'),
+        CARDCOM_USERNAME_CONFIGURED: !!Deno.env.get('CARDCOM_USERNAME'),
+        CARDCOM_API_PASSWORD_CONFIGURED: !!Deno.env.get('CARDCOM_API_PASSWORD'),
+      }
+    };
+    
+    // Optionally check API connection (lightweight validation)
+    try {
+      const testUrl = `${API_CONFIG.BASE_URL}/LowProfile/GetLpResult`;
+      const testResponse = await fetch(testUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "TerminalNumber": parseInt(API_CONFIG.TERMINAL),
+          "ApiName": API_CONFIG.USERNAME,
+          "LowProfileId": "00000000-0000-0000-0000-000000000000" // Invalid ID for testing
+        }),
+      });
+      
+      // We're just checking if the API is accessible, not success of call
+      functionStatus['apiAccessible'] = testResponse.status !== 0;
+      functionStatus['apiResponseStatus'] = testResponse.status;
+      
+    } catch (apiError) {
+      console.error('API connection test error:', apiError);
+      functionStatus['apiAccessible'] = false;
+      functionStatus['apiError'] = apiError.message;
+    }
+    
+    return {
+      success: true,
+      functionStatus
+    };
+  } catch (error) {
+    console.error('Health check error:', error);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
  * Initiate external payment with CardCom LowProfile
  */
 async function initiateExternalPayment(params: any) {
@@ -55,6 +110,14 @@ async function initiateExternalPayment(params: any) {
   } = params;
   
   try {
+    // Log request for debugging
+    console.log('Initiating external payment with params:', {
+      planId,
+      userId: userId ? 'provided' : 'not provided',
+      email: email ? 'provided' : 'not provided',
+      hasRegistrationData: !!registrationData
+    });
+    
     // Determine amount and operation type based on plan
     let amount = 0;
     let operationType = OperationType.TOKEN_ONLY;
@@ -114,71 +177,82 @@ async function initiateExternalPayment(params: any) {
     });
     
     // Call CardCom API to create payment page
-    const response = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/Create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`CardCom LowProfile API error: ${response.status}`, errorText);
-      throw new Error(`CardCom API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-    
-    // Parse the response
-    const result = await response.json();
-    console.log('CardCom LowProfile API response:', result);
-    
-    // Check for API errors
-    if (result.ResponseCode !== 0) {
-      return {
-        success: false,
-        error: result.Description || 'Unknown error creating payment page',
-        details: {
-          responseCode: result.ResponseCode,
-          description: result.Description
-        }
-      };
-    }
-    
-    // Store registration data temporarily if provided
-    if (registrationData) {
-      try {
-        // Create Supabase client
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-        );
-        
-        // Store in a temporary table with short expiration
-        const { error: tempError } = await supabaseClient
-          .from('temp_registration_data')
-          .insert({
-            id: tempRegistrationId,
-            registration_data: registrationData,
-            expires_at: new Date(Date.now() + 30 * 60000).toISOString() // 30 min expiry
-          });
-          
-        if (tempError) {
-          console.error('Error storing temp registration:', tempError);
-        } else {
-          console.log('Stored temp registration data with ID:', tempRegistrationId);
-        }
-      } catch (storageError: any) {
-        console.error('Error in temp registration storage:', storageError);
+    try {
+      console.time('cardcom-api-call');
+      const response = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/Create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      console.timeEnd('cardcom-api-call');
+      
+      console.log('CardCom API response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`CardCom LowProfile API error: ${response.status}`, errorText);
+        throw new Error(`CardCom API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
+      
+      // Parse the response
+      const result = await response.json();
+      console.log('CardCom LowProfile API response:', result);
+      
+      // Check for API errors
+      if (result.ResponseCode !== 0) {
+        return {
+          success: false,
+          error: result.Description || 'Unknown error creating payment page',
+          details: {
+            responseCode: result.ResponseCode,
+            description: result.Description
+          }
+        };
+      }
+      
+      // Store registration data temporarily if provided
+      if (registrationData) {
+        try {
+          console.log('Storing registration data with ID:', tempRegistrationId);
+          
+          // Create Supabase client
+          const supabaseClient = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+          );
+          
+          // Store in a temporary table with short expiration
+          const { error: tempError } = await supabaseClient
+            .from('temp_registration_data')
+            .insert({
+              id: tempRegistrationId,
+              registration_data: registrationData,
+              expires_at: new Date(Date.now() + 30 * 60000).toISOString() // 30 min expiry
+            });
+            
+          if (tempError) {
+            console.error('Error storing temp registration:', tempError);
+          } else {
+            console.log('Stored temp registration data with ID:', tempRegistrationId);
+          }
+        } catch (storageError: any) {
+          console.error('Error in temp registration storage:', storageError);
+        }
+      }
+      
+      // Return successful result with payment page URL
+      return {
+        success: true,
+        url: result.Url,
+        lowProfileId: result.LowProfileId,
+        tempRegistrationId
+      };
+    } catch (error: any) {
+      console.error('CardCom API request error:', error);
+      throw error;
     }
-    
-    // Return successful result with payment page URL
-    return {
-      success: true,
-      url: result.Url,
-      lowProfileId: result.LowProfileId,
-      tempRegistrationId
-    };
   } catch (error: any) {
     console.error('Error initiating external payment:', error);
     throw error;
@@ -479,6 +553,13 @@ async function processDirectPayment(params: any) {
 }
 
 serve(async (req) => {
+  // Log incoming request for debugging
+  console.log(`${new Date().toISOString()} - Direct payment request received:`, {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers)
+  });
+  
   // Handle CORS
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -585,13 +666,24 @@ serve(async (req) => {
           }
         );
       }
+    } else if (requestData.action === 'health-check') {
+      // Health check endpoint
+      const healthResult = await checkHealth();
+      
+      return new Response(
+        JSON.stringify(healthResult),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
     // If no valid action is provided
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: 'Invalid action specified. Use "process" or "initiate".' 
+        error: 'Invalid action specified. Use "process", "initiate", or "health-check".' 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
