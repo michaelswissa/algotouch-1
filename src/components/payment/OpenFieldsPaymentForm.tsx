@@ -8,6 +8,8 @@ import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface OpenFieldsPaymentFormProps {
   planId: string;
@@ -24,6 +26,8 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
   const [registrationData, setRegistrationData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [useDirectPayment, setUseDirectPayment] = useState(false);
   
   // Get plan details from helper
   const planDetails = getSubscriptionPlans();
@@ -80,6 +84,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     } catch (error: any) {
       console.error('Error completing registration:', error);
       toast.error(error.message || 'שגיאה בהשלמת תהליך ההרשמה');
+      setError(error.message || 'שגיאה בהשלמת תהליך ההרשמה');
     } finally {
       setProcessing(false);
     }
@@ -158,18 +163,32 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     } catch (error: any) {
       console.error('Error processing successful payment:', error);
       toast.error(error.message || 'שגיאה בעיבוד התשלום');
+      setError(error.message || 'שגיאה בעיבוד התשלום');
     } finally {
       setProcessing(false);
     }
   };
 
-  const handlePaymentError = (error: string) => {
-    toast.error(`שגיאה בתהליך התשלום: ${error}`);
+  const handlePaymentError = (errorMsg: string) => {
+    console.error('Payment error:', errorMsg);
+    toast.error(`שגיאה בתהליך התשלום: ${errorMsg}`);
+    setError(errorMsg);
+  };
+
+  const switchToDirectPayment = () => {
+    setUseDirectPayment(true);
   };
 
   return (
     <Card className="w-full shadow-sm overflow-hidden">
       <CardContent className="p-0">
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         <CardcomOpenFields
           planId={planId}
           planName={plan.name}
@@ -178,6 +197,19 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           onError={handlePaymentError}
           onCancel={onCancel}
         />
+        
+        {error && (
+          <div className="p-4 text-center">
+            <Button 
+              variant="outline" 
+              onClick={onCancel} 
+              disabled={processing}
+              className="mt-4"
+            >
+              בחר אמצעי תשלום אחר
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

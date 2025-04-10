@@ -10,6 +10,8 @@ const corsHeaders = {
 
 serve(async (req) => {
   try {
+    console.log('Webhook called with URL:', req.url);
+    
     // Get URL parameters from Cardcom callback
     const url = new URL(req.url);
     const params = Object.fromEntries(url.searchParams);
@@ -17,7 +19,8 @@ serve(async (req) => {
     console.log('Received webhook from Cardcom', {
       operationResponse: params.OperationResponse,
       lowProfileId: params.LowProfileCode,
-      dealResponse: params.DealResponse
+      dealResponse: params.DealResponse,
+      fullParams: params
     });
 
     // Initialize Supabase client with service role key (needs admin access)
@@ -53,6 +56,7 @@ serve(async (req) => {
       }
     } else {
       console.error('Payment failed', params);
+      // Log the error but still return OK to acknowledge receipt
     }
 
     // We always return OK to Cardcom to acknowledge the webhook

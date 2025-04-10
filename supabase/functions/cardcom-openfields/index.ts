@@ -50,19 +50,9 @@ serve(async (req) => {
     console.log('Creating payment session for plan:', planId);
 
     // Get the Cardcom API credentials from environment variables
-    const terminalNumber = Deno.env.get('CARDCOM_TERMINAL');
-    const apiUsername = Deno.env.get('CARDCOM_USERNAME');
-    const apiPassword = Deno.env.get('CARDCOM_API_PASSWORD');
-
-    if (!terminalNumber || !apiUsername) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Cardcom API credentials' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
-    }
+    const terminalNumber = "160138";  // Hard-coded from your provided details
+    const apiUsername = "bLaocQRMSnwphQRUVG3b";  // Hard-coded from your provided details
+    const apiPassword = "i9nr6caGbgheTdYfQbo6"; // Only needed for specific operations
 
     // If this is a registration payment, store the registration data temporarily
     if (isRegistration && registrationData) {
@@ -99,60 +89,71 @@ serve(async (req) => {
 
     const productDescription = `מנוי ${planName || planId}`;
 
+    // Create the URL search params for the request
+    const params = new URLSearchParams({
+      'TerminalNumber': terminalNumber,
+      'UserName': apiUsername,
+      'CodePage': '65001',
+      'Operation': '1', // ChargeOnly
+      'Language': 'he',
+      'CoinID': '1', // ILS
+      'SumToBill': amount.toString(),
+      'ProductName': productDescription,
+      'SuccessRedirectUrl': successUrl,
+      'ErrorRedirectUrl': failureUrl,
+      'IndicatorUrl': webhookUrl,
+      'ReturnValue': planId,
+      'APILevel': '10',
+      'CardOwnerName': userName || '',
+      'CardOwnerEmail': userEmail || '',
+      'ShowCardOwnerEmail': userEmail ? 'true' : 'false',
+      'IsVirtualTerminalMode': 'false',
+      'HideCardOwnerName': Boolean(userName) ? 'false' : 'true',
+      'MaxNumOfPayments': '1',
+    });
+
+    console.log('Sending request to Cardcom with params:', Object.fromEntries(params));
+
     // Create the Low Profile payment session
     const cardcomResponse = await fetch('https://secure.cardcom.solutions/Interface/LowProfile.aspx', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        'TerminalNumber': terminalNumber,
-        'UserName': apiUsername,
-        'CodePage': '65001',
-        'Operation': '1', // ChargeOnly
-        'Language': 'he',
-        'CoinID': '1', // ILS
-        'SumToBill': amount.toString(),
-        'ProductName': productDescription,
-        'SuccessRedirectUrl': successUrl,
-        'ErrorRedirectUrl': failureUrl,
-        'IndicatorUrl': webhookUrl,
-        'ReturnValue': planId,
-        'APILevel': '10',
-        'CardOwnerName': userName || '',
-        'CardOwnerEmail': userEmail || '',
-        'ShowCardOwnerEmail': userEmail ? 'true' : 'false',
-        'IsVirtualTerminalMode': 'false',
-        'HideCardOwnerName': Boolean(userName) ? 'false' : 'true',
-        'MaxNumOfPayments': '1',
-      }).toString(),
+      body: params.toString(),
     });
 
+    // Get the full response text for debugging
+    const responseText = await cardcomResponse.text();
+    console.log('Cardcom raw response:', responseText);
+
     if (!cardcomResponse.ok) {
-      const errorText = await cardcomResponse.text();
-      console.error('Error from Cardcom API:', errorText);
+      console.error('Error from Cardcom API:', responseText);
       return new Response(
-        JSON.stringify({ error: 'Error creating Cardcom payment session' }),
+        JSON.stringify({ 
+          error: 'Error creating Cardcom payment session',
+          details: responseText 
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
         }
       );
     }
-
-    const responseText = await cardcomResponse.text();
     
     // Parse the response - Cardcom returns a URL-encoded string
     const responseParams = new URLSearchParams(responseText);
     const responseCode = responseParams.get('ResponseCode');
+    const description = responseParams.get('Description');
     const lowProfileId = responseParams.get('LowProfileCode');
+    const url = responseParams.get('url');
     
     if (responseCode !== '0' || !lowProfileId) {
       console.error('Error in Cardcom response:', responseText);
       return new Response(
         JSON.stringify({ 
           error: 'Invalid response from Cardcom', 
-          details: responseText 
+          details: { responseCode, description, responseText } 
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -165,6 +166,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         lowProfileId,
+        url,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
