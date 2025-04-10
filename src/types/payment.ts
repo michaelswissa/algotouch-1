@@ -1,4 +1,3 @@
-
 // Types for payment processing
 
 export type TokenData = {
@@ -8,6 +7,41 @@ export type TokenData = {
   expiryYear: number;
   cardholderName?: string;
 };
+
+export interface CardcomPaymentResult {
+  status: "approved" | "declined" | "error";
+  message?: string;
+  transactionId?: string;
+  approvalNumber?: string;
+  errorCode?: string;
+  errorDetails?: any;
+}
+
+export interface CardcomLowProfileResponse {
+  ResponseCode: number;
+  Description: string;
+  LowProfileId: string;
+  Url: string;
+}
+
+export interface CardcomChargeResponse {
+  ResponseCode: string;
+  Description: string;
+  InternalDealNumber?: string;
+  ApprovalNumber?: string;
+}
+
+export interface PaymentPageProps {
+  userId: string;
+  amount: number;
+  planId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  onSuccess: (result: { transactionId: string; approvalNumber: string }) => void;
+  onError: (error: any) => void;
+}
 
 // Define the steps for the subscription flow
 export type Steps = 'plan-selection' | 'contract' | 'payment' | 'completion';
@@ -64,23 +98,6 @@ export interface PaymentSessionData {
   planId?: string;
   paymentDetails?: any;
   expiresAt?: string;
-}
-
-export interface CardcomChargeResponse {
-  IsApproved: "1" | "0";
-  ReturnValue?: number;
-  Message?: string;
-  TokenApprovalNumber?: string;
-}
-
-export interface UserSubscription {
-  user_id: string;
-  plan_id: string;
-  status: "active" | "suspended" | "cancelled";
-  renewed_at: string;
-  created_at: string;
-  fail_count?: number;
-  last_attempt_at?: string;
 }
 
 export interface LowProfileDealResponse {

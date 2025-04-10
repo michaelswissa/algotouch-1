@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
@@ -9,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Subscription from './pages/Subscription';
 import MySubscriptionPage from './pages/MySubscriptionPage'; // Changed from MySubscription to MySubscriptionPage
 import ContractDetails from './pages/ContractDetails';
+import TokenReceived from './pages/payment/token-received';
 
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/auth/AuthProvider';
@@ -29,7 +29,8 @@ function App() {
           <Route path="/my-subscription" element={<MySubscriptionPage />} />
           <Route path="/contract/:contractId" element={<ContractDetails />} />
           
-          {/* Add any other routes you have */}
+          {/* Payment routes */}
+          <Route path="/payment/token-received" element={<TokenReceived />} />
           
           {/* Catch-all route */}
           <Route path="*" element={<h1>Page not found</h1>} />
