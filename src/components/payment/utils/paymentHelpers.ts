@@ -35,14 +35,23 @@ export interface TokenData {
   expiryMonth: string;
   expiryYear: string;
   cardholderName: string;
-  [key: string]: string | number | boolean | null | TokenData[]; // Adding index signature for Json compatibility
+  [key: string]: string | number | boolean;
 }
 
-export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
+// Helper function to create token data from card details
+export const createTokenData = (
+  cardNumber: string,
+  expiryDate: string,
+  cardholderName: string
+): TokenData => {
+  // Extract month/year from expiry date (MM/YY format)
+  const [expiryMonth, expiryYear] = expiryDate.split('/');
+  
   return {
     lastFourDigits: cardNumber.slice(-4),
-    expiryMonth: expiryDate.split('/')[0],
-    expiryYear: `20${expiryDate.split('/')[1]}`,
-    cardholderName
+    expiryMonth,
+    expiryYear,
+    cardholderName,
+    tokenCreatedAt: new Date().toISOString(),
   };
 };
