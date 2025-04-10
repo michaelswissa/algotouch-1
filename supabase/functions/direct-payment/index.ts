@@ -1,4 +1,3 @@
-
 // Direct Payment Processing Edge Function
 // This function securely processes credit card payments using the Cardcom API
 // It follows PCI DSS compliance by handling card data only on the server side
@@ -158,32 +157,47 @@ async function processDirectPayment(params: any) {
       }
     }
     
-    // Extract customer information for invoice
+    // Extract customer information for invoice and additional required fields
     const address = customerInfo?.address || '';
     const city = customerInfo?.city || '';
     const zipCode = customerInfo?.zipCode || '';
     const companyId = customerInfo?.companyId || '';
+    const companyName = customerInfo?.companyName || '';
     
-    // Prepare document data if needed
+    // Enhanced document data for Cardcom according to documentation
     const documentData = {
+      DocumentTypeToCreate: "Auto",
       Name: cardholderName || 'Customer',
       Email: cardholderEmail || '',
       Phone: cardholderPhone || '',
+      Mobile: cardholderPhone || '',
       AddressLine1: address || '',
       City: city || '',
-      Mobile: cardholderPhone || '',
       TaxId: companyId || '',
+      Comments: `רכישת ${productName}`,
+      IsVatFree: false,
+      IsSendByEmail: true,
       Products: [
         {
           Description: productName,
           UnitCost: amount,
-          Quantity: 1
+          Quantity: 1,
+          // Include total line cost to avoid rounding errors with decimals
+          TotalLineCost: amount,
+          // Set VAT flag if needed
+          IsVatFree: false
         }
-      ]
+      ],
+      AdvancedDefinition: {
+        // Add any account management details if needed
+        AccountForeignKey: userId || registrationData?.email || tempRegistrationId,
+      }
     };
     
     // Call Cardcom API to process the transaction directly
+    // Enhanced to include all required fields according to Cardcom documentation
     const payload = {
+      // Core required fields
       TerminalNumber: parseInt(API_CONFIG.TERMINAL),
       ApiName: API_CONFIG.USERNAME,
       ApiPassword: API_CONFIG.PASSWORD, // Only included for direct API calls, not for frontend
@@ -191,24 +205,39 @@ async function processDirectPayment(params: any) {
       CardNumber: cardDetails.cardNumber,
       CardExpirationMMYY: cardDetails.expiryDate,
       CVV2: cardDetails.cvv,
-      ExternalUniqTranId: externalTransId,
+      
+      // External reference IDs
+      ExternalUniqTranId: externalTransId, // Unique transaction ID to prevent duplicates
       ReturnValue: tempRegistrationId || userId || 'direct-payment',
+      
+      // Extended card owner information
       CardOwnerInformation: {
         FullName: cardholderName,
         CardOwnerEmail: cardholderEmail,
         Phone: cardholderPhone,
-        Address: address,
-        City: city,
-        ZipCode: zipCode
+        IdentityNumber: '', // Israeli ID number if available
+        AvsAddress: address,
+        AvsCity: city,
+        AvsZip: zipCode
       },
+      
+      // Payment configuration
       ISOCoinId: 1, // ILS
-      SumOfPayments: 1, // Default to single payment
+      CoinID: 1, // Same as ISOCoinId but required separately by some Cardcom endpoints
+      NumOfPayments: 1, // Default to single payment
+      SumOfPayments: 1, // Required by Cardcom
       Language: "he", // Hebrew interface
+      
+      // Product and invoice info
       ProductName: productName, // Product description
-      MoreInfo: `רכישת ${productName} באמצעות כרטיס אשראי`,
+      Description: `רכישת ${productName} באמצעות כרטיס אשראי`, // For billing records
+      MoreInfo: `רכישת ${productName}`, // Additional transaction info
       ExtCompanyId: companyId || '',
-      // Include document info if we're charging (not just token creation)
+      
+      // Document/invoice generation
       Document: (operationType !== OperationType.TOKEN_ONLY) ? documentData : undefined,
+      
+      // Custom transaction fields
       CustomFields: [
         { 
           Id: 1, 
@@ -218,7 +247,16 @@ async function processDirectPayment(params: any) {
           Id: 2, 
           Value: tempRegistrationId || userId || '' 
         }
-      ]
+      ],
+      
+      // Advanced transaction options
+      Advanced: {
+        IsCreateToken: operationType === OperationType.CHARGE_AND_TOKEN || operationType === OperationType.TOKEN_ONLY,
+        SapakMutav: '', // Optional - for meaged terminals
+        CreditType: 1, // Regular credit transaction
+        SendNote: true, // Send email notification
+        IsRefund: false // Not a refund transaction
+      }
     };
     
     // For security, create a sanitized payload for logging (without card details)
@@ -303,35 +341,14 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    // Parse request path and data
-    const url = new URL(req.url);
-    const path = url.pathname.split('/').pop() || '';
+    // Parse request data
+    const requestData = await req.json();
     
-    // Create a Supabase client for authentication
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
-
-    // Get authenticated user information if available
-    let user = null;
-    try {
-      const { data } = await supabaseClient.auth.getUser();
-      user = data.user;
-      console.log('Authenticated user:', user?.email);
-    } catch (authError) {
-      console.error('Auth error:', authError);
-      // Continue without user - might be registration flow
-    }
+    // Log the request (without sensitive data)
+    console.log('direct-payment function called with action:', requestData.action);
     
     // Process direct payment
-    if (path === 'process') {
-      const requestData = await req.json();
+    if (requestData.action === 'process') {
       const { planId, cardDetails, registrationData, customerInfo } = requestData;
       
       if (!planId || !cardDetails) {
@@ -352,8 +369,6 @@ serve(async (req) => {
         const paymentResult = await processDirectPayment({
           planId,
           cardDetails,
-          userId: user?.id,
-          email: user?.email,
           registrationData,
           customerInfo
         });
@@ -381,11 +396,11 @@ serve(async (req) => {
       }
     }
 
-    // If no valid path is provided
+    // If no valid action is provided
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: 'Invalid endpoint' 
+        error: 'Invalid action specified' 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -166,11 +166,12 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         console.error('Error parsing registration data:', e);
       }
       
-      console.log('Calling direct-payment/process edge function...');
+      console.log('Calling direct-payment edge function...');
       
-      // Process payment via server-side Edge function with complete URL to avoid 404 errors
-      const { data, error } = await supabase.functions.invoke('direct-payment/process', {
+      // Fixed: Using the proper function name format in the invoke method
+      const { data, error } = await supabase.functions.invoke('direct-payment', {
         body: {
+          action: 'process', // Specify the action to perform
           planId: selectedPlan,
           cardDetails: {
             cardNumber: cleanCardNumber,
