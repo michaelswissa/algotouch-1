@@ -1,64 +1,98 @@
 
-export interface SubscriptionPlan {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
-  features: string[];
-  trialDays: number;
-  billingCycle: 'monthly' | 'annual' | 'one-time';
-  currency?: string;
-}
+import { SubscriptionPlan } from '@/types/payment';
 
 export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
   return {
     monthly: {
       id: 'monthly',
-      name: 'חודשי',
+      name: 'מנוי חודשי',
       price: 99,
-      currency: '$',
-      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
-      features: ['גישה מלאה לכל התכונות', 'ללא התחייבות', 'חודש ניסיון חינם'],
-      trialDays: 30,
+      description: 'גישה לכל התכונות עם חידוש אוטומטי',
+      features: [
+        'גישה לכל הכלים',
+        'הורדת דוחות',
+        'תמיכה בדוא"ל',
+        'עדכונים חודשיים'
+      ],
+      trialDays: 14,
       billingCycle: 'monthly',
+      currency: 'USD'
     },
     annual: {
       id: 'annual',
-      name: 'שנתי',
-      price: 899,
-      currency: '$',
-      description: '25% הנחה | שלושה חודשים מתנה',
-      features: ['גישה מלאה לכל התכונות', 'חיסכון של 25%', 'חידוש שנתי'],
-      trialDays: 0,
+      name: 'מנוי שנתי',
+      price: 899, // ~25% discount compared to monthly * 12
+      description: 'חסכון של 25% לעומת מנוי חודשי',
+      features: [
+        'כל היתרונות של המנוי החודשי',
+        'חסכון משמעותי',
+        'תמיכה מועדפת',
+        'הדרכות מיוחדות'
+      ],
+      trialDays: 14,
       billingCycle: 'annual',
+      currency: 'USD'
     },
     vip: {
       id: 'vip',
-      name: 'VIP',
+      name: 'מנוי VIP',
       price: 3499,
-      currency: '$',
-      description: 'גישה לכל החיים בתשלום חד פעמי',
-      features: ['גישה לכל החיים', 'כל התכונות העתידיות', 'תמיכה VIP'],
-      trialDays: 0,
-      billingCycle: 'one-time',
-    },
+      description: 'הגרסה המושלמת לעסקים ומקצוענים',
+      features: [
+        'כל היתרונות של המנוי השנתי',
+        'ליווי אישי',
+        'התאמות מיוחדות',
+        'תמיכת פרימיום 24/7',
+        'מספר משתמשים לא מוגבל'
+      ],
+      trialDays: 7,
+      billingCycle: 'annual',
+      currency: 'USD'
+    }
   };
 };
 
-// Updated TokenData interface with an index signature to make it compatible with Json type
-export interface TokenData {
-  lastFourDigits: string;
-  expiryMonth: string;
-  expiryYear: string;
-  cardholderName: string;
-  [key: string]: string | number | boolean | null | TokenData[] | undefined; // Adding index signature for Json compatibility
-}
+export const getPlanSummary = (plan: SubscriptionPlan | undefined) => {
+  if (!plan) return null;
+  
+  const isFreeTrialPlan = plan.trialDays > 0;
+  const isMonthly = plan.billingCycle === 'monthly';
+  const currency = plan.currency || 'USD';
+  
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('he-IL', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0
+    }).format(price);
+  };
+  
+  const summary = {
+    title: plan.name,
+    description: plan.description,
+    pricingLabel: isMonthly ? 'מחיר חודשי:' : 'מחיר שנתי:',
+    price: formatPrice(plan.price),
+    trialNote: isFreeTrialPlan 
+      ? `תקופת ניסיון חינם למשך ${plan.trialDays} ימים, לאחר מכן חיוב ${isMonthly ? 'חודשי' : 'שנתי'} של ${formatPrice(plan.price)}.`
+      : ''
+  };
+  
+  return { summary, isFreeTrialPlan };
+};
 
-export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
+/**
+ * Create tokenization data object from payment form
+ */
+export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string) => {
+  // Parse expiry date in MM/YY format
+  const [expiryMonth, expiryYear] = expiryDate.split('/');
+  
+  // Create token data object with card details
   return {
-    lastFourDigits: cardNumber.slice(-4),
-    expiryMonth: expiryDate.split('/')[0],
-    expiryYear: `20${expiryDate.split('/')[1]}`,
+    token: `simulated_token_${Date.now()}`, // This would normally come from the payment processor
+    lastFourDigits: cardNumber.replace(/\s/g, '').slice(-4),
+    expiryMonth,
+    expiryYear,
     cardholderName
   };
 };

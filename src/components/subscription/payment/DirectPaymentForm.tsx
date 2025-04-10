@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,11 +6,11 @@ import { Shield, ShieldCheck, CreditCard, Lock, AlarmClock, Building, MapPin } f
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { TokenData } from '@/types/payment';
-import PaymentDetails from '@/components/payment/PaymentDetails';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import CardcomOpenFields from '@/components/payment/CardcomOpenFields';
 
 interface DirectPaymentFormProps {
   selectedPlan: string;
@@ -18,7 +19,7 @@ interface DirectPaymentFormProps {
 }
 
 /**
- * DirectPaymentForm - A PCI-compliant payment form that collects card details
+ * DirectPaymentForm - A PCI-compliant payment form that tokenizes card details
  * and processes them securely via the server-side Edge function
  */
 const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({ 
@@ -26,11 +27,6 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
   onPaymentComplete,
   onBack
 }) => {
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardholderName, setCardholderName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [zipCode, setZipCode] = useState('');
@@ -43,53 +39,20 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentTab, setCurrentTab] = useState('card');
 
-  const validateForm = (): boolean => {
+  const validateCustomerInfo = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    const cleanCardNumber = cardNumber.replace(/\s/g, '');
-    if (!cleanCardNumber || cleanCardNumber.length < 14 || cleanCardNumber.length > 19) {
-      newErrors.cardNumber = 'מספר כרטיס לא תקין';
+    if (!phone || phone.length < 9) {
+      newErrors.phone = 'נא להזין מספר טלפון תקין';
     }
     
-    if (!cardholderName || cardholderName.trim().length < 3) {
-      newErrors.cardholderName = 'יש להזין שם מלא';
-    }
-    
-    const expiryRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
-    if (!expiryDate || !expiryRegex.test(expiryDate)) {
-      newErrors.expiryDate = 'תאריך תפוגה לא תקין';
-    } else {
-      const [month, year] = expiryDate.split('/');
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear() % 100;
-      const currentMonth = currentDate.getMonth() + 1;
-      
-      const expiryYear = parseInt(year, 10);
-      const expiryMonth = parseInt(month, 10);
-      
-      if (expiryYear < currentYear || (expiryYear === currentYear && expiryMonth < currentMonth)) {
-        newErrors.expiryDate = 'הכרטיס פג תוקף';
-      }
-    }
-    
-    const cvvRegex = /^\d{3,4}$/;
-    if (!cvv || !cvvRegex.test(cvv)) {
-      newErrors.cvv = 'קוד אבטחה לא תקין';
-    }
-    
-    if (currentTab === 'customer') {
-      if (!phone || phone.length < 9) {
-        newErrors.phone = 'נא להזין מספר טלפון תקין';
+    if (isBusinessCustomer) {
+      if (!companyId || companyId.length < 5) {
+        newErrors.companyId = 'נא להזין מספר ע.מ / ח.פ תקין';
       }
       
-      if (isBusinessCustomer) {
-        if (!companyId || companyId.length < 5) {
-          newErrors.companyId = 'נא להזין מספר ע.מ / ח.פ תקין';
-        }
-        
-        if (!companyName || companyName.trim().length < 2) {
-          newErrors.companyName = 'נא להזין שם חברה';
-        }
+      if (!companyName || companyName.trim().length < 2) {
+        newErrors.companyName = 'נא להזין שם חברה';
       }
     }
     
@@ -97,13 +60,8 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleProcessPayment = async () => {
+  const handleTokenReceived = async (tokenData: any) => {
     setCurrentTab('card');
-    
-    if (!validateForm()) {
-      toast.error('אנא מלא את כל השדות הנדרשים');
-      return;
-    }
     
     if (!phone) {
       setCurrentTab('customer');
@@ -111,14 +69,15 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       return;
     }
     
+    if (!validateCustomerInfo()) {
+      setCurrentTab('customer');
+      toast.error('אנא תקן את השדות המסומנים');
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
-      const [month, year] = expiryDate.split('/');
-      const formattedExpiryDate = `${month}/20${year}`;
-      
-      const cleanCardNumber = cardNumber.replace(/\s/g, '');
-      
       const customerInfo = {
         phone,
         address,
@@ -139,22 +98,26 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         console.error('Error parsing registration data:', e);
       }
       
-      console.log('Calling direct-payment edge function...');
+      console.log('Processing payment with token:', {
+        tokenReceived: !!tokenData,
+        planId: selectedPlan
+      });
       
+      // Process the payment using the Edge Function
       let response;
       let data;
-      let error;
       
       try {
         response = await supabase.functions.invoke('direct-payment', {
           body: {
             action: 'process',
             planId: selectedPlan,
-            cardDetails: {
-              cardNumber: cleanCardNumber,
-              expiryDate: formattedExpiryDate,
-              cvv,
-              cardholderName
+            tokenData: {
+              token: tokenData.token,
+              lastFourDigits: tokenData.lastFourDigits,
+              expiryMonth: tokenData.expiryMonth,
+              expiryYear: tokenData.expiryYear,
+              cardholderName: tokenData.cardholderName
             },
             customerInfo,
             registrationData
@@ -162,7 +125,7 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         });
         
         if (response.error) {
-          console.error('First attempt error:', response.error);
+          console.error('Payment processing error:', response.error);
           throw new Error(`Edge function error: ${response.error.message}`);
         }
         
@@ -174,11 +137,12 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
           response = await supabase.functions.invoke('cardcom-payment/process-payment', {
             body: {
               planId: selectedPlan,
-              cardDetails: {
-                cardNumber: cleanCardNumber,
-                expiryDate: formattedExpiryDate,
-                cvv,
-                cardholderName
+              tokenData: {
+                token: tokenData.token,
+                lastFourDigits: tokenData.lastFourDigits,
+                expiryMonth: tokenData.expiryMonth,
+                expiryYear: tokenData.expiryYear,
+                cardholderName: tokenData.cardholderName
               },
               customerInfo,
               registrationData
@@ -208,10 +172,10 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       if (tokenInfo) {
         const tokenData: TokenData = {
           token: tokenInfo.token,
-          lastFourDigits: cleanCardNumber.slice(-4),
-          expiryMonth: month,
-          expiryYear: `20${year}`,
-          cardholderName
+          lastFourDigits: tokenInfo.lastFourDigits || tokenData.lastFourDigits,
+          expiryMonth: tokenData.expiryMonth,
+          expiryYear: tokenData.expiryYear,
+          cardholderName: tokenData.cardholderName
         };
         
         if (registrationData) {
@@ -258,6 +222,12 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       toast.error(`אירעה שגיאה בעיבוד התשלום: ${error.message || 'שגיאה לא ידועה'}`);
       setIsProcessing(false);
     }
+  };
+  
+  const handlePaymentError = (error: any) => {
+    console.error('Payment error:', error);
+    toast.error(`שגיאה בעיבוד התשלום: ${error.message || 'אירעה שגיאה'}`);
+    setIsProcessing(false);
   };
 
   const getPlanDetails = () => {
@@ -323,7 +293,7 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         <div className="mb-6">
           <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30 rounded-lg p-3 text-sm text-yellow-800 dark:text-yellow-300 flex items-start gap-2">
             <AlarmClock className="h-5 w-5 flex-shrink-0 mt-0.5" />
-            <p>פרטי הכרטיס מאובטחים ומעובדים בצד השרת בהתאם לתקני PCI DSS. האתר אינו שומר את פרטי כרטיס האשראי שלך.</p>
+            <p>פרטי הכרטיס מאובטחים ומעובדים בצד הלקוח בלבד. רק טוקן מאובטח מועבר לשרת בהתאם לתקני PCI DSS.</p>
           </div>
         </div>
         
@@ -340,33 +310,11 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
           </TabsList>
           
           <TabsContent value="card">
-            <div className="space-y-6">
-              <PaymentDetails
-                cardNumber={cardNumber}
-                setCardNumber={setCardNumber}
-                cardholderName={cardholderName}
-                setCardholderName={setCardholderName}
-                expiryDate={expiryDate}
-                setExpiryDate={setExpiryDate}
-                cvv={cvv}
-                setCvv={setCvv}
-              />
-
-              {Object.keys(errors).length > 0 && errors.cardNumber && (
-                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-                  <ul className="list-disc list-inside space-y-1">
-                    {Object.values(errors).filter(error => 
-                      error === errors.cardNumber || 
-                      error === errors.cardholderName || 
-                      error === errors.expiryDate || 
-                      error === errors.cvv
-                    ).map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <CardcomOpenFields 
+              onTokenReceived={handleTokenReceived}
+              onError={handlePaymentError}
+              isProcessing={isProcessing}
+            />
           </TabsContent>
           
           <TabsContent value="customer">
@@ -466,35 +414,24 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
                 </div>
               </div>
               
-              {Object.keys(errors).length > 0 && errors.phone && (
+              {Object.keys(errors).length > 0 && (
                 <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
                   <ul className="list-disc list-inside space-y-1">
-                    {Object.values(errors).filter(error => 
-                      error === errors.phone || 
-                      error === errors.companyId || 
-                      error === errors.companyName
-                    ).map((error, index) => (
+                    {Object.values(errors).map((error, index) => (
                       <li key={index}>{error}</li>
                     ))}
                   </ul>
                 </div>
               )}
+
+              <Button 
+                className="w-full mt-4"
+                onClick={() => setCurrentTab('card')}
+              >
+                המשך לפרטי תשלום
+              </Button>
             </div>
           </TabsContent>
-          
-          <Button 
-            className="w-full mt-6"
-            size="lg"
-            onClick={handleProcessPayment}
-            disabled={isProcessing}
-          >
-            {isProcessing ? 'מעבד תשלום...' : 'בצע תשלום'}
-          </Button>
-          
-          <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1 mt-3">
-            <Lock className="h-3 w-3" />
-            <span>מאובטח על ידי Cardcom</span>
-          </p>
         </Tabs>
       </CardContent>
     </Card>

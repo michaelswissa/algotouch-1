@@ -98,228 +98,25 @@ async function checkHealth() {
 }
 
 /**
- * Initiate external payment with CardCom LowProfile
- */
-async function initiateExternalPayment(params: any) {
-  const {
-    planId,
-    userId,
-    email,
-    registrationData
-  } = params;
-  
-  try {
-    // Log request for debugging
-    console.log('Initiating external payment with params:', {
-      planId,
-      userId: userId ? 'provided' : 'not provided',
-      email: email ? 'provided' : 'not provided',
-      hasRegistrationData: !!registrationData
-    });
-    
-    // Determine amount and operation type based on plan
-    let amount = 0;
-    let operationType = OperationType.TOKEN_ONLY;
-    
-    switch (planId) {
-      case 'monthly':
-        // For monthly plan, create token only (free trial)
-        amount = 0;
-        operationType = OperationType.TOKEN_ONLY;
-        break;
-      case 'annual':
-        // For annual plan, charge and create token
-        amount = 899;
-        operationType = OperationType.CHARGE_AND_TOKEN;
-        break;
-      case 'vip':
-        // For VIP plan, charge only
-        amount = 3499;
-        operationType = OperationType.CHARGE_ONLY;
-        break;
-      default:
-        console.error('Invalid plan ID:', planId);
-        throw new Error('Invalid plan ID');
-    }
-    
-    // Define product name and description based on plan
-    const productName = planId === 'monthly' 
-      ? 'מנוי חודשי - תקופת ניסיון' 
-      : planId === 'annual' 
-        ? 'מנוי שנתי' 
-        : 'מנוי VIP';
-    
-    // Generate a unique ID for this transaction
-    const tempRegistrationId = crypto.randomUUID();
-    const externalTransId = `dir_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    
-    // Create clear success and error URLs with proper parameters
-    const baseUrl = 'https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1';
-    const successRedirectUrl = params.successRedirectUrl || 'http://localhost:5173/subscription?step=payment&success=true';
-    const errorRedirectUrl = params.errorRedirectUrl || 'http://localhost:5173/subscription?step=payment&error=true';
-    
-    // Generate a unique lowProfileId for this transaction
-    const lowProfileId = crypto.randomUUID();
-    
-    // Special case for development/test mode - return simulated response
-    if (Deno.env.get('SUPABASE_ENV') === 'dev' || !API_CONFIG.TERMINAL || !API_CONFIG.USERNAME) {
-      console.log('Development mode or missing credentials, returning simulated payment URL');
-      
-      // Store the temporary registration data if provided
-      if (registrationData) {
-        try {
-          const supabaseAdmin = createClient(
-            Deno.env.get('SUPABASE_URL') || '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-          );
-          
-          await supabaseAdmin
-            .from('temp_registration_data')
-            .insert({
-              id: tempRegistrationId,
-              registration_data: registrationData,
-              expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-              used: false
-            });
-        } catch (error) {
-          console.error('Error storing temp registration data:', error);
-          // Non-fatal error, continue
-        }
-      }
-      
-      return {
-        success: true,
-        url: `${baseUrl}/cardcom-payment/simulate-payment?lpId=${lowProfileId}&success=true&redirect=${encodeURIComponent(successRedirectUrl)}`,
-        lowProfileId,
-        tempRegistrationId,
-        simulated: true
-      };
-    }
-    
-    // Create request body for CardCom LowProfile API
-    const lowProfileBody = {
-      TerminalNumber: parseInt(API_CONFIG.TERMINAL),
-      ApiName: API_CONFIG.USERNAME,
-      ReturnValue: tempRegistrationId,
-      Amount: amount,
-      SuccessRedirectUrl: successRedirectUrl,
-      FailedRedirectUrl: errorRedirectUrl,
-      WebHookUrl: `${baseUrl}/cardcom-payment/webhook`,
-      Language: 'he',
-      ProductName: productName,
-      Operation: operationType === OperationType.TOKEN_ONLY ? 'CreateTokenOnly' : 
-                operationType === OperationType.CHARGE_AND_TOKEN ? 'ChargeAndCreateToken' : 'ChargeOnly',
-      ExternalUniqTranId: externalTransId
-    };
-    
-    // Add document if user info is available
-    if (email) {
-      const customerName = registrationData?.userData?.firstName && registrationData?.userData?.lastName
-        ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}`
-        : email.split('@')[0];
-        
-      lowProfileBody['Document'] = {
-        To: customerName,
-        Email: email,
-        Products: [{
-          Description: productName,
-          UnitCost: amount
-        }]
-      };
-    }
-    
-    console.log('CardCom API Request:', {
-      url: `${API_CONFIG.BASE_URL}/LowProfile/Create`,
-      terminalNumber: lowProfileBody.TerminalNumber,
-      operation: lowProfileBody.Operation,
-      amount: lowProfileBody.Amount,
-      hasDocument: !!lowProfileBody['Document']
-    });
-    
-    // Make request to CardCom API
-    const cardcomResponse = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/Create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(lowProfileBody)
-    });
-    
-    if (!cardcomResponse.ok) {
-      const errorDetails = await cardcomResponse.text();
-      console.error('CardCom API error:', cardcomResponse.status, errorDetails);
-      throw new Error(`CardCom API error: ${cardcomResponse.status} ${errorDetails}`);
-    }
-    
-    const cardcomData = await cardcomResponse.json();
-    console.log('CardCom API Response:', cardcomData);
-    
-    if (cardcomData.ResponseCode !== 0) {
-      throw new Error(`CardCom API error: ${cardcomData.Description}`);
-    }
-    
-    // Store the temporary registration data if provided
-    if (registrationData) {
-      try {
-        const supabaseAdmin = createClient(
-          Deno.env.get('SUPABASE_URL') || '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-        );
-        
-        await supabaseAdmin
-          .from('temp_registration_data')
-          .insert({
-            id: tempRegistrationId,
-            registration_data: registrationData,
-            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            used: false
-          });
-      } catch (error) {
-        console.error('Error storing temp registration data:', error);
-        // Non-fatal error, continue
-      }
-    }
-    
-    // Return success with URL
-    return {
-      success: true,
-      url: cardcomData.Url,
-      lowProfileId: cardcomData.LowProfileId,
-      tempRegistrationId,
-      simulated: false
-    };
-    
-  } catch (error) {
-    console.error('External payment error:', error);
-    return {
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
  * Process direct card payment through CardCom API
  */
 async function processDirectPayment(params: any) {
   const {
     planId,
-    cardDetails,
+    tokenData,
     customerInfo,
     registrationData
   } = params;
   
-  if (!cardDetails || !cardDetails.cardNumber || !cardDetails.expiryDate || !cardDetails.cvv) {
-    throw new Error('Missing required card details');
+  if (!tokenData || !tokenData.token) {
+    throw new Error('Missing required token information');
   }
   
   try {
     // Log request for debugging (without exposing full card details)
     console.log('Processing direct payment with params:', {
       planId,
-      cardNumber: `${cardDetails.cardNumber.substring(0, 4)}...${cardDetails.cardNumber.slice(-4)}`,
-      expiryDate: cardDetails.expiryDate,
+      tokenInfo: 'present',
       customerInfo: customerInfo ? 'provided' : 'not provided',
       hasRegistrationData: !!registrationData
     });
@@ -381,36 +178,41 @@ async function processDirectPayment(params: any) {
         success: true,
         transactionId: `sim_${Date.now()}`,
         tokenInfo: {
-          token: `sim_token_${cardDetails.cardNumber.slice(-4)}_${Date.now()}`,
-          expiryDate: cardDetails.expiryDate,
-          cardholderName: cardDetails.cardholderName
+          token: tokenData.token,
+          lastFourDigits: tokenData.lastFourDigits,
+          expiryDate: `${tokenData.expiryMonth}/${tokenData.expiryYear}`
         },
-        simulated: true
+        simulated: true,
+        tempRegistrationId
       };
     }
     
-    // Create request body for CardCom Transaction API
+    // Create request body for CardCom Transaction API - using token instead of direct card details
     const transactionBody: any = {
       TerminalNumber: parseInt(API_CONFIG.TERMINAL),
       ApiName: API_CONFIG.USERNAME,
       Amount: amount,
-      CardNumber: cardDetails.cardNumber.replace(/\s/g, ''),
-      CardExpirationMMYY: cardDetails.expiryDate,
-      CVV2: cardDetails.cvv,
+      Token: tokenData.token, // Use the token instead of card details
       ExternalUniqTranId: `dir_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       CardOwnerInformation: {
         Phone: customerInfo?.phone || '',
-        FullName: cardDetails.cardholderName || ''
-      }
+        FullName: tokenData.cardholderName || ''
+      },
+      ISOCoinId: 1 // ILS
     };
     
+    // Add API password if needed for specific operations
+    if (operationType === OperationType.CHARGE_ONLY || operationType === OperationType.CHARGE_AND_TOKEN) {
+      transactionBody.ApiPassword = API_CONFIG.PASSWORD;
+    }
+    
+    // Add token handling options
     if (operationType === OperationType.TOKEN_ONLY) {
-      transactionBody.Advanced = {
-        IsCreateToken: true
-      };
+      // If we already have a token, we don't need to do anything here
     } else if (operationType === OperationType.CHARGE_AND_TOKEN) {
+      // If we're charging and wanting to store the token
       transactionBody.Advanced = {
-        IsCreateToken: true
+        ApiPassword: API_CONFIG.PASSWORD
       };
     }
     
@@ -475,9 +277,9 @@ async function processDirectPayment(params: any) {
       success: true,
       transactionId: cardcomData.TranzactionId,
       tokenInfo: {
-        token: cardcomData.Token || `token_${cardDetails.cardNumber.slice(-4)}_${Date.now()}`,
-        expiryDate: cardDetails.expiryDate,
-        cardholderName: cardDetails.cardholderName
+        token: cardcomData.Token || tokenData.token,
+        expiryDate: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
+        lastFourDigits: tokenData.lastFourDigits
       },
       documentInfo: cardcomData.DocumentNumber ? {
         documentNumber: cardcomData.DocumentNumber,
@@ -541,19 +343,8 @@ serve(async (req) => {
           }
         );
         
-      case 'initiate':
-        // Initiate external payment
-        const initiateResult = await initiateExternalPayment(body);
-        return new Response(
-          JSON.stringify(initiateResult),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: initiateResult.success ? 200 : 500
-          }
-        );
-        
       case 'process':
-        // Process direct card payment
+        // Process direct card payment with token
         const processResult = await processDirectPayment(body);
         return new Response(
           JSON.stringify(processResult),

@@ -1,12 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { usePaymentInitialization } from './hooks/usePaymentInitialization';
 import { usePaymentUrlParams } from './hooks/usePaymentUrlParams';
 import { getPlanDetails } from './PlanUtilities';
-import PaymentSectionHeader from './PaymentSectionHeader';
 import DirectPaymentForm from './DirectPaymentForm';
-import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
 import PaymentError from './PaymentError';
 import { toast } from 'sonner';

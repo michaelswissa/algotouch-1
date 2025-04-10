@@ -9,7 +9,6 @@ import { useRegistrationData } from './useRegistrationData';
 import { 
   handleExistingUserPayment, 
   registerNewUser,
-  initiateExternalPayment,
   verifyExternalPayment
 } from '../services/paymentService';
 import { UsePaymentProcessProps, PaymentError } from './types';
@@ -240,194 +239,22 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent, cardData: {
-    cardNumber: string;
-    cardholderName: string;
-    expiryDate: string;
-    cvv: string;
-  }) => {
+  const handleSubmit = async (e: React.FormEvent, tokenData: TokenData) => {
     e.preventDefault();
     
-    const { cardNumber, cardholderName, expiryDate, cvv } = cardData;
-    
-    if (!cardNumber || !cardholderName || !expiryDate || !cvv) {
-      toast.error('נא למלא את כל פרטי התשלום');
+    if (!tokenData || !tokenData.token) {
+      toast.error('לא התקבלו פרטי תשלום מאובטחים');
       return;
     }
     
     setIsProcessing(true);
     
     try {
-      const tokenData: TokenData = {
-        token: `sim_${Date.now()}`,
-        lastFourDigits: cardNumber.replace(/\s/g, '').slice(-4),
-        expiryMonth: expiryDate.split('/')[0],
-        expiryYear: `20${expiryDate.split('/')[1]}`,
-        cardholderName
-      };
-      
       await handlePaymentProcessing(tokenData);
     } catch (error: any) {
       console.error('Payment processing error:', error);
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const handleExternalPayment = async () => {
-    let operationTypeValue = 3;
-    
-    if (planId === 'annual') {
-      operationTypeValue = 2;
-    } else if (planId === 'vip') {
-      operationTypeValue = 1;
-    }
-    
-    setIsProcessing(true);
-    try {
-      // Detailed logging for debugging
-      console.log('Starting external payment process with planId:', planId);
-      
-      try {
-        // First try with the payment service helper
-        console.log('Attempting payment with payment service helper...');
-        const result = await initiateExternalPayment(planId, user, registrationData);
-        console.log('Payment service helper response:', result);
-        
-        if (result && result.url) {
-          console.log('Success! Redirecting to payment URL:', result.url);
-          window.location.href = result.url;
-          return;
-        }
-        console.log('Payment service helper did not return a URL, falling back to direct function call');
-      } catch (helperError) {
-        console.error('Error using payment service helper:', helperError);
-      }
-      
-      console.log('Falling back to direct supabase function invocation...');
-      console.log('Function parameters:', {
-        action: 'initiate',
-        planId: planId,
-        userId: user?.id,
-        email: user?.email,
-        diagnosticInfo
-      });
-
-      // Try multiple approaches, starting with direct function invocation
-      try {
-        console.time('direct-payment-function-call');
-        const { data, error } = await supabase.functions.invoke('direct-payment', {
-          body: {
-            action: 'initiate',
-            planId: planId,
-            userId: user?.id,
-            email: user?.email
-          }
-        });
-        console.timeEnd('direct-payment-function-call');
-        
-        console.log('Direct payment function response:', data);
-        
-        if (error) {
-          console.error('Supabase function error:', error);
-          throw new Error(`Edge Function error: ${error.message}`);
-        }
-        
-        if (!data || !data.url) {
-          console.error('Invalid response data:', data);
-          throw new Error('לא התקבלה כתובת תשלום מהשרת');
-        }
-        
-        if (data.tempRegistrationId) {
-          localStorage.setItem('temp_registration_id', data.tempRegistrationId);
-        }
-        
-        const url = new URL(data.url);
-        const baseUrl = `${window.location.origin}/subscription`;
-        
-        // Add detailed diagnostics as URL parameters
-        url.searchParams.set('diagnosticTime', new Date().toISOString());
-        
-        url.searchParams.set('successRedirectUrl', 
-          `${baseUrl}?step=payment&success=true&lpId=${data.lowProfileId}`);
-        
-        url.searchParams.set('errorRedirectUrl', 
-          `${baseUrl}?step=payment&error=true&lpId=${data.lowProfileId}`);
-        
-        console.log('Redirecting to payment URL:', url.toString());
-        window.location.href = url.toString();
-      } catch (directError) {
-        console.error('Direct function invocation failed:', directError);
-        
-        // Try fallback to cardcom-payment function if available
-        try {
-          console.log('Attempting fallback to cardcom-payment function...');
-          const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('cardcom-payment/create-payment', {
-            body: {
-              planId,
-              userInfo: user ? { userId: user.id, email: user.email } : null,
-              registrationData: registrationData
-            }
-          });
-          
-          console.log('Fallback function response:', fallbackData);
-          
-          if (fallbackError) {
-            throw fallbackError;
-          }
-          
-          if (fallbackData && fallbackData.url) {
-            console.log('Fallback successful! Redirecting to:', fallbackData.url);
-            window.location.href = fallbackData.url;
-            return;
-          }
-          
-          throw new Error('גם ניסיון גיבוי לא הצליח');
-        } catch (fallbackAttemptError) {
-          console.error('Fallback attempt failed:', fallbackAttemptError);
-          throw directError; // Throw the original error
-        }
-      }
-    } catch (error: any) {
-      console.error('Payment initialization error:', error);
-      
-      // Collect detailed diagnostic information
-      const diagnostics = {
-        timestamp: new Date().toISOString(),
-        route: window.location.pathname + window.location.search,
-        browserInfo: {
-          userAgent: navigator.userAgent,
-          language: navigator.language,
-          platform: navigator.platform
-        },
-        error: {
-          message: error.message,
-          stack: error.stack
-        },
-        functionDiagnostics: diagnosticInfo
-      };
-      
-      // Log detailed diagnostic information
-      console.error('Payment diagnostic data:', diagnostics);
-      
-      const errorInfo = await handleError(error, {
-        planId,
-        operationType: operationTypeValue,
-        userInfo: user ? { userId: user.id, email: user.email } : null,
-        // Fix: Remove diagnosticData which is not in the type definition
-      });
-      
-      const paymentError = new PaymentError(
-        errorInfo?.message || 'שגיאה ביצירת עסקה'
-      );
-      paymentError.code = errorInfo?.code;
-      paymentError.details = { ...errorInfo, diagnostics }; // Store diagnostics in the details object instead
-      
-      setPaymentError(paymentError);
-      
-      setIsProcessing(false);
-      
-      toast.error('אירעה שגיאה בעיבוד התשלום. נסה שנית מאוחר יותר.');
     }
   };
 
@@ -439,7 +266,6 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     diagnosticInfo,
     loadRegistrationData,
     handleSubmit,
-    handleExternalPayment,
     isRecovering,
     plan
   };
