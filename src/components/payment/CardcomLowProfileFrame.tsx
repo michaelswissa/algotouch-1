@@ -19,17 +19,19 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
   const [iframeUrl, setIframeUrl] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [lowProfileId, setLowProfileId] = useState<string | null>(null);
 
+  // Generate LowProfile deal when component mounts
   useEffect(() => {
-    // Create a low profile deal to get the iframe URL
     async function createLowProfileDeal() {
       try {
         setLoading(true);
         setError(null);
         
+        // Call the Edge Function to create a LowProfile deal
         const { data, error } = await supabase.functions.invoke('create-lowprofile-deal', {
           body: { 
-            amount: 100, // Will be replaced by actual amount in production
+            amount: 100, // Will be replaced with actual amount in production
             returnUrl: window.location.origin + "/payment/success",
             cancelUrl: window.location.origin + "/payment/cancel",
             language: "he" // Hebrew
@@ -43,14 +45,15 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
           return;
         }
         
-        if (!data?.lowProfileUrl) {
+        if (!data?.lowProfileUrl || !data?.lowProfileId) {
           setError("לא התקבלה כתובת תקינה לטופס התשלום.");
-          onError(new Error("No valid iframe URL received"));
+          onError(new Error("No valid iframe URL or LowProfile ID received"));
           return;
         }
         
-        console.log("Low Profile URL received:", data.lowProfileUrl);
+        console.log("Low Profile data received:", data);
         setIframeUrl(data.lowProfileUrl);
+        setLowProfileId(data.lowProfileId);
       } catch (err) {
         console.error("Exception creating low profile deal:", err);
         setError("שגיאת תקשורת. אנא נסה שוב מאוחר יותר.");
@@ -82,16 +85,25 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
           
           console.log("Token received:", { token, lastFourDigits });
           
-          // Create token data object
-          const tokenData: TokenData = {
-            token,
-            lastFourDigits,
-            expiryMonth,
-            expiryYear,
-            cardholderName
-          };
-          
-          onTokenReceived(tokenData);
+          // Verify payment status with server
+          if (lowProfileId) {
+            verifyPaymentStatus(lowProfileId, token, {
+              token,
+              lastFourDigits,
+              expiryMonth,
+              expiryYear,
+              cardholderName
+            });
+          } else {
+            // Direct token handling if we don't have lowProfileId for some reason
+            onTokenReceived({
+              token,
+              lastFourDigits,
+              expiryMonth,
+              expiryYear,
+              cardholderName
+            });
+          }
         } 
         // Handle errors
         else if (event.data?.Error) {
@@ -109,6 +121,36 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
     return () => window.removeEventListener("message", handleMessage);
   }, [onTokenReceived, onError]);
 
+  // Verify payment status with server
+  const verifyPaymentStatus = async (lowProfileId: string, token: string, tokenData: TokenData) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-lowprofile-payment', {
+        body: { lowProfileId }
+      });
+      
+      if (error) {
+        console.error("Error verifying payment:", error);
+        onError(error);
+        return;
+      }
+      
+      console.log("Payment verification result:", data);
+      
+      if (data.success) {
+        // Payment successful, pass token data to parent
+        onTokenReceived(tokenData);
+      } else {
+        // Payment failed
+        setError(`שגיאה בעיבוד התשלום: ${data.message}`);
+        onError(new Error(data.message));
+      }
+    } catch (err) {
+      console.error("Exception verifying payment:", err);
+      onError(err);
+    }
+  };
+
+  // Display a loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-8">
@@ -118,6 +160,7 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
     );
   }
 
+  // Display an error message if something went wrong
   if (error) {
     return (
       <div className="bg-red-50 border-r-4 border-red-500 p-4 rounded mb-4">
@@ -132,6 +175,7 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
     );
   }
 
+  // Display an error if no iframe URL was returned
   if (!iframeUrl) {
     return (
       <div className="bg-yellow-50 border-r-4 border-yellow-500 p-4 rounded">
@@ -140,6 +184,7 @@ const CardcomLowProfileFrame: React.FC<CardcomLowProfileFrameProps> = ({
     );
   }
 
+  // Render the iframe with Cardcom payment form
   return (
     <div className="w-full">
       <div className="relative overflow-hidden rounded-md border border-gray-200" style={{ height: "400px" }}>
