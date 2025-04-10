@@ -1,3 +1,4 @@
+
 // Direct Payment Processing Edge Function
 // This function securely processes credit card payments using the Cardcom API
 // It follows PCI DSS compliance by handling card data only on the server side
@@ -25,15 +26,15 @@ function handleCors(req: Request) {
 
 // CardCom API configuration
 const API_CONFIG = {
-  TERMINAL: "160138", // Your terminal number
-  USERNAME: "bLaocQRMSnwphQRUVG3b", // Your API username
-  PASSWORD: "i9nr6caGbgheTdYfQbo6", // Your API password
+  TERMINAL: Deno.env.get('CARDCOM_TERMINAL') || "160138", // Your terminal number
+  USERNAME: Deno.env.get('CARDCOM_USERNAME') || "bLaocQRMSnwphQRUVG3b", // Your API username
+  PASSWORD: Deno.env.get('CARDCOM_API_PASSWORD') || "i9nr6caGbgheTdYfQbo6", // Your API password
   BASE_URL: 'https://secure.cardcom.solutions/api/v11',
 };
 
 // Log configuration for debugging (without exposing sensitive values)
 console.log('CardCom API configuration initialized with terminal:', API_CONFIG.TERMINAL);
-console.log('CardCom API credentials status: [credentials configured]');
+console.log('CardCom API credentials status:', API_CONFIG.USERNAME ? '[credentials configured]' : '[credentials missing]');
 
 // CardCom operation types
 enum OperationType {
@@ -58,6 +59,7 @@ async function processDirectPayment(params: any) {
   
   // Validate required card details
   if (!cardDetails || !cardDetails.cardNumber || !cardDetails.expiryDate || !cardDetails.cvv) {
+    console.error('Missing required card details');
     throw new Error('Missing required card details');
   }
   
@@ -89,6 +91,7 @@ async function processDirectPayment(params: any) {
           operationType = OperationType.CHARGE_ONLY;
           break;
         default:
+          console.error('Invalid plan ID:', planId);
           throw new Error('Invalid plan ID');
       }
     }

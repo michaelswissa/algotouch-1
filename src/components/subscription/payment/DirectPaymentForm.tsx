@@ -113,7 +113,7 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       
       console.log('Calling direct-payment/process edge function...');
       
-      // Process payment via server-side Edge function with the project URL to avoid 404 errors
+      // Process payment via server-side Edge function with complete URL to avoid 404 errors
       const { data, error } = await supabase.functions.invoke('direct-payment/process', {
         body: {
           planId: selectedPlan,
