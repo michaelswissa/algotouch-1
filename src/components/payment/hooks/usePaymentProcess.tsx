@@ -392,7 +392,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       console.error('Payment initialization error:', error);
       
       // Collect detailed diagnostic information
-      const diagnosticData = {
+      const diagnostics = {
         timestamp: new Date().toISOString(),
         route: window.location.pathname + window.location.search,
         browserInfo: {
@@ -408,20 +408,20 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       };
       
       // Log detailed diagnostic information
-      console.error('Payment diagnostic data:', diagnosticData);
+      console.error('Payment diagnostic data:', diagnostics);
       
       const errorInfo = await handleError(error, {
         planId,
         operationType: operationTypeValue,
         userInfo: user ? { userId: user.id, email: user.email } : null,
-        diagnosticData
+        // Fix: Remove diagnosticData which is not in the type definition
       });
       
       const paymentError = new PaymentError(
         errorInfo?.message || 'שגיאה ביצירת עסקה'
       );
       paymentError.code = errorInfo?.code;
-      paymentError.details = { ...errorInfo, diagnostics: diagnosticData };
+      paymentError.details = { ...errorInfo, diagnostics }; // Store diagnostics in the details object instead
       
       setPaymentError(paymentError);
       
