@@ -85,7 +85,7 @@ export async function registerNewUser(registrationData: any, tokenData: TokenDat
  */
 export async function verifyExternalPayment(lowProfileId: string) {
   try {
-    const { data, error } = await supabase.functions.invoke('cardcom-payment/verify-payment', {
+    const { data, error } = await supabase.functions.invoke('verify-lowprofile-payment', {
       body: {
         lowProfileId
       }

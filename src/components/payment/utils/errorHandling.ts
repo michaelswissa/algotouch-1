@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentError } from '../hooks/types';
+import { PaymentError } from '@/types/payment';
 
 /**
  * Maps error codes from different sources to standardized error codes
@@ -50,6 +50,12 @@ export function getErrorMessage(code: string): string {
       return 'אירעה שגיאת תקשורת. נסה שנית.';
     case 'timeout':
       return 'פעולת התשלום נמשכה זמן רב מדי. נסה שנית.';
+    case 'invalid_iframe':
+      return 'שגיאה בטעינת טופס התשלום. נסה לרענן את הדף.';
+    case 'token_creation_failed':
+      return 'שגיאה ביצירת אסימון תשלום. נא לנסות שוב.';
+    case 'payment_verification_failed':
+      return 'אימות התשלום נכשל. אנא פנה לשירות לקוחות.';
     default:
       return 'אירעה שגיאה בתהליך התשלום. נסה שנית.';
   }

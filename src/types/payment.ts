@@ -82,3 +82,42 @@ export interface UserSubscription {
   fail_count?: number;
   last_attempt_at?: string;
 }
+
+export interface LowProfileDealResponse {
+  ResponseCode: number;
+  Description: string;
+  LowProfileId?: string;
+  Url?: string;
+}
+
+export interface ChargeTokenRequest {
+  token: string;
+  amount: number;
+  userId?: string;
+  planId?: string;
+  customerId?: string;
+  paymentDescription?: string;
+  externalId?: string;
+}
+
+export interface ChargeTokenResponse {
+  success: boolean;
+  message: string;
+  transactionId?: string;
+  approvalNumber?: string;
+  errorCode?: string;
+  errorDetails?: any;
+}
+
+// Constructor for PaymentError class
+export class PaymentError extends Error {
+  code: string;
+  details?: any;
+
+  constructor(message: string, code: string = 'payment_error', details?: any) {
+    super(message);
+    this.name = 'PaymentError';
+    this.code = code;
+    this.details = details;
+  }
+}

@@ -8,6 +8,9 @@ import PaymentCardForm from './PaymentCardForm';
 import ErrorRecoveryInfo from './ErrorRecoveryInfo';
 import PaymentDiagnostics from './PaymentDiagnostics';
 
+// Import the LowProfile frame component instead of CardcomOpenFields
+import CardcomLowProfileFrame from './CardcomLowProfileFrame';
+
 interface PaymentFormProps {
   planId: string;
   onPaymentComplete: () => void;
@@ -99,12 +102,30 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         isRecovering={isRecovering}
       />
       
-      <PaymentCardForm
-        plan={plan}
-        isProcessing={isProcessing}
-        onSubmit={handleSubmit}
-        planId={planId}
-      />
+      {/* Replace PaymentCardForm with the LowProfile component */}
+      <div className="p-6">
+        {plan && (
+          <div className="bg-muted p-4 rounded-lg space-y-2 mb-6">
+            <h3 className="font-medium">{plan.name}</h3>
+            <p className="text-sm text-muted-foreground">{plan.description}</p>
+            <div className="flex justify-between items-center mt-2">
+              <span>מחיר:</span>
+              <span className="font-semibold">
+                {new Intl.NumberFormat('he-IL', {
+                  style: 'currency',
+                  currency: plan.currency || 'ILS'
+                }).format(plan.price / 100)}
+              </span>
+            </div>
+          </div>
+        )}
+        
+        <CardcomLowProfileFrame 
+          onTokenReceived={(tokenData) => handleSubmit(new Event("submit") as unknown as React.FormEvent, tokenData)}
+          onError={(error) => console.error("Payment error:", error)}
+          isProcessing={isProcessing}
+        />
+      </div>
     </Card>
   );
 };

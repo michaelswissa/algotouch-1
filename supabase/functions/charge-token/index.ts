@@ -13,46 +13,25 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+interface ChargeTokenRequest {
+  token: string;
+  amount?: number;
+  userId?: string;
+  planId?: string;
+  customerId?: string;
+  numOfPayments?: number;
+  cardholderName?: string;
+  email?: string;
+  phone?: string;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-  
-  // Check if this is a health check request
+
   try {
-    const body = await req.json();
-    if (body.action === "health-check") {
-      return new Response(
-        JSON.stringify({ 
-          status: "ok", 
-          message: "Cardcom payment service is operational",
-          timestamp: new Date().toISOString()
-        }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    }
-    
-    // Normal payment processing flow continues below
-    const { token, userId, planId, operationType, amount } = body;
-    
-    if (!token) {
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Missing token", 
-          details: "Payment token is required" 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    }
-    
     // Get Cardcom credentials from environment variables
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL");
     const apiName = Deno.env.get("CARDCOM_USERNAME");
@@ -72,24 +51,59 @@ serve(async (req) => {
         }
       );
     }
+
+    // Parse request body
+    const requestData: ChargeTokenRequest = await req.json();
     
+    // Validate required fields
+    if (!requestData.token) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Missing required fields", 
+          details: "Token is required" 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    // Set default values if not provided
+    const amount = requestData.amount || 100; // 1.00 ILS
+    const numOfPayments = requestData.numOfPayments || 1;
+    const externalId = `charge_${new Date().getTime()}`;
+
     // Create payload for Cardcom ChargeToken API
-    const externalId = `${userId || "anonymous"}_${planId || "subscription"}_${Date.now()}`;
     const payload = {
       TerminalNumber: terminalNumber,
       ApiName: apiName,
       ApiPassword: apiPassword,
       TokenToCharge: {
-        Token: token,
-        SumToBill: amount || 100,
-        NumOfPayments: 1,
+        Token: requestData.token,
+        SumToBill: amount,
+        NumOfPayments: numOfPayments,
         APILevel: "10",
         UniqAsmachta: externalId,
         UniqAsmachtaReturnOriginal: true,
         CoinID: 1, // ILS
       }
     };
+
+    // Add optional fields if provided
+    if (requestData.cardholderName) {
+      payload.TokenToCharge.CardOwnerName = requestData.cardholderName;
+    }
     
+    if (requestData.email) {
+      payload.TokenToCharge.CardOwnerEmail = requestData.email;
+    }
+    
+    if (requestData.phone) {
+      payload.TokenToCharge.CardOwnerPhone = requestData.phone;
+    }
+
     console.log("Sending ChargeToken request:", {
       ...payload,
       ApiPassword: "********" // Mask password in logs
@@ -127,14 +141,14 @@ serve(async (req) => {
     const approvalNumber = responseData.ApprovalNumber || null;
 
     // Log the transaction in the database
-    if (userId) {
+    if (requestData.userId) {
       try {
         const { error: dbError } = await supabase
           .from('user_payment_logs')
           .insert({
-            user_id: userId,
-            token: token,
-            amount: amount || 100,
+            user_id: requestData.userId,
+            token: requestData.token,
+            amount: amount,
             approval_code: approvalNumber,
             status: isApproved ? "success" : "failed",
             transaction_details: responseData
@@ -145,63 +159,6 @@ serve(async (req) => {
         }
       } catch (dbError) {
         console.error("Exception logging transaction to database:", dbError);
-      }
-    }
-    
-    // For successful transactions, update the user's subscription
-    if (isApproved && userId && planId) {
-      try {
-        // Find any existing subscription
-        const { data: existingSubscription } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-          
-        const now = new Date();
-        let periodEnd = new Date();
-        
-        // Set subscription period based on plan
-        if (planId === 'monthly') {
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
-        } else if (planId === 'annual') {
-          periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-        } else if (planId === 'vip') {
-          periodEnd.setFullYear(periodEnd.getFullYear() + 3);
-        }
-        
-        if (existingSubscription) {
-          // Update existing subscription
-          const { error: updateError } = await supabase
-            .from('subscriptions')
-            .update({
-              plan_type: planId,
-              status: 'active',
-              current_period_ends_at: periodEnd.toISOString(),
-              updated_at: now.toISOString()
-            })
-            .eq('user_id', userId);
-            
-          if (updateError) {
-            console.error("Error updating subscription:", updateError);
-          }
-        } else {
-          // Create new subscription
-          const { error: insertError } = await supabase
-            .from('subscriptions')
-            .insert({
-              user_id: userId,
-              plan_type: planId,
-              status: 'active',
-              current_period_ends_at: periodEnd.toISOString()
-            });
-            
-          if (insertError) {
-            console.error("Error creating subscription:", insertError);
-          }
-        }
-      } catch (subError) {
-        console.error("Exception updating subscription:", subError);
       }
     }
 
@@ -221,7 +178,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error processing payment:", error);
+    console.error("Error charging token:", error);
     return new Response(
       JSON.stringify({ 
         success: false,
