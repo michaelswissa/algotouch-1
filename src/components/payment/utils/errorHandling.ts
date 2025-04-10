@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentError } from '../hooks/types';
 
 /**
  * Maps error codes from different sources to standardized error codes
@@ -18,8 +17,14 @@ export function mapErrorCode(error: any): string {
       case 513: return 'expired_card';
       case 607: return 'insufficient_funds';
       case 400: return 'invalid_request';
+      case 404: return 'service_unavailable'; // שגיאת 404 - SDK לא נמצא
       default: return `cardcom_${error.ReturnValue}`;
     }
+  }
+
+  // Handle SDK loading errors
+  if (error?.message?.includes('load') && error?.message?.includes('SDK')) {
+    return 'sdk_load_failed';
   }
 
   // Handle network errors
@@ -50,6 +55,10 @@ export function getErrorMessage(code: string): string {
       return 'אירעה שגיאת תקשורת. נסה שנית.';
     case 'timeout':
       return 'פעולת התשלום נמשכה זמן רב מדי. נסה שנית.';
+    case 'sdk_load_failed':
+      return 'לא ניתן לטעון את מערכת התשלום. אנא נסה שוב מאוחר יותר.';
+    case 'service_unavailable':
+      return 'שירות הסליקה אינו זמין כרגע. אנא נסה שוב מאוחר יותר.';
     default:
       return 'אירעה שגיאה בתהליך התשלום. נסה שנית.';
   }
@@ -59,7 +68,7 @@ export function getErrorMessage(code: string): string {
  * Checks if an error is transient (temporary) and can be retried
  */
 export function isTransientError(code: string): boolean {
-  return ['network_error', 'timeout', 'server_error'].includes(code);
+  return ['network_error', 'timeout', 'server_error', 'sdk_load_failed', 'service_unavailable'].includes(code);
 }
 
 /**
@@ -72,23 +81,29 @@ export async function logPaymentError(
   additionalData?: Record<string, any>
 ): Promise<void> {
   try {
+    const errorCode = typeof error?.code === 'string' ? error.code : mapErrorCode(error);
+    const errorMessage = error?.message || JSON.stringify(error);
+    
+    // Log to console in all cases
+    console.error('Payment error:', { errorCode, errorMessage, userId, context, additionalData });
+
     if (!userId) {
-      console.error('Payment error (anonymous):', error);
       return;
     }
 
     const errorToLog = {
       user_id: userId,
-      error_code: typeof error?.code === 'string' ? error.code : mapErrorCode(error),
-      error_message: error?.message || JSON.stringify(error),
+      error_code: errorCode,
+      error_message: errorMessage,
       context: context || 'payment_processing',
       additional_data: additionalData || {},
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      sdk_info: {
+        window_cardcom_exists: typeof window !== 'undefined' && !!window.Cardcom,
+        script_loaded: document.getElementById('cardcom-sdk') !== null
+      }
     };
-
-    // Log to console in all cases
-    console.error('Payment error:', errorToLog);
-
+    
     // If Supabase is available, log to database
     const { error: dbError } = await supabase
       .from('payment_errors')

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { TokenData, RegistrationData, SubscriptionPlan } from '@/types/payment';
+import { TokenData, SubscriptionPlan } from '@/types/payment';
 import { getSubscriptionPlans } from '../utils/paymentHelpers';
 import { useRegistrationData } from './useRegistrationData';
 import { 
@@ -14,6 +14,7 @@ import {
 import { UsePaymentProcessProps, PaymentError } from './types';
 import { usePaymentErrorHandling } from './usePaymentErrorHandling';
 import { supabase } from '@/integrations/supabase/client';
+import { logPaymentError } from '../utils/errorHandling';
 
 export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProcessProps) => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<PaymentError | null>(null);
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+  const [sdkAvailable, setSdkAvailable] = useState<boolean | null>(null);
   
   const { 
     registrationData, 
@@ -42,6 +44,39 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     onCardUpdate: () => navigate('/subscription?step=update-card'),
     onAlternativePayment: () => navigate('/subscription?step=alternative-payment')
   });
+
+  // בדיקה האם ה-SDK זמין
+  useEffect(() => {
+    const checkSdkAvailability = async () => {
+      try {
+        // בדיקה האם window.Cardcom קיים
+        if (typeof window !== 'undefined' && window.Cardcom) {
+          setSdkAvailable(true);
+          return;
+        }
+        
+        // בדיקה האם הסקריפט נטען
+        const scriptElement = document.getElementById('cardcom-sdk');
+        if (scriptElement) {
+          // אם הסקריפט נטען אבל window.Cardcom לא קיים, כנראה שיש בעיה בסקריפט
+          setSdkAvailable(false);
+          
+          // רישום שגיאה
+          logPaymentError(
+            new Error("Cardcom SDK script loaded but window.Cardcom is undefined"), 
+            user?.id,
+            'sdk_check',
+            { scriptSrc: scriptElement.getAttribute('src') }
+          );
+        }
+      } catch (error) {
+        console.error("Error checking SDK availability:", error);
+        setSdkAvailable(false);
+      }
+    };
+    
+    checkSdkAvailability();
+  }, [user?.id]);
 
   useEffect(() => {
     const checkRecovery = async () => {
@@ -82,27 +117,30 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
           setDiagnosticInfo({ 
             status: 'error', 
             function: functionName,
-            error: functionError 
+            error: functionError,
+            sdk_available: sdkAvailable
           });
         } else {
           console.log('Edge function diagnostic result:', functionData);
           setDiagnosticInfo({ 
             status: 'success', 
             function: functionName,
-            result: functionData 
+            result: functionData,
+            sdk_available: sdkAvailable
           });
         }
       } catch (error) {
         console.error('Edge function diagnostic exception:', error);
         setDiagnosticInfo({ 
-          status: 'exception', 
-          error 
+          status: 'exception',
+          error,
+          sdk_available: sdkAvailable
         });
       }
     };
     
     checkEdgeFunctionStatus();
-  }, []);
+  }, [sdkAvailable]);
 
   const verifyPaymentFromUrl = async (lowProfileId: string) => {
     try {
@@ -128,12 +166,11 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       if (registrationData) {
         const tokenInfo = result.tokenInfo || {
           token: result.paymentDetails?.cardLastDigits || '',
-          lastFourDigits: result.paymentDetails?.cardLastDigits || '',
-          expiryMonth: result.paymentDetails?.cardExpiry ? 
+          cardLast4: result.paymentDetails?.cardLastDigits || '',
+          expMonth: result.paymentDetails?.cardExpiry ? 
             parseInt(result.paymentDetails.cardExpiry.split('/')[0], 10) : 0,
-          expiryYear: result.paymentDetails?.cardExpiry ? 
-            parseInt(result.paymentDetails.cardExpiry.split('/')[1], 10) : 0,
-          cardholderName: result.paymentDetails?.cardOwnerName || ''
+          expYear: result.paymentDetails?.cardExpiry ? 
+            parseInt(result.paymentDetails.cardExpiry.split('/')[1], 10) : 0
         };
         
         const updatedData = {
@@ -170,6 +207,12 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
   };
 
   const handlePaymentProcessing = async (tokenData: TokenData) => {
+    // אם SDK לא זמין, עצור את תהליך התשלום
+    if (sdkAvailable === false) {
+      toast.error('מערכת התשלום אינה זמינה כרגע. אנא נסה שוב מאוחר יותר.');
+      return;
+    }
+
     let operationTypeValue = 3;
     
     if (planId === 'annual') {
@@ -182,10 +225,23 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       setIsProcessing(true);
       setPaymentError(null);
       
+      // וידוא תקינות נתוני הטוקן
+      if (!tokenData.token || tokenData.token.length < 5) {
+        throw new Error('טוקן לא תקין');
+      }
+      
+      if (!tokenData.expMonth || tokenData.expMonth < 1 || tokenData.expMonth > 12) {
+        throw new Error('חודש תפוגה לא תקין');
+      }
+      
+      if (!tokenData.expYear || tokenData.expYear < 2024) {
+        throw new Error('שנת תפוגה לא תקינה');
+      }
+      
       if (user) {
         await handleExistingUserPayment(user.id, planId, tokenData, operationTypeValue, planDetails);
       } else if (registrationData) {
-        const updatedData: Partial<RegistrationData> = {
+        const updatedData = {
           ...registrationData,
           paymentToken: tokenData,
           planId
@@ -262,6 +318,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     loadRegistrationData,
     handleSubmit,
     isRecovering,
-    plan
+    plan,
+    sdkAvailable
   };
 };
