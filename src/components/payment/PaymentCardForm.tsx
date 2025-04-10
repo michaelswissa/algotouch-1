@@ -101,12 +101,12 @@ const PaymentCardForm: React.FC<PaymentCardFormProps> = ({
         
         <div className="text-center space-y-3">
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full text-xs border border-blue-100 dark:border-blue-900/20">
+            <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full text-xs border border-blue-200 dark:border-blue-900/30">
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>תשלום מאובטח</span>
             </div>
             
-            <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 px-2.5 py-1 rounded-full text-xs border border-green-100 dark:border-green-900/20">
+            <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 px-2.5 py-1 rounded-full text-xs border border-green-200 dark:border-green-900/30">
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>SSL מוצפן</span>
             </div>
