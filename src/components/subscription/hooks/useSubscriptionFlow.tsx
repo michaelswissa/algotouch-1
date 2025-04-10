@@ -53,11 +53,39 @@ export const useSubscriptionFlow = () => {
       return step;
     }
     
-    // For completion step, just allow it
-    if (step === 'completion') return step;
+    // For completion step, validate that we've gone through the necessary steps
+    if (step === 'completion') {
+      // Only allow direct navigation to completion if we have evidence of completed payment
+      // Check session storage for evidence of completed payment flow
+      const sessionData = sessionStorage.getItem('subscription_flow');
+      if (sessionData) {
+        const data = JSON.parse(sessionData);
+        const hasCompletedPayment = data.paymentCompleted === true;
+        
+        if (!hasCompletedPayment) {
+          console.log('Completion step requested but payment not verified completed');
+          // Check URL for specific success parameters that indicate verified payment
+          const params = new URLSearchParams(window.location.search);
+          const success = params.get('success');
+          const forceTop = params.get('force_top');
+          const lpId = params.get('lpId');
+          
+          if (success === 'true' && forceTop === 'true' && lpId) {
+            console.log('Payment completion verified via URL parameters');
+            return step;
+          }
+          
+          if (selectedPlan && contractId) {
+            console.log('Redirecting to payment step instead');
+            return 'payment';
+          }
+          
+          return 'plan-selection';
+        }
+      }
+    }
     
-    // Default to plan selection for unknown steps
-    return 'plan-selection';
+    return step;
   };
 
   // Restore flow state from session storage with validation
@@ -189,19 +217,21 @@ export const useSubscriptionFlow = () => {
   };
   
   const handlePaymentComplete = () => {
+    console.log("Payment completed successfully, updating flow state");
+    
+    // Mark payment as completed in session storage
+    const sessionData = sessionStorage.getItem('subscription_flow');
+    const updatedData = sessionData ? JSON.parse(sessionData) : {};
+    updatedData.paymentCompleted = true;
+    sessionStorage.setItem('subscription_flow', JSON.stringify(updatedData));
+    
+    // Move to completion step
     setCurrentStep('completion');
-    // Clear session data on completion
-    sessionStorage.removeItem('subscription_flow');
     
     // Refresh subscription status
     refreshSubscription();
     
     toast.success('ההרשמה הושלמה בהצלחה!');
-    
-    // Redirect to dashboard after short delay
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 5000);
   };
   
   const handleBackToStep = (step: Steps) => {

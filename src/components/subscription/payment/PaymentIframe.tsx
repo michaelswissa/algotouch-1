@@ -29,19 +29,19 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     // Show processing state in iframe
     setIsProcessing(true);
     
-    // Update session storage to completion step
+    // Update session storage to indicate payment is being verified
     try {
       const sessionData = sessionStorage.getItem('subscription_flow');
       const parsedSession = sessionData ? JSON.parse(sessionData) : {};
-      parsedSession.step = 'completion';
+      parsedSession.paymentInProgress = true;
+      parsedSession.paymentLpId = lpId || '';
       sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
       
       // Build redirect URL with all necessary parameters
       const urlParams = new URLSearchParams();
-      urlParams.set('step', 'completion');
-      urlParams.set('success', 'true');
+      urlParams.set('step', 'payment'); // Keep on payment step until verified
+      urlParams.set('success', 'true');  
       urlParams.set('force_top', 'true'); // New parameter to ensure top-level handling
-      urlParams.set('plan', parsedSession.selectedPlan || '');
       
       if (lpId) {
         urlParams.set('lpId', lpId);
@@ -74,11 +74,10 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
         console.error('React navigation error:', e);
       }
       
-      toast.success('התשלום התקבל בהצלחה!');
     } catch (e) {
       console.error('Error updating session data:', e);
       // Fallback redirect without session data
-      window.top.location.href = `${window.location.origin}/subscription?step=completion&success=true&force_top=true`;
+      window.top.location.href = `${window.location.origin}/subscription?step=payment&success=true&force_top=true`;
     }
   };
   
@@ -106,6 +105,13 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
              data.action === 'submit')) {
           console.log('Detected payment submission event');
           setIsProcessing(true);
+          
+          // Set a timeout to reset processing state if success doesn't arrive
+          setTimeout(() => {
+            if (isProcessing) {
+              console.log('Payment processing timeout - still showing loading state after 30 seconds');
+            }
+          }, 30000);
         }
       } catch (err) {
         // Not our message or not JSON, ignore
@@ -119,7 +125,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     return () => {
       window.removeEventListener('message', handleIframeMessage);
     };
-  }, [navigate]);
+  }, [navigate, isProcessing]);
   
   // Set up periodic iframe breakout check
   useEffect(() => {
@@ -131,17 +137,11 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
       const forceTop = urlParams.get('force_top');
       const lpId = urlParams.get('lpId');
       
-      // If we have success=true and force_top=true, we should process the breakout
-      if (success === 'true' && forceTop === 'true') {
-        console.log('Detected success=true and force_top=true in URL, processing redirect');
-        handleSuccessfulPayment(currentUrl, lpId || undefined);
-        return true;
-      }
-      
-      // Also check for completion step
-      if (urlParams.get('step') === 'completion' && forceTop === 'true') {
-        console.log('Detected completion step with force_top=true in URL');
-        handleSuccessfulPayment(currentUrl, lpId || undefined);
+      // Make sure we do NOT auto-navigate to completion from URL params
+      // Instead let the verification process handle this
+      if (success === 'true' && forceTop === 'true' && lpId) {
+        console.log('Success parameters detected, payment will be verified');
+        setIsProcessing(true);
         return true;
       }
       
@@ -149,7 +149,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     };
     
     // Check immediately
-    if (checkUrlForBreakout()) return;
+    checkUrlForBreakout();
     
     // Check periodically 
     const intervalId = setInterval(checkUrlForBreakout, 1000);
@@ -165,24 +165,6 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     window.addEventListener('resize', handleResize);
     handleResize();
 
-    // Force parent window navigation for any success or error URL parameters
-    const checkForSuccessOrError = () => {
-      const currentUrl = window.location.href;
-      const urlParams = new URLSearchParams(window.location.search);
-      const success = urlParams.get('success');
-      const lpId = urlParams.get('lpId');
-      
-      if (success === 'true') {
-        console.log('Success=true detected in URL, processing redirect');
-        handleSuccessfulPayment(currentUrl, lpId || undefined);
-      } else if (currentUrl.includes('error=true')) {
-        toast.error('התשלום נכשל, אנא נסה שנית');
-      }
-    };
-
-    // Run check immediately
-    checkForSuccessOrError();
-    
     // Modified script injection to detect form submissions as well
     const injectIframeListener = () => {
       if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -196,73 +178,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
               const script = document.createElement('script');
               script.innerHTML = getIframeBreakoutScript();
               
-              // Add form submission listener
-              const paymentFormScript = document.createElement('script');
-              paymentFormScript.innerHTML = `
-                // Find all forms in the document
-                document.addEventListener('DOMContentLoaded', function() {
-                  const forms = document.querySelectorAll('form');
-                  forms.forEach(form => {
-                    form.addEventListener('submit', function(e) {
-                      console.log('Form submission detected');
-                      
-                      // Notify parent window about form submission
-                      window.parent.postMessage(JSON.stringify({
-                        type: 'payment_submitted',
-                        status: 'processing',
-                        action: 'submit'
-                      }), '*');
-                      
-                      // If it's a payment form, show our own loading overlay
-                      if (form.querySelector('input[name="cc-number"]') || 
-                          form.querySelector('input[name="cardNumber"]') ||
-                          form.querySelector('.payment-field')) {
-                            
-                        // Create loading overlay if not exists
-                        let overlay = document.getElementById('payment-processing-overlay');
-                        if (!overlay) {
-                          overlay = document.createElement('div');
-                          overlay.id = 'payment-processing-overlay';
-                          overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;';
-                          
-                          const spinner = document.createElement('div');
-                          spinner.style.cssText = 'width: 48px; height: 48px; border: 4px solid rgba(0, 0, 0, 0.1); border-radius: 50%; border-top-color: #3b82f6; animation: spinner 1s linear infinite;';
-                          
-                          const message = document.createElement('div');
-                          message.style.cssText = 'margin-top: 16px; font-size: 18px; color: #111827;';
-                          message.innerText = 'מעבד תשלום...';
-                          
-                          overlay.appendChild(spinner);
-                          overlay.appendChild(message);
-                          
-                          // Add keyframes for spinner animation
-                          const style = document.createElement('style');
-                          style.textContent = '@keyframes spinner { to { transform: rotate(360deg); } }';
-                          document.head.appendChild(style);
-                          
-                          document.body.appendChild(overlay);
-                        }
-                      }
-                    });
-                  });
-                  
-                  // Also watch for click events on submit buttons
-                  const submitButtons = document.querySelectorAll('button[type="submit"], input[type="submit"], .submit-button, .payment-button');
-                  submitButtons.forEach(button => {
-                    button.addEventListener('click', function() {
-                      console.log('Submit button clicked');
-                      window.parent.postMessage(JSON.stringify({
-                        type: 'payment_submitted',
-                        status: 'processing',
-                        action: 'button_click'
-                      }), '*');
-                    });
-                  });
-                });
-              `;
-              
               iframeDocument.body.appendChild(script);
-              iframeDocument.body.appendChild(paymentFormScript);
               console.log('Scripts injected into iframe');
             }
           }, 1000);
@@ -286,7 +202,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [navigate]);
+  }, []);
 
   // Don't render if no URL is provided
   if (!paymentUrl) return null;
@@ -299,25 +215,6 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
   enhancedUrl.searchParams.set('iframe', '0');
   enhancedUrl.searchParams.set('PopUp', '0');
   enhancedUrl.searchParams.set('forceRedirect', 'true');
-
-  // Modify success URL to ensure proper breakout
-  const successUrl = enhancedUrl.searchParams.get('successRedirectUrl');
-  if (successUrl) {
-    try {
-      const successUrlObj = new URL(successUrl);
-      
-      // Add essential parameters to ensure breakout works
-      successUrlObj.searchParams.set('target', '_top');  
-      successUrlObj.searchParams.set('success', 'true');
-      successUrlObj.searchParams.set('step', 'completion');
-      successUrlObj.searchParams.set('force_top', 'true');
-      
-      // Replace the success URL with our enhanced version
-      enhancedUrl.searchParams.set('successRedirectUrl', successUrlObj.toString());
-    } catch (e) {
-      console.error('Error enhancing success URL:', e);
-    }
-  }
 
   return (
     <CardContent className="p-0">

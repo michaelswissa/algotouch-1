@@ -11,12 +11,9 @@ console.log('Iframe URL monitor initialized:', lastUrl);
 
 // Success patterns to watch for
 const SUCCESS_PATTERNS = [
-  'success=true',
-  'step=completion',
   'SuccessAndFailDealPage/Success.aspx',
-  'payment_success',
-  'transaction_completed',
-  'thank_you'
+  'thank_you',
+  'transaction_completed'
 ];
 
 // Check if URL contains any success pattern
@@ -139,7 +136,7 @@ function setupFormSubmissionHandlers() {
   });
 }
 
-// Check URL immediately
+// Check URL for specific success/error patterns only
 function checkUrl(url) {
   // Extract lowProfileId if present
   let lpId = null;
@@ -150,14 +147,14 @@ function checkUrl(url) {
     console.error('Failed to parse URL:', e);
   }
   
-  // Check for success patterns
-  if (containsSuccessPattern(url) || url.includes('success=true')) {
+  // Only break out if we see specific success patterns from Cardcom
+  if (containsSuccessPattern(url)) {
     console.log('Found success pattern in URL:', url);
     return breakoutToParentWindow(url, lpId);
   }
   
   // Check for error patterns
-  if (url.includes('error=true')) {
+  if (url.includes('SuccessAndFailDealPage/Fail.aspx') || url.includes('error=true')) {
     console.log('Found error in URL:', url);
     
     // Handle error case similarly but with error flag
@@ -227,24 +224,16 @@ setInterval(() => {
     document.querySelector('.payment-success'),
     document.querySelector('.success-message'),
     document.querySelector('[data-payment-status="success"]'),
-    document.querySelector('.transaction-approved'),
-    document.querySelector('.approved-transaction')
+    document.querySelector('.transaction-approved')
   ];
   
   if (successElements.some(el => el !== null)) {
     console.log('Success element found in DOM!');
     breakoutToParentWindow(window.location.href);
   }
-  
-  // Check for form submissions with successful results
-  const forms = document.querySelectorAll('form[action*="success"]');
-  if (forms.length > 0) {
-    console.log('Success form detected!');
-    breakoutToParentWindow(window.location.href);
-  }
 }, 500);
 
-// Add event listener for messages from Cardcom script
+// Add event listener for messages from parent
 window.addEventListener('message', function(event) {
   try {
     const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
