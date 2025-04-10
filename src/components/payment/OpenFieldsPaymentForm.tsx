@@ -68,7 +68,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     try {
       console.log('Processing registration payment success for transaction:', transactionId);
       
-      // The cardcom-openfields edge function already stored the registration data
+      // The cardcom-webhook edge function already stored the registration data
       // Now we just need to notify the user and move them to the success screen
       toast.success('ההרשמה הושלמה בהצלחה!');
       

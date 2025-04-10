@@ -55,9 +55,25 @@ serve(async (req) => {
         // Handle standard authenticated payment - no need to do anything here
         // as the frontend will update the subscription record
       }
+      
+      // Log payment for future reference
+      await supabaseAdmin.from('user_payment_logs').insert({
+        transaction_details: params,
+        amount: parseInt(params.SumToBill || '0') || 0,
+        token: params.LowProfileCode || '',
+        approval_code: params.ApprovalNumber || '',
+        status: 'success'
+      });
     } else {
       console.error('Payment failed', params);
-      // Log the error but still return OK to acknowledge receipt
+      
+      // Log failed payment
+      await supabaseAdmin.from('user_payment_logs').insert({
+        transaction_details: params,
+        amount: parseInt(params.SumToBill || '0') || 0,
+        token: params.LowProfileCode || '',
+        status: 'failed'
+      });
     }
 
     // We always return OK to Cardcom to acknowledge the webhook
@@ -176,7 +192,7 @@ async function processRegistrationPayment(
         .insert({
           user_id: userId,
           plan_id: planId,
-          full_name: `${userData.userData?.firstName || ''} ${userData.userData?.lastName || ''}`,
+          full_name: `${userData.userData?.firstName || ''} ${userData.userData?.lastName || ''}`.trim(),
           email: userData.email,
           phone: userData.userData?.phone || null,
           signature: userData.contractDetails.signature,

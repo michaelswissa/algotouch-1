@@ -54,3 +54,7 @@ url = ""
 [functions]
 [functions.cardcom-webhook]
 verify_jwt = false
+[functions.cardcom-check-status]
+verify_jwt = false
+[functions.cardcom-openfields]
+verify_jwt = false
