@@ -48,3 +48,4 @@ scopes = ""
 [functions]
 [functions.cardcom-openfields]
 verify_jwt = false
+
