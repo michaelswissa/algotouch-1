@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -168,99 +167,108 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       
       console.log('Calling direct-payment edge function...');
       
-      // Fixed: Using the proper function name format in the invoke method
-      const { data, error } = await supabase.functions.invoke('direct-payment', {
-        body: {
-          action: 'process', // Specify the action to perform
-          planId: selectedPlan,
-          cardDetails: {
-            cardNumber: cleanCardNumber,
-            expiryDate: formattedExpiryDate,
-            cvv,
-            cardholderName
-          },
-          customerInfo,
-          registrationData
-        }
-      });
-      
-      if (error) {
-        console.error('Payment processing error:', error);
-        toast.error(`אירעה שגיאה בעיבוד התשלום: ${error.message}`);
-        setIsProcessing(false);
-        return;
-      }
-      
-      console.log('Payment process response:', data);
-      
-      if (!data.success) {
-        toast.error(data.error || 'אירעה שגיאה בעיבוד התשלום');
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Extract payment details
-      const { tokenInfo, transactionId, documentInfo } = data;
-      
-      // Log successful payment
-      console.log('Payment successful:', { tokenInfo, transactionId, documentInfo });
-      
-      // Store token data
-      if (tokenInfo) {
-        const tokenData: TokenData = {
-          token: tokenInfo.token,
-          lastFourDigits: cleanCardNumber.slice(-4),
-          expiryMonth: month,
-          expiryYear: `20${year}`,
-          cardholderName
-        };
-        
-        // If we have registration data, update it with token
-        if (registrationData) {
-          registrationData.paymentToken = tokenData;
-          sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
-        }
-        
-        // Update session flow to mark payment complete
-        try {
-          const sessionData = sessionStorage.getItem('subscription_flow');
-          const parsedSession = sessionData 
-            ? JSON.parse(sessionData) 
-            : { step: 'completion' };
-          
-          parsedSession.step = 'completion';
-          parsedSession.selectedPlan = selectedPlan;
-          parsedSession.paymentComplete = true;
-          
-          sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
-        } catch (e) {
-          console.error('Error updating session flow:', e);
-        }
-      }
-      
-      // Show success message with document info if available
-      if (documentInfo && documentInfo.documentUrl) {
-        toast.success('התשלום התקבל בהצלחה! מסמך נשלח לדוא"ל שלך',
-          {
-            action: {
-              label: 'הצג מסמך',
-              onClick: () => window.open(documentInfo.documentUrl, '_blank')
-            }
+      // Adding more detailed error handling and debug information
+      let response;
+      try {
+        response = await supabase.functions.invoke('direct-payment', {
+          body: {
+            action: 'process', // Explicitly set the action parameter
+            planId: selectedPlan,
+            cardDetails: {
+              cardNumber: cleanCardNumber,
+              expiryDate: formattedExpiryDate,
+              cvv,
+              cardholderName
+            },
+            customerInfo,
+            registrationData
           }
-        );
-      } else {
-        toast.success('התשלום התקבל בהצלחה!');
+        });
+        
+        console.log('Edge function response status:', response.error ? 'ERROR' : 'SUCCESS');
+        
+        if (response.error) {
+          console.error('Edge function error:', response.error);
+          throw new Error(`Edge function error: ${response.error.message}`);
+        }
+        
+        const { data, error } = response;
+        
+        if (error) {
+          throw error;
+        }
+
+        if (!data || !data.success) {
+          throw new Error(data?.error || 'אירעה שגיאה בעיבוד התשלום');
+        }
+        
+        // Extract payment details
+        const { tokenInfo, transactionId, documentInfo } = data;
+        
+        // Log successful payment
+        console.log('Payment successful:', { tokenInfo, transactionId, documentInfo });
+        
+        // Store token data
+        if (tokenInfo) {
+          const tokenData: TokenData = {
+            token: tokenInfo.token,
+            lastFourDigits: cleanCardNumber.slice(-4),
+            expiryMonth: month,
+            expiryYear: `20${year}`,
+            cardholderName
+          };
+          
+          // If we have registration data, update it with token
+          if (registrationData) {
+            registrationData.paymentToken = tokenData;
+            sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
+          }
+          
+          // Update session flow to mark payment complete
+          try {
+            const sessionData = sessionStorage.getItem('subscription_flow');
+            const parsedSession = sessionData 
+              ? JSON.parse(sessionData) 
+              : { step: 'completion' };
+            
+            parsedSession.step = 'completion';
+            parsedSession.selectedPlan = selectedPlan;
+            parsedSession.paymentComplete = true;
+            
+            sessionStorage.setItem('subscription_flow', JSON.stringify(parsedSession));
+          } catch (e) {
+            console.error('Error updating session flow:', e);
+          }
+        }
+        
+        // Show success message with document info if available
+        if (documentInfo && documentInfo.documentUrl) {
+          toast.success('התשלום התקבל בהצלחה! מסמך נשלח לדוא"ל שלך',
+            {
+              action: {
+                label: 'הצג מסמך',
+                onClick: () => window.open(documentInfo.documentUrl, '_blank')
+              }
+            }
+          );
+        } else {
+          toast.success('התשלום התקבל בהצלחה!');
+        }
+        
+        // Call payment complete callback
+        setTimeout(() => {
+          setIsProcessing(false);
+          onPaymentComplete();
+        }, 1000);
+        
+      } catch (apiError: any) {
+        console.error('API error details:', apiError);
+        throw new Error(`Failed to process payment: ${apiError.message}`);
       }
       
-      // Call payment complete callback
-      setTimeout(() => {
-        setIsProcessing(false);
-        onPaymentComplete();
-      }, 1000);
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing payment:', error);
-      toast.error('אירעה שגיאה בעיבוד התשלום');
+      toast.error(`אירעה שגיאה בעיבוד התשלום: ${error.message || 'שגיאה לא ידועה'}`);
       setIsProcessing(false);
     }
   };

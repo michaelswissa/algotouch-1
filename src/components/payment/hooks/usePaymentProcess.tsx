@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +13,7 @@ import {
 } from '../services/paymentService';
 import { UsePaymentProcessProps, PaymentError } from './types';
 import { usePaymentErrorHandling } from './usePaymentErrorHandling';
-import { supabase } from '@/integrations/supabase/client'; // Added missing import
+import { supabase } from '@/integrations/supabase/client';
 
 export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProcessProps) => {
   const navigate = useNavigate();
@@ -246,6 +245,16 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
     
     setIsProcessing(true);
     try {
+      try {
+        const result = await initiateExternalPayment(planId, user, registrationData);
+        if (result && result.url) {
+          window.location.href = result.url;
+          return;
+        }
+      } catch (helperError) {
+        console.error('Error using payment service helper:', helperError);
+      }
+
       const { data, error } = await supabase.functions.invoke('direct-payment', {
         body: {
           action: 'initiate',
@@ -255,8 +264,16 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         }
       });
       
+      console.log('Direct payment function response:', data);
+      
       if (error) {
-        throw error;
+        console.error('Supabase function error:', error);
+        throw new Error(`Edge Function error: ${error.message}`);
+      }
+      
+      if (!data || !data.url) {
+        console.error('Invalid response data:', data);
+        throw new Error('לא התקבלה כתובת תשלום מהשרת');
       }
       
       if (data.tempRegistrationId) {
@@ -272,8 +289,11 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       url.searchParams.set('errorRedirectUrl', 
         `${baseUrl}?step=payment&error=true&lpId=${data.lowProfileId}`);
       
+      console.log('Redirecting to payment URL:', url.toString());
       window.location.href = url.toString();
     } catch (error: any) {
+      console.error('Payment initialization error:', error);
+      
       const errorInfo = await handleError(error, {
         planId,
         operationType: operationTypeValue,
@@ -286,6 +306,8 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       setPaymentError(paymentError);
       
       setIsProcessing(false);
+      
+      toast.error('אירעה שגיאה בעיבוד התשלום. נסה שנית מאוחר יותר.');
     }
   };
 

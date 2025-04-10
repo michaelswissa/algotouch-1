@@ -1,3 +1,4 @@
+
 // Direct Payment Processing Edge Function
 // This function securely processes credit card payments using the Cardcom API
 // It follows PCI DSS compliance by handling card data only on the server side
@@ -40,6 +41,148 @@ enum OperationType {
   CHARGE_ONLY = 1,        // Charge card only
   CHARGE_AND_TOKEN = 2,   // Charge and create token
   TOKEN_ONLY = 3,         // Create token only (for future charges)
+}
+
+/**
+ * Initiate external payment with CardCom LowProfile
+ */
+async function initiateExternalPayment(params: any) {
+  const {
+    planId,
+    userId,
+    email,
+    registrationData
+  } = params;
+  
+  try {
+    // Determine amount and operation type based on plan
+    let amount = 0;
+    let operationType = OperationType.TOKEN_ONLY;
+    
+    switch (planId) {
+      case 'monthly':
+        // For monthly plan, create token only (free trial)
+        amount = 0;
+        operationType = OperationType.TOKEN_ONLY;
+        break;
+      case 'annual':
+        // For annual plan, charge and create token
+        amount = 899;
+        operationType = OperationType.CHARGE_AND_TOKEN;
+        break;
+      case 'vip':
+        // For VIP plan, charge only
+        amount = 3499;
+        operationType = OperationType.CHARGE_ONLY;
+        break;
+      default:
+        console.error('Invalid plan ID:', planId);
+        throw new Error('Invalid plan ID');
+    }
+    
+    // Define product name and description based on plan
+    const productName = planId === 'monthly' 
+      ? 'מנוי חודשי - תקופת ניסיון' 
+      : planId === 'annual' 
+        ? 'מנוי שנתי' 
+        : 'מנוי VIP';
+    
+    // Generate a unique ID for this transaction
+    const tempRegistrationId = crypto.randomUUID();
+    const externalTransId = `dir_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    
+    // Prepare request to CardCom API to create LowProfile payment page
+    const payload = {
+      TerminalNumber: parseInt(API_CONFIG.TERMINAL),
+      ApiName: API_CONFIG.USERNAME,
+      ReturnValue: tempRegistrationId || userId || 'direct-payment',
+      Amount: amount,
+      SuccessRedirectUrl: "https://www.placeholder.com", // Will be replaced by client
+      FailedRedirectUrl: "https://www.placeholder.com", // Will be replaced by client
+      WebHookUrl: "https://www.placeholder.com", // Optional for development
+      ProductName: productName,
+      Language: "he", // Hebrew interface
+      Operation: operationType === OperationType.TOKEN_ONLY ? "CreateTokenOnly" 
+               : operationType === OperationType.CHARGE_AND_TOKEN ? "ChargeAndCreateToken"
+               : "ChargeOnly",
+      ISOCoinId: 1, // ILS
+    };
+    
+    console.log('CardCom LowProfile request:', {
+      ...payload,
+      ApiName: '****' // Hide sensitive data in logs
+    });
+    
+    // Call CardCom API to create payment page
+    const response = await fetch(`${API_CONFIG.BASE_URL}/LowProfile/Create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`CardCom LowProfile API error: ${response.status}`, errorText);
+      throw new Error(`CardCom API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    // Parse the response
+    const result = await response.json();
+    console.log('CardCom LowProfile API response:', result);
+    
+    // Check for API errors
+    if (result.ResponseCode !== 0) {
+      return {
+        success: false,
+        error: result.Description || 'Unknown error creating payment page',
+        details: {
+          responseCode: result.ResponseCode,
+          description: result.Description
+        }
+      };
+    }
+    
+    // Store registration data temporarily if provided
+    if (registrationData) {
+      try {
+        // Create Supabase client
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        );
+        
+        // Store in a temporary table with short expiration
+        const { error: tempError } = await supabaseClient
+          .from('temp_registration_data')
+          .insert({
+            id: tempRegistrationId,
+            registration_data: registrationData,
+            expires_at: new Date(Date.now() + 30 * 60000).toISOString() // 30 min expiry
+          });
+          
+        if (tempError) {
+          console.error('Error storing temp registration:', tempError);
+        } else {
+          console.log('Stored temp registration data with ID:', tempRegistrationId);
+        }
+      } catch (storageError: any) {
+        console.error('Error in temp registration storage:', storageError);
+      }
+    }
+    
+    // Return successful result with payment page URL
+    return {
+      success: true,
+      url: result.Url,
+      lowProfileId: result.LowProfileId,
+      tempRegistrationId
+    };
+  } catch (error: any) {
+    console.error('Error initiating external payment:', error);
+    throw error;
+  }
 }
 
 /**
@@ -347,8 +490,9 @@ serve(async (req) => {
     // Log the request (without sensitive data)
     console.log('direct-payment function called with action:', requestData.action);
     
-    // Process direct payment
+    // Handle different actions
     if (requestData.action === 'process') {
+      // Process direct payment
       const { planId, cardDetails, registrationData, customerInfo } = requestData;
       
       if (!planId || !cardDetails) {
@@ -394,13 +538,60 @@ serve(async (req) => {
           }
         );
       }
+    } else if (requestData.action === 'initiate') {
+      // Create payment link/page
+      const { planId, userId, email, registrationData } = requestData;
+      
+      if (!planId) {
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Missing planId parameter' 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          }
+        );
+      }
+
+      try {
+        // Generate payment page URL
+        const initResult = await initiateExternalPayment({
+          planId,
+          userId,
+          email,
+          registrationData
+        });
+        
+        return new Response(
+          JSON.stringify(initResult),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } catch (initError: any) {
+        console.error('Payment initiation error:', initError);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: initError.message 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
+      }
     }
 
     // If no valid action is provided
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: 'Invalid action specified' 
+        error: 'Invalid action specified. Use "process" or "initiate".' 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
