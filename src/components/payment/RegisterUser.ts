@@ -55,7 +55,13 @@ export const registerUser = async ({ registrationData, tokenData, contractDetail
     trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
     
     // Convert TokenData to Json type for Supabase
-    const paymentMethodJson = tokenData as unknown as Json;
+    const paymentMethodJson = {
+      token: tokenData.token,
+      lastFourDigits: tokenData.lastFourDigits,
+      expiryMonth: tokenData.expiryMonth,
+      expiryYear: tokenData.expiryYear,
+      cardholderName: tokenData.cardholderName
+    } as unknown as Json;
     
     // Create the subscription record
     const { error: subscriptionError } = await supabase
@@ -154,4 +160,3 @@ export const registerUser = async ({ registrationData, tokenData, contractDetail
     return { success: false, error };
   }
 };
-

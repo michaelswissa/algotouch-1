@@ -1,193 +1,78 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { PaymentErrorData } from '../hooks/types';
+import { savePaymentSession } from '../services/recoveryService';
+import { sendRecoveryEmail } from '../services/recoveryService';
+import { PaymentError } from '@/types/payment';
 
 /**
- * Map error codes to user-friendly messages
- */
-export const mapErrorCode = (error: any): string => {
-  const errorCode = error?.code || error?.errorCode || 'UNKNOWN_ERROR';
-  
-  switch (errorCode) {
-    case 'card_declined':
-      return 'CARD_DECLINED';
-    case 'expired_card':
-      return 'EXPIRED_CARD';
-    case 'incorrect_cvc':
-      return 'INCORRECT_CVC';
-    case 'insufficient_funds':
-      return 'INSUFFICIENT_FUNDS';
-    case 'invalid_number':
-      return 'INVALID_NUMBER';
-    case 'rate_limit':
-      return 'RATE_LIMIT';
-    case 'timeout':
-      return 'TIMEOUT';
-    case 'network_error':
-      return 'NETWORK_ERROR';
-    case '605':
-      return 'CARD_DECLINED';
-    case '513':
-      return 'EXPIRED_CARD';
-    case '607':
-      return 'INSUFFICIENT_FUNDS';
-    case 'card_error':
-      return 'CARD_ERROR';
-    case 'SESSION_EXPIRED':
-      return 'SESSION_EXPIRED';
-    default:
-      return 'UNKNOWN_ERROR';
-  }
-};
-
-/**
- * Get user-friendly error message based on error code
- */
-export const getErrorMessage = (errorCode: string): string => {
-  switch (errorCode) {
-    case 'CARD_DECLINED':
-      return 'כרטיס האשראי נדחה. אנא נסה כרטיס אחר או צור קשר עם חברת האשראי שלך.';
-    case 'EXPIRED_CARD':
-      return 'כרטיס האשראי פג תוקף. אנא עדכן את פרטי התשלום שלך.';
-    case 'INCORRECT_CVC':
-      return 'קוד ה-CVC שהזנת שגוי. אנא נסה שוב.';
-    case 'INSUFFICIENT_FUNDS':
-      return 'אין מספיק כסף בכרטיס. אנא השתמש בכרטיס אחר או נסה אמצעי תשלום חלופי.';
-    case 'INVALID_NUMBER':
-      return 'מספר כרטיס האשראי אינו חוקי. אנא בדוק את המספר ונסה שוב.';
-    case 'RATE_LIMIT':
-      return 'חריגה ממגבלת הפעולות. אנא נסה שוב מאוחר יותר.';
-    case 'TIMEOUT':
-      return 'זמן התשלום הסתיים. אנא נסה שוב.';
-    case 'NETWORK_ERROR':
-      return 'שגיאת רשת. אנא בדוק את החיבור שלך ונסה שוב.';
-    case 'CARD_ERROR':
-      return 'אירעה שגיאה עם הכרטיס. אנא נסה כרטיס אחר או פנה לתמיכה.';
-    case 'SESSION_EXPIRED':
-      return 'פג תוקף החיבור, אנא התחבר מחדש';
-    default:
-      return 'אירעה שגיאה לא ידועה. אנא נסה שוב או פנה לתמיכה.';
-  }
-};
-
-/**
- * Check if the error is transient and can be retried
- */
-export const isTransientError = (error: any): boolean => {
-  const errorCode = error?.code || error?.errorCode || 'UNKNOWN_ERROR';
-  
-  switch (errorCode) {
-    case 'timeout':
-    case 'network_error':
-      return true;
-    default:
-      return false;
-  }
-};
-
-/**
- * Log payment error to database for tracking and analysis
- */
-export const logPaymentError = async (
-  error: any,
-  userId?: string,
-  context?: string,
-  paymentDetails?: any
-): Promise<PaymentErrorData> => {
-  // Extract error info
-  const errorCode = mapErrorCode(error);
-  const errorMessage = getErrorMessage(errorCode);
-  const errorDetails = {
-    originalError: error?.message || 'Unknown error',
-    stack: error?.stack,
-    code: error?.code,
-    details: error?.details
-  };
-  
-  // Prepare error data
-  const errorData: PaymentErrorData = {
-    errorCode,
-    errorMessage,
-    context,
-    paymentDetails
-  };
-  
-  try {
-    // Log to edge function instead of direct DB access
-    await supabase.functions.invoke('recover-payment-session/log-error', {
-      body: {
-        userId: userId || 'anonymous',
-        errorCode,
-        errorMessage,
-        errorDetails,
-        context,
-        paymentDetails
-      }
-    });
-    
-    console.log('Payment error logged to database');
-  } catch (dbError) {
-    console.error('Failed to log payment error to database:', dbError);
-  }
-  
-  // Return processed error data
-  return errorData;
-};
-
-/**
- * Handle payment errors with consistent approach
+ * Handles payment errors, including saving recovery information and sending notifications
  */
 export const handlePaymentError = async (
   error: any,
-  userId?: string,
-  email?: string | null,
-  tokenData?: any,
-  options?: {
-    recoveryUrl?: string;
-    paymentDetails?: any;
+  context: {
+    userId?: string;
+    email?: string;
+    planId?: string;
+    tokenInfo?: any;
+    operationType?: number;
   }
-): Promise<PaymentErrorData> => {
-  // Log error to database
-  const errorData = await logPaymentError(
-    error,
-    userId,
-    'payment-processing',
-    options?.paymentDetails || {}
-  );
+): Promise<PaymentError> => {
+  console.error('Payment error occurred:', error, 'Context:', context);
   
-  // Don't attempt recovery for certain error types
-  if (isTransientError(error)) {
-    console.log('Transient error, no recovery needed');
-    return errorData;
+  let errorCode = 'payment_failed';
+  let errorMessage = 'אירעה שגיאה בתהליך התשלום';
+  
+  // Extract error information
+  if (error?.message) {
+    errorMessage = error.message;
   }
   
-  try {
-    // Create a recovery session for this error if appropriate
-    const { savePaymentSession } = await import('../services/recoveryService');
-    
-    const sessionId = await savePaymentSession({
-      userId,
-      email: email || undefined,
-      planId: options?.paymentDetails?.planId || 'unknown',
-      paymentDetails: {
-        ...options?.paymentDetails,
-        tokenData,
-        errorInfo: errorData
+  if (error?.code) {
+    errorCode = error.code;
+  }
+  
+  // Determine if this error should create a recovery session
+  const needsRecovery = ![
+    'user_cancelled',
+    'invalid_input',
+    'card_declined_fraud',
+  ].includes(errorCode);
+  
+  // Create a payment session for recovery if needed
+  let sessionId = null;
+  if (needsRecovery && context.planId) {
+    try {
+      sessionId = await savePaymentSession({
+        userId: context.userId,
+        email: context.email,
+        planId: context.planId,
+        paymentDetails: {
+          tokenInfo: context.tokenInfo,
+          operationType: context.operationType,
+          lastErrorCode: errorCode,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      if (sessionId && context.email) {
+        await sendRecoveryEmail(
+          context.email,
+          {
+            code: errorCode,
+            message: errorMessage,
+            planId: context.planId,
+          },
+          sessionId
+        );
       }
-    });
-    
-    if (sessionId) {
-      console.log(`Created recovery session: ${sessionId}`);
+    } catch (recoveryError) {
+      console.error('Error creating recovery session:', recoveryError);
     }
-    
-    const result: PaymentErrorData = {
-      ...errorData,
-      recoverySessionId: sessionId || undefined
-    };
-    
-    return result;
-  } catch (recoveryError) {
-    console.error('Failed to create recovery session:', recoveryError);
-    return errorData;
   }
+  
+  // Return formatted error info
+  return {
+    code: errorCode,
+    message: errorMessage,
+    raw: error
+  };
 };

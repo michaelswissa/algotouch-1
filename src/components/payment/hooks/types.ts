@@ -32,3 +32,12 @@ export interface PaymentErrorContext {
   operationType?: number;
   userInfo?: { userId?: string; email?: string } | null;
 }
+
+export interface PaymentSessionData {
+  sessionId?: string;
+  userId?: string;
+  email?: string;
+  planId?: string;
+  paymentDetails?: any;
+  expiresAt?: string;
+}

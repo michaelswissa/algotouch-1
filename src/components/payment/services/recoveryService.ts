@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentSessionData } from '../hooks/types';
+import { PaymentSessionData } from '@/types/payment';
 
 // Send a recovery email to the user after a payment failure
 export const sendRecoveryEmail = async (

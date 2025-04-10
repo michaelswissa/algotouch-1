@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { TokenData } from '@/types/payment';
+import { TokenData, RegistrationData, SubscriptionPlan } from '@/types/payment';
 import { getSubscriptionPlans } from '../utils/paymentHelpers';
 import { useRegistrationData } from './useRegistrationData';
 import { 
@@ -126,20 +126,25 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       toast.success('התשלום אומת בהצלחה!');
       
       if (registrationData) {
+        const tokenInfo = result.tokenInfo || {
+          token: result.paymentDetails?.cardLastDigits || '',
+          lastFourDigits: result.paymentDetails?.cardLastDigits || '',
+          expiryMonth: result.paymentDetails?.cardExpiry ? 
+            parseInt(result.paymentDetails.cardExpiry.split('/')[0], 10) : 0,
+          expiryYear: result.paymentDetails?.cardExpiry ? 
+            parseInt(result.paymentDetails.cardExpiry.split('/')[1], 10) : 0,
+          cardholderName: result.paymentDetails?.cardOwnerName || ''
+        };
+        
         const updatedData = {
           ...registrationData,
-          paymentToken: result.tokenInfo || {
-            token: result.paymentDetails?.cardLastDigits || '',
-            expiry: result.paymentDetails?.cardExpiry || '',
-            lastFourDigits: result.paymentDetails?.cardLastDigits || '',
-            cardholderName: result.paymentDetails?.cardOwnerName || ''
-          }
+          paymentToken: tokenInfo
         };
         
         updateRegistrationData(updatedData);
         
         if (updatedData.email && updatedData.password) {
-          await registerNewUser(updatedData, updatedData.paymentToken);
+          await registerNewUser(updatedData, tokenInfo);
         }
       }
       
@@ -180,14 +185,9 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
       if (user) {
         await handleExistingUserPayment(user.id, planId, tokenData, operationTypeValue, planDetails);
       } else if (registrationData) {
-        const updatedData = {
+        const updatedData: Partial<RegistrationData> = {
           ...registrationData,
-          paymentToken: {
-            token: tokenData.token || tokenData.lastFourDigits,
-            expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
-            lastFourDigits: tokenData.lastFourDigits,
-            cardholderName: tokenData.cardholderName
-          },
+          paymentToken: tokenData,
           planId
         };
         
@@ -203,12 +203,7 @@ export const usePaymentProcess = ({ planId, onPaymentComplete }: UsePaymentProce
         
         const minimalRegData = {
           planId,
-          paymentToken: {
-            token: tokenData.token || tokenData.lastFourDigits,
-            expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
-            lastFourDigits: tokenData.lastFourDigits,
-            cardholderName: tokenData.cardholderName
-          },
+          paymentToken: tokenData,
           registrationTime: new Date().toISOString()
         };
         

@@ -4,8 +4,7 @@ import { TokenData } from "@/types/payment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { CreditCard, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 
 type CardcomOpenFieldsProps = {
   onTokenReceived: (tokenData: TokenData) => void;

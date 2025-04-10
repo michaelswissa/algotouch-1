@@ -1,5 +1,5 @@
 
-import { SubscriptionPlan } from '@/types/payment';
+import { SubscriptionPlan, TokenData } from '@/types/payment';
 
 export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
   return {
@@ -55,7 +55,7 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
 export const getPlanSummary = (plan: SubscriptionPlan | undefined) => {
   if (!plan) return null;
   
-  const isFreeTrialPlan = plan.trialDays > 0;
+  const isFreeTrialPlan = plan.trialDays && plan.trialDays > 0;
   const isMonthly = plan.billingCycle === 'monthly';
   const currency = plan.currency || 'USD';
   
@@ -69,7 +69,7 @@ export const getPlanSummary = (plan: SubscriptionPlan | undefined) => {
   
   const summary = {
     title: plan.name,
-    description: plan.description,
+    description: plan.description || '',
     pricingLabel: isMonthly ? 'מחיר חודשי:' : 'מחיר שנתי:',
     price: formatPrice(plan.price),
     trialNote: isFreeTrialPlan 
@@ -83,9 +83,9 @@ export const getPlanSummary = (plan: SubscriptionPlan | undefined) => {
 /**
  * Create tokenization data object from payment form
  */
-export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string) => {
+export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
   // Parse expiry date in MM/YY format
-  const [expiryMonth, expiryYear] = expiryDate.split('/');
+  const [expiryMonth, expiryYear] = expiryDate.split('/').map(part => parseInt(part.trim(), 10));
   
   // Create token data object with card details
   return {

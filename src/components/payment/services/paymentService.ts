@@ -51,11 +51,10 @@ export async function registerNewUser(registrationData: any, tokenData: TokenDat
         registrationData: {
           ...registrationData,
           paymentToken: {
-            token: tokenData.token || tokenData.lastFourDigits,
-            expiry: tokenData.expiryMonth && tokenData.expiryYear 
-              ? `${tokenData.expiryMonth}/${tokenData.expiryYear}` 
-              : undefined,
+            token: tokenData.token,
             lastFourDigits: tokenData.lastFourDigits,
+            expiryMonth: tokenData.expiryMonth,
+            expiryYear: tokenData.expiryYear,
             cardholderName: tokenData.cardholderName
           }
         }
