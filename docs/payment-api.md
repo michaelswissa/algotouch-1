@@ -156,4 +156,3 @@ The system uses Supabase Edge Functions for secure server-side processing:
 - Always validate payment data on both client and server
 - Implement proper error handling with recovery options
 - Follow PCI DSS compliance guidelines
-
