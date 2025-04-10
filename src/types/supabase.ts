@@ -106,6 +106,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           comments: number;
           created_at: string;
           updated_at: string;
+          media_urls: string[] | null; // Added missing media_urls property
         };
         Insert: {
           id?: string;
@@ -116,6 +117,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           comments?: number;
           created_at?: string;
           updated_at?: string;
+          media_urls?: string[] | null; // Added to Insert
         };
         Update: {
           id?: string;
@@ -126,6 +128,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           comments?: number;
           created_at?: string;
           updated_at?: string;
+          media_urls?: string[] | null; // Added to Update
         };
         Relationships: [];
       };
@@ -547,3 +550,4 @@ export type TablesInsert<
     ? I
     : never
   : never;
+
