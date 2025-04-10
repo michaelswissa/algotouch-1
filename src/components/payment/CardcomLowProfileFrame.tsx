@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { TokenData } from "@/types/payment";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CardcomLowProfileFrameProps {
   onTokenReceived: (tokenData: TokenData) => void;
