@@ -82,6 +82,63 @@ function breakoutToParentWindow(url, lpId) {
   return true;
 }
 
+// Handle form submissions
+function setupFormSubmissionHandlers() {
+  // Find all forms in the document
+  const forms = document.querySelectorAll('form');
+  
+  // For each form, attach a submit handler
+  forms.forEach(form => {
+    form.addEventListener('submit', function(e) {
+      console.log('Payment form submission detected');
+      
+      // Notify parent window about form submission
+      window.parent.postMessage(JSON.stringify({
+        type: 'payment_submitted',
+        status: 'processing'
+      }), '*');
+      
+      // Create loading overlay if not exists
+      let overlay = document.getElementById('payment-processing-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'payment-processing-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;';
+        
+        const spinner = document.createElement('div');
+        spinner.style.cssText = 'width: 48px; height: 48px; border: 4px solid rgba(0, 0, 0, 0.1); border-radius: 50%; border-top-color: #3b82f6; animation: spinner 1s linear infinite;';
+        
+        const message = document.createElement('div');
+        message.style.cssText = 'margin-top: 16px; font-size: 18px; color: #111827;';
+        message.innerText = 'מעבד תשלום...';
+        
+        overlay.appendChild(spinner);
+        overlay.appendChild(message);
+        
+        // Add keyframes for spinner animation
+        const style = document.createElement('style');
+        style.textContent = '@keyframes spinner { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+        
+        document.body.appendChild(overlay);
+      }
+    });
+  });
+  
+  // Also attach click handlers to buttons that might submit payments
+  const submitButtons = document.querySelectorAll('button[type="submit"], input[type="submit"], .submit-button, .payment-button, [data-submit="true"]');
+  submitButtons.forEach(button => {
+    button.addEventListener('click', function(e) {
+      console.log('Submit button clicked');
+      window.parent.postMessage(JSON.stringify({
+        type: 'payment_submitted',
+        status: 'processing',
+        action: 'button_click'
+      }), '*');
+    });
+  });
+}
+
 // Check URL immediately
 function checkUrl(url) {
   // Extract lowProfileId if present
@@ -132,6 +189,16 @@ function handleUrlChange(newUrl) {
   checkUrl(newUrl);
 }
 
+// Set up form submission handlers when DOM is ready
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setupFormSubmissionHandlers();
+} else {
+  document.addEventListener('DOMContentLoaded', setupFormSubmissionHandlers);
+}
+
+// Try to set up forms immediately too
+setupFormSubmissionHandlers();
+
 // Observe DOM changes to detect navigation
 const observer = new MutationObserver(() => {
   if (window.location.href !== lastUrl) {
@@ -139,6 +206,9 @@ const observer = new MutationObserver(() => {
     lastUrl = newUrl;
     handleUrlChange(newUrl);
   }
+  
+  // Also check for new forms that might have been dynamically added
+  setupFormSubmissionHandlers();
 });
 
 // Start observing

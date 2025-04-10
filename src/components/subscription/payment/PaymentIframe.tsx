@@ -5,6 +5,7 @@ import { Shield, ShieldCheck, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import getIframeBreakoutScript from './iframe/IframeBreakoutScript';
+import { Spinner } from '@/components/ui/spinner';
 
 interface PaymentIframeProps {
   paymentUrl: string | null;
@@ -12,6 +13,7 @@ interface PaymentIframeProps {
 
 const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
   const [iframeHeight, setIframeHeight] = useState(650);
+  const [isProcessing, setIsProcessing] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const navigate = useNavigate();
   const breakoutAttempted = useRef(false);
@@ -23,6 +25,9 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     breakoutAttempted.current = true;
     
     console.log('Payment successful, breaking out of iframe and navigating', { url, lpId });
+    
+    // Show processing state in iframe
+    setIsProcessing(true);
     
     // Update session storage to completion step
     try {
@@ -89,7 +94,18 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
         // Process specific message types
         if (data && data.type === 'cardcom_redirect' && data.success === true) {
           console.log('Received cardcom_redirect success message, breaking out of iframe');
+          // Show processing state
+          setIsProcessing(true);
           handleSuccessfulPayment(data.url, data.lowProfileId);
+        }
+        
+        // Also detect payment submission events
+        if (data && 
+            (data.type === 'payment_submitted' || 
+             data.status === 'processing' || 
+             data.action === 'submit')) {
+          console.log('Detected payment submission event');
+          setIsProcessing(true);
         }
       } catch (err) {
         // Not our message or not JSON, ignore
@@ -167,7 +183,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     // Run check immediately
     checkForSuccessOrError();
     
-    // Add a script to detect navigation events inside the iframe
+    // Modified script injection to detect form submissions as well
     const injectIframeListener = () => {
       if (iframeRef.current && iframeRef.current.contentWindow) {
         try {
@@ -180,8 +196,74 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
               const script = document.createElement('script');
               script.innerHTML = getIframeBreakoutScript();
               
+              // Add form submission listener
+              const paymentFormScript = document.createElement('script');
+              paymentFormScript.innerHTML = `
+                // Find all forms in the document
+                document.addEventListener('DOMContentLoaded', function() {
+                  const forms = document.querySelectorAll('form');
+                  forms.forEach(form => {
+                    form.addEventListener('submit', function(e) {
+                      console.log('Form submission detected');
+                      
+                      // Notify parent window about form submission
+                      window.parent.postMessage(JSON.stringify({
+                        type: 'payment_submitted',
+                        status: 'processing',
+                        action: 'submit'
+                      }), '*');
+                      
+                      // If it's a payment form, show our own loading overlay
+                      if (form.querySelector('input[name="cc-number"]') || 
+                          form.querySelector('input[name="cardNumber"]') ||
+                          form.querySelector('.payment-field')) {
+                            
+                        // Create loading overlay if not exists
+                        let overlay = document.getElementById('payment-processing-overlay');
+                        if (!overlay) {
+                          overlay = document.createElement('div');
+                          overlay.id = 'payment-processing-overlay';
+                          overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;';
+                          
+                          const spinner = document.createElement('div');
+                          spinner.style.cssText = 'width: 48px; height: 48px; border: 4px solid rgba(0, 0, 0, 0.1); border-radius: 50%; border-top-color: #3b82f6; animation: spinner 1s linear infinite;';
+                          
+                          const message = document.createElement('div');
+                          message.style.cssText = 'margin-top: 16px; font-size: 18px; color: #111827;';
+                          message.innerText = 'מעבד תשלום...';
+                          
+                          overlay.appendChild(spinner);
+                          overlay.appendChild(message);
+                          
+                          // Add keyframes for spinner animation
+                          const style = document.createElement('style');
+                          style.textContent = '@keyframes spinner { to { transform: rotate(360deg); } }';
+                          document.head.appendChild(style);
+                          
+                          document.body.appendChild(overlay);
+                        }
+                      }
+                    });
+                  });
+                  
+                  // Also watch for click events on submit buttons
+                  const submitButtons = document.querySelectorAll('button[type="submit"], input[type="submit"], .submit-button, .payment-button');
+                  submitButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                      console.log('Submit button clicked');
+                      window.parent.postMessage(JSON.stringify({
+                        type: 'payment_submitted',
+                        status: 'processing',
+                        action: 'button_click'
+                      }), '*');
+                    });
+                  });
+                });
+              `;
+              
               iframeDocument.body.appendChild(script);
-              console.log('Script injected into iframe');
+              iframeDocument.body.appendChild(paymentFormScript);
+              console.log('Scripts injected into iframe');
             }
           }, 1000);
         } catch (error) {
@@ -264,6 +346,15 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
           </div>
         </div>
         
+        {/* Processing overlay - shown when payment is being processed */}
+        {isProcessing && (
+          <div className="absolute inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center rounded-b-lg">
+            <Spinner size="xl" className="mb-4" />
+            <h3 className="text-xl font-medium mb-2">מעבד את התשלום...</h3>
+            <p className="text-muted-foreground text-sm">אנא המתן, התשלום מעובד כעת</p>
+          </div>
+        )}
+        
         {/* Enhanced iframe container with shadow and border */}
         <div className="relative bg-gradient-to-b from-primary/5 to-transparent p-4 sm:p-6">
           <div className="relative rounded-lg overflow-hidden border-2 border-primary/20 shadow-xl hover:shadow-2xl transition-shadow duration-300">
@@ -274,7 +365,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
               width="100%"
               height={iframeHeight}
               frameBorder="0"
-              title="Cardcom Payment Form"
+              title="Payment Form"
               className="w-full"
               name="payment_iframe_window"
             />
