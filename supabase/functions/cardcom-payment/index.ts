@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
+import { createClient } from '@supabase/supabase-js';
 
 // Configure CORS headers
 const corsHeaders = {
@@ -27,7 +27,7 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const path = url.pathname.split('/').pop() || '';
+    const path = url.pathname.split('/').pop();
 
     // Create a Supabase client
     const supabaseClient = createClient(
@@ -40,37 +40,48 @@ serve(async (req) => {
       }
     );
 
-    // Mock successful response for testing
-    if (path === 'mock-payment') {
+    // Create payment session with Cardcom
+    if (path === 'create-payment') {
+      const { planId, userId, fullName, email, operationType, successRedirectUrl, errorRedirectUrl } = await req.json();
+      
+      console.log('Creating payment session for:', { planId, userId, email });
+      
+      // In a real implementation, you would make an API call to Cardcom
+      // Here, for demonstration purposes, we'll create a simulated payment URL
+      
+      const baseUrl = req.headers.get('origin') || 'http://localhost:3000';
+      const paymentUrl = `${baseUrl}/subscription?step=4&success=true&plan=${planId}`;
+      
+      // Log the created payment session for debugging
+      console.log('Created payment URL:', paymentUrl);
+      
       return new Response(
         JSON.stringify({
           success: true,
-          url: "https://example.com/payment-iframe",
-          lowProfileId: "mock-" + crypto.randomUUID(),
+          url: paymentUrl
         }),
         {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
         }
       );
     }
 
+    // If no valid path is provided
     return new Response(
-      JSON.stringify({
-        error: "Invalid endpoint",
-      }),
+      JSON.stringify({ error: 'Invalid endpoint' }),
       {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
       }
     );
   } catch (error) {
+    console.error('Error processing request:', error);
     return new Response(
-      JSON.stringify({
-        error: error.message || "Unknown error occurred",
-      }),
+      JSON.stringify({ error: error.message }),
       {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }

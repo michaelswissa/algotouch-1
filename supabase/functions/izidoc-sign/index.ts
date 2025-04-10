@@ -60,23 +60,21 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
   console.log(`Storing signature for user: ${request.userId}, plan: ${request.planId}`);
   try {
     // Store the contract HTML in storage first
-    const contractFileName = `${request.userId}/contract_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
+    const contractFileName = `contract_${request.userId}_${new Date().toISOString().replace(/[:.]/g, '-')}.html`;
     const contractData = request.contractHtml;
     
     // Create contracts bucket if it doesn't exist
     try {
-      console.log("Checking if contracts bucket exists");
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const contractsBucketExists = buckets?.some(bucket => bucket.name === 'contracts');
+      const { data: bucketExists } = await supabase
+        .storage
+        .getBucket('contracts');
       
-      if (!contractsBucketExists) {
-        console.log("Contracts bucket doesn't exist, creating it");
+      if (!bucketExists) {
         const { error: bucketError } = await supabase
           .storage
           .createBucket('contracts', {
             public: false,
             fileSizeLimit: 10485760, // 10MB
-            allowedMimeTypes: ['text/html', 'application/pdf']
           });
         
         if (bucketError) {
@@ -84,8 +82,6 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
         } else {
           console.log("Created contracts bucket successfully");
         }
-      } else {
-        console.log("Contracts bucket exists");
       }
     } catch (bucketCheckError) {
       console.log("Bucket check error, attempting to create it:", bucketCheckError);
@@ -93,7 +89,6 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
         await supabase.storage.createBucket('contracts', {
           public: false,
           fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['text/html', 'application/pdf']
         });
         console.log("Created contracts bucket successfully after error");
       } catch (createBucketError) {
@@ -105,23 +100,11 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
     const encoder = new TextEncoder();
     const bytes = encoder.encode(contractData);
     
-    // Make sure the user folder exists
-    const userFolder = request.userId;
-    console.log(`Checking user folder: ${userFolder}`);
-    try {
-      await supabase.storage.from('contracts').list(userFolder);
-      console.log("User folder exists or will be created automatically");
-    } catch (folderError) {
-      console.log("Error checking user folder, will be created on upload:", folderError);
-    }
-    
-    console.log(`Uploading contract file to storage: ${contractFileName}`);
-    
     const { data: storageData, error: storageError } = await supabase
       .storage
       .from('contracts')
       .upload(
-        contractFileName, 
+        `${request.userId}/${contractFileName}`, 
         bytes,
         {
           contentType: 'text/html',
@@ -131,7 +114,6 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
     
     if (storageError) {
       console.error("Error storing contract in storage:", storageError);
-      console.error("Storage error details:", JSON.stringify(storageError));
     } else {
       console.log("Contract stored in storage successfully:", storageData.path);
     }
@@ -140,13 +122,12 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
     const { data: urlData, error: urlError } = await supabase
       .storage
       .from('contracts')
-      .createSignedUrl(contractFileName, 60 * 60 * 24 * 7); // 7 days expiry
+      .createSignedUrl(`${request.userId}/${contractFileName}`, 60 * 60 * 24 * 7); // 7 days expiry
     
     const contractUrl = urlError ? null : urlData?.signedUrl;
-    console.log("Contract signed URL created:", contractUrl ? "success" : "failed");
+    console.log("Contract signed URL:", contractUrl);
     
     // Now store the signature info in the database
-    console.log("Inserting contract signature into database");
     const { data: signatureData, error: signatureError } = await supabase
       .from("contract_signatures")
       .insert({
@@ -171,7 +152,7 @@ async function storeSignature(supabase: any, request: SigningRequest, ipAddress:
       .single();
       
     if (signatureError) {
-      console.error("Error storing signature in database:", signatureError);
+      console.error("Error storing signature:", signatureError);
       throw signatureError;
     }
     
@@ -276,7 +257,6 @@ serve(async (req) => {
     let supabase;
     try {
       supabase = createSupabaseClient();
-      console.log("Supabase client created successfully");
     } catch (clientError) {
       console.error("Error creating Supabase client:", clientError);
       return new Response(
@@ -357,7 +337,7 @@ serve(async (req) => {
         <p>שלום ${request.fullName},</p>
         <p>אנו מאשרים כי ביום ${formattedDateTime.split(',')[0]} בשעה ${formattedDateTime.split(',')[1]} השלמת את תהליך החתימה הדיגיטלית על ההסכם עם AlgoTouch.</p>
         <p>החתימה בוצעה באופן אלקטרוני, תוך אישור מלא של כל התנאים והסעיפים המפורטים בהסכם, ונרשמה במערכת המאובטחת שלנו.</p>
-        <p>לצורך עיון במסמך המלא, ניתן להוריד בעת חתימת ההסכם.</p>
+        <p>לצורך עיון במסמך המלא, ניתן להורידו בעת חתימת ההסכם.</p>
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eaeaea;">
           <p>תודה על שיתוף הפעולה,<br>AlgoTouch</p>
         </div>
@@ -415,7 +395,6 @@ serve(async (req) => {
     
     let adminEmailResult;
     try {
-      // Always send to the admin for backup purposes
       console.log("Sending email to admin via direct email function");
       adminEmailResult = await sendEmailDirectly(
         supabase,
@@ -423,7 +402,7 @@ serve(async (req) => {
         `הסכם חדש נחתם - ${request.fullName}`,
         adminEmailBody,
         [{
-          filename: `contract-${request.fullName.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0,10)}.html`,
+          filename: `contract-${request.fullName}-${new Date().toISOString().slice(0,10)}.html`,
           content: contractBase64,
           mimeType: "text/html"
         }]

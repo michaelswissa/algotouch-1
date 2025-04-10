@@ -86,23 +86,23 @@ const CalendarGrid = ({
       </div>
       
       <div className="grid grid-cols-7 gap-2 text-center" dir="rtl">
-        <TooltipProvider>
-          {calendarDays.map((dayObj, index) => {
-            // Create a key that includes the month and year
-            const dayKey = dayObj.month === 'current' 
-              ? `${dayObj.day}-${currentMonthIndex}-${currentYear}` 
-              : `${dayObj.day}-${dayObj.month}`;
-              
-            const isSelected = selectedDay === dayKey;
-            const tradeCount = getTradeCount(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData);
-            const dailyPnL = getDailyPnL(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData);
-            const hasTrades = tradeCount > 0 && dayObj.month === 'current';
+        {calendarDays.map((dayObj, index) => {
+          // Create a key that includes the month and year
+          const dayKey = dayObj.month === 'current' 
+            ? `${dayObj.day}-${currentMonthIndex}-${currentYear}` 
+            : `${dayObj.day}-${dayObj.month}`;
             
-            // Show prev/next month days with low opacity
-            const isPrevOrNextMonth = dayObj.month !== 'current';
-            
-            return (
-              <Tooltip key={index}>
+          const isSelected = selectedDay === dayKey;
+          const tradeCount = getTradeCount(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData);
+          const dailyPnL = getDailyPnL(dayObj.day, dayObj.month, currentMonthIndex, currentYear, tradesData);
+          const hasTrades = tradeCount > 0 && dayObj.month === 'current';
+          
+          // Show prev/next month days with low opacity
+          const isPrevOrNextMonth = dayObj.month !== 'current';
+          
+          return (
+            <TooltipProvider key={index}>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <div
                     onClick={() => onDayClick(dayObj.day, dayObj.month)}
@@ -205,9 +205,9 @@ const CalendarGrid = ({
                   )}
                 </TooltipContent>
               </Tooltip>
-            );
-          })}
-        </TooltipProvider>
+            </TooltipProvider>
+          );
+        })}
       </div>
     </div>
   );

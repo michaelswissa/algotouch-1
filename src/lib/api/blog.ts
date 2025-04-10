@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 
-// Blog posts with images using paths to the uploaded images
+// Example blog posts with images using local paths
 export function useBlogPostsWithRefresh(refreshInterval = 120000) {
   const [blogPosts, setBlogPosts] = useState<any[]>([
     {
@@ -12,7 +12,7 @@ export function useBlogPostsWithRefresh(refreshInterval = 120000) {
       date: "27.03.2025",
       author: "יובל לוי",
       tags: ["מערכות מסחר", "כלים"],
-      coverImage: "/lovable-uploads/eaaedceb-e362-4bfa-b236-a73f5544c6f3.png"  // תמונת הרובוט בחלון עם שולחן וWall St
+      coverImage: "/images/stock-market-1.jpg"
     },
     {
       id: 2,
@@ -22,7 +22,7 @@ export function useBlogPostsWithRefresh(refreshInterval = 120000) {
       date: "25.03.2025",
       author: "שרה כהן",
       tags: ["אסטרטגיות", "שוק אמריקאי"],
-      coverImage: "/lovable-uploads/c329da61-ad36-468f-bd33-878ec966c5a8.png"  // תמונת הרובוט עם סימן שאלה וגרף
+      coverImage: "/images/stock-market-2.jpg"
     },
     {
       id: 3,
@@ -32,7 +32,7 @@ export function useBlogPostsWithRefresh(refreshInterval = 120000) {
       date: "22.03.2025",
       author: "דן אברהם",
       tags: ["ניהול סיכונים", "הדרכה"],
-      coverImage: "/lovable-uploads/fab3481d-e54b-40ba-8173-ca15a5739a3a.png"  // תמונת הרובוט המנצח עם גביע ומטבעות
+      coverImage: "/images/stock-market-3.jpg"
     },
     {
       id: 4,

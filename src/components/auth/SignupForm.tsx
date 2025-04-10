@@ -98,7 +98,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       console.log('Registration data saved to session storage');
       toast.success('הפרטים נשמרו בהצלחה');
       
-      // Navigate directly to subscription page
+      // Navigate directly to subscription page bypassing the ProtectedRoute check
       navigate('/subscription', { replace: true, state: { isRegistering: true } });
       
       if (onSignupSuccess) {

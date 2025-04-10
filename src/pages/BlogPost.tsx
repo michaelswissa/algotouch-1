@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -8,7 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, Calendar, User, Tag, ThumbsUp, MessageSquare, Bookmark, Share } from 'lucide-react';
 import { useBlogPostsWithRefresh } from '@/lib/api/blog';
 
-// Fallback images if needed
 const stockMarketImages = [
   '/images/stock-market-1.jpg',
   '/images/stock-market-2.jpg',
@@ -24,9 +22,8 @@ const BlogPost = () => {
   
   const post = blogPosts.find(post => post.id === Number(id));
   
-  // Use the cover image from the post, or a fallback if it doesn't exist
   const getConsistentImage = (post: any, postIndex: number) => {
-    if (!post?.coverImage) {
+    if (!post?.coverImage || post.coverImage.includes('unsplash.com')) {
       return stockMarketImages[postIndex % stockMarketImages.length];
     }
     return post.coverImage;

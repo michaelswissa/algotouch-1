@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -49,28 +49,30 @@ const RatingButtons: React.FC<RatingButtonsProps> = ({
     <>
       <div className={cn("flex flex-wrap gap-2 justify-between", className)}>
         {options.map((option) => (
-          <Tooltip key={option.value}>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={value === option.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => onChange(option.value)}
-                className={cn(
-                  "flex-1 transition-all duration-200 hover:scale-105",
-                  value === option.value && "bg-primary text-primary-foreground ring-2 ring-primary/20"
-                )}
-              >
-                {option.icon && <span className="mr-1">{option.icon}</span>}
-                {option.label}
-              </Button>
-            </TooltipTrigger>
-            {option.tooltip && (
-              <TooltipContent className="bg-card">
-                <p>{option.tooltip}</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
+          <TooltipProvider key={option.value}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant={value === option.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onChange(option.value)}
+                  className={cn(
+                    "flex-1 transition-all duration-200 hover:scale-105",
+                    value === option.value && "bg-primary text-primary-foreground ring-2 ring-primary/20"
+                  )}
+                >
+                  {option.icon && <span className="mr-1">{option.icon}</span>}
+                  {option.label}
+                </Button>
+              </TooltipTrigger>
+              {option.tooltip && (
+                <TooltipContent className="bg-card">
+                  <p>{option.tooltip}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         ))}
       </div>
 

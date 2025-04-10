@@ -2,8 +2,6 @@
 {
   "imports": {
     "https://deno.land/std@0.168.0/http/server.ts": "https://deno.land/std@0.168.0/http/server.ts",
-    "https://deno.land/x/xhr@0.1.0/mod.ts": "https://deno.land/x/xhr@0.1.0/mod.ts",
-    "supabase": "https://esm.sh/@supabase/supabase-js@2.14.0",
-    "uuid": "https://deno.land/std@0.168.0/uuid/mod.ts"
+    "https://deno.land/x/xhr@0.1.0/mod.ts": "https://deno.land/x/xhr@0.1.0/mod.ts"
   }
 }
