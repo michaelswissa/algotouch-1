@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,16 +58,31 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     const getUserDetails = async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, email')
-          .eq('id', data.user.id)
-          .single();
-        
-        if (profile) {
-          setCardOwnerName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim());
-          setCardOwnerEmail(profile.email || data.user.email || '');
-        } else {
+        try {
+          // Fetch profile data, handle potential error
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+          
+          if (profile) {
+            // Build name from profile data if available
+            const firstName = profile.first_name || '';
+            const lastName = profile.last_name || '';
+            if (firstName || lastName) {
+              setCardOwnerName(`${firstName} ${lastName}`.trim());
+            }
+            
+            // Set email from profile or user data
+            setCardOwnerEmail(profile.email || data.user.email || '');
+          } else {
+            // Fallback to user email from auth
+            setCardOwnerEmail(data.user.email || '');
+          }
+        } catch (err) {
+          console.error('Error fetching profile:', err);
+          // Fallback to user email from auth
           setCardOwnerEmail(data.user.email || '');
         }
       }
