@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { TokenData } from './utils/paymentHelpers';
+import { TokenData } from '@/types/payment';
 import { Json } from '@/integrations/supabase/types';
 
 interface RegisterUserParams {
@@ -154,3 +154,4 @@ export const registerUser = async ({ registrationData, tokenData, contractDetail
     return { success: false, error };
   }
 };
+

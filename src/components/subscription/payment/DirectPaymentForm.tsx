@@ -60,7 +60,7 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleTokenReceived = async (tokenData: any) => {
+  const handleTokenReceived = async (tokenData: TokenData) => {
     setCurrentTab('card');
     
     if (!phone) {
@@ -170,7 +170,7 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
       console.log('Payment successful:', { tokenInfo, transactionId, documentInfo });
       
       if (tokenInfo) {
-        const tokenData: TokenData = {
+        const paymentTokenData: TokenData = {
           token: tokenInfo.token,
           lastFourDigits: tokenInfo.lastFourDigits || tokenData.lastFourDigits,
           expiryMonth: tokenData.expiryMonth,
@@ -179,7 +179,7 @@ const DirectPaymentForm: React.FC<DirectPaymentFormProps> = ({
         };
         
         if (registrationData) {
-          registrationData.paymentToken = tokenData;
+          registrationData.paymentToken = paymentTokenData;
           sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
         }
         
