@@ -31,18 +31,19 @@ serve(async (req) => {
     const {
       planId,
       planName,
-      amount,
+      amount: displayAmount, // This is the display amount in USD
       userEmail,
       userName,
+      userId,
       isRegistration,
       registrationData
     } = await req.json();
 
     // Validate required fields
-    if (!planId || !amount) {
-      console.error('Missing required fields:', { planId, amount });
+    if (!planId) {
+      console.error('Missing required fields:', { planId });
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: planId or amount', success: false }),
+        JSON.stringify({ error: 'Missing required field: planId', success: false }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -50,7 +51,30 @@ serve(async (req) => {
       );
     }
 
-    console.log('Creating payment session for plan:', planId, 'with amount:', amount);
+    console.log('Creating payment session for plan:', planId);
+
+    // Convert displayed USD price to ILS for charging
+    let ilsAmount = 0;
+    let operationType = "ChargeOnly"; // Default operation type
+
+    // Set the actual ILS amount and operation type based on the plan
+    if (planId === 'monthly') {
+      ilsAmount = 0; // Free first month
+      operationType = "ChargeAndCreateToken"; // Create token for future charges
+    } else if (planId === 'annual') {
+      ilsAmount = 3371; // 3,371 ILS immediate charge
+      operationType = "ChargeAndCreateToken"; // Immediate charge and create token for future renewals
+    } else if (planId === 'vip') {
+      ilsAmount = 13121; // 13,121 ILS one-time payment
+      operationType = "ChargeOnly"; // One-time charge, no token needed
+    }
+
+    console.log('Plan details:', { 
+      planId, 
+      ilsAmount,
+      displayAmountUSD: displayAmount, 
+      operationType 
+    });
 
     // Get the Cardcom API credentials from environment variables
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
@@ -110,12 +134,20 @@ serve(async (req) => {
     
     console.log('URLs configured:', { successUrl, failureUrl, webhookUrl });
 
+    // Pass the user ID via CustomFields for reference in the webhook
+    const customFields = [
+      {
+        Id: 1,
+        Value: userId || ""
+      }
+    ];
+
     // Create a Low Profile request to Cardcom
     const createLPRequest = {
       TerminalNumber: Number(terminalNumber),
       ApiName: apiName,
-      Operation: "ChargeOnly",
-      Amount: amount,
+      Operation: operationType, // "ChargeOnly", "ChargeAndCreateToken", "CreateTokenOnly"
+      Amount: ilsAmount, // This is the actual ILS amount to charge
       ReturnValue: planId, // Store plan ID for reference
       SuccessRedirectUrl: successUrl,
       FailedRedirectUrl: failureUrl,
@@ -128,9 +160,9 @@ serve(async (req) => {
         Email: userEmail || "",
         Products: [
           { 
-            Description: planName || "Subscription Plan", 
+            Description: getPlanDescription(planId), 
             Quantity: 1, 
-            UnitCost: amount 
+            UnitCost: ilsAmount 
           }
         ],
         IsAllowEditDocument: false,
@@ -145,7 +177,8 @@ serve(async (req) => {
         IsHideCardOwnerEmail: false,
         IsCardOwnerEmailRequired: true,
         CardOwnerEmailValue: userEmail || "",
-        CardOwnerNameValue: userName || ""
+        CardOwnerNameValue: userName || "",
+        CustomFields: customFields
       },
       AdvancedDefinition: {
         ThreeDSecureState: "Enabled" // Enable 3D Secure for added security
@@ -191,9 +224,13 @@ serve(async (req) => {
         apiName,
         planId,
         planName,
-        amount,
+        amount: ilsAmount,
+        displayAmount: displayAmount,
+        currency: 'ILS',
         userEmail,
-        userName
+        userName,
+        userId,
+        operation: operationType
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -214,3 +251,17 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to get Hebrew plan descriptions
+function getPlanDescription(planId: string): string {
+  switch (planId) {
+    case 'monthly':
+      return 'מנוי חודשי - חודש ניסיון חינם + 371 ש"ח חיוב חודשי';
+    case 'annual':
+      return 'מנוי שנתי - 3,371 ש"ח חיוב שנתי';
+    case 'vip':
+      return 'מנוי VIP - 13,121 ש"ח תשלום חד פעמי לכל החיים';
+    default:
+      return 'מנוי';
+  }
+}

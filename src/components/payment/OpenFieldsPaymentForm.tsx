@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CardcomOpenFields from './CardcomOpenFields';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,9 +43,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   const plans = getSubscriptionPlans();
   const plan = plans[planId as keyof typeof plans] || plans.monthly;
   
-  // Calculate amount to charge based on plan
-  const amount = plan.price;
-  
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
       <CardHeader>
@@ -55,10 +52,10 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
         </div>
         <CardDescription>
           {planId === 'monthly' 
-            ? 'הירשם למנוי חודשי עם חודש ניסיון חינם' 
+            ? 'הרשמה למנוי חודשי עם חודש ניסיון חינם' 
             : planId === 'annual' 
-              ? 'הירשם למנוי שנתי עם 25% הנחה' 
-              : 'הירשם למנוי VIP לכל החיים'}
+              ? 'הרשמה למנוי שנתי עם חיסכון של 25%' 
+              : 'רכישת מנוי VIP לכל החיים'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -66,20 +63,21 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {planId === 'monthly' 
-              ? 'המנוי כולל חודש ניסיון חינם. החיוב הראשון יתבצע רק לאחר 30 יום.'
+              ? 'המנוי כולל חודש ניסיון חינם. החיוב הראשון של 371 ₪ יתבצע רק לאחר 30 יום.'
               : planId === 'annual' 
-                ? 'המנוי השנתי משקף חיסכון של 3 חודשים בהשוואה למנוי חודשי.' 
-                : 'מנוי VIP הוא תשלום חד פעמי המעניק גישה לכל החיים.'}
+                ? 'המנוי השנתי במחיר 3,371 ₪ משקף חיסכון של 25% בהשוואה למנוי חודשי.' 
+                : 'מנוי VIP הוא תשלום חד פעמי של 13,121 ₪ המעניק גישה לכל החיים.'}
           </AlertDescription>
         </Alert>
         
         <CardcomOpenFields 
           planId={planId}
           planName={plan.name}
-          amount={amount}
+          amount={plan.displayPrice} // Display price (USD)
           onSuccess={handleSuccess}
           onError={handleError}
           onCancel={onCancel}
+          onPaymentStart={handlePaymentStart}
         />
       </CardContent>
     </Card>

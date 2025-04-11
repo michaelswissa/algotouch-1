@@ -59,7 +59,10 @@ const UserSubscription = () => {
     );
   }
 
-  const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
+  const showTrialStatus = subscription.status === 'trial';
+  const isPaidPlan = subscription.status === 'active' && subscription.plan_type !== 'vip';
+  const isVip = subscription.plan_type === 'vip';
+  const isCancelled = subscription.status === 'cancelled';
 
   return (
     <SubscriptionCard
@@ -67,7 +70,7 @@ const UserSubscription = () => {
       description={`סטטוס: ${details?.statusText}`}
     >
       <>
-        {subscription.status === 'trial' && details && (
+        {showTrialStatus && details && (
           <SubscriptionStatus 
             status={subscription.status} 
             daysLeft={details.daysLeft} 
@@ -78,20 +81,37 @@ const UserSubscription = () => {
         <div className="grid grid-cols-1 gap-4 mt-4">
           {details && (
             <>
-              <BillingInfo 
-                nextBillingDate={details.nextBillingDate} 
-                planPrice={details.planPrice}
-                currency="$"
-              />
+              {(isPaidPlan || showTrialStatus || isCancelled) && (
+                <BillingInfo 
+                  nextBillingDate={details.nextBillingDate} 
+                  planPrice={details.planPrice}
+                  currency="₪"
+                />
+              )}
               
+              {isVip && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-lg">
+                  <h3 className="font-medium text-green-700 dark:text-green-300">מנוי VIP לכל החיים</h3>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                    רכשת גישה ללא הגבלת זמן למערכת. אין צורך בחיוב נוסף.
+                  </p>
+                </div>
+              )}
+              
+              {/* Show payment method for all subscription types */}
               <PaymentMethodInfo 
                 paymentMethod={details.paymentMethod} 
               />
             </>
           )}
         </div>
+        
+        <SubscriptionFooter 
+          subscriptionId={subscription.id}
+          status={subscription.status}
+          planType={subscription.plan_type}
+        />
       </>
-      <SubscriptionFooter />
     </SubscriptionCard>
   );
 };

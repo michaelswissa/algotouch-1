@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,7 +44,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   
   const navigate = useNavigate();
 
-  // Check URL parameters for success/error redirects from Cardcom
+  const plans = getSubscriptionPlans();
+  const plan = plans[planId as keyof typeof plans] || plans.monthly;
+  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
@@ -63,12 +64,10 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   }, []);
 
   useEffect(() => {
-    // Get user details for the form if available
     const getUserDetails = async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
         try {
-          // Fetch profile data, handle potential error
           const { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
@@ -76,22 +75,18 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             .maybeSingle();
           
           if (profile) {
-            // Build name from profile data if available
             const firstName = profile.first_name || '';
             const lastName = profile.last_name || '';
             if (firstName || lastName) {
               setCardOwnerName(`${firstName} ${lastName}`.trim());
             }
             
-            // Always use email from auth user data, since profile doesn't have an email field
             setCardOwnerEmail(data.user.email || '');
           } else {
-            // Fallback to user email from auth
             setCardOwnerEmail(data.user.email || '');
           }
         } catch (err) {
           console.error('Error fetching profile:', err);
-          // Fallback to user email from auth
           setCardOwnerEmail(data.user.email || '');
         }
       }
@@ -101,10 +96,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     initializePaymentSession();
   }, [planId, amount]);
 
-  // Only initialize iframe fields after we have the low profile code and AFTER iframes are loaded
   useEffect(() => {
     if (lowProfileCode && masterFrameRef.current && cardNumberFrameRef.current && cvvFrameRef.current) {
-      // Set a timeout to ensure iframes are fully loaded first
       const timer = setTimeout(() => {
         console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
         initializeIframeFields();
@@ -118,7 +111,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     setError(null);
     
     try {
-      // Get user data from supabase auth
       const { data: { user } } = await supabase.auth.getUser();
       
       const { data: registrationData } = await supabase
@@ -129,20 +121,19 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         .limit(1)
         .maybeSingle();
         
-      // Prepare request data
       const requestData = {
         planId,
         planName,
-        amount,
+        amount: plan.displayPrice,
         userEmail: cardOwnerEmail || (user?.email || ''),
         userName: cardOwnerName || (user?.user_metadata?.full_name || ''),
+        userId: user?.id || null,
         isRegistration: !!registrationData,
         registrationData: registrationData?.registration_data || null
       };
       
       console.log('Initializing payment session with data:', requestData);
       
-      // Call our edge function to initialize the cardcom session
       const { data, error: functionError } = await supabase.functions.invoke('cardcom-openfields', {
         body: requestData
       });
@@ -158,7 +149,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       
       console.log('Payment session created successfully with ID:', data.lowProfileId);
       
-      // Store the lowProfileId
       setLowProfileCode(data.lowProfileId);
     } catch (error) {
       console.error('Error initializing payment session:', error);
@@ -185,17 +175,15 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     try {
       console.log('Starting iframe initialization with lowProfileCode:', lowProfileCode);
       
-      // Fetch CSS files for styling the iframe fields
       const cardNumberCssResponse = await fetch('/assets/styles/cardNumber.css');
       const cardNumberCss = await cardNumberCssResponse.text();
       
       const cvvCssResponse = await fetch('/assets/styles/cvvField.css');
       const cvvCss = await cvvCssResponse.text();
 
-      // Post message to master iframe with initialization data
       const message = {
         action: 'init',
-        lowProfileCode: lowProfileCode, // This is the required parameter
+        lowProfileCode: lowProfileCode,
         cardFieldCSS: cardNumberCss, 
         cvvFieldCSS: cvvCss,
         placeholder: "0000 0000 0000 0000",
@@ -224,10 +212,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }
   };
 
-  // Listen for messages from iframes
   useEffect(() => {
     const handleFrameMessages = (event: MessageEvent) => {
-      // Check if the message is from Cardcom domains
       if (!event.origin.includes('cardcom.solutions')) {
         return;
       }
@@ -247,7 +233,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           onError?.(msg.message || 'שגיאה בעיבוד התשלום');
           break;
         case "handleValidations":
-          // Handle field validations
           if (msg.field === "cvv") {
             setCvvFieldClass(msg.isValid);
           }
@@ -259,7 +244,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           }
           break;
         default:
-          // Log any other messages for debugging
           console.log('Other message from iframe:', msg);
           break;
       }
@@ -320,7 +304,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       isValid = false;
     }
     
-    // Validate card number and CVV through iframes
     if (masterFrameRef.current) {
       masterFrameRef.current.contentWindow?.postMessage({ action: "validateCardNumber" }, '*');
       masterFrameRef.current.contentWindow?.postMessage({ action: "validateCvv" }, '*');
@@ -355,7 +338,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       return;
     }
     
-    // Update card holder details
     const cardOwnerData = {
       cardOwnerName,
       cardOwnerEmail,
@@ -368,15 +350,14 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       data: cardOwnerData 
     }, '*');
     
-    // Submit the payment - THE IMPORTANT PART - lowProfileCode is passed here
     const formProps = {
       action: 'doTransaction',
-      lowProfileCode: lowProfileCode, // Pass the lowProfileCode as a top-level parameter
+      lowProfileCode: lowProfileCode,
       cardOwnerName,
       cardOwnerEmail,
       expirationMonth,
       expirationYear,
-      cardOwnerId: '000000000', // Default value to pass validation
+      cardOwnerId: '000000000',
       cardOwnerPhone: '',
       numberOfPayments: "1",
       document: createDocument()
@@ -422,11 +403,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     
     console.log('Payment successful:', data);
     
-    // Call the onSuccess callback with the transaction ID
     if (onSuccess && data.TranzactionId) {
       onSuccess(data.TranzactionId.toString());
     } else {
-      // If no callback is provided, redirect to success page
       navigate(`/subscription?success=true&planId=${planId}&lowProfileId=${lowProfileCode}`);
     }
   };
@@ -490,16 +469,14 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
 
   return (
     <div className="flex flex-col p-4 space-y-4" dir="rtl">
-      {/* Hidden master iframe - always render this one */}
       <iframe 
         id="CardComMasterFrame" 
-        name="CardComMasterFrame"  // Important: Add name attribute
+        name="CardComMasterFrame"
         ref={masterFrameRef}
         src={`${CARDCOM_IFRAME_URL}/master`}
         style={{ display: 'none', width: '0px', height: '0px' }} 
       />
       
-      {/* Payment Form */}
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -541,7 +518,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           {lowProfileCode && (
             <iframe
               id="CardComCardNumber"
-              name="CardComCardNumber"  // Important: Add name attribute
+              name="CardComCardNumber"
               ref={cardNumberFrameRef}
               src={`${CARDCOM_IFRAME_URL}/cardNumber`}
               style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
@@ -606,7 +583,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             {lowProfileCode && (
               <iframe
                 id="CardComCvv"
-                name="CardComCvv"  // Important: Add name attribute
+                name="CardComCvv"
                 ref={cvvFrameRef}
                 src={`${CARDCOM_IFRAME_URL}/CVV`}
                 style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
@@ -624,7 +601,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           </div>
         </div>
         
-        {/* Secure payment note */}
         <div className="text-xs text-muted-foreground mt-2 text-center">
           <p>התשלום מאובטח ומתבצע באמצעות Cardcom</p>
         </div>
@@ -646,6 +622,25 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           </Button>
         </div>
       </form>
+      
+      {!loading && !error && (
+        <div className="bg-muted/30 p-3 rounded-md mt-2">
+          <p className="text-sm font-medium mb-1">פרטי חיוב:</p>
+          {planId === 'monthly' ? (
+            <p className="text-sm text-muted-foreground">
+              חודש ראשון חינם, לאחר מכן חיוב של <span className="font-semibold">₪371</span> מדי חודש
+            </p>
+          ) : planId === 'annual' ? (
+            <p className="text-sm text-muted-foreground">
+              חיוב חד פעמי של <span className="font-semibold">₪3,371</span> עכשיו, ולאחר מכן חידוש שנתי במחיר זהה
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              תשלום חד פעמי של <span className="font-semibold">₪13,121</span> לגישה ללא הגבלת זמן
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };

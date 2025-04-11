@@ -7,6 +7,8 @@ interface PlanSummaryProps {
   price: number;
   description: string;
   currency?: string;
+  displayPrice?: number;
+  displayCurrency?: string;
   hasTrial?: boolean;
 }
 
@@ -14,7 +16,9 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
   planName, 
   price, 
   description, 
-  currency = '$',
+  currency = '₪',
+  displayPrice,
+  displayCurrency = '$',
   hasTrial = false
 }) => {
   // Function to get the icon based on plan name
@@ -34,7 +38,7 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
           </div>
           <div className="text-right">
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold">{currency}{price}</span>
+              <span className="text-3xl font-bold">{displayCurrency}{displayPrice}</span>
               <span className="text-sm text-muted-foreground">
                 {planName.includes('חודשי') 
                   ? '/חודש' 
@@ -42,6 +46,9 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
                     ? '/שנה' 
                     : ' תשלום חד פעמי'}
               </span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              ({currency}{price})
             </div>
           </div>
         </div>

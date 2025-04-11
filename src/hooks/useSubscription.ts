@@ -13,6 +13,7 @@ interface Subscription {
   status: string;
   trial_ends_at: string | null;
   current_period_ends_at: string | null;
+  next_charge_date: string | null;
   payment_method: {
     lastFourDigits: string;
     expiryMonth: string;
@@ -63,6 +64,7 @@ export const useSubscription = () => {
               status: data.status,
               trial_ends_at: data.trial_ends_at,
               current_period_ends_at: data.current_period_ends_at,
+              next_charge_date: data.next_charge_date,
               payment_method: data.payment_method
             };
             setSubscription(formattedSubscription);
@@ -87,14 +89,26 @@ export const useSubscription = () => {
   const getSubscriptionDetails = (sub: Subscription | null): SubscriptionDetails | null => {
     if (!sub) return null;
     
-    const planName = sub.plan_type === 'annual' ? 'שנתי' : 'חודשי';
-    const planPrice = sub.plan_type === 'annual' ? '899' : '99';
+    // Get Hebrew plan name and actual price in ILS
+    const planName = sub.plan_type === 'annual' ? 'שנתי' : 
+                    sub.plan_type === 'vip' ? 'VIP' : 'חודשי';
+    
+    // Set the actual ILS prices
+    let planPrice = '';
+    if (sub.plan_type === 'monthly') {
+      planPrice = '371';
+    } else if (sub.plan_type === 'annual') {
+      planPrice = '3,371';
+    } else if (sub.plan_type === 'vip') {
+      planPrice = '13,121';
+    }
     
     let statusText = '';
     let nextBillingDate = '';
     let progressValue = 0;
     let daysLeft = 0;
     
+    // Set status text and next billing date based on subscription status
     if (sub.status === 'trial' && sub.trial_ends_at) {
       const trialEndDate = parseISO(sub.trial_ends_at);
       daysLeft = Math.max(0, differenceInDays(trialEndDate, new Date()));
@@ -102,15 +116,33 @@ export const useSubscription = () => {
       
       statusText = 'בתקופת ניסיון';
       nextBillingDate = format(trialEndDate, 'dd/MM/yyyy', { locale: he });
-    } else if (sub.current_period_ends_at) {
-      const periodEndDate = parseISO(sub.current_period_ends_at);
-      const periodStartDate = addMonths(periodEndDate, -1);
-      daysLeft = Math.max(0, differenceInDays(periodEndDate, new Date()));
-      const totalDays = differenceInDays(periodEndDate, periodStartDate);
-      progressValue = Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
+    } else if (sub.next_charge_date) {
+      // Use next_charge_date if available
+      const nextChargeDate = parseISO(sub.next_charge_date);
+      nextBillingDate = format(nextChargeDate, 'dd/MM/yyyy', { locale: he });
       
-      statusText = 'פעיל';
-      nextBillingDate = format(periodEndDate, 'dd/MM/yyyy', { locale: he });
+      if (sub.status === 'active') {
+        statusText = 'פעיל';
+        
+        // Calculate days left and progress based on either current_period_ends_at or next_charge_date
+        const endDate = sub.current_period_ends_at 
+          ? parseISO(sub.current_period_ends_at) 
+          : nextChargeDate;
+          
+        const startDate = sub.plan_type === 'monthly' 
+          ? addMonths(endDate, -1) 
+          : addMonths(endDate, -12);
+          
+        daysLeft = Math.max(0, differenceInDays(endDate, new Date()));
+        const totalDays = differenceInDays(endDate, startDate);
+        progressValue = Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
+      } else if (sub.status === 'cancelled') {
+        statusText = 'מבוטל';
+      }
+    } else if (sub.status === 'active' && sub.plan_type === 'vip') {
+      // VIP plan has no end date
+      statusText = 'פעיל לכל החיים';
+      nextBillingDate = 'ללא חיוב נוסף';
     }
     
     // Process payment method safely

@@ -1,10 +1,10 @@
 
-project_id = "algotouch-trader"
+project_id = "ndhakvhrrkczgylcmyoc"
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage"]
+schemas = ["public", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -12,6 +12,13 @@ max_rows = 1000
 port = 54322
 shadow_port = 54320
 major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 15
+max_client_conn = 100
 
 [studio]
 enabled = true
@@ -21,13 +28,16 @@ api_url = "http://localhost"
 [inbucket]
 enabled = true
 port = 54324
+smtp_port = 54325
+pop3_port = 54326
 
 [storage]
 enabled = true
-file_size_limit = "50MiB"
+port = 54327
 
 [auth]
 enabled = true
+port = 54328
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
@@ -51,10 +61,26 @@ secret = ""
 redirect_uri = ""
 url = ""
 
-[functions]
-[functions.cardcom-webhook]
-verify_jwt = false
+[analytics]
+enabled = false
+port = 54330
+vector_port = 54331
+backend = "postgres"
+
+[experimental]
+enabled = false
+
+[edge_functions]
+enabled = true
+
 [functions.cardcom-check-status]
 verify_jwt = false
+
 [functions.cardcom-openfields]
+verify_jwt = false
+
+[functions.cardcom-recurring]
+verify_jwt = false
+
+[functions.cardcom-webhook]
 verify_jwt = false
