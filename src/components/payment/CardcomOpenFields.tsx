@@ -285,7 +285,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     } else if (!/^\d{2}$/.test(expirationMonth) || parseInt(expirationMonth) < 1 || parseInt(expirationMonth) > 12) {
       setError('חודש תפוגה לא תקין');
       isValid = false;
-    } else if (!/^\d{2}$/.test(expiryYear)) {
+    } else if (!/^\d{2}$/.test(expirationYear)) {
       setError('שנת תפוגה לא תקינה');
       isValid = false;
     }
