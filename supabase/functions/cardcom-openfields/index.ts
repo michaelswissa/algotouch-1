@@ -37,9 +37,9 @@ serve(async (req) => {
     } = await req.json();
 
     // Validate required fields
-    if (!planId) {
+    if (!planId || !amount) {
       return new Response(
-        JSON.stringify({ error: 'Missing required field: planId' }),
+        JSON.stringify({ error: 'Missing required fields: planId or amount', success: false }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -47,7 +47,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Creating payment session for plan:', planId);
+    console.log('Creating payment session for plan:', planId, 'with amount:', amount);
 
     // Get the Cardcom API credentials from environment variables or hardcoded values
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
@@ -93,7 +93,7 @@ serve(async (req) => {
 
     // Create a Low Profile request to Cardcom
     const createLPRequest = {
-      TerminalNumber: terminalNumber,
+      TerminalNumber: Number(terminalNumber),
       ApiName: apiName,
       Operation: "ChargeOnly", // Default operation
       Amount: amount,
@@ -179,7 +179,7 @@ serve(async (req) => {
     console.error('Error processing request:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An unexpected error occurred',
         success: false 
       }),
       {

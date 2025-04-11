@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from 'lucide-react';
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface CardcomOpenFieldsProps {
   planId: string;
@@ -44,10 +45,17 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   // Check URL parameters for success/error redirects from Cardcom
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const lowProfileIdParam = urlParams.get('lowProfileId');
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
     
-    if (lowProfileIdParam) {
-      checkTransactionStatus(lowProfileIdParam);
+    if (success === 'true') {
+      const lowProfileId = urlParams.get('lowProfileId');
+      if (lowProfileId) {
+        console.log('Transaction success, checking status with lowProfileId:', lowProfileId);
+        checkTransactionStatus(lowProfileId);
+      }
+    } else if (error === 'true') {
+      setError('התשלום נכשל. אנא נסה שנית.');
     }
   }, []);
 
@@ -94,7 +102,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   useEffect(() => {
     if (lowProfileCode && masterFrameRef.current) {
       console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
-      initializeIframeFields(lowProfileCode);
+      initializeIframeFields();
     }
   }, [lowProfileCode]);
 
@@ -154,9 +162,15 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }
   };
 
-  const initializeIframeFields = async (profileCode: string) => {
+  const initializeIframeFields = async () => {
     if (!masterFrameRef.current) {
       console.error('Master iframe reference not available');
+      return;
+    }
+
+    if (!lowProfileCode) {
+      console.error('LowProfileCode is required but not available');
+      setError('שגיאה בהתחברות למערכת התשלומים. קוד עסקה חסר.');
       return;
     }
 
@@ -171,7 +185,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       // Post message to master iframe with initialization data
       const message = {
         action: 'init',
-        lowProfileCode: profileCode,
+        lowProfileCode: lowProfileCode, // This is the required parameter
         cardFieldCSS: cardNumberCss, 
         cvvFieldCSS: cvvCss,
         placeholder: "0000 0000 0000 0000",
@@ -181,7 +195,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       
       console.log('Sending initialization message to iframe:', { 
         action: message.action, 
-        lowProfileCode: profileCode,
+        lowProfileCode: lowProfileCode,
         hasCardCSS: !!message.cardFieldCSS,
         hasCvvCSS: !!message.cvvFieldCSS
       });
@@ -189,7 +203,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       masterFrameRef.current.contentWindow?.postMessage(message, '*');
     } catch (error) {
       console.error('Error loading CSS files or initializing iframes:', error);
-      setError('Failed to load form styles');
+      setError('שגיאה בטעינת סגנונות הטופס');
     }
   };
 
@@ -212,8 +226,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         case "HandleEror":
           console.error("Payment error:", msg.message);
           setProcessingPayment(false);
-          setError(msg.message || 'Payment processing failed');
-          onError?.(msg.message || 'Payment processing failed');
+          setError(msg.message || 'שגיאה בעיבוד התשלום');
+          onError?.(msg.message || 'שגיאה בעיבוד התשלום');
           break;
         case "handleValidations":
           // Handle field validations
@@ -311,7 +325,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     setError(null);
     
     if (!masterFrameRef.current) {
-      setError('Error initializing payment form');
+      setError('שגיאה באתחול טופס התשלום');
       setProcessingPayment(false);
       return;
     }
@@ -328,7 +342,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       data: cardOwnerData 
     }, '*');
     
-    // Submit the payment
+    // Submit the payment - THE IMPORTANT PART - lowProfileCode is passed here
     const formProps = {
       action: 'doTransaction',
       cardOwnerName,
@@ -368,8 +382,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     setProcessingPayment(false);
     
     if (!data || !data.IsSuccess) {
-      setError(data?.Description || 'Payment failed without specific error');
-      onError?.(data?.Description || 'Payment failed without specific error');
+      setError(data?.Description || 'התשלום נכשל ללא שגיאה ספציפית');
+      onError?.(data?.Description || 'התשלום נכשל ללא שגיאה ספציפית');
       return;
     }
     
@@ -404,12 +418,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           Description: data.Description
         });
       } else if (data.ResponseCode !== 0) {
-        setError(data.Description || 'Payment failed');
-        onError?.(data.Description || 'Payment failed');
+        setError(data.Description || 'התשלום נכשל');
+        onError?.(data.Description || 'התשלום נכשל');
       }
     } catch (error) {
       console.error('Error checking transaction status:', error);
-      setError(error instanceof Error ? error.message : 'Failed to verify payment status');
+      setError(error instanceof Error ? error.message : 'שגיאה באימות סטטוס התשלום');
     }
   };
   

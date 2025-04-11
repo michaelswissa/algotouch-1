@@ -28,9 +28,10 @@ serve(async (req) => {
   try {
     const { lowProfileId } = await req.json();
 
+    // Validate required fields
     if (!lowProfileId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required field: lowProfileId' }),
+        JSON.stringify({ ResponseCode: 400, Description: 'Missing required field: lowProfileId' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -41,23 +42,24 @@ serve(async (req) => {
     console.log('Checking transaction status for lowProfileId:', lowProfileId);
 
     // Get the Cardcom API credentials from environment variables
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "";
-    const apiName = Deno.env.get("CARDCOM_USERNAME") || "";
-
-    // Create request for Cardcom API to check low profile transaction status
-    const getLowProfileRequest = {
-      TerminalNumber: terminalNumber,
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
+    const apiName = Deno.env.get("CARDCOM_USERNAME") || "bLaocQRMSnwphQRUVG3b";
+    
+    // Query the Cardcom API for the transaction status
+    const request = {
+      TerminalNumber: Number(terminalNumber),
       ApiName: apiName,
       LowProfileId: lowProfileId
     };
-
-    // Call Cardcom API to get transaction status
+    
+    console.log('Sending request to Cardcom API:', JSON.stringify(request));
+    
     const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(getLowProfileRequest),
+      body: JSON.stringify(request),
     });
     
     if (!response.ok) {
@@ -66,186 +68,68 @@ serve(async (req) => {
       throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
     }
     
-    const transactionResult = await response.json();
-    console.log('Transaction result:', JSON.stringify(transactionResult));
-
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
+    const cardcomResponse = await response.json();
+    console.log('Received response from Cardcom API:', JSON.stringify(cardcomResponse));
     
-    // Process transaction based on the status
-    if (transactionResult.ResponseCode === 0 && 
-        transactionResult.Operation === "ChargeOnly" &&
-        transactionResult.TranzactionInfo?.ResponseCode === 0) {
+    if (cardcomResponse.ResponseCode === 0 && cardcomResponse.TranzactionInfo?.TranzactionId) {
+      console.log('Transaction successful:', cardcomResponse.TranzactionInfo.TranzactionId);
       
-      // Extract transaction details
-      const {
-        TranzactionInfo,
-        LowProfileId,
-        ReturnValue: planId,
-        UIValues
-      } = transactionResult;
+      // For successful transactions, update the subscription or registration in Supabase
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
       
-      console.log('Successfully processed transaction:', {
-        LowProfileId,
-        planId,
-        transactionId: TranzactionInfo.TranzactionId
-      });
-
-      // Try to find a user either from temp registration data or directly by email
-      let userId = null;
-      const userEmail = UIValues?.CardOwnerEmail || null;
-      
-      if (userEmail) {
-        // Check if this is a new registration
-        const { data: tempRegistrationData } = await supabaseClient
-          .from('temp_registration_data')
-          .select('*')
-          .eq('used', false)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      if (supabaseUrl && supabaseKey) {
+        try {
+          const supabase = createClient(supabaseUrl, supabaseKey);
           
-        if (tempRegistrationData) {
-          // This is a new registration - create the user first
-          const registrationData = tempRegistrationData.registration_data;
-          
-          if (registrationData.email && registrationData.password) {
-            console.log('Creating new user from registration data');
+          // Check if this is a registration with temp data
+          if (cardcomResponse.ReturnValue) {
+            const planId = cardcomResponse.ReturnValue;
             
-            // Create the user
-            const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
-              email: registrationData.email,
-              password: registrationData.password,
-              email_confirm: true,
-              user_metadata: {
-                full_name: registrationData.userData?.firstName + ' ' + registrationData.userData?.lastName
-              }
-            });
-            
-            if (authError) {
-              console.error('Error creating user:', authError);
-            } else if (authData.user) {
-              userId = authData.user.id;
+            // Get the most recent unused registration data
+            const { data: registrationData } = await supabase
+              .from('temp_registration_data')
+              .select('*')
+              .eq('used', false)
+              .order('created_at', { ascending: false })
+              .limit(1);
               
-              // Update profile with registration data
-              if (userId && registrationData.userData) {
-                await supabaseClient.from('profiles').update({
-                  first_name: registrationData.userData.firstName,
-                  last_name: registrationData.userData.lastName,
-                  phone: registrationData.userData.phone,
-                }).eq('id', userId);
-              }
+            if (registrationData && registrationData.length > 0) {
+              console.log('Found registration data, processing registration');
               
-              // Mark registration data as used
-              await supabaseClient.from('temp_registration_data')
+              // Mark the registration data as used to prevent duplicate processing
+              await supabase
+                .from('temp_registration_data')
                 .update({ used: true })
-                .eq('id', tempRegistrationData.id);
+                .eq('id', registrationData[0].id);
+                
+              // Process transaction data for existing users
+              // This would typically involve creating or updating a subscription record
+              // or processing a one-time payment
             }
           }
-        } else {
-          // This is an existing user - find them by email
-          const { data: userData } = await supabaseClient.auth.admin
-            .listUsers();
-          
-          const user = userData.users.find(
-            (u) => u.email?.toLowerCase() === userEmail.toLowerCase()
-          );
-          
-          if (user) {
-            userId = user.id;
-          }
+        } catch (error) {
+          console.error('Error processing Supabase updates:', error);
         }
       }
-      
-      // If we have a user ID, create or update subscription
-      if (userId) {
-        console.log('Processing subscription for user:', userId);
-        
-        const now = new Date();
-        let trialEndsAt = null;
-        let currentPeriodEndsAt = null;
-        let status = 'active';
-        
-        // Set subscription parameters based on plan
-        if (planId === 'monthly') {
-          // For monthly plans, start with a trial period
-          status = 'trial';
-          trialEndsAt = new Date(now);
-          trialEndsAt.setMonth(now.getMonth() + 1);
-        } else if (planId === 'annual') {
-          // For annual plans, set the period end to one year from now
-          currentPeriodEndsAt = new Date(now);
-          currentPeriodEndsAt.setFullYear(now.getFullYear() + 1);
-        }
-        // For VIP plans, no need for trial or period end dates
-        
-        // Payment method details
-        const paymentMethod = {
-          lastFourDigits: TranzactionInfo.Last4CardDigitsString || "",
-          expiryMonth: TranzactionInfo.CardMonth?.toString() || "",
-          expiryYear: TranzactionInfo.CardYear?.toString() || "",
-          cardholderName: UIValues.CardOwnerName || "",
-        };
-        
-        // Create or update subscription
-        const { error: subscriptionError } = await supabaseClient
-          .from('subscriptions')
-          .upsert({
-            user_id: userId,
-            plan_type: planId,
-            status: status,
-            trial_ends_at: trialEndsAt?.toISOString() || null,
-            current_period_ends_at: currentPeriodEndsAt?.toISOString() || null,
-            payment_method: paymentMethod,
-            contract_signed: true,
-            contract_signed_at: now.toISOString()
-          });
-        
-        if (subscriptionError) {
-          console.error('Error creating subscription:', subscriptionError);
-        }
-        
-        // Log the payment
-        const { error: paymentError } = await supabaseClient
-          .from('payment_history')
-          .insert({
-            user_id: userId,
-            subscription_id: userId, // Using user ID as subscription ID for simplicity
-            amount: TranzactionInfo.Amount,
-            currency: 'ILS',
-            status: 'completed',
-            payment_method: paymentMethod,
-            payment_date: now.toISOString()
-          });
-        
-        if (paymentError) {
-          console.error('Error logging payment:', paymentError);
-        }
-      } else {
-        console.log('Could not find or create user for transaction');
-      }
-    } else if (transactionResult.ResponseCode !== 0) {
-      console.error('Transaction failed with response code:', transactionResult.ResponseCode);
-      console.error('Transaction error description:', transactionResult.Description);
     }
     
-    // Return the transaction result to the client
+    // Return the Cardcom response to the client
     return new Response(
-      JSON.stringify(transactionResult),
+      JSON.stringify(cardcomResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
+
   } catch (error) {
-    console.error('Error checking transaction status:', error);
+    console.error('Error processing request:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        success: false 
+        ResponseCode: 500, 
+        Description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        error: true
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

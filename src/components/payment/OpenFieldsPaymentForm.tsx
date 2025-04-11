@@ -9,24 +9,34 @@ import { AlertCircle } from 'lucide-react';
 
 interface OpenFieldsPaymentFormProps {
   planId: string;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (transactionId: string) => void;
+  onPaymentStart?: () => void;
+  onError?: (error: string) => void;
   onCancel?: () => void;
 }
 
 const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({ 
   planId, 
   onPaymentComplete,
+  onPaymentStart,
+  onError,
   onCancel 
 }) => {
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const handleSuccess = (transactionId: string) => {
     setProcessingPayment(false);
-    onPaymentComplete();
+    onPaymentComplete(transactionId);
   };
 
   const handleError = (error: string) => {
     setProcessingPayment(false);
+    if (onError) onError(error);
+  };
+
+  const handlePaymentStart = () => {
+    setProcessingPayment(true);
+    if (onPaymentStart) onPaymentStart();
   };
 
   // Get plan details to display in the UI
