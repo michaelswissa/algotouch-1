@@ -26,10 +26,14 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
+    console.log('Received request to check payment status');
+    
     const { lowProfileId } = await req.json();
+    console.log('Checking status for lowProfileId:', lowProfileId);
 
     // Validate required fields
     if (!lowProfileId) {
+      console.error('Missing required field: lowProfileId');
       return new Response(
         JSON.stringify({ ResponseCode: 400, Description: 'Missing required field: lowProfileId' }),
         {
@@ -39,11 +43,20 @@ serve(async (req) => {
       );
     }
 
-    console.log('Checking transaction status for lowProfileId:', lowProfileId);
-
     // Get the Cardcom API credentials from environment variables
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
     const apiName = Deno.env.get("CARDCOM_USERNAME") || "bLaocQRMSnwphQRUVG3b";
+    
+    if (!terminalNumber || !apiName) {
+      console.error('Missing Cardcom API credentials');
+      return new Response(
+        JSON.stringify({ ResponseCode: 500, Description: 'Missing Cardcom API credentials' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
     
     // Query the Cardcom API for the transaction status
     const request = {
@@ -52,7 +65,7 @@ serve(async (req) => {
       LowProfileId: lowProfileId
     };
     
-    console.log('Sending request to Cardcom API:', JSON.stringify(request));
+    console.log('Sending request to Cardcom GetLpResult API:', JSON.stringify(request));
     
     const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult", {
       method: "POST",
@@ -69,7 +82,7 @@ serve(async (req) => {
     }
     
     const cardcomResponse = await response.json();
-    console.log('Received response from Cardcom API:', JSON.stringify(cardcomResponse));
+    console.log('Received response from Cardcom GetLpResult API:', JSON.stringify(cardcomResponse));
     
     if (cardcomResponse.ResponseCode === 0 && cardcomResponse.TranzactionInfo?.TranzactionId) {
       console.log('Transaction successful:', cardcomResponse.TranzactionInfo.TranzactionId);
@@ -85,6 +98,7 @@ serve(async (req) => {
           // Check if this is a registration with temp data
           if (cardcomResponse.ReturnValue) {
             const planId = cardcomResponse.ReturnValue;
+            console.log('Transaction has ReturnValue (planId):', planId);
             
             // Get the most recent unused registration data
             const { data: registrationData } = await supabase
@@ -103,6 +117,8 @@ serve(async (req) => {
                 .update({ used: true })
                 .eq('id', registrationData[0].id);
                 
+              console.log('Registration data marked as used');
+              
               // Process transaction data for existing users
               // This would typically involve creating or updating a subscription record
               // or processing a one-time payment

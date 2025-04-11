@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { toast } from 'sonner';
 import OpenFieldsPaymentForm from '@/components/payment/OpenFieldsPaymentForm';
+import { useNavigate } from 'react-router-dom';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -19,6 +20,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   onPaymentComplete,
   onBack
 }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { fullName, email } = useSubscriptionContext();
   const [registrationData, setRegistrationData] = useState<any>(null);
@@ -43,16 +45,22 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
     const success = params.get('success');
+    const lowProfileId = params.get('lowProfileId');
     
     if (error === 'true') {
       setPaymentError('התשלום נכשל, אנא נסה שנית');
       toast.error('התשלום נכשל, אנא נסה שנית');
+    } else if (success === 'true' && lowProfileId) {
+      // If we have lowProfileId, the payment might be successful but needs verification
+      // The verification will be handled by usePaymentStatus in the parent component
+      console.log('Payment potentially successful, will verify with lowProfileId:', lowProfileId);
+      setPaymentProcessing(true);
     } else if (success === 'true') {
       setPaymentSuccess(true);
       toast.success('התשלום התקבל בהצלחה!');
       onPaymentComplete();
     }
-  }, [onPaymentComplete]);
+  }, [navigate, onPaymentComplete]);
 
   // User is considered "valid" if they are either:
   // 1. Logged in (authenticated) OR

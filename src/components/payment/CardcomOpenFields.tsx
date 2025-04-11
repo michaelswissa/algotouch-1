@@ -33,12 +33,15 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [processingPayment, setProcessingPayment] = useState<boolean>(false);
   
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
+  const cardNumberFrameRef = useRef<HTMLIFrameElement>(null);
+  const cvvFrameRef = useRef<HTMLIFrameElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   
   const [cardOwnerName, setCardOwnerName] = useState('');
   const [cardOwnerEmail, setCardOwnerEmail] = useState('');
   const [expirationMonth, setExpirationMonth] = useState('');
   const [expirationYear, setExpirationYear] = useState('');
+  const [iframesReady, setIframesReady] = useState(false);
   
   const navigate = useNavigate();
 
@@ -98,11 +101,15 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     initializePaymentSession();
   }, [planId, amount]);
 
-  // Only initialize iframe fields after we have the low profile code
+  // Only initialize iframe fields after we have the low profile code and AFTER iframes are loaded
   useEffect(() => {
-    if (lowProfileCode && masterFrameRef.current) {
-      console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
-      initializeIframeFields();
+    if (lowProfileCode && masterFrameRef.current && cardNumberFrameRef.current && cvvFrameRef.current) {
+      // Set a timeout to ensure iframes are fully loaded first
+      const timer = setTimeout(() => {
+        console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
+        initializeIframeFields();
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, [lowProfileCode]);
 
@@ -163,8 +170,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   };
 
   const initializeIframeFields = async () => {
-    if (!masterFrameRef.current) {
-      console.error('Master iframe reference not available');
+    if (!masterFrameRef.current || !cardNumberFrameRef.current || !cvvFrameRef.current) {
+      console.error('One or more iframe references not available');
+      setError('שגיאה באתחול טופס התשלום - חסרים מרכיבי מסגרת הטופס');
       return;
     }
 
@@ -175,6 +183,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }
 
     try {
+      console.log('Starting iframe initialization with lowProfileCode:', lowProfileCode);
+      
       // Fetch CSS files for styling the iframe fields
       const cardNumberCssResponse = await fetch('/assets/styles/cardNumber.css');
       const cardNumberCss = await cardNumberCssResponse.text();
@@ -200,7 +210,14 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         hasCvvCSS: !!message.cvvFieldCSS
       });
       
-      masterFrameRef.current.contentWindow?.postMessage(message, '*');
+      if (masterFrameRef.current.contentWindow) {
+        masterFrameRef.current.contentWindow.postMessage(message, '*');
+        console.log('Initialization message sent to iframe');
+        setIframesReady(true);
+      } else {
+        console.error('Master iframe contentWindow not available');
+        setError('שגיאה באתחול מערכת התשלום - חלון הטופס לא זמין');
+      }
     } catch (error) {
       console.error('Error loading CSS files or initializing iframes:', error);
       setError('שגיאה בטעינת סגנונות הטופס');
@@ -236,6 +253,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           }
           if (msg.field === "cardNumber") {
             setCardNumberClass(msg.isValid);
+          }
+          if (msg.field === "reCaptcha") {
+            console.log('reCaptcha validation:', msg.isValid);
           }
           break;
         default:
@@ -321,6 +341,11 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       return;
     }
     
+    if (!iframesReady) {
+      setError('טופס התשלום עדיין בטעינה. אנא המתן רגע ונסה שוב.');
+      return;
+    }
+    
     setProcessingPayment(true);
     setError(null);
     
@@ -337,6 +362,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       cardOwnerPhone: ''
     };
     
+    console.log('Setting card owner details:', cardOwnerData);
     masterFrameRef.current.contentWindow?.postMessage({ 
       action: 'setCardOwnerDetails', 
       data: cardOwnerData 
@@ -345,6 +371,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     // Submit the payment - THE IMPORTANT PART - lowProfileCode is passed here
     const formProps = {
       action: 'doTransaction',
+      lowProfileCode: lowProfileCode, // Pass the lowProfileCode as a top-level parameter
       cardOwnerName,
       cardOwnerEmail,
       expirationMonth,
@@ -352,11 +379,17 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       cardOwnerId: '000000000', // Default value to pass validation
       cardOwnerPhone: '',
       numberOfPayments: "1",
-      lowProfileCode: lowProfileCode, // Make sure we're passing the lowProfileCode correctly
       document: createDocument()
     };
     
-    console.log('Submitting payment with lowProfileCode:', lowProfileCode);
+    console.log('Submitting payment transaction with params:', {
+      action: formProps.action,
+      lowProfileCode: lowProfileCode,
+      cardOwnerName: formProps.cardOwnerName,
+      hasExpiry: !!formProps.expirationMonth && !!formProps.expirationYear,
+      hasDocument: !!formProps.document
+    });
+    
     masterFrameRef.current.contentWindow?.postMessage(formProps, '*');
   };
 
@@ -394,7 +427,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       onSuccess(data.TranzactionId.toString());
     } else {
       // If no callback is provided, redirect to success page
-      navigate(`/subscription?success=true&planId=${planId}`);
+      navigate(`/subscription?success=true&planId=${planId}&lowProfileId=${lowProfileCode}`);
     }
   };
 
@@ -460,6 +493,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       {/* Hidden master iframe - always render this one */}
       <iframe 
         id="CardComMasterFrame" 
+        name="CardComMasterFrame"  // Important: Add name attribute
         ref={masterFrameRef}
         src={`${CARDCOM_IFRAME_URL}/master`}
         style={{ display: 'none', width: '0px', height: '0px' }} 
@@ -507,6 +541,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           {lowProfileCode && (
             <iframe
               id="CardComCardNumber"
+              name="CardComCardNumber"  // Important: Add name attribute
+              ref={cardNumberFrameRef}
               src={`${CARDCOM_IFRAME_URL}/cardNumber`}
               style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
               title="Card Number"
@@ -570,6 +606,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             {lowProfileCode && (
               <iframe
                 id="CardComCvv"
+                name="CardComCvv"  // Important: Add name attribute
+                ref={cvvFrameRef}
                 src={`${CARDCOM_IFRAME_URL}/CVV`}
                 style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
                 title="CVV"
@@ -595,7 +633,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <Button 
             type="submit" 
             className="w-full md:w-auto px-8"
-            disabled={processingPayment || !lowProfileCode}
+            disabled={processingPayment || !lowProfileCode || !iframesReady}
           >
             {processingPayment ? (
               <>

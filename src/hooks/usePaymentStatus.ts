@@ -22,13 +22,17 @@ export const usePaymentStatus = (
       if (success === 'true' && lowProfileId) {
         setIsChecking(true);
         try {
+          console.log('Checking payment status for lowProfileId:', lowProfileId);
           const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
             body: { lowProfileId }
           });
           
           if (error) {
+            console.error('Error from cardcom-check-status function:', error);
             throw new Error(error.message);
           }
+          
+          console.log('Received payment status response:', data);
           
           if (data.ResponseCode === 0 && data.TranzactionInfo?.TranzactionId) {
             setPaymentSuccess(true);
