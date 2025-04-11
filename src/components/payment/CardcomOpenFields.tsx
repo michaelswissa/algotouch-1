@@ -30,11 +30,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [processingPayment, setProcessingPayment] = useState<boolean>(false);
-  const [iframesReady, setIframesReady] = useState<boolean>(false);
   
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
-  const cardNumberFrameRef = useRef<HTMLIFrameElement>(null);
-  const cvvFrameRef = useRef<HTMLIFrameElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   
   const [cardOwnerName, setCardOwnerName] = useState('');
@@ -190,7 +187,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       });
       
       masterFrameRef.current.contentWindow?.postMessage(message, '*');
-      setIframesReady(true);
     } catch (error) {
       console.error('Error loading CSS files or initializing iframes:', error);
       setError('Failed to load form styles');
@@ -342,15 +338,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       cardOwnerId: '000000000', // Default value to pass validation
       cardOwnerPhone: '',
       numberOfPayments: "1",
+      lowProfileCode: lowProfileCode, // Make sure we're passing the lowProfileCode correctly
       document: createDocument()
     };
     
     console.log('Submitting payment with lowProfileCode:', lowProfileCode);
-    
-    masterFrameRef.current.contentWindow?.postMessage({
-      ...formProps,
-      lowProfileCode: lowProfileCode
-    }, '*');
+    masterFrameRef.current.contentWindow?.postMessage(formProps, '*');
   };
 
   const createDocument = () => {
@@ -448,7 +441,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     );
   }
 
-  // Only render the form when we have a lowProfileCode
   return (
     <div className="flex flex-col p-4 space-y-4" dir="rtl">
       {/* Hidden master iframe - always render this one */}
@@ -501,7 +493,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           {lowProfileCode && (
             <iframe
               id="CardComCardNumber"
-              ref={cardNumberFrameRef}
               src={`${CARDCOM_IFRAME_URL}/cardNumber`}
               style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
               title="Card Number"
@@ -565,7 +556,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             {lowProfileCode && (
               <iframe
                 id="CardComCvv"
-                ref={cvvFrameRef}
                 src={`${CARDCOM_IFRAME_URL}/CVV`}
                 style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
                 title="CVV"
