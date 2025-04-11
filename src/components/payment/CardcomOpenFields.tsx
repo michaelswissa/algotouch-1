@@ -30,6 +30,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [processingPayment, setProcessingPayment] = useState<boolean>(false);
+  const [iframesReady, setIframesReady] = useState<boolean>(false);
   
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const cardNumberFrameRef = useRef<HTMLIFrameElement>(null);
@@ -40,7 +41,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [cardOwnerEmail, setCardOwnerEmail] = useState('');
   const [expirationMonth, setExpirationMonth] = useState('');
   const [expirationYear, setExpirationYear] = useState('');
-  const [fieldsInitialized, setFieldsInitialized] = useState(false);
   
   const navigate = useNavigate();
 
@@ -65,7 +65,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             .from('profiles')
             .select('*')
             .eq('id', data.user.id)
-            .single();
+            .maybeSingle();
           
           if (profile) {
             // Build name from profile data if available
@@ -92,6 +92,14 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     getUserDetails();
     initializePaymentSession();
   }, [planId, amount]);
+
+  // Only initialize iframe fields after we have the low profile code
+  useEffect(() => {
+    if (lowProfileCode && masterFrameRef.current) {
+      console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
+      initializeIframeFields(lowProfileCode);
+    }
+  }, [lowProfileCode]);
 
   const initializePaymentSession = async () => {
     setLoading(true);
@@ -120,6 +128,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         registrationData: registrationData?.registration_data || null
       };
       
+      console.log('Initializing payment session with data:', requestData);
+      
       // Call our edge function to initialize the cardcom session
       const { data, error: functionError } = await supabase.functions.invoke('cardcom-openfields', {
         body: requestData
@@ -134,15 +144,10 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         throw new Error(data.error || 'Failed to create payment session');
       }
       
-      console.log('Payment session created:', data.lowProfileId);
+      console.log('Payment session created successfully with ID:', data.lowProfileId);
       
       // Store the lowProfileId
       setLowProfileCode(data.lowProfileId);
-      
-      // Initialize the iframe fields once we have the low profile code
-      if (data.lowProfileId) {
-        initializeIframeFields(data.lowProfileId);
-      }
     } catch (error) {
       console.error('Error initializing payment session:', error);
       setError(error instanceof Error ? error.message : 'Failed to initialize payment');
@@ -152,125 +157,44 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }
   };
 
-  const initializeIframeFields = (profileCode: string) => {
-    if (!masterFrameRef.current || !cardNumberFrameRef.current || !cvvFrameRef.current) {
-      console.error('Iframe references not available');
+  const initializeIframeFields = async (profileCode: string) => {
+    if (!masterFrameRef.current) {
+      console.error('Master iframe reference not available');
       return;
     }
 
-    // Load CSS files
-    const loadCssFiles = async () => {
-      try {
-        // Fetch card number CSS
-        const cardNumberCssResponse = await fetch('/assets/styles/cardNumber.css');
-        const cardNumberCss = await cardNumberCssResponse.text();
-        
-        // Create CVV CSS inline
-        const cvvCss = `
-          body {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            direction: rtl;
-          }
-          
-          .cvvField {
-            border: 1px solid #e2e8f0;
-            border-radius: 0.375rem;
-            height: 40px;
-            margin: 0;
-            padding: 0 10px;
-            width: 100%;
-            font-size: 0.875rem;
-            background-color: white;
-            color: #000; /* Dark text color for better readability */
-            direction: rtl;
-          }
-          
-          .cvvField:focus {
-            outline: none;
-            border-color: #3182ce;
-            box-shadow: 0 0 0 1px #3182ce;
-          }
-          
-          .cvvField.invalid {
-            border: 1px solid #e53e3e;
-          }
-          
-          input::-webkit-outer-spin-button,
-          input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-          }
-          
-          input[type=number] {
-            -moz-appearance: textfield;
-          }
-        `;
+    try {
+      // Fetch CSS files for styling the iframe fields
+      const cardNumberCssResponse = await fetch('/assets/styles/cardNumber.css');
+      const cardNumberCss = await cardNumberCssResponse.text();
+      
+      const cvvCssResponse = await fetch('/assets/styles/cvvField.css');
+      const cvvCss = await cvvCssResponse.text();
 
-        // Update card number CSS to ensure text is readable
-        const updatedCardNumberCss = `
-          body {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            direction: rtl;
-          }
-          
-          .cardNumberField {
-            border: 1px solid #e2e8f0;
-            border-radius: 0.375rem;
-            height: 40px;
-            margin: 0;
-            padding: 0 10px;
-            width: 100%;
-            font-size: 0.875rem;
-            background-color: white;
-            color: #000; /* Dark text color for better readability */
-            direction: rtl;
-          }
-          
-          .cardNumberField:focus {
-            outline: none;
-            border-color: #3182ce;
-            box-shadow: 0 0 0 1px #3182ce;
-          }
-          
-          .cardNumberField.invalid {
-            border: 1px solid #e53e3e;
-          }
-          
-          input::-webkit-outer-spin-button,
-          input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-          }
-          
-          input[type=number] {
-            -moz-appearance: textfield;
-          }
-        `;
-        
-        // Post message to master iframe with initialization data
-        const message = {
-          action: 'init',
-          lowProfileCode: profileCode,
-          cardFieldCSS: updatedCardNumberCss, // Use updated CSS with readable text
-          cvvFieldCSS: cvvCss,
-          placeholder: "0000 0000 0000 0000",
-          cvvPlaceholder: "123",
-          language: "he"
-        };
-        
-        masterFrameRef.current.contentWindow?.postMessage(message, '*');
-        setFieldsInitialized(true);
-      } catch (error) {
-        console.error('Error loading CSS files:', error);
-        setError('Failed to load form styles');
-      }
-    };
-    
-    loadCssFiles();
+      // Post message to master iframe with initialization data
+      const message = {
+        action: 'init',
+        lowProfileCode: profileCode,
+        cardFieldCSS: cardNumberCss, 
+        cvvFieldCSS: cvvCss,
+        placeholder: "0000 0000 0000 0000",
+        cvvPlaceholder: "123",
+        language: "he"
+      };
+      
+      console.log('Sending initialization message to iframe:', { 
+        action: message.action, 
+        lowProfileCode: profileCode,
+        hasCardCSS: !!message.cardFieldCSS,
+        hasCvvCSS: !!message.cvvFieldCSS
+      });
+      
+      masterFrameRef.current.contentWindow?.postMessage(message, '*');
+      setIframesReady(true);
+    } catch (error) {
+      console.error('Error loading CSS files or initializing iframes:', error);
+      setError('Failed to load form styles');
+    }
   };
 
   // Listen for messages from iframes
@@ -305,6 +229,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           }
           break;
         default:
+          // Log any other messages for debugging
+          console.log('Other message from iframe:', msg);
           break;
       }
     };
@@ -359,7 +285,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     } else if (!/^\d{2}$/.test(expirationMonth) || parseInt(expirationMonth) < 1 || parseInt(expirationMonth) > 12) {
       setError('חודש תפוגה לא תקין');
       isValid = false;
-    } else if (!/^\d{2}$/.test(expirationYear)) {
+    } else if (!/^\d{2}$/.test(expiryYear)) {
       setError('שנת תפוגה לא תקינה');
       isValid = false;
     }
@@ -375,6 +301,11 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    if (!lowProfileCode) {
+      setError('לא ניתן לבצע תשלום - חסר קוד חיוב (lowProfileCode)');
+      return;
+    }
     
     if (!validateFields()) {
       return;
@@ -414,10 +345,11 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       document: createDocument()
     };
     
-    console.log('Submitting payment:', formProps);
+    console.log('Submitting payment with lowProfileCode:', lowProfileCode);
     
     masterFrameRef.current.contentWindow?.postMessage({
-      ...formProps
+      ...formProps,
+      lowProfileCode: lowProfileCode
     }, '*');
   };
 
@@ -516,9 +448,10 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     );
   }
 
+  // Only render the form when we have a lowProfileCode
   return (
     <div className="flex flex-col p-4 space-y-4" dir="rtl">
-      {/* Hidden iframes */}
+      {/* Hidden master iframe - always render this one */}
       <iframe 
         id="CardComMasterFrame" 
         ref={masterFrameRef}
@@ -540,7 +473,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               onChange={(e) => setCardOwnerName(e.target.value)}
               className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="שם מלא כפי שמופיע על הכרטיס"
-              disabled={processingPayment}
+              disabled={processingPayment || !lowProfileCode}
               required
             />
           </div>
@@ -556,7 +489,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               onChange={(e) => setCardOwnerEmail(e.target.value)}
               className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="your@email.com"
-              disabled={processingPayment}
+              disabled={processingPayment || !lowProfileCode}
             />
           </div>
         </div>
@@ -565,13 +498,23 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <label htmlFor="CardComCardNumber" className="block text-sm font-medium">
             מספר כרטיס אשראי
           </label>
-          <iframe
-            id="CardComCardNumber"
-            ref={cardNumberFrameRef}
-            src={`${CARDCOM_IFRAME_URL}/cardNumber`}
-            style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
-            title="Card Number"
-          />
+          {lowProfileCode && (
+            <iframe
+              id="CardComCardNumber"
+              ref={cardNumberFrameRef}
+              src={`${CARDCOM_IFRAME_URL}/cardNumber`}
+              style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
+              title="Card Number"
+            />
+          )}
+          {!lowProfileCode && (
+            <div className="w-full p-2 border rounded-md h-[40px] bg-gray-100">
+              <div className="flex justify-center items-center h-full">
+                <Spinner className="h-4 w-4 mr-2" />
+                <span className="text-sm text-gray-500">טוען...</span>
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="grid grid-cols-3 gap-4">
@@ -589,7 +532,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               }}
               className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="MM"
-              disabled={processingPayment}
+              disabled={processingPayment || !lowProfileCode}
               required
               maxLength={2}
             />
@@ -609,7 +552,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               }}
               className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
               placeholder="YY"
-              disabled={processingPayment}
+              disabled={processingPayment || !lowProfileCode}
               required
               maxLength={2}
             />
@@ -619,13 +562,23 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             <label htmlFor="CardComCvv" className="block text-sm font-medium">
               קוד אבטחה (CVV)
             </label>
-            <iframe
-              id="CardComCvv"
-              ref={cvvFrameRef}
-              src={`${CARDCOM_IFRAME_URL}/CVV`}
-              style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
-              title="CVV"
-            />
+            {lowProfileCode && (
+              <iframe
+                id="CardComCvv"
+                ref={cvvFrameRef}
+                src={`${CARDCOM_IFRAME_URL}/CVV`}
+                style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
+                title="CVV"
+              />
+            )}
+            {!lowProfileCode && (
+              <div className="w-full p-2 border rounded-md h-[40px] bg-gray-100">
+                <div className="flex justify-center items-center h-full">
+                  <Spinner className="h-4 w-4 mr-2" />
+                  <span className="text-sm text-gray-500">טוען...</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         
@@ -638,7 +591,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <Button 
             type="submit" 
             className="w-full md:w-auto px-8"
-            disabled={processingPayment}
+            disabled={processingPayment || !lowProfileCode}
           >
             {processingPayment ? (
               <>
