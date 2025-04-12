@@ -113,7 +113,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   };
 
   return (
-    <Card className="glass-card-2025">
+    <Card className="glass-card backdrop-blur-md bg-black/50 border border-white/10 shadow-xl">
       <CardHeader>
         <CardTitle>הרשמה</CardTitle>
         <CardDescription>צור חשבון חדש כדי להתחיל</CardDescription>
