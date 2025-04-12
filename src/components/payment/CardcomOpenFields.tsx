@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,6 +98,19 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     getUserDetails();
     initializePaymentSession();
   }, [planId, amount]);
+
+  useEffect(() => {
+    const cardcom3DSScript = document.createElement('script');
+    const time = new Date().getTime();
+    cardcom3DSScript.setAttribute('src', `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${time}`);
+    document.head.appendChild(cardcom3DSScript);
+    
+    return () => {
+      if (document.head.contains(cardcom3DSScript)) {
+        document.head.removeChild(cardcom3DSScript);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (lowProfileCode && masterFrameRef.current && cardNumberFrameRef.current && cvvFrameRef.current) {

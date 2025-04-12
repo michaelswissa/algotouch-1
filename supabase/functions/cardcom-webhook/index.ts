@@ -1,6 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.3";
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Configure CORS headers
 const corsHeaders = {
@@ -26,59 +31,154 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('Received webhook request from Cardcom');
+    console.log('Received webhook request from CardCom');
     
     // Parse the webhook payload
     const webhookData = await req.json();
     console.log('Webhook payload:', JSON.stringify(webhookData));
     
+    if (!webhookData) {
+      throw new Error('No webhook data received');
+    }
+    
     // Check if the transaction was successful
     if (webhookData.ResponseCode === 0 && webhookData.TranzactionInfo?.TranzactionId) {
       console.log('Transaction successful:', webhookData.TranzactionInfo.TranzactionId);
       
-      // Process the payment data
-      const planId = webhookData.ReturnValue;
+      // Extract user ID from ReturnValue if passed during payment initialization
+      const userId = webhookData.ReturnValue;
       const transactionId = webhookData.TranzactionInfo.TranzactionId;
+      const lowProfileId = webhookData.LowProfileId;
       
-      // Initialize Supabase client
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      // Find the payment session
+      const { data: paymentSession } = await supabase
+        .from("payment_sessions")
+        .select("*")
+        .eq("payment_details->lowProfileId", lowProfileId)
+        .maybeSingle();
       
-      if (supabaseUrl && supabaseKey) {
-        const supabase = createClient(supabaseUrl, supabaseKey);
+      if (paymentSession) {
+        console.log(`Found payment session for lowProfileId ${lowProfileId}:`, paymentSession);
         
-        // Here you would typically:
-        // 1. Update the user's subscription status
-        // 2. Process any registration data if this was part of registration flow
-        // 3. Record the payment in your database
+        // Extract plan information and user details
+        const planId = paymentSession.plan_id;
+        const sessionUserId = paymentSession.user_id;
+        const amount = paymentSession.payment_details?.amount || 0;
         
-        console.log('Processing webhook for plan:', planId, 'with transaction ID:', transactionId);
-        
-        // Check if this is a registration payment
-        const { data: registrationData } = await supabase
-          .from('temp_registration_data')
-          .select('*')
-          .eq('used', false)
-          .order('created_at', { ascending: false })
-          .limit(1);
+        if (sessionUserId) {
+          // Update user subscription based on plan
+          const now = new Date();
+          let periodEndsAt = null;
+          const trialEndsAt = planId === 'monthly' ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
           
-        if (registrationData && registrationData.length > 0) {
-          console.log('Found temporary registration data, processing new user registration');
+          if (planId === 'annual') {
+            periodEndsAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+          }
           
-          // Mark the data as used
-          await supabase
-            .from('temp_registration_data')
-            .update({ used: true })
-            .eq('id', registrationData[0].id);
+          const status = planId === 'monthly' ? 'trial' : 'active';
+          
+          // Update the user's subscription
+          const { error: subscriptionError } = await supabase
+            .from("subscriptions")
+            .upsert({
+              user_id: sessionUserId,
+              plan_type: planId,
+              status: status,
+              current_period_ends_at: periodEndsAt?.toISOString(),
+              trial_ends_at: trialEndsAt?.toISOString(),
+              payment_method: {
+                type: "cardcom",
+                last4: webhookData.TranzactionInfo.Last4CardDigitsString || "",
+                brand: webhookData.TranzactionInfo.Brand || ""
+              },
+              contract_signed: true,
+              contract_signed_at: now.toISOString()
+            });
             
-          // Further processing would happen here based on your application's requirements
+          if (subscriptionError) {
+            console.error('Error updating subscription:', subscriptionError);
+          } else {
+            console.log('Subscription updated successfully');
+          }
+          
+          // Record the payment in the payment_history table
+          const { error: paymentError } = await supabase
+            .from("payment_history")
+            .insert({
+              user_id: sessionUserId,
+              subscription_id: sessionUserId, // Using user_id as subscription_id
+              amount: amount,
+              currency: "ILS",
+              status: "completed",
+              payment_method: {
+                type: "cardcom",
+                last4: webhookData.TranzactionInfo.Last4CardDigitsString || "",
+                brand: webhookData.TranzactionInfo.Brand || "",
+                transaction_id: transactionId.toString()
+              }
+            });
+            
+          if (paymentError) {
+            console.error('Error recording payment history:', paymentError);
+          } else {
+            console.log('Payment history recorded successfully');
+          }
+          
+          // Log transaction details
+          await supabase
+            .from("user_payment_logs")
+            .insert({
+              user_id: sessionUserId,
+              amount: amount,
+              status: "completed",
+              token: lowProfileId,
+              approval_code: webhookData.TranzactionInfo.ApprovalNumber || "",
+              transaction_details: {
+                transaction_id: transactionId,
+                plan_id: planId,
+                timestamp: new Date().toISOString(),
+                card_last_four: webhookData.TranzactionInfo.Last4CardDigitsString || "",
+                is_3ds_verified: !!webhookData.TranzactionInfo.CardNumberEntryMode?.includes("3DS"),
+                payment_method: {
+                  type: "credit_card",
+                  brand: webhookData.TranzactionInfo.Brand || "",
+                  last4: webhookData.TranzactionInfo.Last4CardDigitsString || ""
+                }
+              }
+            });
+        }
+      } else {
+        console.warn('No payment session found for lowProfileId:', lowProfileId);
+      }
+    } else if (webhookData.ResponseCode !== 0) {
+      console.error('Transaction failed:', webhookData.Description);
+      
+      // Log the failed transaction if we have a lowProfileId
+      if (webhookData.LowProfileId) {
+        const { data: paymentSession } = await supabase
+          .from("payment_sessions")
+          .select("*")
+          .eq("payment_details->lowProfileId", webhookData.LowProfileId)
+          .maybeSingle();
+        
+        if (paymentSession && paymentSession.user_id) {
+          await supabase
+            .from("payment_errors")
+            .insert({
+              user_id: paymentSession.user_id,
+              error_code: webhookData.ResponseCode.toString(),
+              error_message: webhookData.Description || "Unknown error",
+              context: "webhook",
+              payment_details: {
+                lowProfileId: webhookData.LowProfileId,
+                plan_id: paymentSession.plan_id
+              }
+            });
         }
       }
-    } else {
-      console.log('Transaction was not successful or incomplete');
     }
     
-    // Respond with a success status (this is important for Cardcom to know we received the webhook)
+    // Always respond with a success status to CardCom to prevent retries
     return new Response(
       JSON.stringify({ success: true }),
       {
@@ -89,7 +189,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing webhook:', error);
     
-    // Even on error, return a success response to Cardcom to prevent retries
+    // Even on error, return a success response to CardCom to prevent retries
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -97,7 +197,7 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200, // Always return 200 to Cardcom
+        status: 200, // Always return 200 to CardCom
       }
     );
   }
