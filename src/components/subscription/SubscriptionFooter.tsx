@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -24,10 +23,8 @@ const SubscriptionFooter: React.FC<SubscriptionFooterProps> = ({
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = React.useState(false);
   
-  // Only show cancellation for active monthly or annual plans
   const showCancellation = status === 'active' && (planType === 'monthly' || planType === 'annual');
   
-  // If VIP or already cancelled, no need for cancellation
   if (planType === 'vip' || status === 'cancelled') {
     return null;
   }
@@ -73,9 +70,8 @@ const SubscriptionFooter: React.FC<SubscriptionFooterProps> = ({
       if (onCancelled) {
         onCancelled();
       } else {
-        // Reload the page after a short delay
         setTimeout(() => {
-          navigate(0); // Refresh the page
+          navigate(0);
         }, 1500);
       }
     } catch (error) {
@@ -92,7 +88,7 @@ const SubscriptionFooter: React.FC<SubscriptionFooterProps> = ({
 
   return (
     <div className="mt-8 space-y-4">
-      <Alert variant="warning" className="bg-amber-50 border-amber-200">
+      <Alert variant="default" className="bg-amber-50 border-amber-200">
         <AlertCircle className="h-4 w-4 text-amber-500" />
         <AlertDescription className="text-amber-700">
           {status === 'trial' ? (

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +7,7 @@ import { AlertCircle } from 'lucide-react';
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getSubscriptionPlans } from './utils/paymentHelpers';
 
 interface CardcomOpenFieldsProps {
   planId: string;
@@ -14,6 +16,7 @@ interface CardcomOpenFieldsProps {
   onSuccess?: (transactionId: string) => void;
   onError?: (error: string) => void;
   onCancel?: () => void;
+  onPaymentStart?: () => void;
 }
 
 const CARDCOM_IFRAME_URL = 'https://secure.cardcom.solutions/api/openfields';

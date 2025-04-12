@@ -73,7 +73,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
         <CardcomOpenFields 
           planId={planId}
           planName={plan.name}
-          amount={plan.displayPrice} // Display price (USD)
+          amount={plan.displayPrice} 
           onSuccess={handleSuccess}
           onError={handleError}
           onCancel={onCancel}

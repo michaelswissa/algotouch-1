@@ -12,7 +12,9 @@ export interface PlanProps {
   id: string;
   name: string;
   price: number;
+  displayPrice: number;
   currency: string;
+  displayCurrency: string;
   billingPeriod: string;
   description: string;
   icon: React.ReactNode;
