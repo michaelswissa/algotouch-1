@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,7 +112,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   };
 
   return (
-    <Card className="bg-[#333]/70 backdrop-blur-md border border-white/10 shadow-xl">
+    <Card className="glass-card">
       <CardHeader>
         <CardTitle>הרשמה</CardTitle>
         <CardDescription>צור חשבון חדש כדי להתחיל</CardDescription>
