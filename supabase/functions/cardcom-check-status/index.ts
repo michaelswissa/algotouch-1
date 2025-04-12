@@ -29,17 +29,10 @@ serve(async (req) => {
     const { lowProfileId } = await req.json();
     
     if (!lowProfileId) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Missing lowProfileId parameter", 
-          success: false 
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
+      throw new Error('Missing lowProfileId parameter');
     }
+    
+    console.log('Checking status for lowProfileId:', lowProfileId);
 
     // Get the Cardcom API credentials
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
@@ -49,19 +42,22 @@ serve(async (req) => {
       throw new Error('Missing Cardcom API credentials');
     }
     
-    console.log('Checking transaction status for lowProfileId:', lowProfileId);
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
     
-    // Make request to Cardcom API to get the transaction status
-    const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult", {
-      method: "POST",
+    // Make request to Cardcom API to get transaction status
+    const response = await fetch("https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx", {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        TerminalNumber: parseInt(terminalNumber),
-        ApiName: apiName,
-        LowProfileId: lowProfileId,
-      }),
+      // Append the parameters as query string
+      // Note: This is how Cardcom expects the parameters for this endpoint
+      // We're using URLSearchParams to properly encode the parameters
+      url: `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx?terminalnumber=${terminalNumber}&username=${apiName}&lowprofilecode=${lowProfileId}&codepage=65001`,
     });
 
     if (!response.ok) {
@@ -70,181 +66,146 @@ serve(async (req) => {
       throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
     }
     
-    const cardcomResponse = await response.json();
-    console.log('Cardcom response:', cardcomResponse);
+    // Parse the response data
+    const responseText = await response.text();
     
-    if (cardcomResponse.ResponseCode !== 0) {
-      console.error('Cardcom response error:', cardcomResponse);
-      throw new Error(`Cardcom error: ${cardcomResponse.Description}`);
+    // Parse the response data
+    let responseData: Record<string, any> = {};
+    const responseParams = new URLSearchParams(responseText);
+    
+    // Convert the URLSearchParams to a plain object
+    for (const [key, value] of responseParams.entries()) {
+      responseData[key] = value;
     }
     
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    console.log('Cardcom response data:', responseData);
     
-    // If the transaction was successful, update the subscription in the database
-    if (cardcomResponse.OperationResponse === 0) {
-      try {
-        // Get the user ID from the ReturnValue field
-        const userId = cardcomResponse.ReturnValue;
-        
-        if (userId && userId !== 'guest') {
-          // Check if the user has a pending subscription
-          const { data: subscriptionData, error: subscriptionError } = await supabaseClient
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('cardcom_profile_id', lowProfileId)
-            .maybeSingle();
-            
-          if (subscriptionError) {
-            console.error('Error fetching subscription:', subscriptionError);
-          } else if (subscriptionData) {
-            // Get operation details
-            const operation = cardcomResponse.Operation;
-            const planType = subscriptionData.plan_type;
-            
-            // Payment method details
-            const paymentMethod = {
-              lastFourDigits: cardcomResponse.TranzactionInfo?.Last4CardDigitsString || 
-                               cardcomResponse.TranzactionInfo?.Last4CardDigits?.toString() || 
-                               '0000',
-              expiryMonth: cardcomResponse.CardValidityMonth || 
-                           cardcomResponse.TranzactionInfo?.CardMonth?.toString().padStart(2, '0') || 
-                           '12',
-              expiryYear: cardcomResponse.CardValidityYear || 
-                          cardcomResponse.TranzactionInfo?.CardYear?.toString() || 
-                          '25',
-              cardBrand: cardcomResponse.TranzactionInfo?.Brand || 'Unknown',
-              cardholderName: cardcomResponse.UIValues?.CardOwnerName || 
-                              cardcomResponse.TranzactionInfo?.CardOwnerName || 
-                              'Card Holder'
-            };
-            
-            // Token details if created (for recurring payments)
-            let token = null;
-            if (operation === "CreateTokenOnly" || operation === "ChargeAndCreateToken") {
-              token = cardcomResponse.Token || null;
-            }
-            
-            // Update the subscription status and payment details
-            const now = new Date();
-            const updateData: Record<string, any> = {
-              status: planType === 'monthly' ? 'trial' : 'active',
-              payment_method: paymentMethod,
-              updated_at: now.toISOString(),
-            };
-            
-            // For monthly plans with trial
-            if (planType === 'monthly') {
-              const trialEnds = new Date();
-              trialEnds.setDate(trialEnds.getDate() + 30); // 30-day trial
-              updateData.trial_ends_at = trialEnds.toISOString();
-              updateData.next_charge_date = trialEnds.toISOString();
-            } 
-            // For annual plans
-            else if (planType === 'annual') {
-              const periodEnds = new Date();
-              periodEnds.setFullYear(periodEnds.getFullYear() + 1); // 1-year subscription
-              updateData.current_period_ends_at = periodEnds.toISOString();
-              updateData.next_charge_date = periodEnds.toISOString();
-            }
-            // For VIP plans (one-time payment)
-            else if (planType === 'vip') {
-              updateData.trial_ends_at = null;
-              updateData.current_period_ends_at = null;
-              updateData.next_charge_date = null;
-            }
-            
-            if (token) {
-              // Create or update payment token
-              const { error: tokenError } = await supabaseClient
-                .from('payment_tokens')
-                .upsert({
-                  user_id: userId,
-                  token: token,
-                  is_default: true,
-                  token_details: {
-                    ...paymentMethod,
-                    created_at: now.toISOString()
-                  }
-                });
-
-              if (tokenError) {
-                console.error('Error saving payment token:', tokenError);
-              }
-            }
-            
-            // Update subscription record
-            const { error: updateError } = await supabaseClient
+    // Check if the transaction was successful
+    if (responseData.OperationResponse === '0') {
+      console.log('Transaction successful');
+      
+      // If we have a user ID in the ReturnValue, update their subscription
+      if (responseData.ReturnValue) {
+        try {
+          const userId = responseData.ReturnValue;
+          const planType = responseData.planType || 'monthly'; // Default to monthly if not specified
+          
+          // Get transaction details
+          const transactionId = responseData.InternalDealNumber;
+          const amount = responseData.Amount || 0;
+          
+          // Update the user's subscription in the database
+          if (userId) {
+            // See if there's an existing subscription
+            const { data: existingSubscription, error: subscriptionError } = await supabaseClient
               .from('subscriptions')
-              .update(updateData)
-              .eq('id', subscriptionData.id);
+              .select('*')
+              .eq('user_id', userId)
+              .maybeSingle();
               
-            if (updateError) {
-              console.error('Error updating subscription:', updateError);
+            if (subscriptionError) {
+              console.error('Error fetching subscription:', subscriptionError);
             }
             
-            // Record payment history
-            if (operation === "ChargeOnly" || operation === "ChargeAndCreateToken") {
-              // Calculate amount based on plan type
-              let paymentAmount = 0;
-              if (planType === 'monthly') {
-                paymentAmount = 0; // Free trial
-              } else if (planType === 'annual') {
-                paymentAmount = 3371; // Annual price in ILS
-              } else if (planType === 'vip') {
-                paymentAmount = 13121; // VIP price in ILS
+            // Determine subscription details based on plan type
+            const now = new Date();
+            let subscriptionData: Record<string, any> = {
+              user_id: userId,
+              plan_type: planType,
+              status: planType === 'monthly' ? 'trial' : 'active',
+              updated_at: now.toISOString(),
+              payment_method: {
+                lastFourDigits: responseData.CardNumber5 || '',
+                expiryMonth: responseData.Tokef30 ? responseData.Tokef30.substring(0, 2) : '',
+                expiryYear: responseData.Tokef30 ? responseData.Tokef30.substring(2) : ''
               }
-              
-              // Skip payment recording for free trials
-              if (paymentAmount > 0) {
-                const { error: paymentError } = await supabaseClient
-                  .from('payment_history')
-                  .insert({
-                    user_id: userId,
-                    subscription_id: subscriptionData.id,
-                    amount: paymentAmount,
-                    currency: 'ILS',
-                    status: 'completed',
-                    payment_method: {
-                      ...paymentMethod,
-                      transactionId: cardcomResponse.TranzactionInfo?.TranzactionId || null,
-                      approvalNumber: cardcomResponse.TranzactionInfo?.ApprovalNumber || null
-                    },
-                    payment_date: now.toISOString()
-                  });
+            };
+            
+            // Set trial_ends_at for monthly plans
+            if (planType === 'monthly') {
+              const trialEndDate = new Date(now);
+              trialEndDate.setDate(trialEndDate.getDate() + 30); // 30 days trial
+              subscriptionData.trial_ends_at = trialEndDate.toISOString();
+              subscriptionData.next_charge_date = trialEndDate.toISOString();
+            } else if (planType === 'annual') {
+              // For annual plans, set the period end date to 1 year from now
+              const periodEndDate = new Date(now);
+              periodEndDate.setFullYear(periodEndDate.getFullYear() + 1);
+              subscriptionData.current_period_ends_at = periodEndDate.toISOString();
+              subscriptionData.next_charge_date = periodEndDate.toISOString();
+            }
+            
+            if (existingSubscription) {
+              // Update existing subscription
+              const { error: updateError } = await supabaseClient
+                .from('subscriptions')
+                .update(subscriptionData)
+                .eq('id', existingSubscription.id);
                 
-                if (paymentError) {
-                  console.error('Error recording payment history:', paymentError);
-                }
+              if (updateError) {
+                console.error('Error updating subscription:', updateError);
+              }
+            } else {
+              // Create new subscription
+              const { error: insertError } = await supabaseClient
+                .from('subscriptions')
+                .insert([subscriptionData]);
+                
+              if (insertError) {
+                console.error('Error creating subscription:', insertError);
+              }
+            }
+            
+            // Record the payment in payment_history
+            if (transactionId) {
+              const { error: paymentError } = await supabaseClient
+                .from('payment_history')
+                .insert([{
+                  user_id: userId,
+                  subscription_id: existingSubscription?.id || null,
+                  amount: amount,
+                  currency: 'ILS',
+                  status: 'completed',
+                  payment_method: {
+                    type: 'cardcom',
+                    lastFourDigits: responseData.CardNumber5 || '',
+                    brand: responseData.Mutag_24 || '',
+                    transactionId: transactionId
+                  },
+                  payment_date: now.toISOString()
+                }]);
+                
+              if (paymentError) {
+                console.error('Error recording payment history:', paymentError);
               }
             }
           }
+        } catch (dbError) {
+          console.error('Database error:', dbError);
+          // Continue processing even if DB operations fail
         }
-      } catch (dbError) {
-        console.error('Database error:', dbError);
-        // Don't throw, as we still want to return the Cardcom response
       }
+    } else {
+      console.log('Transaction failed or pending:', responseData.OperationResponse);
     }
     
-    // Return the success response
+    // Return the response data
     return new Response(
-      JSON.stringify(cardcomResponse),
+      JSON.stringify(responseData),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
   } catch (error) {
-    console.error('Error checking transaction status:', error);
+    console.error('Error checking payment status:', error);
     
     return new Response(
       JSON.stringify({ 
+        success: false, 
         error: error instanceof Error ? error.message : 'An unexpected error occurred',
-        success: false 
+        ResponseCode: 999,
+        Description: error instanceof Error ? error.message : 'An unexpected error occurred' 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

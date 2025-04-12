@@ -36,7 +36,7 @@ export const usePaymentStatus = (
           
           console.log('Received payment status response:', data);
           
-          if (data.ResponseCode === 0 && data.Operation) {
+          if (data.ResponseCode === 0 && (data.Operation || data.TranzactionInfo)) {
             setPaymentSuccess(true);
             
             // Customize success message based on plan type

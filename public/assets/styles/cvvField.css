@@ -3,22 +3,29 @@ body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 .cvvField {
   border: 1px solid #ccc;
-  border-radius: 3px;
-  height: 39px;
-  margin: 0;
+  border-radius: 4px;
+  height: 40px;
+  width: 100%;
   padding: 0 10px;
-  width: calc(100% - 20px);
   font-size: 16px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
-.cvvField.invalid{
-  border: 1px solid #c01111;
-  background-color: rgba(255, 0, 0, 0.05);
+.cvvField:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.cvvField.invalid {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2);
 }
 
 input::-webkit-outer-spin-button,

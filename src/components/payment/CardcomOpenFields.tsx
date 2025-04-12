@@ -114,7 +114,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   }, []);
 
   useEffect(() => {
-    if (lowProfileCode && masterFrameRef.current && cardNumberFrameRef.current && cvvFrameRef.current) {
+    if (lowProfileCode && masterFrameRef.current) {
       const timer = setTimeout(() => {
         console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
         initializeIframeFields();
@@ -182,8 +182,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   };
 
   const initializeIframeFields = async () => {
-    if (!masterFrameRef.current || !cardNumberFrameRef.current || !cvvFrameRef.current) {
-      console.error('One or more iframe references not available');
+    if (!masterFrameRef.current) {
+      console.error('Master iframe reference not available');
       setError('שגיאה באתחול טופס התשלום - חסרים מרכיבי מסגרת הטופס');
       return;
     }
@@ -516,6 +516,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
 
   return (
     <div className="flex flex-col p-4 space-y-4" dir="rtl">
+      {/* Master iframe - THIS is the main frame that manages the payment process */}
       <iframe 
         id="CardComMasterFrame" 
         name="CardComMasterFrame"
@@ -562,24 +563,17 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <label htmlFor="CardComCardNumber" className="block text-sm font-medium">
             מספר כרטיס אשראי
           </label>
-          {lowProfileCode && (
+          <div className="card-number-container">
+            {/* Add specific ID and name that Cardcom requires */}
             <iframe
               id="CardComCardNumber"
               name="CardComCardNumber"
               ref={cardNumberFrameRef}
               src={`${CARDCOM_IFRAME_URL}/cardNumber`}
-              style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
+              style={{ width: '100%', height: '40px', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: 'white' }}
               title="Card Number"
             />
-          )}
-          {!lowProfileCode && (
-            <div className="w-full p-2 border rounded-md h-[40px] bg-gray-100">
-              <div className="flex justify-center items-center h-full">
-                <Spinner className="h-4 w-4 mr-2" />
-                <span className="text-sm text-gray-500">טוען...</span>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
         
         <div className="grid grid-cols-3 gap-4">
@@ -624,27 +618,20 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="CVV" className="block text-sm font-medium">
+            <label htmlFor="CardComCvv" className="block text-sm font-medium">
               קוד אבטחה (CVV)
             </label>
-            {lowProfileCode && (
+            <div className="cvv-container">
+              {/* Add specific ID and name that Cardcom requires */}
               <iframe
-                id="CVV"
-                name="CVV"
+                id="CardComCvv"
+                name="CardComCvv"
                 ref={cvvFrameRef}
                 src={`${CARDCOM_IFRAME_URL}/cvv`}
-                style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
+                style={{ width: '100%', height: '40px', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: 'white' }}
                 title="CVV"
               />
-            )}
-            {!lowProfileCode && (
-              <div className="w-full p-2 border rounded-md h-[40px] bg-gray-100">
-                <div className="flex justify-center items-center h-full">
-                  <Spinner className="h-4 w-4 mr-2" />
-                  <span className="text-sm text-gray-500">טוען...</span>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
         
