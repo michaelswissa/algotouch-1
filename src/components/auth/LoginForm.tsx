@@ -79,7 +79,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <Card className="glass-card backdrop-blur-md bg-black/50 border border-white/10 shadow-xl">
+    <Card className="bg-[#333]/70 backdrop-blur-md border border-white/10 shadow-xl">
       <CardHeader>
         <CardTitle>התחברות</CardTitle>
         <CardDescription>הזן את פרטי ההתחברות שלך</CardDescription>
