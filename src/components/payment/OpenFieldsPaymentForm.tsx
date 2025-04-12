@@ -15,6 +15,13 @@ interface OpenFieldsPaymentFormProps {
   onCancel?: () => void;
 }
 
+// Define exact plan prices in ILS (including commas for display)
+const PLAN_PRICES = {
+  monthly: { price: 371, displayPrice: 371, name: 'חודשי' },
+  annual: { price: 3371, displayPrice: 3371, name: 'שנתי' },
+  vip: { price: 13121, displayPrice: 13121, name: 'VIP לכל החיים' }
+};
+
 const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({ 
   planId, 
   onPaymentComplete,
@@ -39,6 +46,21 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     };
   }, []);
 
+  // Add this useEffect to check for payment status from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    const lowProfileId = sessionStorage.getItem('payment_lowProfileId');
+    
+    if (success === 'true' && lowProfileId) {
+      // We have a successful callback
+      console.log('Payment callback detected with lowProfileId:', lowProfileId);
+      
+      // Payment verification will be handled by usePaymentStatus
+      // This is just for logging purposes
+    }
+  }, []);
+
   const handleSuccess = (transactionId: string) => {
     setProcessingPayment(false);
     onPaymentComplete(transactionId);
@@ -55,8 +77,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   };
 
   // Get plan details to display in the UI
-  const plans = getSubscriptionPlans();
-  const plan = plans[planId as keyof typeof plans] || plans.monthly;
+  const planInfo = PLAN_PRICES[planId as keyof typeof PLAN_PRICES] || PLAN_PRICES.monthly;
   
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -87,8 +108,8 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
         
         <CardcomOpenFields 
           planId={planId}
-          planName={plan.name}
-          amount={plan.displayPrice} 
+          planName={planInfo.name}
+          amount={planInfo.displayPrice} 
           onSuccess={handleSuccess}
           onError={handleError}
           onCancel={onCancel}

@@ -1,12 +1,13 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useNavigate } from 'react-router-dom';
-import usePaymentStatus from '@/hooks/usePaymentStatus';
+import { usePaymentStatus } from '@/hooks/usePaymentStatus';
+import { toast } from 'sonner';
 
 interface PaymentStatusProps {
   redirectOnSuccess?: string;
@@ -17,6 +18,25 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isChecking, paymentSuccess, paymentError } = usePaymentStatus(redirectOnSuccess);
+  
+  // Auto-redirect after successful payment verification
+  useEffect(() => {
+    if (paymentSuccess) {
+      // Check for stored lowProfileId to clean up
+      const lowProfileId = sessionStorage.getItem('payment_lowProfileId');
+      if (lowProfileId) {
+        sessionStorage.removeItem('payment_lowProfileId');
+        sessionStorage.removeItem('payment_planId');
+      }
+      
+      // Redirect after a short delay to show success message
+      const timer = setTimeout(() => {
+        navigate(redirectOnSuccess, { replace: true });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [paymentSuccess, navigate, redirectOnSuccess]);
   
   const handleRetry = () => {
     navigate('/subscription');

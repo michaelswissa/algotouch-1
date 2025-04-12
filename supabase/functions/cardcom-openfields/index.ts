@@ -13,6 +13,13 @@ const CARDCOM_API_NAME = Deno.env.get("CARDCOM_API_NAME") || "";
 const CARDCOM_API_PASSWORD = Deno.env.get("CARDCOM_API_PASSWORD") || "";
 const CARDCOM_API_URL = Deno.env.get("CARDCOM_API_URL") || "https://secure.cardcom.solutions";
 
+// Plan prices in ILS
+const PLAN_PRICES = {
+  monthly: 371,
+  annual: 3371,
+  vip: 13121
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -20,15 +27,35 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { planId, planName, amount, userEmail, userName, userId, isRegistration, registrationData, enable3DS } = await req.json();
 
-    if (!planId || !amount) {
+    // Validate the plan and amount
+    if (!planId || !PLAN_PRICES[planId as keyof typeof PLAN_PRICES]) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing required parameters" }),
+        JSON.stringify({ success: false, error: "Invalid plan ID" }),
+        { 
+          status: 400,
+          headers: { 
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+
+    // Validate that the amount matches the plan
+    const expectedAmount = PLAN_PRICES[planId as keyof typeof PLAN_PRICES];
+    if (Math.abs(Number(amount) - expectedAmount) > 0.01) {
+      console.error(`Amount mismatch: expected ${expectedAmount}, got ${amount}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Invalid amount for plan. Expected: ${expectedAmount}` 
+        }),
         { 
           status: 400,
           headers: { 
@@ -53,17 +80,17 @@ serve(async (req) => {
       ApiName: CARDCOM_API_NAME,
       ApiPassword: CARDCOM_API_PASSWORD,
       Operation: "ChargeOnly",
-      Amount: amount,
+      Amount: expectedAmount, // Use validated expected amount
       ReturnValue: userId || "", // This will be returned in the webhook
       SuccessRedirectUrl: successRedirectUrl,
       FailedRedirectUrl: failedRedirectUrl,
       WebHookUrl: indicatorUrl,
-      ProductName: planName || "Subscription",
+      ProductName: planName || `מנוי ${planId}`,
       Language: "he",
       ISOCoinId: 1, // ILS
       // Add 3DS configuration
       AdvancedDefinition: {
-        ThreeDSecureState: enable3DS ? "Enabled" : "Auto", // Enable 3DS explicitly if requested
+        ThreeDSecureState: enable3DS ? "Enabled" : "Auto", 
         VirtualTerminal: {
           IsEnable: false
         },
@@ -79,10 +106,10 @@ serve(async (req) => {
         Email: userEmail || "",
         Products: [
           { 
-            Description: planName || "Subscription", 
+            Description: planName || `מנוי ${planId}`, 
             Quantity: 1, 
-            UnitCost: amount,
-            TotalLineCost: amount
+            UnitCost: expectedAmount,
+            TotalLineCost: expectedAmount
           }
         ],
         IsAllowEditDocument: false,
@@ -97,7 +124,7 @@ serve(async (req) => {
       user_id: userId || null,
       plan_id: planId,
       payment_details: {
-        amount,
+        amount: expectedAmount,
         planName,
         currency: "ILS",
         terminal_number: CARDCOM_TERMINAL_NUMBER

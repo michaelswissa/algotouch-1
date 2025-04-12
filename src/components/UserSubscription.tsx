@@ -140,6 +140,21 @@ const UserSubscription = () => {
               .update({ payment_details: paymentDetails })
               .eq('id', sessionData.id);
           }
+        } else if (!subscription) {
+          // No subscription found, check if we should try to create one from payment logs
+          setCheckingMessage('בודק אפשרות ליצירת מנוי...');
+          
+          // Let's try invoking the subscription sync function to create a subscription if needed
+          const { error: syncError } = await supabase.functions.invoke('cardcom-subscription-sync', {
+            body: { userId: user.id }
+          });
+          
+          if (syncError) {
+            console.error('Error syncing subscription:', syncError);
+          } else {
+            // Refetch after sync
+            refetchSubscription();
+          }
         }
       } catch (error) {
         console.error("Error checking pending payments:", error);
@@ -150,6 +165,44 @@ const UserSubscription = () => {
     
     checkPendingPayments();
   }, [user, subscription, refetchSubscription]);
+  
+  // Check for pending payment in URL params or session storage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    const lowProfileId = sessionStorage.getItem('payment_lowProfileId');
+    
+    if (success === 'true' && lowProfileId && user?.id) {
+      setIsChecking(true);
+      setCheckingMessage('מאמת את פרטי התשלום האחרון...');
+      
+      // Check payment status using the edge function
+      const verifyPayment = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
+            body: { lowProfileId }
+          });
+          
+          if (error) {
+            console.error('Error checking payment:', error);
+          } else if (data.OperationResponse === 0) {
+            // Payment successful, clean up
+            sessionStorage.removeItem('payment_lowProfileId');
+            sessionStorage.removeItem('payment_planId');
+            
+            // Refetch subscription
+            refetchSubscription();
+          }
+        } catch (error) {
+          console.error('Error verifying payment:', error);
+        } finally {
+          setIsChecking(false);
+        }
+      };
+      
+      verifyPayment();
+    }
+  }, [user, refetchSubscription]);
 
   if (loading || isChecking) {
     return (
