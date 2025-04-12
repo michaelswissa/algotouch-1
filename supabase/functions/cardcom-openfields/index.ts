@@ -1,199 +1,118 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.3";
 
-// Configure CORS headers
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Get environment variables for Cardcom API
+const CARDCOM_TERMINAL_NUMBER = parseInt(Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "0", 10);
+const CARDCOM_API_NAME = Deno.env.get("CARDCOM_API_NAME") || "";
+const CARDCOM_API_PASSWORD = Deno.env.get("CARDCOM_API_PASSWORD") || "";
+const CARDCOM_API_URL = Deno.env.get("CARDCOM_API_URL") || "https://secure.cardcom.solutions";
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Handle CORS preflight requests
-function handleCors(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders,
-      status: 204,
-    });
-  }
-  return null;
-}
-
 serve(async (req) => {
-  // Handle CORS
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
-    console.log('Received request to cardcom-openfields');
-    
-    const {
-      planId,
-      planName,
-      amount: displayAmount, // This is the display amount in USD
-      userEmail,
-      userName,
-      userId,
-      isRegistration,
-      registrationData
-    } = await req.json();
+    const { planId, planName, amount, userEmail, userName, userId, isRegistration, registrationData, enable3DS } = await req.json();
 
-    // Validate required fields
-    if (!planId) {
-      console.error('Missing required fields:', { planId });
+    if (!planId || !amount) {
       return new Response(
-        JSON.stringify({ error: 'Missing required field: planId', success: false }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        JSON.stringify({ success: false, error: "Missing required parameters" }),
+        { 
           status: 400,
+          headers: { 
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
         }
       );
     }
 
-    console.log('Creating payment session for plan:', planId);
-
-    // Convert displayed USD price to ILS for charging
-    let ilsAmount = 0;
-    let operationType = "ChargeOnly"; // Default operation type
-
-    // Set the actual ILS amount and operation type based on the plan
-    if (planId === 'monthly') {
-      ilsAmount = 0; // Free first month
-      operationType = "ChargeAndCreateToken"; // Create token for future charges
-    } else if (planId === 'annual') {
-      ilsAmount = 3371; // 3,371 ILS immediate charge
-      operationType = "ChargeAndCreateToken"; // Immediate charge and create token for future renewals
-    } else if (planId === 'vip') {
-      ilsAmount = 13121; // 13,121 ILS one-time payment
-      operationType = "ChargeOnly"; // One-time charge, no token needed
-    }
-
-    console.log('Plan details:', { 
-      planId, 
-      ilsAmount,
-      displayAmountUSD: displayAmount, 
-      operationType 
-    });
-
-    // Get the Cardcom API credentials from environment variables
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL") || "160138";
-    const apiName = Deno.env.get("CARDCOM_USERNAME") || "bLaocQRMSnwphQRUVG3b";
-
-    if (!terminalNumber || !apiName) {
-      console.error('Missing Cardcom API credentials');
-      return new Response(
-        JSON.stringify({ error: 'Missing Cardcom API credentials', success: false }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
-    }
-
-    // If this is a registration payment, store the registration data temporarily
-    if (isRegistration && registrationData) {
-      console.log('Processing registration data for new user');
-      
-      // Initialize Supabase client
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      );
-      
-      // Create an expiry date (30 minutes from now)
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 30);
-      
-      // Store registration data in a temporary table
-      const { error } = await supabaseClient
-        .from('temp_registration_data')
-        .insert({
-          registration_data: registrationData,
-          expires_at: expiresAt.toISOString(),
-          used: false
-        });
-      
-      if (error) {
-        console.error('Error storing temporary registration data:', error);
-      }
-    }
-
-    // Create request URL for dynamic origin detection
-    const requestUrl = new URL(req.url);
-    const origin = requestUrl.origin.includes('localhost') || requestUrl.origin.includes('127.0.0.1') 
-      ? 'http://localhost:3000' 
-      : requestUrl.origin;
+    // Get the base URL for redirects
+    const origin = req.headers.get("origin") || "http://localhost:5173";
     
-    // Build webhook URL and redirect URLs using the detected origin
-    const successUrl = `${origin}/subscription?success=true&planId=${planId}`;
-    const failureUrl = `${origin}/subscription?error=true`;
-    
-    // Use functions/cardcom-webhook endpoint as the webhook URL
-    const webhookUrl = `${origin}/functions/cardcom-webhook`;
-    
-    console.log('URLs configured:', { successUrl, failureUrl, webhookUrl });
+    // Prepare success and failure URLs
+    const successRedirectUrl = `${origin}/subscription?success=true&planId=${planId}`;
+    const failedRedirectUrl = `${origin}/subscription?error=true&planId=${planId}`;
+    const indicatorUrl = `${origin}/api/payment-webhook`; // This would be your webhook endpoint
 
-    // Pass the user ID via CustomFields for reference in the webhook
-    const customFields = [
-      {
-        Id: 1,
-        Value: userId || ""
-      }
-    ];
-
-    // Create a Low Profile request to Cardcom
+    // Create LowProfile request for Cardcom
     const createLPRequest = {
-      TerminalNumber: Number(terminalNumber),
-      ApiName: apiName,
-      Operation: operationType, // "ChargeOnly", "ChargeAndCreateToken", "CreateTokenOnly"
-      Amount: ilsAmount, // This is the actual ILS amount to charge
-      ReturnValue: planId, // Store plan ID for reference
-      SuccessRedirectUrl: successUrl,
-      FailedRedirectUrl: failureUrl,
-      WebHookUrl: webhookUrl,
-      ProductName: planName || 'Subscription Plan',
-      Language: 'he',
+      TerminalNumber: CARDCOM_TERMINAL_NUMBER,
+      ApiName: CARDCOM_API_NAME,
+      ApiPassword: CARDCOM_API_PASSWORD,
+      Operation: "ChargeOnly",
+      Amount: amount,
+      ReturnValue: userId || "", // This will be returned in the webhook
+      SuccessRedirectUrl: successRedirectUrl,
+      FailedRedirectUrl: failedRedirectUrl,
+      WebHookUrl: indicatorUrl,
+      ProductName: planName || "Subscription",
+      Language: "he",
       ISOCoinId: 1, // ILS
+      // Add 3DS configuration
+      AdvancedDefinition: {
+        ThreeDSecureState: enable3DS ? "Enabled" : "Auto", // Enable 3DS explicitly if requested
+        VirtualTerminal: {
+          IsEnable: false
+        },
+      },
+      // UI definition for proper reCAPTCHA integration
+      UIDefinition: {
+        CardOwnerEmailValue: userEmail || "",
+        CardOwnerNameValue: userName || "",
+      },
+      // Document info for receipt/invoice
       Document: {
-        Name: userName || "User",
+        Name: userName || "Customer",
         Email: userEmail || "",
         Products: [
           { 
-            Description: getPlanDescription(planId), 
+            Description: planName || "Subscription", 
             Quantity: 1, 
-            UnitCost: ilsAmount 
+            UnitCost: amount,
+            TotalLineCost: amount
           }
         ],
         IsAllowEditDocument: false,
         IsShowOnlyDocument: false,
-        Language: 'he'
-      },
-      UIDefinition: {
-        IsHideCVV: false,
-        IsHideCardOwnerName: false,
-        IsHideCardOwnerPhone: false,
-        IsCardOwnerPhoneRequired: true,
-        IsHideCardOwnerEmail: false,
-        IsCardOwnerEmailRequired: true,
-        CardOwnerEmailValue: userEmail || "",
-        CardOwnerNameValue: userName || "",
-        CustomFields: customFields
-      },
-      AdvancedDefinition: {
-        ThreeDSecureState: "Enabled" // Enable 3D Secure for added security
+        Language: "he"
       }
     };
-    
-    console.log('Sending request to Cardcom API with params:', {
-      TerminalNumber: createLPRequest.TerminalNumber,
-      ApiName: createLPRequest.ApiName,
-      Amount: createLPRequest.Amount,
-      Operation: createLPRequest.Operation
-    });
-    
-    // Call Cardcom API to create a Low Profile payment page
-    const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
+
+    // Store the payment session details
+    const paymentSession = {
+      id: crypto.randomUUID(),
+      user_id: userId || null,
+      plan_id: planId,
+      payment_details: {
+        amount,
+        planName,
+        currency: "ILS",
+        terminal_number: CARDCOM_TERMINAL_NUMBER
+      },
+      email: userEmail || null,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+    };
+
+    // Save the payment session to the database
+    await supabase.from("payment_sessions").insert(paymentSession);
+
+    // Create a lowProfile in Cardcom
+    console.log("Creating LowProfile with Cardcom:", createLPRequest);
+
+    const response = await fetch(`${CARDCOM_API_URL}/api/v11/LowProfile/Create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -201,67 +120,48 @@ serve(async (req) => {
       body: JSON.stringify(createLPRequest),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Cardcom API error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
+    const responseData = await response.json();
+    console.log("Cardcom LowProfile response:", responseData);
+
+    if (responseData.ResponseCode !== 0) {
+      throw new Error(responseData.Description || "Error creating payment session with Cardcom");
     }
-    
-    const cardcomResponse = await response.json();
-    console.log('Cardcom API response received:', JSON.stringify(cardcomResponse));
-    
-    if (cardcomResponse.ResponseCode !== 0) {
-      console.error('Cardcom API returned error:', cardcomResponse.Description);
-      throw new Error(`Cardcom error: ${cardcomResponse.Description}`);
-    }
-    
-    // For OpenFields flow, we only need the LowProfileId
+
+    // Update payment session with lowProfileId
+    await supabase
+      .from("payment_sessions")
+      .update({ payment_details: { ...paymentSession.payment_details, lowProfileId: responseData.LowProfileId } })
+      .eq("id", paymentSession.id);
+
     return new Response(
       JSON.stringify({
         success: true,
-        lowProfileId: cardcomResponse.LowProfileId,
-        terminalNumber,
-        apiName,
-        planId,
-        planName,
-        amount: ilsAmount,
-        displayAmount: displayAmount,
-        currency: 'ILS',
-        userEmail,
-        userName,
-        userId,
-        operation: operationType
+        lowProfileId: responseData.LowProfileId,
+        url: responseData.Url,
+        sessionId: paymentSession.id
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       }
     );
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error("Error creating payment session:", error);
+
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'An unexpected error occurred',
-        success: false 
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "An unknown error occurred"
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       }
     );
   }
 });
-
-// Helper function to get Hebrew plan descriptions
-function getPlanDescription(planId: string): string {
-  switch (planId) {
-    case 'monthly':
-      return 'מנוי חודשי - חודש ניסיון חינם + 371 ש"ח חיוב חודשי';
-    case 'annual':
-      return 'מנוי שנתי - 3,371 ש"ח חיוב שנתי';
-    case 'vip':
-      return 'מנוי VIP - 13,121 ש"ח תשלום חד פעמי לכל החיים';
-    default:
-      return 'מנוי';
-  }
-}

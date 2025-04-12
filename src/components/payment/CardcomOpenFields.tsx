@@ -27,7 +27,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   amount,
   onSuccess,
   onError,
-  onCancel
+  onCancel,
+  onPaymentStart
 }) => {
   const [lowProfileCode, setLowProfileCode] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -132,7 +133,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         userName: cardOwnerName || (user?.user_metadata?.full_name || ''),
         userId: user?.id || null,
         isRegistration: !!registrationData,
-        registrationData: registrationData?.registration_data || null
+        registrationData: registrationData?.registration_data || null,
+        enable3DS: true // Enable 3DS processing
       };
       
       console.log('Initializing payment session with data:', requestData);
@@ -191,14 +193,17 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         cvvFieldCSS: cvvCss,
         placeholder: "0000 0000 0000 0000",
         cvvPlaceholder: "123",
-        language: "he"
+        language: "he",
+        // 3DS configuration
+        is3DSEnabled: true
       };
       
       console.log('Sending initialization message to iframe:', { 
         action: message.action, 
         lowProfileCode: lowProfileCode,
         hasCardCSS: !!message.cardFieldCSS,
-        hasCvvCSS: !!message.cvvFieldCSS
+        hasCvvCSS: !!message.cvvFieldCSS,
+        is3DSEnabled: message.is3DSEnabled
       });
       
       if (masterFrameRef.current.contentWindow) {
@@ -244,6 +249,21 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           }
           if (msg.field === "reCaptcha") {
             console.log('reCaptcha validation:', msg.isValid);
+          }
+          break;
+        case "handle3DSProcess": // Handle 3DS specific events
+          console.log('3DS process event:', msg.status);
+          if (msg.status === 'started') {
+            // The 3DS verification has started
+            console.log('3DS verification process has started');
+          } else if (msg.status === 'completed') {
+            // The 3DS verification has completed successfully
+            console.log('3DS verification completed successfully');
+          } else if (msg.status === 'failed') {
+            // The 3DS verification has failed
+            console.error('3DS verification failed:', msg.error);
+            setError('אימות 3DS נכשל: ' + (msg.error || 'שגיאה לא ידועה'));
+            onError?.('אימות 3DS נכשל: ' + (msg.error || 'שגיאה לא ידועה'));
           }
           break;
         default:
@@ -335,6 +355,10 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     setProcessingPayment(true);
     setError(null);
     
+    if (onPaymentStart) {
+      onPaymentStart();
+    }
+    
     if (!masterFrameRef.current) {
       setError('שגיאה באתחול טופס התשלום');
       setProcessingPayment(false);
@@ -363,7 +387,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       cardOwnerId: '000000000',
       cardOwnerPhone: '',
       numberOfPayments: "1",
-      document: createDocument()
+      document: createDocument(),
+      is3DSEnabled: true  // Enable 3DS for the transaction
     };
     
     console.log('Submitting payment transaction with params:', {
@@ -371,7 +396,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       lowProfileCode: lowProfileCode,
       cardOwnerName: formProps.cardOwnerName,
       hasExpiry: !!formProps.expirationMonth && !!formProps.expirationYear,
-      hasDocument: !!formProps.document
+      hasDocument: !!formProps.document,
+      is3DSEnabled: formProps.is3DSEnabled
     });
     
     masterFrameRef.current.contentWindow?.postMessage(formProps, '*');
@@ -605,7 +631,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         </div>
         
         <div className="text-xs text-muted-foreground mt-2 text-center">
-          <p>התשלום מאובטח ומתבצע באמצעות Cardcom</p>
+          <p>התשלום מאובטח ומתבצע באמצעות Cardcom עם אבטחת 3DS</p>
         </div>
         
         <div className="flex justify-center pt-4">

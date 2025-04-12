@@ -24,6 +24,21 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
 }) => {
   const [processingPayment, setProcessingPayment] = useState(false);
 
+  // Load the 3DS script when the component mounts
+  useEffect(() => {
+    const cardcom3DSScript = document.createElement('script');
+    const time = new Date().getTime();
+    cardcom3DSScript.setAttribute('src', `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${time}`);
+    document.head.appendChild(cardcom3DSScript);
+    
+    // Clean up the script when the component unmounts
+    return () => {
+      if (document.head.contains(cardcom3DSScript)) {
+        document.head.removeChild(cardcom3DSScript);
+      }
+    };
+  }, []);
+
   const handleSuccess = (transactionId: string) => {
     setProcessingPayment(false);
     onPaymentComplete(transactionId);
