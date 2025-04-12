@@ -79,7 +79,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <Card className="glass-card">
+    <Card className="glass-card-2025">
       <CardHeader>
         <CardTitle>התחברות</CardTitle>
         <CardDescription>הזן את פרטי ההתחברות שלך</CardDescription>
