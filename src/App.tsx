@@ -1,14 +1,15 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
-import TradeReport from './pages/TradeReport';
+import MonthlyReport from './pages/MonthlyReport'; // Changed from TradeReport to MonthlyReport
 import Subscription from './pages/Subscription';
 import MySubscriptionPage from './pages/MySubscriptionPage';
 import { AuthProvider } from './contexts/auth';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import ProtectedRoute from './components/ProtectedRoute'; // Changed to default import
 import { Toaster } from "@/components/ui/toaster"
 import TransactionManagerPage from './components/payment/TransactionManagerPage';
 
@@ -16,12 +17,12 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Toaster richColors position="top-center" />
+        <Toaster /> {/* Removed richColors and position props */}
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/trade-report" element={<ProtectedRoute><TradeReport /></ProtectedRoute>} />
+          <Route path="/trade-report" element={<ProtectedRoute><MonthlyReport /></ProtectedRoute>} />
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/subscription/:planId" element={<Subscription />} />
           <Route path="/my-subscription" element={<MySubscriptionPage />} />
