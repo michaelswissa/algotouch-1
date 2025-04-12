@@ -1,46 +1,53 @@
-
-import React, { useState } from 'react';
+import React from 'react';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { useToast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface SubscriptionFooterProps {
-  subscriptionId: string;
-  status: string;
-  planType: string;
+  subscriptionId?: string;
+  status?: string;
+  planType?: string;
   onCancelled?: () => void;
 }
 
 const SubscriptionFooter: React.FC<SubscriptionFooterProps> = ({
   subscriptionId,
-  status,
-  planType,
+  status = '',
+  planType = '',
   onCancelled
 }) => {
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = React.useState(false);
+  
+  const showCancellation = status === 'active' && (planType === 'monthly' || planType === 'annual');
+  
+  if (planType === 'vip' || status === 'cancelled') {
+    return null;
+  }
 
-  // VIP subscriptions cannot be cancelled as they're lifetime
-  const canCancel = planType !== 'vip' && status !== 'cancelled';
-
-  const handleCancel = async () => {
+  const handleCancelSubscription = async () => {
+    if (!subscriptionId) {
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לבטל את המנוי כעת, אנא נסה שוב מאוחר יותר",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!window.confirm("האם אתה בטוח שברצונך לבטל את המנוי? המנוי יישאר פעיל עד תום תקופת החיוב הנוכחית.")) {
+      return;
+    }
+    
+    setIsLoading(true);
+    
     try {
-      setIsCancelling(true);
-      
-      // Call the server to cancel the subscription
-      const { error } = await supabase.functions.invoke('cardcom-recurring', {
-        body: { 
+      const { data, error } = await supabase.functions.invoke('cardcom-recurring', {
+        body: {
           action: 'cancel',
           subscriptionId
         }
@@ -50,66 +57,66 @@ const SubscriptionFooter: React.FC<SubscriptionFooterProps> = ({
         throw new Error(error.message);
       }
       
-      toast.success('המנוי בוטל בהצלחה');
-      setShowCancelDialog(false);
+      if (!data.success) {
+        throw new Error(data.error || "ארעה שגיאה בעת ביטול המנוי");
+      }
       
-      // Trigger parent refresh
-      if (onCancelled) onCancelled();
+      toast({
+        title: "המנוי בוטל בהצלחה",
+        description: "המנוי יישאר פעיל עד תום תקופת החיוב הנוכחית",
+        variant: "default"
+      });
       
+      if (onCancelled) {
+        onCancelled();
+      } else {
+        setTimeout(() => {
+          navigate(0);
+        }, 1500);
+      }
     } catch (error) {
       console.error('Error cancelling subscription:', error);
-      toast.error('אירעה שגיאה בביטול המנוי');
+      toast({
+        title: "שגיאה בביטול המנוי",
+        description: error instanceof Error ? error.message : "ארעה שגיאה בעת ביטול המנוי",
+        variant: "destructive"
+      });
     } finally {
-      setIsCancelling(false);
+      setIsLoading(false);
     }
   };
-  
+
   return (
-    <div className="mt-8 space-y-4 border-t pt-4">
-      <div className="flex justify-between items-center">
-        <Button variant="link" size="sm" className="text-muted-foreground" asChild>
-          <a 
-            href="https://support.example.com/billing" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center"
-          >
-            צור קשר עם התמיכה <ExternalLink className="h-3.5 w-3.5 ms-1" />
-          </a>
-        </Button>
-        
-        {canCancel && (
+    <div className="mt-8 space-y-4">
+      <Alert variant="default" className="bg-amber-50 border-amber-200">
+        <AlertCircle className="h-4 w-4 text-amber-500" />
+        <AlertDescription className="text-amber-700">
+          {status === 'trial' ? (
+            <>לאחר תקופת הניסיון יחל חיוב אוטומטי בהתאם למסלול שבחרת.</>
+          ) : (
+            <>המנוי יחודש באופן אוטומטי בסוף כל תקופה. ניתן לבטל את החידוש האוטומטי בכל עת.</>
+          )}
+        </AlertDescription>
+      </Alert>
+      
+      {showCancellation && (
+        <div className="flex justify-center">
           <Button 
             variant="outline" 
-            onClick={() => setShowCancelDialog(true)}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+            onClick={handleCancelSubscription}
+            disabled={isLoading}
           >
-            בטל מנוי
+            {isLoading ? "מבטל מנוי..." : "ביטול המנוי"}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
       
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>בטוח שברצונך לבטל את המנוי?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ביטול המנוי יסתיים בסוף תקופת החיוב הנוכחית. לא יבוצעו חיובים נוספים.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isCancelling}>חזור</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                handleCancel();
-              }}
-              disabled={isCancelling}
-            >
-              {isCancelling ? 'מבטל מנוי...' : 'אישור ביטול'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <div className="text-center text-xs text-muted-foreground mt-6">
+        <p>לעזרה ותמיכה ניתן לפנות ל-
+          <a href="mailto:support@example.com" className="text-primary hover:underline">support@example.com</a>
+        </p>
+      </div>
     </div>
   );
 };

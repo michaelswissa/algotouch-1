@@ -20,7 +20,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -28,7 +28,7 @@ serve(async (req) => {
 
     if (!lowProfileId) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing lowProfileId parameter" }),
+        JSON.stringify({ success: false, error: "Missing lowProfileId" }),
         { 
           status: 400,
           headers: { 
@@ -39,122 +39,114 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Checking status for lowProfileId: ${lowProfileId}`);
-
-    // Get the payment session by lowProfileId
-    const { data: paymentSession, error: sessionError } = await supabase
+    // Find the payment session
+    const { data: paymentSession } = await supabase
       .from("payment_sessions")
       .select("*")
       .eq("payment_details->lowProfileId", lowProfileId)
       .maybeSingle();
 
-    if (sessionError) {
-      console.error("Error fetching payment session:", sessionError);
-      throw new Error(`Error fetching payment session: ${sessionError.message}`);
-    }
-
     if (!paymentSession) {
-      console.log("No payment session found for lowProfileId:", lowProfileId);
-      return new Response(
-        JSON.stringify({ 
-          ResponseCode: 400, 
-          Description: "No payment session found for the given lowProfileId" 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.log(`No payment session found for lowProfileId: ${lowProfileId}`);
     }
 
-    // Get the transaction status from Cardcom API
-    const requestBody = {
+    // Create the request to get LowProfile result
+    const getLowProfileRequest = {
       TerminalNumber: CARDCOM_TERMINAL_NUMBER,
-      UserName: CARDCOM_API_NAME,
-      LowProfileCode: lowProfileId
+      ApiName: CARDCOM_API_NAME,
+      LowProfileId: lowProfileId
     };
 
-    console.log("Sending request to Cardcom API:", requestBody);
+    console.log(`Checking transaction status for lowProfileId: ${lowProfileId}`);
 
-    const response = await fetch(`${CARDCOM_API_URL}/Interface/BillGoldGetLowProfileIndicator.aspx`, {
+    // Call Cardcom API to get the status
+    const response = await fetch(`${CARDCOM_API_URL}/api/v11/LowProfile/GetLpResult`, {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json" 
+      headers: {
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(getLowProfileRequest),
     });
 
-    const responseData = await response.json();
-    console.log("Received response from Cardcom API:", responseData);
+    if (!response.ok) {
+      throw new Error(`Cardcom API returned ${response.status}: ${response.statusText}`);
+    }
 
-    // Process the response and update the database records
-    if (responseData.OperationResponse === 0 && responseData.TranzactionInfo?.TranzactionId) {
-      // The transaction was successful
-      const transactionId = responseData.TranzactionInfo.TranzactionId;
-      const amount = paymentSession.payment_details?.amount || 0;
-      const planId = paymentSession.plan_id || 'monthly';
-      const userId = paymentSession.user_id;
-      
-      console.log(`Transaction ${transactionId} was successful for user ${userId}, plan ${planId}`);
+    const data = await response.json();
+    console.log("Transaction status:", data);
 
-      // Update payment session record
-      await supabase
-        .from("payment_sessions")
-        .update({
-          payment_details: {
-            ...paymentSession.payment_details,
-            processed: true,
-            transaction_id: transactionId,
-            timestamp: new Date().toISOString()
-          }
-        })
-        .eq("id", paymentSession.id);
+    // Check if transaction was successful
+    if (data.ResponseCode === 0 && data.TranzactionInfo?.TranzactionId) {
+      console.log("Transaction successful:", data.TranzactionInfo.TranzactionId);
 
-      // Record the payment log
-      await supabase
-        .from("user_payment_logs")
-        .insert({
-          user_id: userId,
-          amount: amount,
-          status: "completed",
-          token: lowProfileId,
-          approval_code: responseData.TranzactionInfo.ApprovalNumber || "",
-          transaction_details: {
-            transaction_id: transactionId,
-            card_last_four: responseData.TranzactionInfo.Last4CardDigitsString || "",
-            card_brand: responseData.TranzactionInfo.Brand || "",
-            payment_method: {
-              type: "credit_card",
-              brand: responseData.TranzactionInfo.Brand || "",
-              last4: responseData.TranzactionInfo.Last4CardDigitsString || "",
-              expiryMonth: (responseData.UIValues?.CardMonth || "").toString().padStart(2, '0'),
-              expiryYear: (responseData.UIValues?.CardYear || "").toString()
+      // If we have a payment session and user ID, record the payment
+      if (paymentSession && paymentSession.user_id) {
+        // Log the successful payment
+        await supabase
+          .from("user_payment_logs")
+          .insert({
+            user_id: paymentSession.user_id,
+            amount: paymentSession.payment_details.amount,
+            status: "completed",
+            token: lowProfileId,
+            approval_code: data.TranzactionInfo.ApprovalNumber || "",
+            transaction_details: {
+              transaction_id: data.TranzactionInfo.TranzactionId,
+              plan_id: paymentSession.plan_id,
+              timestamp: new Date().toISOString(),
+              card_last_four: data.TranzactionInfo.Last4CardDigitsString || "",
+              is_3ds_verified: !!data.TranzactionInfo.CardNumberEntryMode?.includes("3DS"), // Check if 3DS was used
+              payment_method: {
+                type: "credit_card",
+                brand: data.TranzactionInfo.Brand || "",
+                last4: data.TranzactionInfo.Last4CardDigitsString || ""
+              }
             }
-          }
-        });
+          });
+      }
+    } else if (data.ResponseCode !== 0) {
+      console.error("Transaction failed:", data.Description);
 
-      // Invoke the subscription sync function to create/update subscription
-      try {
-        await supabase.functions.invoke("cardcom-subscription-sync", {
-          body: { userId }
-        });
-      } catch (syncError) {
-        console.error("Error invoking subscription sync:", syncError);
+      // Log failed payment if we have session data
+      if (paymentSession && paymentSession.user_id) {
+        await supabase
+          .from("payment_errors")
+          .insert({
+            user_id: paymentSession.user_id,
+            error_code: data.ResponseCode.toString(),
+            error_message: data.Description,
+            context: "transaction_check",
+            payment_details: {
+              lowProfileId,
+              plan_id: paymentSession.plan_id
+            }
+          });
       }
     }
 
-    // Return the Cardcom API response
     return new Response(
-      JSON.stringify(responseData),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify(data),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      }
     );
   } catch (error) {
-    console.error("Error checking payment status:", error);
+    console.error("Error checking transaction status:", error);
+
     return new Response(
-      JSON.stringify({ 
-        ResponseCode: 500, 
-        Description: error instanceof Error ? error.message : "An unknown error occurred" 
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "An unknown error occurred"
       }),
-      { 
+      {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       }
     );
   }

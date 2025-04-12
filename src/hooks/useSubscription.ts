@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { format, addMonths, parseISO, differenceInDays } from 'date-fns';
@@ -41,63 +41,50 @@ export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
-  
-  const fetchSubscription = useCallback(async () => {
-    if (user?.id) {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (error) {
-          if (error.code !== 'PGRST116') { // PGRST116 is "not found" which is expected if no subscription
-            console.error('Error fetching subscription:', error);
-          }
-          setSubscription(null);
-          setDetails(null);
-          return;
-        }
-        
-        // Convert Supabase data to our Subscription type
-        if (data) {
-          const formattedSubscription: Subscription = {
-            id: data.id,
-            plan_type: data.plan_type,
-            status: data.status,
-            trial_ends_at: data.trial_ends_at,
-            current_period_ends_at: data.current_period_ends_at,
-            next_charge_date: data.next_charge_date,
-            payment_method: data.payment_method
-          };
-          setSubscription(formattedSubscription);
-          
-          // Process the subscription details
-          const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
-          setDetails(subscriptionDetails);
-        } else {
-          setSubscription(null);
-          setDetails(null);
-        }
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-        setSubscription(null);
-        setDetails(null);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setSubscription(null);
-      setDetails(null);
-      setLoading(false);
-    }
-  }, [user]);
 
   useEffect(() => {
+    const fetchSubscription = async () => {
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (error) {
+            throw error;
+          }
+          
+          // Convert Supabase data to our Subscription type
+          if (data) {
+            const formattedSubscription: Subscription = {
+              id: data.id,
+              plan_type: data.plan_type,
+              status: data.status,
+              trial_ends_at: data.trial_ends_at,
+              current_period_ends_at: data.current_period_ends_at,
+              next_charge_date: data.next_charge_date,
+              payment_method: data.payment_method
+            };
+            setSubscription(formattedSubscription);
+            
+            // Process the subscription details
+            const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
+            setDetails(subscriptionDetails);
+          }
+        } catch (error) {
+          console.error('Error fetching subscription:', error);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+    
     fetchSubscription();
-  }, [fetchSubscription]);
+  }, [user]);
 
   const getSubscriptionDetails = (sub: Subscription | null): SubscriptionDetails | null => {
     if (!sub) return null;
@@ -152,24 +139,6 @@ export const useSubscription = () => {
       } else if (sub.status === 'cancelled') {
         statusText = 'מבוטל';
       }
-    } else if (sub.current_period_ends_at) {
-      // Fallback to current_period_ends_at if next_charge_date is not available
-      const endDate = parseISO(sub.current_period_ends_at);
-      nextBillingDate = format(endDate, 'dd/MM/yyyy', { locale: he });
-      
-      if (sub.status === 'active') {
-        statusText = 'פעיל';
-        
-        const startDate = sub.plan_type === 'monthly' 
-          ? addMonths(endDate, -1) 
-          : addMonths(endDate, -12);
-          
-        daysLeft = Math.max(0, differenceInDays(endDate, new Date()));
-        const totalDays = differenceInDays(endDate, startDate);
-        progressValue = Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
-      } else if (sub.status === 'cancelled') {
-        statusText = 'מבוטל';
-      }
     } else if (sub.status === 'active' && sub.plan_type === 'vip') {
       // VIP plan has no end date
       statusText = 'פעיל לכל החיים';
@@ -181,20 +150,11 @@ export const useSubscription = () => {
     if (sub.payment_method) {
       // Check if payment_method has the expected structure
       const paymentMethod = sub.payment_method as any;
-      // Check for original structure
       if (paymentMethod.lastFourDigits) {
         paymentMethodDetails = {
           lastFourDigits: paymentMethod.lastFourDigits,
           expiryMonth: paymentMethod.expiryMonth,
           expiryYear: paymentMethod.expiryYear
-        };
-      }
-      // Check for Cardcom payment method structure
-      else if (paymentMethod.last4) {
-        paymentMethodDetails = {
-          lastFourDigits: paymentMethod.last4,
-          expiryMonth: paymentMethod.expiryMonth || '12',
-          expiryYear: paymentMethod.expiryYear || '25'
         };
       }
     }
@@ -209,11 +169,6 @@ export const useSubscription = () => {
       paymentMethod: paymentMethodDetails
     };
   };
-  
-  // Add a refetch method
-  const refetchSubscription = useCallback(() => {
-    fetchSubscription();
-  }, [fetchSubscription]);
 
-  return { subscription, loading, details, refetchSubscription };
+  return { subscription, loading, details };
 };

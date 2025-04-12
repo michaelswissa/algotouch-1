@@ -85,5 +85,5 @@ verify_jwt = false
 [functions.cardcom-webhook]
 verify_jwt = false
 
-[functions.cardcom-subscription-sync]
+[functions.cardcom-transaction-manager]
 verify_jwt = false

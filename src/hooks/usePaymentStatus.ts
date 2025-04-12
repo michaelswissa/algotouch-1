@@ -17,7 +17,7 @@ export const usePaymentStatus = (
       const params = new URLSearchParams(window.location.search);
       const success = params.get('success');
       const error = params.get('error');
-      const lowProfileId = sessionStorage.getItem('payment_lowProfileId');
+      const lowProfileId = params.get('lowProfileId');
       
       if (success === 'true' && lowProfileId) {
         setIsChecking(true);
@@ -34,13 +34,9 @@ export const usePaymentStatus = (
           
           console.log('Received payment status response:', data);
           
-          if (data.OperationResponse === 0 && data.TranzactionInfo?.TranzactionId) {
+          if (data.ResponseCode === 0 && data.TranzactionInfo?.TranzactionId) {
             setPaymentSuccess(true);
             toast.success('התשלום התקבל בהצלחה!');
-            
-            // Clear session storage
-            sessionStorage.removeItem('payment_lowProfileId');
-            sessionStorage.removeItem('payment_planId');
             
             // Allow toasts to be shown before redirecting
             setTimeout(() => {

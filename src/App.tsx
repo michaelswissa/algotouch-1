@@ -1,35 +1,43 @@
 
-import { Routes, Route } from 'react-router-dom';
-import { Toaster } from '@/components/ui/toaster';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import Subscription from '@/pages/Subscription';
-import MySubscriptionPage from '@/pages/MySubscriptionPage';
-import PaymentStatusPage from '@/pages/PaymentStatusPage';
-import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
-import HomePage from '@/pages/HomePage';
-import AuthPage from '@/pages/AuthPage';
-import ProfilePage from '@/pages/ProfilePage';
-import DashboardPage from '@/pages/DashboardPage';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import Index from './pages/Index';
+import Auth from './pages/Auth';
+import Dashboard from './pages/Dashboard';
+import NotFound from './pages/NotFound';
+import MonthlyReport from './pages/MonthlyReport'; // Changed from TradeReport to MonthlyReport
+import Subscription from './pages/Subscription';
+import MySubscriptionPage from './pages/MySubscriptionPage';
+import { AuthProvider } from './contexts/auth';
+import ProtectedRoute from './components/ProtectedRoute'; // Changed to default import
+import { Toaster } from "@/components/ui/toaster"
+import TransactionManagerPage from './components/payment/TransactionManagerPage';
 
 function App() {
   return (
-    <TooltipProvider>
-      <>
+    <Router>
+      <AuthProvider>
+        <Toaster /> {/* Removed richColors and position props */}
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/trade-report" element={<ProtectedRoute><MonthlyReport /></ProtectedRoute>} />
           <Route path="/subscription" element={<Subscription />} />
-          <Route path="/payment-status" element={<PaymentStatusPage />} />
-          <Route path="/payment-success" element={<PaymentSuccessPage />} />
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/my-subscription" element={<ProtectedRoute><MySubscriptionPage /></ProtectedRoute>} />
+          <Route path="/subscription/:planId" element={<Subscription />} />
+          <Route path="/my-subscription" element={<MySubscriptionPage />} />
+          <Route 
+            path="/payment-manager" 
+            element={
+              <ProtectedRoute>
+                <TransactionManagerPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<NotFound />} />
         </Routes>
-
-        <Toaster />
-      </>
-    </TooltipProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
