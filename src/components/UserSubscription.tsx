@@ -70,10 +70,17 @@ const UserSubscription = () => {
             periodEnd.setFullYear(periodEnd.getFullYear() + 1);
           }
           
-          const paymentMethod = paymentLog.transaction_details?.payment_method || {
+          // Make sure transaction_details exists and is an object before accessing its properties
+          const transactionDetails = paymentLog.transaction_details || {};
+          const paymentMethod = {
             type: "credit_card",
-            brand: paymentLog.transaction_details?.card_brand || "",
-            lastFourDigits: paymentLog.transaction_details?.card_last_four || ""
+            brand: typeof transactionDetails === 'object' ? transactionDetails.card_brand || "" : "",
+            lastFourDigits: typeof transactionDetails === 'object' ? transactionDetails.card_last_four || "" : "",
+            expiryMonth: typeof transactionDetails === 'object' && transactionDetails.payment_method 
+              ? transactionDetails.payment_method.expiryMonth || "12" : "12",
+            expiryYear: typeof transactionDetails === 'object' && transactionDetails.payment_method
+              ? transactionDetails.payment_method.expiryYear || new Date().getFullYear().toString().substr(-2) : 
+                new Date().getFullYear().toString().substr(-2)
           };
           
           // Create a subscription record
@@ -90,10 +97,15 @@ const UserSubscription = () => {
           
           // Clean up the payment session
           if (sessions?.length) {
+            const sessionData = sessions[0];
+            const paymentDetails = typeof sessionData.payment_details === 'object' ? 
+              { ...sessionData.payment_details, processed: true } : 
+              { processed: true };
+              
             await supabase
               .from('payment_sessions')
-              .update({ payment_details: { ...sessions[0].payment_details, processed: true } })
-              .eq('id', sessions[0].id);
+              .update({ payment_details: paymentDetails })
+              .eq('id', sessionData.id);
           }
           
           toast.success("המנוי שלך הופעל בהצלחה!");

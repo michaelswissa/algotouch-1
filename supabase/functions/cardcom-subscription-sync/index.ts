@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.3";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -70,9 +70,7 @@ serve(async (req) => {
         console.log(`Found payment log for user ${userId}, creating subscription...`);
         
         const paymentLog = paymentLogs[0];
-        const planType = sessions?.[0]?.plan_id || 
-                         paymentLog.transaction_details?.plan_id || 
-                         'monthly';
+        const planType = sessions?.[0]?.plan_id || 'monthly';
         
         // Create subscription record
         const now = new Date();
@@ -92,18 +90,36 @@ serve(async (req) => {
           nextChargeDate = new Date(periodEnd);
         }
         
-        let paymentMethod: any = {};
+        let paymentMethod = {
+          type: "credit_card",
+          brand: "",
+          lastFourDigits: "",
+          expiryMonth: "12",
+          expiryYear: new Date().getFullYear().toString().substr(-2)
+        };
         
-        // Try to extract payment method details
-        if (paymentLog.transaction_details?.payment_method) {
-          const pm = paymentLog.transaction_details.payment_method;
-          paymentMethod = {
-            type: "credit_card",
-            brand: pm.brand || "",
-            lastFourDigits: pm.last4 || "",
-            expiryMonth: pm.expiryMonth || "12",
-            expiryYear: pm.expiryYear || new Date().getFullYear().toString().substr(-2)
-          };
+        // Try to extract payment method details from transaction details
+        const transactionDetails = paymentLog.transaction_details;
+        if (transactionDetails && typeof transactionDetails === 'object') {
+          if (transactionDetails.payment_method && typeof transactionDetails.payment_method === 'object') {
+            const pm = transactionDetails.payment_method;
+            paymentMethod = {
+              type: "credit_card",
+              brand: pm.brand || "",
+              lastFourDigits: pm.last4 || "",
+              expiryMonth: pm.expiryMonth || "12",
+              expiryYear: pm.expiryYear || new Date().getFullYear().toString().substr(-2)
+            };
+          } else {
+            // Fall back to direct properties if payment_method object doesn't exist
+            paymentMethod = {
+              type: "credit_card",
+              brand: transactionDetails.card_brand || "",
+              lastFourDigits: transactionDetails.card_last_four || "",
+              expiryMonth: "12",
+              expiryYear: new Date().getFullYear().toString().substr(-2)
+            };
+          }
         }
         
         // Create a subscription record
@@ -137,7 +153,7 @@ serve(async (req) => {
             .from("payment_sessions")
             .update({
               payment_details: {
-                ...sessions[0].payment_details,
+                ...(typeof sessions[0].payment_details === 'object' ? sessions[0].payment_details : {}),
                 processed: true,
                 processed_at: new Date().toISOString()
               }
