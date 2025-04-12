@@ -84,3 +84,6 @@ verify_jwt = false
 
 [functions.cardcom-webhook]
 verify_jwt = false
+
+[functions.cardcom-subscription-sync]
+verify_jwt = false

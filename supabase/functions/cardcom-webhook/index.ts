@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.3";
+import { createClient } from "@supabase/supabase-js";
 
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -62,43 +62,90 @@ serve(async (req) => {
         
         // Extract plan information and user details
         const planId = paymentSession.plan_id;
-        const sessionUserId = paymentSession.user_id;
+        const sessionUserId = paymentSession.user_id || userId;
         const amount = paymentSession.payment_details?.amount || 0;
         
         if (sessionUserId) {
           // Update user subscription based on plan
           const now = new Date();
           let periodEndsAt = null;
+          let nextChargeDate = null;
           const trialEndsAt = planId === 'monthly' ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
           
           if (planId === 'annual') {
             periodEndsAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+            nextChargeDate = new Date(periodEndsAt);
+          } else if (planId === 'monthly' && trialEndsAt) {
+            // For monthly plan, next charge is after trial
+            nextChargeDate = new Date(trialEndsAt);
           }
           
           const status = planId === 'monthly' ? 'trial' : 'active';
           
-          // Update the user's subscription
-          const { error: subscriptionError } = await supabase
+          // Extract payment method details from the transaction
+          const paymentMethod = {
+            type: "cardcom",
+            lastFourDigits: webhookData.TranzactionInfo.Last4CardDigitsString || "",
+            expiryMonth: (webhookData.UIValues?.CardMonth || "").toString().padStart(2, '0'),
+            expiryYear: (webhookData.UIValues?.CardYear || "").toString(),
+            brand: webhookData.TranzactionInfo.Brand || "",
+            cardholderName: webhookData.UIValues?.CardOwnerName || ""
+          };
+          
+          // Check if user already has a subscription
+          const { data: existingSubscription } = await supabase
             .from("subscriptions")
-            .upsert({
-              user_id: sessionUserId,
-              plan_type: planId,
-              status: status,
-              current_period_ends_at: periodEndsAt?.toISOString(),
-              trial_ends_at: trialEndsAt?.toISOString(),
-              payment_method: {
-                type: "cardcom",
-                last4: webhookData.TranzactionInfo.Last4CardDigitsString || "",
-                brand: webhookData.TranzactionInfo.Brand || ""
-              },
-              contract_signed: true,
-              contract_signed_at: now.toISOString()
-            });
+            .select("*")
+            .eq("user_id", sessionUserId)
+            .maybeSingle();
             
-          if (subscriptionError) {
-            console.error('Error updating subscription:', subscriptionError);
+          if (existingSubscription) {
+            console.log('User already has subscription, updating:', existingSubscription.id);
+            
+            // Update existing subscription
+            const { error: subscriptionError } = await supabase
+              .from("subscriptions")
+              .update({
+                plan_type: planId,
+                status: status,
+                current_period_ends_at: periodEndsAt?.toISOString(),
+                next_charge_date: nextChargeDate?.toISOString(),
+                trial_ends_at: trialEndsAt?.toISOString(),
+                payment_method: paymentMethod,
+                contract_signed: true,
+                contract_signed_at: now.toISOString(),
+                updated_at: now.toISOString()
+              })
+              .eq("id", existingSubscription.id);
+              
+            if (subscriptionError) {
+              console.error('Error updating subscription:', subscriptionError);
+            } else {
+              console.log('Subscription updated successfully');
+            }
           } else {
-            console.log('Subscription updated successfully');
+            console.log('Creating new subscription for user:', sessionUserId);
+            
+            // Create new subscription
+            const { error: subscriptionError } = await supabase
+              .from("subscriptions")
+              .insert({
+                user_id: sessionUserId,
+                plan_type: planId,
+                status: status,
+                current_period_ends_at: periodEndsAt?.toISOString(),
+                next_charge_date: nextChargeDate?.toISOString(),
+                trial_ends_at: trialEndsAt?.toISOString(),
+                payment_method: paymentMethod,
+                contract_signed: true,
+                contract_signed_at: now.toISOString()
+              });
+              
+            if (subscriptionError) {
+              console.error('Error creating subscription:', subscriptionError);
+            } else {
+              console.log('Subscription created successfully');
+            }
           }
           
           // Record the payment in the payment_history table
@@ -114,8 +161,11 @@ serve(async (req) => {
                 type: "cardcom",
                 last4: webhookData.TranzactionInfo.Last4CardDigitsString || "",
                 brand: webhookData.TranzactionInfo.Brand || "",
-                transaction_id: transactionId.toString()
-              }
+                transaction_id: transactionId.toString(),
+                expiryMonth: (webhookData.UIValues?.CardMonth || "").toString().padStart(2, '0'),
+                expiryYear: (webhookData.UIValues?.CardYear || "").toString()
+              },
+              payment_date: now.toISOString()
             });
             
           if (paymentError) {
@@ -142,13 +192,70 @@ serve(async (req) => {
                 payment_method: {
                   type: "credit_card",
                   brand: webhookData.TranzactionInfo.Brand || "",
-                  last4: webhookData.TranzactionInfo.Last4CardDigitsString || ""
-                }
+                  last4: webhookData.TranzactionInfo.Last4CardDigitsString || "",
+                  expiryMonth: (webhookData.UIValues?.CardMonth || "").toString().padStart(2, '0'),
+                  expiryYear: (webhookData.UIValues?.CardYear || "").toString()
+                },
+                UIValues: webhookData.UIValues || {}
               }
             });
+            
+          // Mark payment session as processed
+          await supabase
+            .from("payment_sessions")
+            .update({ 
+              payment_details: { 
+                ...paymentSession.payment_details,
+                processed: true,
+                transaction_id: transactionId,
+                processed_at: now.toISOString()
+              } 
+            })
+            .eq("id", paymentSession.id);
         }
       } else {
         console.warn('No payment session found for lowProfileId:', lowProfileId);
+        
+        // Try to find based on userId if provided
+        if (userId) {
+          console.log('Trying to create subscription based on userId:', userId);
+          const transactionInfo = webhookData.TranzactionInfo;
+          const uiValues = webhookData.UIValues || {};
+          
+          // Create default payment method
+          const paymentMethod = {
+            type: "cardcom",
+            lastFourDigits: transactionInfo.Last4CardDigitsString || "",
+            expiryMonth: (uiValues.CardMonth || "").toString().padStart(2, '0'),
+            expiryYear: (uiValues.CardYear || "").toString(),
+            brand: transactionInfo.Brand || ""
+          };
+          
+          // Default to monthly plan if we don't know
+          const planId = 'monthly';
+          const now = new Date();
+          const trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          
+          // Create subscription directly
+          const { error: subscriptionError } = await supabase
+            .from("subscriptions")
+            .upsert({
+              user_id: userId,
+              plan_type: planId,
+              status: 'trial',
+              trial_ends_at: trialEndsAt.toISOString(),
+              next_charge_date: trialEndsAt.toISOString(),
+              payment_method: paymentMethod,
+              contract_signed: true,
+              contract_signed_at: now.toISOString()
+            });
+            
+          if (subscriptionError) {
+            console.error('Error creating fallback subscription:', subscriptionError);
+          } else {
+            console.log('Fallback subscription created successfully');
+          }
+        }
       }
     } else if (webhookData.ResponseCode !== 0) {
       console.error('Transaction failed:', webhookData.Description);
