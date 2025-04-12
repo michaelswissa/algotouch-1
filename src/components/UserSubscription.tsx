@@ -70,32 +70,64 @@ const UserSubscription = () => {
             periodEnd.setFullYear(periodEnd.getFullYear() + 1);
           }
           
-          // Make sure transaction_details exists and is an object before accessing its properties
-          const transactionDetails = paymentLog.transaction_details || {};
-          const paymentMethod = {
+          let paymentMethod = {
             type: "credit_card",
-            brand: typeof transactionDetails === 'object' ? transactionDetails.card_brand || "" : "",
-            lastFourDigits: typeof transactionDetails === 'object' ? transactionDetails.card_last_four || "" : "",
-            expiryMonth: typeof transactionDetails === 'object' && transactionDetails.payment_method 
-              ? transactionDetails.payment_method.expiryMonth || "12" : "12",
-            expiryYear: typeof transactionDetails === 'object' && transactionDetails.payment_method
-              ? transactionDetails.payment_method.expiryYear || new Date().getFullYear().toString().substr(-2) : 
-                new Date().getFullYear().toString().substr(-2)
+            brand: "",
+            lastFourDigits: "",
+            expiryMonth: "12",
+            expiryYear: new Date().getFullYear().toString().substr(-2)
           };
           
-          // Create a subscription record
-          await supabase.from('subscriptions').insert({
-            user_id: user.id,
-            plan_type: planType,
-            status: planType === 'monthly' ? 'trial' : 'active',
-            trial_ends_at: trialEnd?.toISOString(),
-            current_period_ends_at: periodEnd?.toISOString(),
-            payment_method: paymentMethod,
-            contract_signed: true,
-            contract_signed_at: now.toISOString()
-          });
+          // Try to extract payment method details from transaction details
+          const transactionDetails = paymentLog.transaction_details;
+          if (transactionDetails && typeof transactionDetails === 'object') {
+            // Check if we have a payment_method object
+            if (transactionDetails.payment_method && 
+                typeof transactionDetails.payment_method === 'object') {
+              const pm = transactionDetails.payment_method;
+              paymentMethod = {
+                type: "credit_card",
+                brand: pm.brand || "",
+                lastFourDigits: pm.last4 || "",
+                expiryMonth: pm.expiryMonth || "12",
+                expiryYear: pm.expiryYear || new Date().getFullYear().toString().substr(-2)
+              };
+            } 
+            // Fall back to direct properties
+            else {
+              const td = transactionDetails as Record<string, any>;
+              paymentMethod = {
+                type: "credit_card",
+                brand: td.card_brand || "",
+                lastFourDigits: td.card_last_four || "",
+                expiryMonth: "12",
+                expiryYear: new Date().getFullYear().toString().substr(-2)
+              };
+            }
+          }
           
-          // Clean up the payment session
+          // Create a subscription record
+          const { error: subscriptionError } = await supabase
+            .from("subscriptions")
+            .insert({
+              user_id: user.id,
+              plan_type: planType,
+              status: planType === 'monthly' ? 'trial' : 'active',
+              trial_ends_at: trialEnd?.toISOString(),
+              current_period_ends_at: periodEnd?.toISOString(),
+              payment_method: paymentMethod,
+              contract_signed: true,
+              contract_signed_at: now.toISOString()
+            });
+          
+          if (subscriptionError) {
+            console.error("Error creating subscription:", subscriptionError);
+          } else {
+            toast.success("המנוי שלך הופעל בהצלחה!");
+            refetchSubscription();
+          }
+          
+          // Mark all payment sessions as processed
           if (sessions?.length) {
             const sessionData = sessions[0];
             const paymentDetails = typeof sessionData.payment_details === 'object' ? 
@@ -107,9 +139,6 @@ const UserSubscription = () => {
               .update({ payment_details: paymentDetails })
               .eq('id', sessionData.id);
           }
-          
-          toast.success("המנוי שלך הופעל בהצלחה!");
-          refetchSubscription();
         }
       } catch (error) {
         console.error("Error checking pending payments:", error);

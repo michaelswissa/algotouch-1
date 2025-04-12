@@ -1,6 +1,6 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.3";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -101,8 +101,9 @@ serve(async (req) => {
         // Try to extract payment method details from transaction details
         const transactionDetails = paymentLog.transaction_details;
         if (transactionDetails && typeof transactionDetails === 'object') {
-          if (transactionDetails.payment_method && typeof transactionDetails.payment_method === 'object') {
-            const pm = transactionDetails.payment_method;
+          const td = transactionDetails as Record<string, any>;
+          if (td.payment_method && typeof td.payment_method === 'object') {
+            const pm = td.payment_method as Record<string, any>;
             paymentMethod = {
               type: "credit_card",
               brand: pm.brand || "",
@@ -114,8 +115,8 @@ serve(async (req) => {
             // Fall back to direct properties if payment_method object doesn't exist
             paymentMethod = {
               type: "credit_card",
-              brand: transactionDetails.card_brand || "",
-              lastFourDigits: transactionDetails.card_last_four || "",
+              brand: td.card_brand || "",
+              lastFourDigits: td.card_last_four || "",
               expiryMonth: "12",
               expiryYear: new Date().getFullYear().toString().substr(-2)
             };
