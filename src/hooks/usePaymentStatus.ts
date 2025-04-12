@@ -10,6 +10,7 @@ export const usePaymentStatus = (
   const [isChecking, setIsChecking] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,6 +19,7 @@ export const usePaymentStatus = (
       const success = params.get('success');
       const error = params.get('error');
       const lowProfileId = params.get('lowProfileId');
+      const planId = params.get('planId');
       
       if (success === 'true' && lowProfileId) {
         setIsChecking(true);
@@ -34,24 +36,50 @@ export const usePaymentStatus = (
           
           console.log('Received payment status response:', data);
           
-          if (data.ResponseCode === 0 && data.TranzactionInfo?.TranzactionId) {
+          if (data.ResponseCode === 0 && data.Operation) {
             setPaymentSuccess(true);
-            toast.success('התשלום התקבל בהצלחה!');
+            
+            // Customize success message based on plan type
+            if (planId === 'monthly') {
+              toast.success('נרשמת בהצלחה לחודש ניסיון חינם!');
+            } else if (planId === 'annual') {
+              toast.success('נרשמת בהצלחה למנוי שנתי!');
+            } else if (planId === 'vip') {
+              toast.success('נרשמת בהצלחה למנוי VIP לכל החיים!');
+            } else {
+              toast.success('התשלום התקבל בהצלחה!');
+            }
             
             // Allow toasts to be shown before redirecting
             setTimeout(() => {
               navigate(redirectOnSuccess, { replace: true });
             }, 2000);
+          } else if (retryCount < 3) {
+            // Sometimes the transaction might not be processed immediately
+            // Try a few times with increasing delays
+            console.log(`Attempt ${retryCount + 1} failed, retrying in ${(retryCount + 1) * 2} seconds...`);
+            setTimeout(() => {
+              setRetryCount(prevCount => prevCount + 1);
+            }, (retryCount + 1) * 2000);
           } else {
             setPaymentError(data.Description || 'אירעה שגיאה בתהליך התשלום');
             toast.error('אירעה שגיאה בתהליך התשלום');
           }
         } catch (err) {
           console.error('Error checking payment status:', err);
-          setPaymentError(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
-          toast.error('אירעה שגיאה בבדיקת סטטוס התשלום');
+          if (retryCount < 3) {
+            // Retry on error as well
+            setTimeout(() => {
+              setRetryCount(prevCount => prevCount + 1);
+            }, (retryCount + 1) * 2000);
+          } else {
+            setPaymentError(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
+            toast.error('אירעה שגיאה בבדיקת סטטוס התשלום');
+          }
         } finally {
-          setIsChecking(false);
+          if (retryCount >= 3) {
+            setIsChecking(false);
+          }
         }
       } else if (error === 'true') {
         setPaymentError('התשלום נכשל');
@@ -60,7 +88,7 @@ export const usePaymentStatus = (
     };
     
     checkPaymentStatus();
-  }, [navigate, redirectOnSuccess]);
+  }, [navigate, redirectOnSuccess, retryCount]);
 
   return {
     isChecking,

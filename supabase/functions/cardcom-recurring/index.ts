@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 
@@ -41,8 +40,8 @@ serve(async (req) => {
     }
 
     // Get the Cardcom API credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL");
-    const apiName = Deno.env.get("CARDCOM_USERNAME");
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
     const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD");
     
     if (!terminalNumber || !apiName || !apiPassword) {
@@ -248,14 +247,17 @@ async function processRecurringCharge(subscription: any, supabase: any, terminal
 async function cancelSubscription(subscription: any, supabase: any) {
   const now = new Date();
   
+  // For subscriptions with an end date, keep the end date as is
+  const updateData: Record<string, any> = {
+    status: 'cancelled',
+    cancelled_at: now.toISOString(),
+    updated_at: now.toISOString()
+  };
+  
   // Update subscription status
   const { error: updateError } = await supabase
     .from('subscriptions')
-    .update({
-      status: 'cancelled',
-      cancelled_at: now.toISOString(),
-      updated_at: now.toISOString()
-    })
+    .update(updateData)
     .eq('id', subscription.id);
     
   if (updateError) {

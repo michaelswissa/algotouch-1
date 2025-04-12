@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -146,7 +147,11 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         userId: user?.id || null,
         isRegistration: !!registrationData,
         registrationData: registrationData?.registration_data || null,
-        enable3DS: true // Enable 3DS processing
+        enable3DS: true, // Enable 3DS processing
+        // Add isRecurring flag to handle monthly/annual subscriptions correctly
+        isRecurring: planId === 'monthly' || planId === 'annual',
+        // For monthly plans, we want a free trial for the first month
+        freeTrialDays: planId === 'monthly' ? 30 : 0
       };
       
       console.log('Initializing payment session with data:', requestData);
@@ -447,6 +452,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     if (onSuccess && data.TranzactionId) {
       onSuccess(data.TranzactionId.toString());
     } else {
+      // Make sure to include the lowProfileCode in the URL to verify the transaction
       navigate(`/subscription?success=true&planId=${planId}&lowProfileId=${lowProfileCode}`);
     }
   };
@@ -618,15 +624,15 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="CardComCvv" className="block text-sm font-medium">
+            <label htmlFor="CVV" className="block text-sm font-medium">
               קוד אבטחה (CVV)
             </label>
             {lowProfileCode && (
               <iframe
-                id="CardComCvv"
-                name="CardComCvv"
+                id="CVV"
+                name="CVV"
                 ref={cvvFrameRef}
-                src={`${CARDCOM_IFRAME_URL}/CVV`}
+                src={`${CARDCOM_IFRAME_URL}/cvv`}
                 style={{ width: '100%', height: '40px', border: 'none', backgroundColor: 'white' }}
                 title="CVV"
               />
@@ -642,46 +648,23 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           </div>
         </div>
         
-        <div className="text-xs text-muted-foreground mt-2 text-center">
-          <p>התשלום מאובטח ומתבצע באמצעות Cardcom עם אבטחת 3DS</p>
-        </div>
-        
-        <div className="flex justify-center pt-4">
-          <Button 
-            type="submit" 
-            className="w-full md:w-auto px-8"
-            disabled={processingPayment || !lowProfileCode || !iframesReady}
-          >
-            {processingPayment ? (
-              <>
-                <Spinner className="h-4 w-4 mr-2" />
-                מעבד תשלום...
-              </>
-            ) : (
-              'בצע תשלום'
-            )}
-          </Button>
-        </div>
-      </form>
-      
-      {!loading && !error && (
-        <div className="bg-muted/30 p-3 rounded-md mt-2">
-          <p className="text-sm font-medium mb-1">פרטי חיוב:</p>
-          {planId === 'monthly' ? (
-            <p className="text-sm text-muted-foreground">
-              חודש ראשון חינם, לאחר מכן חיוב של <span className="font-semibold">₪371</span> מדי חודש
-            </p>
-          ) : planId === 'annual' ? (
-            <p className="text-sm text-muted-foreground">
-              חיוב חד פעמי של <span className="font-semibold">₪3,371</span> עכשיו, ולאחר מכן חידוש שנתי במחיר זהה
-            </p>
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={processingPayment || !lowProfileCode}
+        >
+          {processingPayment ? (
+            <span className="flex items-center">
+              <Spinner className="h-4 w-4 mr-2" />
+              מעבד תשלום...
+            </span>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              תשלום חד פעמי של <span className="font-semibold">₪13,121</span> לגישה ללא הגבלת זמן
-            </p>
+            planId === 'monthly' 
+              ? 'התחל תקופת ניסיון חינם' 
+              : 'בצע תשלום'
           )}
-        </div>
-      )}
+        </Button>
+      </form>
     </div>
   );
 };

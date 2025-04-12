@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { format, addMonths, parseISO, differenceInDays } from 'date-fns';
@@ -42,49 +42,53 @@ export const useSubscription = () => {
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      if (user?.id) {
-        try {
-          const { data, error } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (error) {
-            throw error;
-          }
-          
-          // Convert Supabase data to our Subscription type
-          if (data) {
-            const formattedSubscription: Subscription = {
-              id: data.id,
-              plan_type: data.plan_type,
-              status: data.status,
-              trial_ends_at: data.trial_ends_at,
-              current_period_ends_at: data.current_period_ends_at,
-              next_charge_date: data.next_charge_date,
-              payment_method: data.payment_method
-            };
-            setSubscription(formattedSubscription);
-            
-            // Process the subscription details
-            const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
-            setDetails(subscriptionDetails);
-          }
-        } catch (error) {
-          console.error('Error fetching subscription:', error);
-        } finally {
-          setLoading(false);
+  const fetchSubscription = useCallback(async () => {
+    if (user?.id) {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) {
+          throw error;
         }
-      } else {
+        
+        // Convert Supabase data to our Subscription type
+        if (data) {
+          const formattedSubscription: Subscription = {
+            id: data.id,
+            plan_type: data.plan_type,
+            status: data.status,
+            trial_ends_at: data.trial_ends_at,
+            current_period_ends_at: data.current_period_ends_at,
+            next_charge_date: data.next_charge_date,
+            payment_method: data.payment_method
+          };
+          setSubscription(formattedSubscription);
+          
+          // Process the subscription details
+          const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
+          setDetails(subscriptionDetails);
+        } else {
+          setSubscription(null);
+          setDetails(null);
+        }
+      } catch (error) {
+        console.error('Error fetching subscription:', error);
+      } finally {
         setLoading(false);
       }
-    };
-    
-    fetchSubscription();
+    } else {
+      setLoading(false);
+    }
   }, [user]);
+  
+  useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]);
 
   const getSubscriptionDetails = (sub: Subscription | null): SubscriptionDetails | null => {
     if (!sub) return null;
@@ -170,5 +174,10 @@ export const useSubscription = () => {
     };
   };
 
-  return { subscription, loading, details };
+  return { 
+    subscription, 
+    loading, 
+    details,
+    refetch: fetchSubscription
+  };
 };
