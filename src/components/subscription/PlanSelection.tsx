@@ -44,13 +44,14 @@ const PlanSelection: React.FC<PlanSelectionProps> = ({ onPlanSelected }) => {
                 </div>
               )}
               <div className="flex flex-col h-full">
-                <h3 className="text-lg font-semibold">{plan.title}</h3>
+                <h3 className="text-lg font-semibold">{plan.name}</h3>
                 <div className="mt-2 text-2xl font-bold">₪{plan.price.toLocaleString()}</div>
-                <div className="text-sm text-muted-foreground">{plan.billing}</div>
+                <div className="text-sm text-muted-foreground">{plan.billingPeriod}</div>
                 
-                {plan.discount && (
+                {/* Check if plan has a display price different from actual price */}
+                {plan.displayPrice && plan.displayPrice !== plan.price && (
                   <div className="mt-2 text-sm text-green-600 font-medium">
-                    {plan.discount}
+                    חיסכון של {Math.round(100 - (plan.price / (plan.price * 12/10)) * 100)}%
                   </div>
                 )}
                 
@@ -58,7 +59,7 @@ const PlanSelection: React.FC<PlanSelectionProps> = ({ onPlanSelected }) => {
                   {plan.features.slice(0, 3).map((feature, i) => (
                     <div key={i} className="flex items-center">
                       <Check className="h-4 w-4 mr-2 text-primary" />
-                      <span className="text-sm">{feature}</span>
+                      <span className="text-sm">{feature.name}</span>
                     </div>
                   ))}
                 </div>
