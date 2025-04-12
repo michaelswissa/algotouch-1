@@ -1,15 +1,15 @@
 
 import { Routes, Route } from 'react-router-dom';
-import HomePage from '@/pages/HomePage';
-import AuthPage from '@/pages/AuthPage';
-import ProfilePage from '@/pages/ProfilePage';
-import DashboardPage from '@/pages/DashboardPage';
+import { Toaster } from '@/components/ui/toaster';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import Subscription from '@/pages/Subscription';
 import MySubscriptionPage from '@/pages/MySubscriptionPage';
 import PaymentStatusPage from '@/pages/PaymentStatusPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { Toaster } from '@/components/ui/toaster';
+import HomePage from '@/pages/HomePage';
+import AuthPage from '@/pages/AuthPage';
+import ProfilePage from '@/pages/ProfilePage';
+import DashboardPage from '@/pages/DashboardPage';
 
 function App() {
   return (
