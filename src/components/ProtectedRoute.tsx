@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
@@ -21,7 +20,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const [isValidRegistration, setIsValidRegistration] = useState(false);
   
   useEffect(() => {
-    // Check for registration data in session storage and validate it
     const registrationData = sessionStorage.getItem('registration_data');
     if (registrationData) {
       try {
@@ -30,7 +28,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         const now = new Date();
         const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
         
-        // Registration data is valid if less than 30 minutes old
         const isValid = timeDiffInMinutes < 30;
         setHasRegistrationData(true);
         setIsValidRegistration(isValid);
@@ -49,7 +46,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }, [location.pathname]);
 
-  // Show consistent loader while auth is initializing
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -58,18 +54,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Check for registration in progress from location state
   const isRegistering = location.state?.isRegistering === true;
 
-  // Allow access to public paths regardless of auth status
   if (isPublicPath(location.pathname, publicPaths)) {
     return <>{children}</>;
   }
 
-  // Special case for subscription page - allow access if:
-  // 1. User is authenticated OR
-  // 2. User is in registration process (has valid data in sessionStorage) OR
-  // 3. User is redirected directly from signup (isRegistering state)
   if (isSubscriptionPath(location.pathname)) {
     if (isAuthenticated || (hasRegistrationData && isValidRegistration) || isRegistering) {
       console.log("ProtectedRoute: Allowing access to subscription path", {
@@ -86,20 +76,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (requireAuth && !isAuthenticated) {
     console.log("ProtectedRoute: User is not authenticated, redirecting to auth");
-    // Redirect to login page if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
     console.log("ProtectedRoute: User is already authenticated, redirecting to dashboard");
-    // Redirect to dashboard if already authenticated (for login/register pages)
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 };
 
-// Helper functions to improve readability
 function isPublicPath(path: string, publicPaths: string[]): boolean {
   return publicPaths.some(publicPath => 
     path === publicPath || path.startsWith(`${publicPath}/`)
