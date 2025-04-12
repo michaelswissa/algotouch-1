@@ -81,10 +81,12 @@ const UserSubscription = () => {
           // Try to extract payment method details from transaction details
           const transactionDetails = paymentLog.transaction_details;
           if (transactionDetails && typeof transactionDetails === 'object') {
+            // Safely access payment_method with type checks
+            const td = transactionDetails as Record<string, any>;
+            
             // Check if we have a payment_method object
-            if (transactionDetails.payment_method && 
-                typeof transactionDetails.payment_method === 'object') {
-              const pm = transactionDetails.payment_method;
+            if (td.payment_method && typeof td.payment_method === 'object') {
+              const pm = td.payment_method as Record<string, any>;
               paymentMethod = {
                 type: "credit_card",
                 brand: pm.brand || "",
@@ -95,11 +97,10 @@ const UserSubscription = () => {
             } 
             // Fall back to direct properties
             else {
-              const td = transactionDetails as Record<string, any>;
               paymentMethod = {
                 type: "credit_card",
-                brand: td.card_brand || "",
-                lastFourDigits: td.card_last_four || "",
+                brand: td.card_brand as string || "",
+                lastFourDigits: td.card_last_four as string || "",
                 expiryMonth: "12",
                 expiryYear: new Date().getFullYear().toString().substr(-2)
               };
@@ -131,7 +132,7 @@ const UserSubscription = () => {
           if (sessions?.length) {
             const sessionData = sessions[0];
             const paymentDetails = typeof sessionData.payment_details === 'object' ? 
-              { ...sessionData.payment_details, processed: true } : 
+              { ...(sessionData.payment_details as Record<string, any>), processed: true } : 
               { processed: true };
               
             await supabase
