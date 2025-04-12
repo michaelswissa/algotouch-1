@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import CardcomOpenFields from './CardcomOpenFields';
-import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -15,7 +14,7 @@ interface OpenFieldsPaymentFormProps {
   onCancel?: () => void;
 }
 
-// Define exact plan prices in ILS (including commas for display)
+// Define exact plan prices in ILS
 const PLAN_PRICES = {
   monthly: { price: 371, displayPrice: 371, name: 'חודשי' },
   annual: { price: 3371, displayPrice: 3371, name: 'שנתי' },
@@ -33,17 +32,28 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
 
   // Load the 3DS script when the component mounts
   useEffect(() => {
-    const cardcom3DSScript = document.createElement('script');
-    const time = new Date().getTime();
-    cardcom3DSScript.setAttribute('src', `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${time}`);
-    document.head.appendChild(cardcom3DSScript);
-    
-    // Clean up the script when the component unmounts
-    return () => {
-      if (document.head.contains(cardcom3DSScript)) {
-        document.head.removeChild(cardcom3DSScript);
+    const loadScript = async () => {
+      try {
+        const time = new Date().getTime();
+        const scriptId = 'cardcom-3ds-script';
+        
+        // Check if script is already loaded
+        if (document.getElementById(scriptId)) {
+          return;
+        }
+        
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${time}`;
+        script.async = true;
+        
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('Error loading Cardcom 3DS script:', error);
       }
     };
+    
+    loadScript();
   }, []);
 
   // Add this useEffect to check for payment status from URL params
@@ -55,9 +65,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     if (success === 'true' && lowProfileId) {
       // We have a successful callback
       console.log('Payment callback detected with lowProfileId:', lowProfileId);
-      
-      // Payment verification will be handled by usePaymentStatus
-      // This is just for logging purposes
     }
   }, []);
 
@@ -80,7 +87,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   const planInfo = PLAN_PRICES[planId as keyof typeof PLAN_PRICES] || PLAN_PRICES.monthly;
   
   return (
-    <Card className="max-w-lg mx-auto" dir="rtl">
+    <Card className="max-w-lg mx-auto">
       <CardHeader>
         <div className="flex items-center gap-2">
           <CreditCard className="h-5 w-5 text-primary" />

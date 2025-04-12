@@ -10,23 +10,26 @@ import HomePage from '@/pages/HomePage';
 import AuthPage from '@/pages/AuthPage';
 import ProfilePage from '@/pages/ProfilePage';
 import DashboardPage from '@/pages/DashboardPage';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 function App() {
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/subscription" element={<Subscription />} />
-        <Route path="/payment-status" element={<PaymentStatusPage />} />
-        <Route path="/payment-success" element={<PaymentSuccessPage />} />
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/my-subscription" element={<ProtectedRoute><MySubscriptionPage /></ProtectedRoute>} />
-      </Routes>
+    <TooltipProvider>
+      <>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/subscription" element={<Subscription />} />
+          <Route path="/payment-status" element={<PaymentStatusPage />} />
+          <Route path="/payment-success" element={<PaymentSuccessPage />} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/my-subscription" element={<ProtectedRoute><MySubscriptionPage /></ProtectedRoute>} />
+        </Routes>
 
-      <Toaster />
-    </>
+        <Toaster />
+      </>
+    </TooltipProvider>
   );
 }
 
