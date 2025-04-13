@@ -80,7 +80,7 @@ serve(async (req) => {
       id: session.id,
       userId: session.user_id,
       planId: session.plan_id,
-      isRegistrationFlow: session.payment_details?.isRegistrationFlow
+      isRegistrationFlow: session.payment_details?.registrationData ? true : false
     });
 
     // Extract transaction details
@@ -102,7 +102,8 @@ serve(async (req) => {
                         webhookData.TranzactionInfo?.Last4CardDigitsString || '',
         cardHolderName: webhookData.UIValues?.CardOwnerName || '',
         cardHolderEmail: webhookData.UIValues?.CardOwnerEmail || '',
-        cardHolderPhone: webhookData.UIValues?.CardOwnerPhone || ''
+        cardHolderPhone: webhookData.UIValues?.CardOwnerPhone || '',
+        cardBrand: webhookData.TranzactionInfo?.Brand || '',
       };
     } else if (webhookData.TranzactionInfo) {
       // Extract card details for one-time payments
@@ -131,30 +132,44 @@ serve(async (req) => {
       })
       .eq('id', session.id);
 
-    // Log the payment in user_payment_logs
-    const { data: paymentLog } = await supabaseClient
-      .from('user_payment_logs')
-      .insert({
-        user_id: session.user_id || null,
-        token: lowProfileId,
-        amount: session.payment_details.amount || 0,
-        approval_code: approvalNumber,
-        status: 'completed',
-        transaction_details: webhookData
-      })
-      .select()
-      .single();
-
-    console.log('Payment logged:', paymentLog);
-
     // Process the payment based on session information
     // Handle both logged-in users and registration flow
     if (session.user_id) {
       // Case 1: User is logged in
       await processExistingUserPayment(supabaseClient, session, webhookData, paymentMethod);
-    } else if (session.payment_details.registrationData) {
-      // Case 2: Registration flow
-      await processNewUserRegistration(supabaseClient, session, webhookData, paymentMethod);
+      
+      // Log the payment in user_payment_logs
+      await supabaseClient
+        .from('user_payment_logs')
+        .insert({
+          user_id: session.user_id,
+          token: lowProfileId,
+          amount: session.payment_details.amount || 0,
+          approval_code: approvalNumber,
+          status: 'completed',
+          transaction_details: webhookData
+        });
+        
+      console.log('Payment logged for existing user:', session.user_id);
+    } else if (session.payment_details?.registrationData) {
+      // Case 2: Registration flow - create the user first
+      const { userId, success } = await processNewUserRegistration(supabaseClient, session, webhookData, paymentMethod);
+      
+      if (success && userId) {
+        // Log the payment in user_payment_logs with the newly created user ID
+        await supabaseClient
+          .from('user_payment_logs')
+          .insert({
+            user_id: userId,
+            token: lowProfileId,
+            amount: session.payment_details.amount || 0,
+            approval_code: approvalNumber,
+            status: 'completed',
+            transaction_details: webhookData
+          });
+          
+        console.log('Payment logged for new user:', userId);
+      }
     } else {
       console.error('Invalid session state - no user_id or registration data');
     }
@@ -297,7 +312,7 @@ async function processExistingUserPayment(supabaseClient, session, webhookData, 
     }
 
     console.log('Successfully processed payment for existing user:', userId);
-    return true;
+    return { success: true, userId };
   } catch (error) {
     console.error('Error processing existing user payment:', error);
     throw error;
@@ -309,19 +324,23 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
     const registrationData = session.payment_details.registrationData;
     const planId = session.plan_id;
     const planDetails = session.payment_details;
-    const userEmail = session.email || registrationData.email;
+    
+    if (!registrationData) {
+      throw new Error('Missing registration data');
+    }
+
+    const userEmail = registrationData.email;
+    if (!userEmail) {
+      throw new Error('Missing email in registration data');
+    }
     
     console.log('Processing new user registration with payment:', { 
       planId, 
       email: userEmail 
     });
     
-    if (!registrationData || !userEmail) {
-      throw new Error('Missing registration data');
-    }
-    
     // Check if user already exists with this email
-    const { data: existingUser } = await supabaseClient.auth.admin.listUsers({
+    const { data: existingUsers } = await supabaseClient.auth.admin.listUsers({
       filter: {
         email: userEmail
       }
@@ -330,8 +349,8 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
     let userId;
     
     // If user already exists, use that ID
-    if (existingUser && existingUser.users && existingUser.users.length > 0) {
-      userId = existingUser.users[0].id;
+    if (existingUsers && existingUsers.users && existingUsers.users.length > 0) {
+      userId = existingUsers.users[0].id;
       console.log('Using existing user account:', userId);
     } else {
       // Create the user account
@@ -340,8 +359,8 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
         password: registrationData.password,
         email_confirm: true, // Auto-confirm email for better UX
         user_metadata: {
-          first_name: registrationData.userData.firstName,
-          last_name: registrationData.userData.lastName,
+          first_name: registrationData.userData?.firstName,
+          last_name: registrationData.userData?.lastName,
           registration_complete: true,
           signup_step: 'completed',
           signup_date: new Date().toISOString()
@@ -366,12 +385,6 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
       .from('payment_sessions')
       .update({ user_id: userId })
       .eq('id', session.id);
-    
-    // Update user_payment_logs with the user_id
-    await supabaseClient
-      .from('user_payment_logs')
-      .update({ user_id: userId })
-      .eq('token', session.payment_details.lowProfileId);
     
     // Set up dates based on plan type
     const now = new Date();
@@ -401,27 +414,55 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
       status = 'active';
     }
     
-    // Create subscription record
-    const { error: subscriptionError } = await supabaseClient
+    // Check for existing subscription first
+    const { data: existingSubscription } = await supabaseClient
       .from('subscriptions')
-      .insert({
-        user_id: userId,
-        plan_type: planId,
-        status: status,
-        payment_method: paymentMethod,
-        trial_ends_at: trialEndsAt?.toISOString() || null,
-        current_period_ends_at: periodEndsAt?.toISOString() || null,
-        next_charge_date: periodEndsAt?.toISOString() || null,
-        contract_signed: true,
-        contract_signed_at: now.toISOString()
-      });
-    
-    if (subscriptionError) {
-      console.error('Error creating subscription:', subscriptionError);
-      throw subscriptionError;
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+      
+    if (existingSubscription) {
+      // Update existing subscription
+      await supabaseClient
+        .from('subscriptions')
+        .update({
+          plan_type: planId,
+          status: status,
+          payment_method: paymentMethod,
+          trial_ends_at: trialEndsAt?.toISOString() || null,
+          current_period_ends_at: periodEndsAt?.toISOString() || null,
+          next_charge_date: periodEndsAt?.toISOString() || null,
+          updated_at: now.toISOString(),
+          cancelled_at: null, // Clear cancelled status if user is resubscribing
+          contract_signed: true,
+          contract_signed_at: now.toISOString()
+        })
+        .eq('id', existingSubscription.id);
+        
+      console.log('Updated existing subscription for new user:', userId);
+    } else {
+      // Create subscription record
+      const { error: subscriptionError } = await supabaseClient
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          plan_type: planId,
+          status: status,
+          payment_method: paymentMethod,
+          trial_ends_at: trialEndsAt?.toISOString() || null,
+          current_period_ends_at: periodEndsAt?.toISOString() || null,
+          next_charge_date: periodEndsAt?.toISOString() || null,
+          contract_signed: true,
+          contract_signed_at: now.toISOString()
+        });
+      
+      if (subscriptionError) {
+        console.error('Error creating subscription:', subscriptionError);
+        throw subscriptionError;
+      }
+      
+      console.log('Created subscription for new user:', userId);
     }
-    
-    console.log('Created subscription for new user:', userId);
     
     // Record payment history
     // Skip if it's a free trial with no charge
@@ -460,9 +501,9 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
     const { error: profileError } = await supabaseClient
       .from('profiles')
       .update({
-        first_name: registrationData.userData.firstName,
-        last_name: registrationData.userData.lastName,
-        phone: registrationData.userData.phone || null
+        first_name: registrationData.userData?.firstName,
+        last_name: registrationData.userData?.lastName,
+        phone: registrationData.userData?.phone || null
       })
       .eq('id', userId);
     
@@ -474,29 +515,52 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
     // If there's contract data, store it
     if (registrationData.contractDetails) {
       try {
-        const { error: contractError } = await supabaseClient
+        // Check if contract already exists for this user
+        const { data: existingContract } = await supabaseClient
           .from('contract_signatures')
-          .insert({
-            user_id: userId,
-            plan_id: planId,
-            full_name: `${registrationData.userData.firstName} ${registrationData.userData.lastName}`,
-            email: userEmail,
-            phone: registrationData.userData.phone || null,
-            signature: registrationData.contractDetails.signature,
-            contract_html: registrationData.contractDetails.contractHtml,
-            ip_address: null,
-            user_agent: registrationData.contractDetails.browserInfo?.userAgent,
-            browser_info: registrationData.contractDetails.browserInfo || null,
-            contract_version: registrationData.contractDetails.contractVersion || "1.0",
-            agreed_to_terms: registrationData.contractDetails.agreedToTerms || false,
-            agreed_to_privacy: registrationData.contractDetails.agreedToPrivacy || false,
-          });
+          .select('id')
+          .eq('user_id', userId)
+          .eq('plan_id', planId)
+          .maybeSingle();
           
-        if (contractError) {
-          console.error('Error storing contract signature:', contractError);
-          // Non-critical error, don't throw
+        if (existingContract) {
+          // Update existing contract
+          await supabaseClient
+            .from('contract_signatures')
+            .update({
+              signature: registrationData.contractDetails.signature,
+              contract_html: registrationData.contractDetails.contractHtml,
+              updated_at: now.toISOString()
+            })
+            .eq('id', existingContract.id);
+            
+          console.log('Updated existing contract for user:', userId);
         } else {
-          console.log('Contract signature stored for new user:', userId);
+          // Create new contract record
+          const { error: contractError } = await supabaseClient
+            .from('contract_signatures')
+            .insert({
+              user_id: userId,
+              plan_id: planId,
+              full_name: `${registrationData.userData?.firstName} ${registrationData.userData?.lastName}`,
+              email: userEmail,
+              phone: registrationData.userData?.phone || null,
+              signature: registrationData.contractDetails.signature,
+              contract_html: registrationData.contractDetails.contractHtml,
+              ip_address: null,
+              user_agent: registrationData.contractDetails.browserInfo?.userAgent,
+              browser_info: registrationData.contractDetails.browserInfo || null,
+              contract_version: registrationData.contractDetails.contractVersion || "1.0",
+              agreed_to_terms: registrationData.contractDetails.agreedToTerms || false,
+              agreed_to_privacy: registrationData.contractDetails.agreedToPrivacy || false,
+            });
+            
+          if (contractError) {
+            console.error('Error storing contract signature:', contractError);
+            // Non-critical error, don't throw
+          } else {
+            console.log('Contract signature stored for new user:', userId);
+          }
         }
       } catch (signatureError) {
         console.error('Exception storing signature:', signatureError);
@@ -505,9 +569,9 @@ async function processNewUserRegistration(supabaseClient, session, webhookData, 
     }
     
     console.log('Successfully processed registration and payment for new user:', userId);
-    return true;
+    return { success: true, userId };
   } catch (error) {
     console.error('Error processing registration with payment:', error);
-    throw error;
+    return { success: false, error: error.message };
   }
 }

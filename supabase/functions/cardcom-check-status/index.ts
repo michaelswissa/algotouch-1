@@ -29,42 +29,40 @@ serve(async (req) => {
     const { lowProfileId } = await req.json();
     
     if (!lowProfileId) {
-      throw new Error('Missing lowProfileId parameter');
-    }
-    
-    console.log('Checking payment status for lowProfileId:', lowProfileId);
-    
-    // Get Cardcom credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
-    const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
-    
-    if (!terminalNumber || !apiName) {
-      throw new Error('Missing Cardcom API credentials in environment variables');
+      return new Response(
+        JSON.stringify({ error: 'Missing lowProfileId parameter' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
-    // Create Supabase client
+    console.log('Checking transaction status for:', lowProfileId);
+    
+    // Initialize Supabase client with service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // First check if we already have this payment recorded through the webhook
+    // First check our database to see if we have recorded this payment
     const { data: paymentLog } = await supabaseClient
       .from('user_payment_logs')
       .select('*')
       .eq('token', lowProfileId)
       .maybeSingle();
       
-    if (paymentLog && paymentLog.status === 'completed') {
-      console.log('Payment already processed via webhook:', paymentLog);
+    if (paymentLog) {
+      console.log('Found payment log in database:', paymentLog);
+      // If we have record of this payment in our database
       return new Response(
         JSON.stringify({ 
-          ResponseCode: 0, 
-          Description: "Payment already processed", 
-          OperationResponse: "0",
-          paymentAlreadyProcessed: true,
-          status: 'completed',
-          TranzactionId: paymentLog.transaction_details?.TranzactionId || null
+          ResponseCode: 0,
+          Description: 'Payment found in database',
+          status: 'success',
+          transaction_id: paymentLog.id,
+          webhook_processed: true
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -73,124 +71,50 @@ serve(async (req) => {
       );
     }
 
-    // Query Cardcom API to check transaction status
-    const cardcomUrl = 'https://secure.cardcom.solutions/Interface/BillGoldService.asmx/GetLowProfileIndicator';
-    const cardcomPayload = {
-      terminalNumber: terminalNumber,
-      userName: apiName,
-      lowProfileCode: lowProfileId,
-      codepage: 65001
+    // If not found in our database, check with Cardcom
+    const terminalNumber = Deno.env.get('CARDCOM_TERMINAL_NUMBER');
+    const apiName = Deno.env.get('CARDCOM_API_NAME');
+    
+    if (!terminalNumber || !apiName) {
+      throw new Error('Missing Cardcom credentials in environment variables');
+    }
+    
+    const cardcomRequest = {
+      TerminalNumber: Number(terminalNumber),
+      ApiName: apiName,
+      LowProfileId: lowProfileId
     };
-    
-    console.log('Sending request to Cardcom API:', cardcomPayload);
-    
-    const response = await fetch(cardcomUrl, {
+
+    // Call Cardcom API to check transaction status
+    const cardcomResponse = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(cardcomPayload),
+      body: JSON.stringify(cardcomRequest)
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to check payment status: ${response.statusText}`);
+    if (!cardcomResponse.ok) {
+      throw new Error(`Error calling Cardcom API: ${cardcomResponse.statusText}`);
     }
 
-    const result = await response.json();
-    console.log('Cardcom API response:', result);
-    
-    // Find the payment session associated with this lowProfileId
-    const { data: session, error: sessionError } = await supabaseClient
-      .from('payment_sessions')
-      .select('*')
-      .eq('payment_details->lowProfileId', lowProfileId)
-      .maybeSingle();
+    const cardcomResult = await cardcomResponse.json();
+    console.log('Cardcom API response:', cardcomResult);
 
-    if (sessionError) {
-      console.error('Error finding payment session:', sessionError);
-    }
-
-    // If the payment was successful, update the session status
-    if (result && (result.ResponseCode === 0 || result.OperationResponse === "0")) {
-      if (session) {
-        // Extract payment method details for subscription
-        let paymentMethod = {};
-        
-        if (result.TokenInfo) {
-          // Extract token for recurring payments
-          paymentMethod = {
-            token: result.TokenInfo.Token,
-            tokenExpiryDate: result.TokenInfo.TokenExDate,
-            lastFourDigits: result.TranzactionInfo?.Last4CardDigits?.toString() || 
-                            result.TranzactionInfo?.Last4CardDigitsString || '',
-            cardHolderName: result.UIValues?.CardOwnerName || '',
-            cardHolderEmail: result.UIValues?.CardOwnerEmail || '',
-            cardHolderPhone: result.UIValues?.CardOwnerPhone || ''
-          };
-        } else if (result.TranzactionInfo) {
-          // Extract card details for one-time payments
-          paymentMethod = {
-            lastFourDigits: result.TranzactionInfo.Last4CardDigits?.toString() || 
-                            result.TranzactionInfo.Last4CardDigitsString || '',
-            cardHolderName: result.UIValues?.CardOwnerName || 
-                            result.TranzactionInfo.CardOwnerName || '',
-            cardBrand: result.TranzactionInfo.Brand || '',
-            approvalNumber: result.TranzactionInfo.ApprovalNumber || ''
-          };
-        }
-        
-        // Extract transaction details
-        const transactionId = result.TranzactionId || result.TranzactionInfo?.TranzactionId;
-        const approvalNumber = 
-          result.TranzactionInfo?.ApprovalNumber || 
-          result.TokenInfo?.TokenApprovalNumber || 
-          '';
-        
-        // Update session status
-        await supabaseClient
-          .from('payment_sessions')
-          .update({
-            payment_details: {
-              ...session.payment_details,
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-              transaction_id: transactionId,
-              approval_number: approvalNumber,
-              payment_method: paymentMethod
-            }
-          })
-          .eq('id', session.id);
-
-        // Log the payment in user_payment_logs if it hasn't been logged yet
-        if (!paymentLog) {
-          await supabaseClient
-            .from('user_payment_logs')
-            .insert({
-              user_id: session.user_id || null,
-              token: lowProfileId,
-              amount: session.payment_details.amount || 0,
-              approval_code: approvalNumber,
-              status: 'completed',
-              transaction_details: result
-            });
-        }
-      }
-    }
-    
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify(cardcomResult),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
   } catch (error) {
-    console.error('Error checking payment status:', error);
+    console.error('Error checking transaction status:', error);
     
     return new Response(
       JSON.stringify({ 
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
+        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+        ResponseCode: 400
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
