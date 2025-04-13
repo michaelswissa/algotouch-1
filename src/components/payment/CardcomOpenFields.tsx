@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -94,9 +93,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       setIsLoading(true);
       setError(null);
       
-      // Check if user is logged in or has registration data
-      if (!user?.id && !registrationData) {
-        throw new Error('המשתמש לא מחובר');
+      // Check if we have either logged-in user OR registration data
+      const isAuthenticated = !!user?.id;
+      const isRegistering = !!registrationData;
+      
+      if (!isAuthenticated && !isRegistering) {
+        console.error('No authentication or registration data found');
+        throw new Error('נדרש להתחבר או להשלים את תהליך ההרשמה כדי להמשיך');
       }
 
       // Get user info from either authenticated user or registration data
@@ -107,7 +110,14 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
                         : '');
       const userEmail = user?.email || registrationData?.email || '';
       
-      console.log('Initializing payment session with:', { userId, userName, userEmail, planId });
+      console.log('Initializing payment session with:', { 
+        userId, 
+        userName, 
+        userEmail, 
+        planId,
+        isAuthenticated,
+        isRegistering 
+      });
 
       // Clean up any existing payment sessions for authenticated users
       if (userId) {
@@ -462,13 +472,17 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }
   };
 
-  // If no user and no registration data found
-  if (!user?.id && !registrationData) {
+  // Check for valid user cases - either authenticated or in registration process
+  const isAuthenticated = !!user?.id;
+  const isRegistering = !!registrationData;
+  const isValidUser = isAuthenticated || isRegistering;
+
+  if (!isValidUser) {
     return (
       <div className="space-y-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>המשתמש לא מחובר</AlertDescription>
+          <AlertDescription>נדרש להתחבר או להשלים את תהליך ההרשמה כדי להמשיך</AlertDescription>
         </Alert>
         <div className="flex justify-center">
           <Button onClick={onCancel} className="w-full">
