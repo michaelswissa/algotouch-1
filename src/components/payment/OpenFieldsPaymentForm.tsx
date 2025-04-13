@@ -27,10 +27,24 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   onCancel 
 }) => {
   const { user } = useAuth();
+  const [registrationData, setRegistrationData] = useState<any>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
+
+  // Check for registration data
+  useEffect(() => {
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      if (storedData) {
+        console.log('Found registration data in OpenFieldsPaymentForm');
+        setRegistrationData(JSON.parse(storedData));
+      }
+    } catch (err) {
+      console.error('Error parsing registration data:', err);
+    }
+  }, []);
 
   // Check if user already has a subscription when the component mounts
   useEffect(() => {

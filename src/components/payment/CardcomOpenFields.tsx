@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button'; // Corrected import path
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
@@ -33,6 +33,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     terminalNumber: string;
     apiName: string;
   } | null>(null);
+  const [registrationData, setRegistrationData] = useState<any>(null);
 
   // Create refs for the iframe elements
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
@@ -46,6 +47,20 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [cardNumberFrameLoaded, setCardNumberFrameLoaded] = useState(false);
   const [cvvFrameLoaded, setCvvFrameLoaded] = useState(false);
   const [processing3DS, setProcessing3DS] = useState(false);
+
+  // Get registration data from session storage if available
+  useEffect(() => {
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      if (storedData) {
+        const parsedData = JSON.parse(storedData);
+        console.log('Found registration data in session storage:', parsedData);
+        setRegistrationData(parsedData);
+      }
+    } catch (err) {
+      console.error('Error parsing registration data:', err);
+    }
+  }, []);
 
   useEffect(() => {
     // Initialize the payment session when the component mounts
@@ -79,15 +94,26 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       setIsLoading(true);
       setError(null);
       
-      // Check if user is logged in
-      if (!user?.id) {
+      // Check if user is logged in or has registration data
+      const userId = user?.id || (registrationData?.userData?.id);
+      const userName = user?.user_metadata?.name || 
+                      registrationData?.userData?.firstName && registrationData?.userData?.lastName
+                        ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}`
+                        : '';
+      const userEmail = user?.email || registrationData?.email || '';
+      
+      if (!userId && !registrationData) {
         throw new Error('המשתמש לא מחובר');
       }
 
-      // Clean up any existing payment sessions
-      await supabase.rpc('cleanup_user_payment_sessions', { 
-        user_id_param: user.id 
-      });
+      console.log('Initializing payment session with:', { userId, userName, userEmail, planId });
+
+      // Clean up any existing payment sessions if user is logged in
+      if (user?.id) {
+        await supabase.rpc('cleanup_user_payment_sessions', { 
+          user_id_param: user.id 
+        }).catch(err => console.error('Error cleaning up sessions:', err));
+      }
       
       // Calculate amount based on plan type
       let planAmount = amount;
@@ -129,15 +155,16 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           planId,
           planName,
           amount: planAmount,
-          userId: user.id,
-          userName: user.user_metadata?.name || '',
-          userEmail: user.email || '',
+          userId: userId,
+          userName: userName,
+          userEmail: userEmail,
           isRecurring: planId === 'monthly' || planId === 'annual',
           freeTrialDays: planId === 'monthly' ? 30 : 0
         }
       });
       
       if (error) {
+        console.error('Error creating payment session:', error);
         throw new Error(error.message);
       }
       
@@ -261,6 +288,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       }
     `;
 
+    console.log('Initializing Cardcom iframes with lowProfileCode:', lowProfileCode);
+
     // Initialize the master iframe with configuration
     masterFrameRef.current?.contentWindow.postMessage({
       action: 'init',
@@ -276,6 +305,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       showFieldLabels: true
     }, 'https://secure.cardcom.solutions');
 
+    console.log('Cardcom iframe initialization message sent');
     setMasterFrameLoaded(true);
   };
 
@@ -303,6 +333,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       } 
       else if (message.action === 'Handle3DSProcess') {
         // 3DS process started - show loading state
+        console.log('3DS process started');
         setProcessing3DS(true);
         if (onPaymentStart) onPaymentStart();
       }
@@ -388,12 +419,19 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       
       // If the master iframe is loaded, send the transaction request
       if (masterFrameRef.current?.contentWindow) {
+        console.log('Submitting payment with:', {
+          cardOwnerName,
+          cardOwnerEmail: user?.email || registrationData?.email || '',
+          expirationMonth,
+          expirationYear
+        });
+        
         // Set card owner details
         masterFrameRef.current.contentWindow.postMessage({
           action: 'setCardOwnerDetails',
           data: {
             cardOwnerName,
-            cardOwnerEmail: user?.email || '',
+            cardOwnerEmail: user?.email || registrationData?.email || '',
             cardOwnerPhone: ''
           }
         }, 'https://secure.cardcom.solutions');
@@ -403,7 +441,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           action: 'doTransaction',
           cardOwnerId: cardOwnerID,
           cardOwnerName,
-          cardOwnerEmail: user?.email || '',
+          cardOwnerEmail: user?.email || registrationData?.email || '',
           expirationMonth,
           expirationYear,
           numberOfPayments: "1", // Always use 1 payment through Cardcom, we handle installments differently
@@ -421,6 +459,23 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       if (onError) onError('שגיאה בשליחת התשלום');
     }
   };
+
+  // If no user and no registration data found
+  if (!user?.id && !registrationData) {
+    return (
+      <div className="space-y-4">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>המשתמש לא מחובר</AlertDescription>
+        </Alert>
+        <div className="flex justify-center">
+          <Button onClick={onCancel} className="w-full">
+            חזור
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

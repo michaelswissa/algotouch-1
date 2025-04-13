@@ -32,7 +32,7 @@ serve(async (req) => {
   try {
     const { planId, planName, amount, userId, userName, userEmail, isRecurring, freeTrialDays } = await req.json();
     
-    console.log('Creating payment session for:', { planId, userId, userEmail });
+    console.log('Creating payment session for:', { planId, userId, userEmail, userName });
     
     // Get Cardcom credentials
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
@@ -94,7 +94,7 @@ serve(async (req) => {
     const origin = req.headers.get('origin') || 'https://ndhakvhrrkczgylcmyoc.supabase.co';
     const webhookUrl = `${origin}/functions/v1/cardcom-webhook`;
 
-    console.log('Payment session created successfully', { lowProfileId, sessionId });
+    console.log('Payment session created successfully', { lowProfileId, sessionId, webhookUrl });
     
     return new Response(
       JSON.stringify({

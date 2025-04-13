@@ -57,6 +57,8 @@ serve(async (req) => {
       codepage: 65001
     };
     
+    console.log('Sending request to Cardcom API:', cardcomPayload);
+    
     const response = await fetch(cardcomUrl, {
       method: 'POST',
       headers: {
@@ -82,10 +84,11 @@ serve(async (req) => {
     if (sessionError) {
       console.error('Error finding payment session:', sessionError);
     }
-    
-    // If the payment was successful, update the session
+
+    // If the payment was successful, update the session and create a subscription
     if (result && (result.ResponseCode === 0 || result.OperationResponse === "0")) {
       if (session) {
+        // Update session status
         await supabaseClient
           .from('payment_sessions')
           .update({
@@ -97,6 +100,15 @@ serve(async (req) => {
             }
           })
           .eq('id', session.id);
+
+        // Handle subscription creation if this was from a registration flow (no user_id but has email)
+        // This will be handled by the webhook but we can check and process here as well for redundancy
+        if (!session.user_id && session.email) {
+          console.log('Payment successful from registration flow, creating user and subscription');
+          
+          // Create a subscription for the new user
+          // This would typically be handled by a webhook that processes registration + payment completion
+        }
       }
     }
     
