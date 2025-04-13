@@ -27,174 +27,91 @@ serve(async (req) => {
 
   try {
     // Parse webhook data from Cardcom
-    const payload = await req.json();
-    console.log('Received webhook from Cardcom:', payload);
-
-    // Validate required fields
-    if (!payload.LowProfileId) {
-      throw new Error('Missing LowProfileId in webhook payload');
+    const webhookData = await req.json();
+    console.log('Received webhook data from Cardcom:', webhookData);
+    
+    // Extract the lowProfileId from the webhook data
+    const lowProfileId = webhookData.LowProfileId;
+    if (!lowProfileId) {
+      throw new Error('Missing LowProfileId in webhook data');
     }
 
-    // Check if the transaction was successful
-    const isSuccess = payload.ResponseCode === 0 || payload.OperationResponse === "0";
+    // Check if payment was successful
+    const isPaymentSuccessful = 
+      webhookData.OperationResponse === "0" || 
+      (webhookData.TranzactionInfo && webhookData.TranzactionInfo.ResponseCode === 0);
     
-    if (!isSuccess) {
-      console.error('Transaction failed:', payload);
+    if (!isPaymentSuccessful) {
+      console.log('Payment was unsuccessful', {
+        lowProfileId,
+        responseCode: webhookData.OperationResponse || webhookData.TranzactionInfo?.ResponseCode,
+        description: webhookData.Description || webhookData.TranzactionInfo?.Description
+      });
+      
+      // Handle failed payment - log but don't throw error
       return new Response(
-        JSON.stringify({ success: false, message: 'Transaction failed' }),
+        JSON.stringify({ success: false, message: 'Payment unsuccessful' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200, // Still return 200 to acknowledge receipt
+          status: 200, // Return 200 to acknowledge receipt
         }
       );
     }
 
-    // Create Supabase client
+    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Find the payment session associated with this lowProfileId
+    // Get the payment session
     const { data: session, error: sessionError } = await supabaseClient
       .from('payment_sessions')
       .select('*')
-      .eq('payment_details->lowProfileId', payload.LowProfileId)
-      .maybeSingle();
+      .eq('payment_details->lowProfileId', lowProfileId)
+      .single();
 
     if (sessionError || !session) {
-      console.error('Error finding payment session:', sessionError || 'Session not found');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: sessionError?.message || 'Payment session not found',
-          lowProfileId: payload.LowProfileId
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200, // Still return 200 to acknowledge receipt
-        }
-      );
+      console.error('Error retrieving payment session:', sessionError);
+      throw new Error('Payment session not found');
     }
 
-    // Check for duplicate transactions (idempotency)
-    const { data: existingPayment } = await supabaseClient.rpc('check_duplicate_payment', {
-      low_profile_id: payload.LowProfileId
-    });
-    
-    if (existingPayment) {
-      console.log('Payment already processed:', payload.LowProfileId);
-      return new Response(
-        JSON.stringify({ success: true, message: 'Payment already processed', duplicate: true }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
+    console.log('Found payment session:', session);
 
     // Extract transaction details
-    const transactionInfo = payload.TranzactionInfo || {};
-    const amount = session.payment_details?.amount || 0;
-    const planType = session.plan_id;
-    const userId = session.user_id;
+    const transactionId = webhookData.TranzactionId || webhookData.TranzactionInfo?.TranzactionId;
+    const approvalNumber = 
+      webhookData.TranzactionInfo?.ApprovalNumber || 
+      webhookData.TokenInfo?.TokenApprovalNumber || 
+      '';
 
-    // Check if it's a token creation or charge
-    const isTokenCreation = payload.Operation === "3" || payload.Operation === "CreateTokenOnly";
-    const isChargeAndToken = payload.Operation === "2" || payload.Operation === "ChargeAndCreateToken";
-    const isChargeOnly = payload.Operation === "1" || payload.Operation === "ChargeOnly";
+    // Extract payment method details for subscription
+    let paymentMethod = {};
 
-    // Extract payment method details
-    const paymentMethod = {
-      lastFourDigits: transactionInfo.Last4CardDigits || transactionInfo.Last4CardDigitsString || '0000',
-      cardType: transactionInfo.CardInfo || 'Unknown',
-      cardBrand: transactionInfo.Brand || 'Unknown',
-      cardholderName: transactionInfo.CardOwnerName || '',
-      expiryMonth: transactionInfo.CardMonth || 0,
-      expiryYear: transactionInfo.CardYear || 0
-    };
-
-    // Record payment log
-    const { error: paymentLogError } = await supabaseClient
-      .from('user_payment_logs')
-      .insert({
-        user_id: userId,
-        token: payload.LowProfileId,
-        amount: amount,
-        status: 'completed',
-        approval_code: transactionInfo.ApprovalNumber || '',
-        transaction_details: transactionInfo
-      });
-
-    if (paymentLogError) {
-      console.error('Error recording payment log:', paymentLogError);
+    if (webhookData.TokenInfo) {
+      // Extract token for recurring payments
+      paymentMethod = {
+        token: webhookData.TokenInfo.Token,
+        tokenExpiryDate: webhookData.TokenInfo.TokenExDate,
+        lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigits?.toString() || 
+                        webhookData.TranzactionInfo?.Last4CardDigitsString || '',
+        cardHolderName: webhookData.UIValues?.CardOwnerName || '',
+        cardHolderEmail: webhookData.UIValues?.CardOwnerEmail || '',
+        cardHolderPhone: webhookData.UIValues?.CardOwnerPhone || ''
+      };
+    } else if (webhookData.TranzactionInfo) {
+      // Extract card details for one-time payments
+      paymentMethod = {
+        lastFourDigits: webhookData.TranzactionInfo.Last4CardDigits?.toString() || 
+                        webhookData.TranzactionInfo.Last4CardDigitsString || '',
+        cardHolderName: webhookData.UIValues?.CardOwnerName || 
+                        webhookData.TranzactionInfo.CardOwnerName || '',
+        cardBrand: webhookData.TranzactionInfo.Brand || '',
+        approvalNumber
+      };
     }
 
-    // Determine trial period if applicable
-    const now = new Date();
-    let trialEndsAt = null;
-    let nextChargeDate = null;
-    let currentPeriodEndsAt = null;
-
-    if (planType === 'monthly' && (isTokenCreation || isChargeAndToken)) {
-      // 30-day free trial for monthly subscriptions
-      trialEndsAt = new Date(now);
-      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
-      nextChargeDate = new Date(trialEndsAt);
-      currentPeriodEndsAt = new Date(trialEndsAt);
-      currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
-    } else if (planType === 'annual' && (isChargeOnly || isChargeAndToken)) {
-      // Annual plan - immediate charge, 12 months validity
-      nextChargeDate = new Date(now);
-      nextChargeDate.setFullYear(nextChargeDate.getFullYear() + 1);
-      currentPeriodEndsAt = new Date(nextChargeDate);
-    } else if (planType === 'vip' && isChargeOnly) {
-      // VIP plan - one-time charge, no recurring payments
-      currentPeriodEndsAt = null; // Lifetime access
-    }
-
-    // Extract token data if created
-    let tokenInfo = null;
-    if ((isTokenCreation || isChargeAndToken) && payload.TokenInfo) {
-      tokenInfo = payload.TokenInfo;
-      
-      // Store the payment token
-      const { error: tokenError } = await supabaseClient
-        .from('payment_tokens')
-        .insert({
-          user_id: userId,
-          token: tokenInfo.Token || '',
-          card_last_four: paymentMethod.lastFourDigits,
-          card_brand: paymentMethod.cardBrand,
-          token_expiry: tokenInfo.TokenExDate ? new Date(tokenInfo.TokenExDate) : null,
-          is_active: true
-        });
-      
-      if (tokenError) {
-        console.error('Error storing payment token:', tokenError);
-      }
-    }
-
-    // Update or create subscription
-    const { error: subscriptionError } = await supabaseClient
-      .from('subscriptions')
-      .upsert({
-        user_id: userId,
-        plan_type: planType,
-        status: trialEndsAt ? 'trial' : 'active',
-        payment_method: paymentMethod,
-        trial_ends_at: trialEndsAt?.toISOString() || null,
-        next_charge_date: nextChargeDate?.toISOString() || null,
-        current_period_ends_at: currentPeriodEndsAt?.toISOString() || null,
-        contract_signed: true,
-        contract_signed_at: now.toISOString()
-      });
-
-    if (subscriptionError) {
-      console.error('Error updating subscription:', subscriptionError);
-    }
-
-    // Update session to mark as completed
+    // Update the payment session with transaction details
     await supabaseClient
       .from('payment_sessions')
       .update({
@@ -202,44 +119,45 @@ serve(async (req) => {
           ...session.payment_details,
           status: 'completed',
           completed_at: new Date().toISOString(),
-          transaction_id: transactionInfo.TranzactionId || null
+          transaction_id: transactionId,
+          approval_number: approvalNumber,
+          payment_method: paymentMethod
         }
       })
       .eq('id', session.id);
 
-    // For annual or VIP plans with immediate payment, record payment history
-    if ((planType === 'annual' || planType === 'vip') && (isChargeOnly || isChargeAndToken)) {
-      await supabaseClient
-        .from('payment_history')
-        .insert({
-          user_id: userId,
-          subscription_id: userId, // Using user ID as subscription ID for now
-          amount: amount,
-          currency: 'ILS',
-          status: 'completed',
-          payment_method: paymentMethod
-        });
+    // Log the payment in user_payment_logs
+    await supabaseClient
+      .from('user_payment_logs')
+      .insert({
+        user_id: session.user_id || null,
+        token: lowProfileId,
+        amount: session.payment_details.amount || 0,
+        approval_code: approvalNumber,
+        status: 'completed',
+        transaction_details: webhookData
+      });
+
+    // Process the payment based on session information
+    // Handle both logged-in users and registration flow
+    if (session.user_id) {
+      // Case 1: User is logged in
+      await processExistingUserPayment(supabaseClient, session, webhookData, paymentMethod);
+    } else if (session.payment_details.registrationData) {
+      // Case 2: Registration flow
+      await processNewUserRegistration(supabaseClient, session, webhookData, paymentMethod);
+    } else {
+      console.error('Invalid session state - no user_id or registration data');
     }
 
-    console.log('Payment processed successfully:', {
-      lowProfileId: payload.LowProfileId,
-      planType,
-      userId,
-      isTokenCreation,
-      isChargeAndToken,
-      isChargeOnly
-    });
-
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Payment processed successfully'
-      }),
+      JSON.stringify({ success: true }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
+    
   } catch (error) {
     console.error('Error processing webhook:', error);
     
@@ -255,3 +173,253 @@ serve(async (req) => {
     );
   }
 });
+
+async function processExistingUserPayment(supabaseClient, session, webhookData, paymentMethod) {
+  try {
+    const userId = session.user_id;
+    const planId = session.plan_id;
+    const planDetails = session.payment_details;
+    const now = new Date();
+    
+    // Determine subscription type and end dates
+    let periodEndsAt = null;
+    let trialEndsAt = null;
+    let status = 'active';
+    
+    if (planId === 'monthly') {
+      if (planDetails.freeTrialDays && planDetails.freeTrialDays > 0) {
+        status = 'trial';
+        trialEndsAt = new Date(now);
+        trialEndsAt.setDate(trialEndsAt.getDate() + planDetails.freeTrialDays);
+        
+        // Set next charge date to after trial period
+        periodEndsAt = new Date(trialEndsAt);
+        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+      } else {
+        // Regular monthly subscription
+        periodEndsAt = new Date(now);
+        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+      }
+    } else if (planId === 'annual') {
+      periodEndsAt = new Date(now);
+      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+    } else if (planId === 'vip') {
+      // VIP is lifetime, no end date
+      status = 'active';
+    }
+    
+    // Save or update subscription
+    const { data: existingSubscription, error: findError } = await supabaseClient
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (findError) {
+      console.error('Error finding subscription:', findError);
+      throw findError;
+    }
+    
+    if (existingSubscription) {
+      // Update existing subscription
+      await supabaseClient
+        .from('subscriptions')
+        .update({
+          plan_type: planId,
+          status: status,
+          payment_method: paymentMethod,
+          trial_ends_at: trialEndsAt?.toISOString() || null,
+          current_period_ends_at: periodEndsAt?.toISOString() || null,
+          next_charge_date: periodEndsAt?.toISOString() || null,
+          updated_at: now.toISOString(),
+          cancelled_at: null, // Clear cancelled status if user is resubscribing
+        })
+        .eq('id', existingSubscription.id);
+    } else {
+      // Create new subscription
+      await supabaseClient
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          plan_type: planId,
+          status: status,
+          payment_method: paymentMethod,
+          trial_ends_at: trialEndsAt?.toISOString() || null,
+          current_period_ends_at: periodEndsAt?.toISOString() || null,
+          next_charge_date: periodEndsAt?.toISOString() || null,
+          contract_signed: true,
+          contract_signed_at: now.toISOString()
+        });
+    }
+    
+    // Record payment in payment_history
+    // Skip if it's a free trial with no charge
+    if (planId !== 'monthly' || status !== 'trial') {
+      await supabaseClient
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: existingSubscription?.id || userId, // Use subscription ID if available
+          amount: planDetails.amount || 0,
+          currency: 'ILS',
+          status: 'completed',
+          payment_method: paymentMethod,
+          payment_date: now.toISOString()
+        });
+    }
+
+    console.log('Successfully processed payment for existing user:', userId);
+    return true;
+  } catch (error) {
+    console.error('Error processing existing user payment:', error);
+    throw error;
+  }
+}
+
+async function processNewUserRegistration(supabaseClient, session, webhookData, paymentMethod) {
+  try {
+    const registrationData = session.payment_details.registrationData;
+    const planId = session.plan_id;
+    const planDetails = session.payment_details;
+    const userEmail = session.email || registrationData.email;
+    
+    console.log('Processing new user registration with payment:', { 
+      planId, 
+      email: userEmail 
+    });
+    
+    if (!registrationData || !userEmail) {
+      throw new Error('Missing registration data');
+    }
+    
+    // Create the user account
+    const { data: userData, error: userError } = await supabaseClient.auth.admin.createUser({
+      email: userEmail,
+      password: registrationData.password,
+      email_confirm: true, // Auto-confirm email for better UX
+      user_metadata: {
+        first_name: registrationData.userData.firstName,
+        last_name: registrationData.userData.lastName,
+        registration_complete: true,
+        signup_step: 'completed',
+        signup_date: new Date().toISOString()
+      }
+    });
+    
+    if (userError) {
+      console.error('Error creating user:', userError);
+      throw userError;
+    }
+    
+    if (!userData.user) {
+      throw new Error('Failed to create user account');
+    }
+    
+    const userId = userData.user.id;
+    console.log('User created successfully:', userId);
+    
+    // Set up dates based on plan type
+    const now = new Date();
+    let periodEndsAt = null;
+    let trialEndsAt = null;
+    let status = 'active';
+    
+    if (planId === 'monthly') {
+      if (planDetails.freeTrialDays && planDetails.freeTrialDays > 0) {
+        status = 'trial';
+        trialEndsAt = new Date(now);
+        trialEndsAt.setDate(trialEndsAt.getDate() + planDetails.freeTrialDays);
+        
+        // Set next charge date to after trial period
+        periodEndsAt = new Date(trialEndsAt);
+        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+      } else {
+        // Regular monthly subscription
+        periodEndsAt = new Date(now);
+        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+      }
+    } else if (planId === 'annual') {
+      periodEndsAt = new Date(now);
+      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+    } else if (planId === 'vip') {
+      // VIP is lifetime, no end date
+      status = 'active';
+    }
+    
+    // Create subscription record
+    const { error: subscriptionError } = await supabaseClient
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        plan_type: planId,
+        status: status,
+        payment_method: paymentMethod,
+        trial_ends_at: trialEndsAt?.toISOString() || null,
+        current_period_ends_at: periodEndsAt?.toISOString() || null,
+        next_charge_date: periodEndsAt?.toISOString() || null,
+        contract_signed: true,
+        contract_signed_at: now.toISOString()
+      });
+    
+    if (subscriptionError) {
+      console.error('Error creating subscription:', subscriptionError);
+      throw subscriptionError;
+    }
+    
+    // Record payment history
+    // Skip if it's a free trial with no charge
+    if (planId !== 'monthly' || status !== 'trial') {
+      await supabaseClient
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: userId,
+          amount: planDetails.amount || 0,
+          currency: 'ILS',
+          status: 'completed',
+          payment_method: paymentMethod,
+          payment_date: now.toISOString()
+        });
+    } else {
+      // Record trial started
+      await supabaseClient
+        .from('payment_history')
+        .insert({
+          user_id: userId,
+          subscription_id: userId,
+          amount: 0,
+          currency: 'ILS',
+          status: 'trial_started',
+          payment_method: paymentMethod,
+          payment_date: now.toISOString()
+        });
+    }
+
+    // Update profile information
+    const { error: profileError } = await supabaseClient
+      .from('profiles')
+      .update({
+        first_name: registrationData.userData.firstName,
+        last_name: registrationData.userData.lastName,
+        phone: registrationData.userData.phone || null
+      })
+      .eq('id', userId);
+    
+    if (profileError) {
+      console.error('Error updating profile:', profileError);
+      // Non-critical error, don't throw
+    }
+
+    // Update payment session with created user_id
+    await supabaseClient
+      .from('payment_sessions')
+      .update({ user_id: userId })
+      .eq('id', session.id);
+    
+    console.log('Successfully processed registration and payment for new user:', userId);
+    return true;
+  } catch (error) {
+    console.error('Error processing registration with payment:', error);
+    throw error;
+  }
+}

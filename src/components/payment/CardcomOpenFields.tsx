@@ -163,7 +163,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           userName: userName,
           userEmail: userEmail,
           isRecurring: planId === 'monthly' || planId === 'annual',
-          freeTrialDays: planId === 'monthly' ? 30 : 0
+          freeTrialDays: planId === 'monthly' ? 30 : 0,
+          registrationData: !user?.id ? registrationData : null // Pass registration data if user is not logged in
         }
       });
       
@@ -423,9 +424,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       
       // If the master iframe is loaded, send the transaction request
       if (masterFrameRef.current?.contentWindow) {
+        // Get user email - try from authenticated user first, then registration data
+        const userEmail = user?.email || registrationData?.email || '';
+        
         console.log('Submitting payment with:', {
           cardOwnerName,
-          cardOwnerEmail: user?.email || registrationData?.email || '',
+          cardOwnerEmail: userEmail,
           expirationMonth,
           expirationYear
         });
@@ -435,7 +439,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           action: 'setCardOwnerDetails',
           data: {
             cardOwnerName,
-            cardOwnerEmail: user?.email || registrationData?.email || '',
+            cardOwnerEmail: userEmail,
             cardOwnerPhone: ''
           }
         }, 'https://secure.cardcom.solutions');
@@ -445,7 +449,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           action: 'doTransaction',
           cardOwnerId: cardOwnerID,
           cardOwnerName,
-          cardOwnerEmail: user?.email || registrationData?.email || '',
+          cardOwnerEmail: userEmail,
           expirationMonth,
           expirationYear,
           numberOfPayments: "1", // Always use 1 payment through Cardcom, we handle installments differently

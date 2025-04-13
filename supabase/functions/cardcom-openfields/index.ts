@@ -30,9 +30,25 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { planId, planName, amount, userId, userName, userEmail, isRecurring, freeTrialDays } = await req.json();
+    const { 
+      planId, 
+      planName, 
+      amount, 
+      userId, 
+      userName, 
+      userEmail, 
+      isRecurring, 
+      freeTrialDays,
+      registrationData // Added support for registration data
+    } = await req.json();
     
-    console.log('Creating payment session for:', { planId, userId, userEmail, userName });
+    console.log('Creating payment session for:', { 
+      planId, 
+      userId, 
+      userEmail, 
+      userName, 
+      hasRegistrationData: !!registrationData 
+    });
     
     // Get Cardcom credentials
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
@@ -64,25 +80,36 @@ serve(async (req) => {
       operation = freeTrialDays > 0 ? "3" : "2"; // CreateTokenOnly or ChargeAndCreateToken
     }
 
+    // Payment details including registration data if present
+    const paymentDetails = {
+      lowProfileId,
+      amount,
+      planName,
+      userName,
+      userEmail,
+      operation,
+      status: 'created',
+      created_at: new Date().toISOString()
+    };
+
+    // If registration data provided, store it with the payment session
+    if (registrationData) {
+      Object.assign(paymentDetails, { 
+        registrationData,
+        isRegistrationFlow: true
+      });
+    }
+
     // Save payment session to database
     const { error: sessionError } = await supabaseClient
       .from('payment_sessions')
       .insert({
         id: sessionId,
-        user_id: userId,
+        user_id: userId || null, // Allow null for registration flow
         email: userEmail,
         plan_id: planId,
         expires_at: expiresAt.toISOString(),
-        payment_details: {
-          lowProfileId,
-          amount,
-          planName,
-          userName,
-          userEmail,
-          operation,
-          status: 'created',
-          created_at: new Date().toISOString()
-        }
+        payment_details: paymentDetails
       });
 
     if (sessionError) {

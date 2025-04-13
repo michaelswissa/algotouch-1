@@ -48,6 +48,31 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // First check if we already have this payment recorded through the webhook
+    const { data: paymentLog } = await supabaseClient
+      .from('user_payment_logs')
+      .select('*')
+      .eq('token', lowProfileId)
+      .maybeSingle();
+      
+    if (paymentLog && paymentLog.status === 'completed') {
+      console.log('Payment already processed via webhook:', paymentLog);
+      return new Response(
+        JSON.stringify({ 
+          ResponseCode: 0, 
+          Description: "Payment already processed", 
+          OperationResponse: "0",
+          paymentAlreadyProcessed: true,
+          status: 'completed',
+          TranzactionId: paymentLog.transaction_details?.TranzactionId || null
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
     // Query Cardcom API to check transaction status
     const cardcomUrl = 'https://secure.cardcom.solutions/Interface/BillGoldService.asmx/GetLowProfileIndicator';
     const cardcomPayload = {
@@ -85,9 +110,42 @@ serve(async (req) => {
       console.error('Error finding payment session:', sessionError);
     }
 
-    // If the payment was successful, update the session and create a subscription
+    // If the payment was successful, update the session status
     if (result && (result.ResponseCode === 0 || result.OperationResponse === "0")) {
       if (session) {
+        // Extract payment method details for subscription
+        let paymentMethod = {};
+        
+        if (result.TokenInfo) {
+          // Extract token for recurring payments
+          paymentMethod = {
+            token: result.TokenInfo.Token,
+            tokenExpiryDate: result.TokenInfo.TokenExDate,
+            lastFourDigits: result.TranzactionInfo?.Last4CardDigits?.toString() || 
+                            result.TranzactionInfo?.Last4CardDigitsString || '',
+            cardHolderName: result.UIValues?.CardOwnerName || '',
+            cardHolderEmail: result.UIValues?.CardOwnerEmail || '',
+            cardHolderPhone: result.UIValues?.CardOwnerPhone || ''
+          };
+        } else if (result.TranzactionInfo) {
+          // Extract card details for one-time payments
+          paymentMethod = {
+            lastFourDigits: result.TranzactionInfo.Last4CardDigits?.toString() || 
+                            result.TranzactionInfo.Last4CardDigitsString || '',
+            cardHolderName: result.UIValues?.CardOwnerName || 
+                            result.TranzactionInfo.CardOwnerName || '',
+            cardBrand: result.TranzactionInfo.Brand || '',
+            approvalNumber: result.TranzactionInfo.ApprovalNumber || ''
+          };
+        }
+        
+        // Extract transaction details
+        const transactionId = result.TranzactionId || result.TranzactionInfo?.TranzactionId;
+        const approvalNumber = 
+          result.TranzactionInfo?.ApprovalNumber || 
+          result.TokenInfo?.TokenApprovalNumber || 
+          '';
+        
         // Update session status
         await supabaseClient
           .from('payment_sessions')
@@ -96,18 +154,25 @@ serve(async (req) => {
               ...session.payment_details,
               status: 'completed',
               completed_at: new Date().toISOString(),
-              transaction_id: result.TranzactionId || result.TranzactionInfo?.TranzactionId || null
+              transaction_id: transactionId,
+              approval_number: approvalNumber,
+              payment_method: paymentMethod
             }
           })
           .eq('id', session.id);
 
-        // Handle subscription creation if this was from a registration flow (no user_id but has email)
-        // This will be handled by the webhook but we can check and process here as well for redundancy
-        if (!session.user_id && session.email) {
-          console.log('Payment successful from registration flow, creating user and subscription');
-          
-          // Create a subscription for the new user
-          // This would typically be handled by a webhook that processes registration + payment completion
+        // Log the payment in user_payment_logs if it hasn't been logged yet
+        if (!paymentLog) {
+          await supabaseClient
+            .from('user_payment_logs')
+            .insert({
+              user_id: session.user_id || null,
+              token: lowProfileId,
+              amount: session.payment_details.amount || 0,
+              approval_code: approvalNumber,
+              status: 'completed',
+              transaction_details: result
+            });
         }
       }
     }
