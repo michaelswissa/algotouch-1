@@ -725,9 +725,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_duplicate_payment: {
+        Args: { low_profile_id: string }
+        Returns: boolean
+      }
       check_row_exists: {
         Args: { p_table_name: string; p_column_name: string; p_value: string }
         Returns: boolean
+      }
+      cleanup_user_payment_sessions: {
+        Args: { user_id_param: string }
+        Returns: undefined
       }
       increment: {
         Args: { row_id: string; table_name: string; column_name: string }

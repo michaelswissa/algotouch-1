@@ -1,4 +1,3 @@
-
 import { Database as OriginalDatabase, Json } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -518,6 +517,19 @@ export interface ExtendedDatabase extends OriginalDatabase {
           p_table_name: string;
           p_column_name: string;
           p_increment_by?: number;
+        };
+        Returns: boolean;
+      };
+      // Add our new functions
+      cleanup_user_payment_sessions: {
+        Args: {
+          user_id_param: string;
+        };
+        Returns: undefined;
+      };
+      check_duplicate_payment: {
+        Args: {
+          low_profile_id: string;
         };
         Returns: boolean;
       };

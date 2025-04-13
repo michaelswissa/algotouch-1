@@ -2,11 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 
 interface CardcomOpenFieldsProps {
   planId: string;
@@ -24,7 +23,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   onPaymentStart
 }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -214,36 +212,68 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           // Add required CSS for the CardCom fields
           const cardCss = `
             .cardNumberField {
-              border: 1px solid #ccc;
-              border-radius: 4px;
+              border: 1px solid #e2e8f0;
+              border-radius: 0.375rem;
               height: 40px;
               width: 100%;
               padding: 0 10px;
               font-size: 16px;
               box-sizing: border-box;
+              font-family: inherit;
+              background-color: white;
+              color: #1a202c;
+              transition: border-color 0.2s;
+              direction: ltr;
+              text-align: left;
             }
             .cardNumberField:focus {
-              border-color: #3498db;
+              border-color: #3182ce;
               outline: none;
-              box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+              box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+            }
+            .cardNumberField:hover {
+              border-color: #cbd5e0;
+            }
+            .cardNumberField::placeholder {
+              color: #a0aec0;
             }
           `;
           
           const cvvCss = `
             .cvvField {
-              border: 1px solid #ccc;
-              border-radius: 4px;
+              border: 1px solid #e2e8f0;
+              border-radius: 0.375rem;
               height: 40px;
               width: 100%;
               padding: 0 10px;
               font-size: 16px;
               text-align: center;
               box-sizing: border-box;
+              font-family: inherit;
+              background-color: white;
+              color: #1a202c;
+              transition: border-color 0.2s;
             }
             .cvvField:focus {
-              border-color: #3498db;
+              border-color: #3182ce;
               outline: none;
-              box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+              box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+            }
+            .cvvField:hover {
+              border-color: #cbd5e0;
+            }
+            .cvvField::placeholder {
+              color: #a0aec0;
+            }
+          `;
+
+          // Add captcha CSS styles
+          const captchaCss = `
+            .captchaField {
+              width: 100%;
+              max-width: 300px;
+              margin: 0 auto;
+              display: block;
             }
           `;
 
@@ -253,10 +283,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             lowProfileCode: data.lowProfileId,
             cardFieldCSS: cardCss,
             cvvFieldCSS: cvvCss,
+            captchaFieldCSS: captchaCss,
             language: 'he',
             placeholder: '0000-0000-0000-0000',
-            cvvPlaceholder: '123',
-            captchaFieldCSS: ''
+            cvvPlaceholder: '***',
+            use3DS: true, // Enable 3DS
+            useReCaptcha: true, // Enable Google reCAPTCHA
+            showFieldLabels: true
           }, 'https://secure.cardcom.solutions');
           
           setIframeLoaded(true);
@@ -361,7 +394,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           }
         }, 'https://secure.cardcom.solutions');
         
-        // Submit the transaction
+        // Submit the transaction with 3DS enabled
         iframeRef.current.contentWindow.postMessage({
           action: 'doTransaction',
           cardOwnerId: cardOwnerID,
@@ -371,6 +404,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           expirationYear,
           cardOwnerPhone: '',
           numberOfPayments: planId === 'monthly' ? "1" : planId === 'annual' ? "1" : "1",
+          use3DS: true // Ensure 3DS is enabled for the transaction
         }, 'https://secure.cardcom.solutions');
       }
     } catch (err) {
@@ -416,16 +450,18 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               id="cardOwnerID"
               className="w-full p-2 border rounded-md"
               placeholder="מספר תעודת זהות (אופציונלי)"
+              pattern="[0-9]*"
+              inputMode="numeric"
+              maxLength={9}
             />
           </div>
 
-          {/* Card Number */}
+          {/* Card Number - Will be replaced by CardCom iframe */}
           <div>
             <label htmlFor="CardComCardNumber" className="block text-sm font-medium mb-1">
               מספר כרטיס
             </label>
             <div className="payment-field-container relative">
-              {/* This iframe will be replaced with the Cardcom iframe */}
               <iframe
                 ref={iframeRef}
                 id="CardComMasterFrame"

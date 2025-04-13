@@ -39,6 +39,45 @@ export const usePaymentStatus = (
         setIsChecking(true);
         try {
           console.log('Checking payment status for lowProfileId:', lowProfileId);
+          
+          // First check if we already have this payment recorded through the webhook
+          const { data: existingPayment, error: checkError } = await supabase.rpc('check_duplicate_payment', {
+            low_profile_id: lowProfileId
+          });
+          
+          if (checkError) {
+            console.error('Error checking for duplicate payment:', checkError);
+            throw new Error(checkError.message);
+          }
+          
+          if (existingPayment) {
+            console.log('Payment already processed via webhook');
+            setPaymentSuccess(true);
+            
+            // Success message based on plan type
+            if (planId === 'monthly') {
+              toast.success('נרשמת בהצלחה לחודש ניסיון חינם!');
+            } else if (planId === 'annual') {
+              toast.success('נרשמת בהצלחה למנוי שנתי!');
+            } else if (planId === 'vip') {
+              toast.success('נרשמת בהצלחה למנוי VIP לכל החיים!');
+            } else {
+              toast.success('התשלום התקבל בהצלחה!');
+            }
+            
+            // Clean up the payment processing flag
+            localStorage.removeItem('payment_processing');
+            setPaymentProcessingId(null);
+            
+            // Allow toasts to be shown before redirecting
+            setTimeout(() => {
+              navigate(redirectOnSuccess, { replace: true });
+            }, 2000);
+            
+            return;
+          }
+
+          // If not already processed by webhook, check status with the API
           const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
             body: { lowProfileId }
           });
