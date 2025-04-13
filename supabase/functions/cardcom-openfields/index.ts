@@ -39,15 +39,25 @@ serve(async (req) => {
       userEmail, 
       isRecurring, 
       freeTrialDays,
-      registrationData // Added support for registration data
+      registrationData // Registration data for non-authenticated users
     } = await req.json();
     
+    // Validate essential parameters
+    if (!planId) {
+      throw new Error('Missing required parameter: planId');
+    }
+    
+    if (!userEmail) {
+      throw new Error('Missing required parameter: userEmail');
+    }
+
     console.log('Creating payment session for:', { 
       planId, 
       userId, 
       userEmail, 
       userName, 
-      hasRegistrationData: !!registrationData 
+      hasRegistrationData: !!registrationData,
+      amount
     });
     
     // Get Cardcom credentials
@@ -71,7 +81,7 @@ serve(async (req) => {
     // Generate a unique session ID
     const sessionId = generateRandomId();
     
-    // Create a payment session with Cardcom
+    // Generate a unique lowProfileId for Cardcom
     const lowProfileId = generateRandomId();
 
     // Determine operation based on plan
@@ -85,10 +95,13 @@ serve(async (req) => {
       lowProfileId,
       amount,
       planName,
+      planId,
       userName,
       userEmail,
       operation,
       status: 'created',
+      freeTrialDays,
+      isRecurring,
       created_at: new Date().toISOString()
     };
 
@@ -98,6 +111,8 @@ serve(async (req) => {
         registrationData,
         isRegistrationFlow: true
       });
+      
+      console.log('Storing registration data with payment session');
     }
 
     // Save payment session to database
@@ -117,11 +132,26 @@ serve(async (req) => {
       throw new Error(`Failed to create payment session: ${sessionError.message}`);
     }
 
-    // Create webhook URL with origin or fallback
-    const origin = req.headers.get('origin') || 'https://ndhakvhrrkczgylcmyoc.supabase.co';
+    // Create webhook URL with current hostname or fallback
+    let origin = req.headers.get('origin');
+    if (!origin) {
+      try {
+        const url = new URL(req.url);
+        origin = `${url.protocol}//${url.hostname}`;
+      } catch (e) {
+        origin = 'https://ndhakvhrrkczgylcmyoc.supabase.co';
+      }
+    }
+    
     const webhookUrl = `${origin}/functions/v1/cardcom-webhook`;
 
-    console.log('Payment session created successfully', { lowProfileId, sessionId, webhookUrl });
+    console.log('Payment session created successfully', { 
+      lowProfileId, 
+      sessionId, 
+      webhookUrl,
+      operation,
+      isRegistrationFlow: !!registrationData
+    });
     
     return new Response(
       JSON.stringify({

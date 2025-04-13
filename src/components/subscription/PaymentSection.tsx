@@ -8,6 +8,7 @@ import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionCont
 import { toast } from 'sonner';
 import OpenFieldsPaymentForm from '@/components/payment/OpenFieldsPaymentForm';
 import { useNavigate } from 'react-router-dom';
+import usePaymentStatus from '@/hooks/usePaymentStatus';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -28,44 +29,33 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  // Use hook to check payment status from URL parameters
+  const { isChecking, paymentSuccess: urlPaymentSuccess, paymentError: urlPaymentError } = usePaymentStatus();
+
   // Check for registration data in session storage on component mount
   useEffect(() => {
     const storedData = sessionStorage.getItem('registration_data');
     if (storedData) {
       try {
-        setRegistrationData(JSON.parse(storedData));
+        const data = JSON.parse(storedData);
+        console.log('Found registration data in PaymentSection:', data);
+        setRegistrationData(data);
       } catch (error) {
         console.error('Error parsing registration data:', error);
       }
     }
   }, []);
 
-  // Check URL parameters for payment status
+  // Handle payment status from URL parameters
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
-    const success = params.get('success');
-    const lowProfileId = params.get('lowProfileId');
-    
-    if (error === 'true') {
-      setPaymentError('התשלום נכשל, אנא נסה שנית');
-      toast.error('התשלום נכשל, אנא נסה שנית');
-    } else if (success === 'true' && lowProfileId) {
-      // If we have lowProfileId, the payment might be successful but needs verification
-      // The verification will be handled by usePaymentStatus in the parent component
-      console.log('Payment potentially successful, will verify with lowProfileId:', lowProfileId);
-      setPaymentProcessing(true);
-    } else if (success === 'true') {
+    if (urlPaymentSuccess) {
       setPaymentSuccess(true);
-      toast.success('התשלום התקבל בהצלחה!');
       onPaymentComplete();
+    } else if (urlPaymentError) {
+      setPaymentError(urlPaymentError);
+      toast.error(`שגיאה בתשלום: ${urlPaymentError}`);
     }
-  }, [navigate, onPaymentComplete]);
-
-  // User is considered "valid" if they are either:
-  // 1. Logged in (authenticated) OR
-  // 2. In the registration process with valid data in sessionStorage
-  const isValidUser = user || registrationData;
+  }, [urlPaymentSuccess, urlPaymentError, onPaymentComplete]);
 
   const handlePaymentStart = () => {
     setPaymentProcessing(true);
@@ -93,12 +83,28 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     toast.error(`שגיאה בתשלום: ${error}`);
   };
 
+  // User is considered "valid" if they are either:
+  // 1. Logged in (authenticated) OR
+  // 2. In the registration process with valid data in sessionStorage
+  const isAuthenticated = !!user;
+  const isRegistering = !!registrationData;
+  const isValidUser = isAuthenticated || isRegistering;
+
+  if (isChecking) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin" />
+        <span className="mr-4">בודק סטטוס תשלום...</span>
+      </div>
+    );
+  }
+
   if (!isValidUser) {
     return (
-      <Alert className="max-w-lg mx-auto">
+      <Alert variant="destructive" className="max-w-lg mx-auto">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          יש להיות מחובר כדי להמשיך לתשלום. אנא התחבר או הירשם.
+          יש להיות מחובר או להשלים את תהליך ההרשמה כדי להמשיך לתשלום.
         </AlertDescription>
       </Alert>
     );

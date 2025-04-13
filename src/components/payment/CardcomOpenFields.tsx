@@ -54,7 +54,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       const storedData = sessionStorage.getItem('registration_data');
       if (storedData) {
         const parsedData = JSON.parse(storedData);
-        console.log('Found registration data in session storage:', parsedData);
+        console.log('Found registration data in CardcomOpenFields:', parsedData);
         setRegistrationData(parsedData);
       }
     } catch (err) {
@@ -95,24 +95,25 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       setError(null);
       
       // Check if user is logged in or has registration data
-      const userId = user?.id || (registrationData?.userData?.id);
-      const userName = user?.user_metadata?.name || 
-                      registrationData?.userData?.firstName && registrationData?.userData?.lastName
-                        ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}`
-                        : '';
-      const userEmail = user?.email || registrationData?.email || '';
-      
-      if (!userId && !registrationData) {
+      if (!user?.id && !registrationData) {
         throw new Error('המשתמש לא מחובר');
       }
 
+      // Get user info from either authenticated user or registration data
+      const userId = user?.id;
+      const userName = user?.user_metadata?.name || 
+                      (registrationData?.userData?.firstName && registrationData?.userData?.lastName
+                        ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}`
+                        : '');
+      const userEmail = user?.email || registrationData?.email || '';
+      
       console.log('Initializing payment session with:', { userId, userName, userEmail, planId });
 
-      // Clean up any existing payment sessions if user is logged in
-      if (user?.id) {
+      // Clean up any existing payment sessions for authenticated users
+      if (userId) {
         try {
           await supabase.rpc('cleanup_user_payment_sessions', { 
-            user_id_param: user.id 
+            user_id_param: userId 
           });
         } catch (err) {
           console.error('Error cleaning up sessions:', err);
@@ -164,7 +165,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           userEmail: userEmail,
           isRecurring: planId === 'monthly' || planId === 'annual',
           freeTrialDays: planId === 'monthly' ? 30 : 0,
-          registrationData: !user?.id ? registrationData : null // Pass registration data if user is not logged in
+          registrationData: !userId ? registrationData : null // Pass registration data if user is not logged in
         }
       });
       
@@ -200,7 +201,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   };
 
   const cleanupPaymentSession = async () => {
-    if (sessionId && user?.id) {
+    if (sessionId) {
       try {
         await supabase
           .from('payment_sessions')
@@ -328,13 +329,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       if (message.action === 'handleValidations') {
         // Handle field validation results (card number, CVV, etc.)
         console.log(`Field ${message.field} validation:`, message.isValid);
-        
-        // Update UI based on validation if needed
-        if (message.field === 'cardNumber' && !message.isValid) {
-          // Handle invalid card number
-        } else if (message.field === 'cvv' && !message.isValid) {
-          // Handle invalid CVV
-        }
       } 
       else if (message.action === 'Handle3DSProcess') {
         // 3DS process started - show loading state
@@ -440,7 +434,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           data: {
             cardOwnerName,
             cardOwnerEmail: userEmail,
-            cardOwnerPhone: ''
+            cardOwnerPhone: registrationData?.userData?.phone || ''
           }
         }, 'https://secure.cardcom.solutions');
         
@@ -521,6 +515,11 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             id="cardOwnerName"
             className="w-full p-2 border rounded-md"
             placeholder="שם מלא כפי שמופיע על הכרטיס"
+            defaultValue={user?.user_metadata?.first_name && user?.user_metadata?.last_name ? 
+              `${user.user_metadata.first_name} ${user.user_metadata.last_name}` : 
+              registrationData?.userData?.firstName && registrationData?.userData?.lastName ?
+              `${registrationData.userData.firstName} ${registrationData.userData.lastName}` : 
+              ''}
             required
           />
         </div>

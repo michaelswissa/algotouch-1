@@ -79,171 +79,86 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     };
     
     checkExistingSubscription();
-    
-    // Clear any persisting payment sessions
-    const cleanUpPaymentSessions = async () => {
-      try {
-        if (user?.id) {
-          const { error } = await supabase.rpc('cleanup_user_payment_sessions', { 
-            user_id_param: user.id 
-          });
-          
-          if (error) {
-            console.error('Error cleaning up payment sessions:', error);
-          }
-        }
-      } catch (err) {
-        console.error('Error cleaning up payment sessions:', err);
-      }
-    };
-    
-    cleanUpPaymentSessions();
-  }, [user, planId]);
+  }, [user?.id, planId]);
 
-  const handleSuccess = (transactionId: string) => {
-    setProcessingPayment(false);
-    onPaymentComplete(transactionId);
-  };
-
-  const handleError = (error: string) => {
-    setProcessingPayment(false);
-    if (onError) onError(error);
-  };
-
-  const handlePaymentStart = () => {
-    setProcessingPayment(true);
-    if (onPaymentStart) onPaymentStart();
-  };
-
-  // Handle plan change confirmation
-  const handlePlanChangeConfirmed = async () => {
-    try {
-      if (user?.id) {
-        // Mark existing subscription as cancelled
-        const { error } = await supabase
-          .from('subscriptions')
-          .update({
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-          .not('status', 'eq', 'cancelled');
-          
-        if (error) {
-          toast.error('שגיאה בביטול המנוי הקיים');
-          return;
-        }
-        
-        toast.success('המנוי הקיים בוטל, כעת תוכל להירשם למנוי חדש');
-        setIsChangingPlan(false);
-        setHasSubscription(false);
-      }
-    } catch (err) {
-      console.error('Error cancelling subscription:', err);
-      toast.error('שגיאה בביטול המנוי הקיים');
-    }
-  };
-
-  // Get plan details to display in the UI
-  const plans = getSubscriptionPlans();
-  const plan = plans[planId as keyof typeof plans] || plans.monthly;
-  
   if (isCheckingSubscription) {
     return (
-      <Card className="max-w-lg mx-auto" dir="rtl">
-        <CardContent className="p-6">
-          <div className="flex justify-center items-center py-8">
-            <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-center py-8">
+        <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin"></div>
+        <span className="mr-4">בודק פרטי מנוי...</span>
+      </div>
     );
   }
-  
-  if (isChangingPlan) {
+
+  // Determine if this is an authenticated user or registration flow
+  const isAuthenticated = !!user?.id;
+  const isRegistering = !!registrationData;
+  const isValidUser = isAuthenticated || isRegistering;
+
+  if (!isValidUser) {
     return (
-      <Card className="max-w-lg mx-auto" dir="rtl">
+      <Alert variant="destructive" className="max-w-lg mx-auto">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          המשתמש לא מחובר. אנא התחבר או השלם את תהליך ההרשמה.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // If user is already subscribed, show warning or change plan option
+  if (hasSubscription && !isChangingPlan) {
+    return (
+      <Alert className="max-w-lg mx-auto">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          יש לך כבר מנוי פעיל. ניתן לראות את פרטי המנוי שלך בדף המנוי שלי.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // If user is changing plans, show confirmation
+  if (hasSubscription && isChangingPlan) {
+    return (
+      <Card className="max-w-lg mx-auto">
         <CardHeader>
           <CardTitle>שינוי תכנית מנוי</CardTitle>
           <CardDescription>
-            יש לך כבר מנוי פעיל. האם ברצונך לעבור למנוי {plan.name}?
+            אתה עומד לשנות את תכנית המנוי שלך. השינוי יכנס לתוקף מיד עם אישור התשלום.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              שינוי המנוי יבטל את המנוי הקיים שלך ויחליף אותו במנוי חדש.
-            </AlertDescription>
-          </Alert>
-          <div className="flex justify-between gap-4">
-            <Button variant="outline" onClick={onCancel} className="flex-1">
-              בטל
-            </Button>
-            <Button onClick={handlePlanChangeConfirmed} className="flex-1">
-              אשר שינוי מנוי
-            </Button>
-          </div>
+          <CardcomOpenFields
+            planId={planId}
+            onPaymentComplete={onPaymentComplete}
+            onPaymentStart={onPaymentStart}
+            onError={onError}
+            onCancel={onCancel}
+          />
         </CardContent>
       </Card>
     );
   }
-  
-  if (hasSubscription && !isChangingPlan) {
-    return (
-      <Card className="max-w-lg mx-auto" dir="rtl">
-        <CardHeader>
-          <CardTitle>יש לך כבר מנוי פעיל</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              יש לך כבר מנוי פעיל במערכת. אם ברצונך לשנות מנוי, אנא בטל את המנוי הקיים תחילה.
-            </AlertDescription>
-          </Alert>
-          <Button onClick={onCancel} className="w-full">
-            חזור
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-  
+
+  // Regular payment flow (new subscription or registration)
   return (
-    <Card className="max-w-lg mx-auto" dir="rtl">
+    <Card className="max-w-lg mx-auto">
       <CardHeader>
         <div className="flex items-center gap-2">
           <CreditCard className="h-5 w-5 text-primary" />
           <CardTitle>פרטי תשלום</CardTitle>
         </div>
         <CardDescription>
-          {planId === 'monthly' 
-            ? 'הרשמה למנוי חודשי עם חודש ניסיון חינם' 
-            : planId === 'annual' 
-              ? 'הרשמה למנוי שנתי עם חיסכון של 25%' 
-              : 'רכישת מנוי VIP לכל החיים'}
+          {isRegistering ? 'השלם את פרטי התשלום להשלמת ההרשמה' : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="bg-muted rounded-md p-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-medium">{plan.name}</h3>
-              <p className="text-sm text-muted-foreground">{plan.description}</p>
-            </div>
-            <div className="text-right">
-              <p className="font-bold">{typeof plan.price === 'number' ? `${plan.price} ₪` : plan.price}</p>
-              {planId === 'monthly' && <p className="text-xs text-muted-foreground">חודש ראשון: חינם</p>}
-            </div>
-          </div>
-        </div>
-
-        <CardcomOpenFields 
+      <CardContent>
+        <CardcomOpenFields
           planId={planId}
-          onPaymentComplete={handleSuccess}
-          onError={handleError}
-          onPaymentStart={handlePaymentStart}
+          onPaymentComplete={onPaymentComplete}
+          onPaymentStart={onPaymentStart}
+          onError={onError}
           onCancel={onCancel}
         />
       </CardContent>
