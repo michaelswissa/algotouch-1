@@ -11,6 +11,7 @@ export const usePaymentStatus = (
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [paymentProcessingId, setPaymentProcessingId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,14 +22,19 @@ export const usePaymentStatus = (
       const lowProfileId = params.get('lowProfileId');
       const planId = params.get('planId');
       
-      // Clear any stale payment data from localStorage
-      if (localStorage.getItem('payment_processing')) {
-        localStorage.removeItem('payment_processing');
+      // Check if we're already processing this payment
+      const storedProcessingId = localStorage.getItem('payment_processing');
+      if (storedProcessingId && storedProcessingId === lowProfileId) {
+        // We're already processing this payment, don't duplicate
+        console.log('Already processing payment:', storedProcessingId);
+        setPaymentProcessingId(storedProcessingId);
+        return;
       }
       
       if (success === 'true' && lowProfileId) {
         // Store that we're processing a payment to avoid duplicate checks
         localStorage.setItem('payment_processing', lowProfileId);
+        setPaymentProcessingId(lowProfileId);
         
         setIsChecking(true);
         try {
@@ -44,7 +50,11 @@ export const usePaymentStatus = (
           
           console.log('Received payment status response:', data);
           
-          if (data.ResponseCode === 0 && (data.Operation || data.TranzactionInfo)) {
+          // Check if the transaction was successful either from ResponseCode or from TranzactionInfo
+          if (data.ResponseCode === 0 || 
+              (data.OperationResponse === '0') || 
+              (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0)) {
+            
             setPaymentSuccess(true);
             
             // Customize success message based on plan type
@@ -60,6 +70,7 @@ export const usePaymentStatus = (
             
             // Clean up the payment processing flag
             localStorage.removeItem('payment_processing');
+            setPaymentProcessingId(null);
             
             // Allow toasts to be shown before redirecting
             setTimeout(() => {
@@ -75,6 +86,7 @@ export const usePaymentStatus = (
           } else {
             // Clean up after max retries
             localStorage.removeItem('payment_processing');
+            setPaymentProcessingId(null);
             
             setPaymentError(data.Description || 'אירעה שגיאה בתהליך התשלום');
             toast.error('אירעה שגיאה בתהליך התשלום');
@@ -89,6 +101,7 @@ export const usePaymentStatus = (
           } else {
             // Clean up after max retries
             localStorage.removeItem('payment_processing');
+            setPaymentProcessingId(null);
             
             setPaymentError(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
             toast.error('אירעה שגיאה בבדיקת סטטוס התשלום');
@@ -97,6 +110,7 @@ export const usePaymentStatus = (
           if (retryCount >= 3) {
             setIsChecking(false);
             localStorage.removeItem('payment_processing');
+            setPaymentProcessingId(null);
           }
         }
       } else if (error === 'true') {
@@ -105,12 +119,17 @@ export const usePaymentStatus = (
       }
     };
     
-    // Check if we're already processing a payment to prevent duplicate checks
-    const isProcessing = localStorage.getItem('payment_processing');
-    if (!isProcessing) {
+    // Check if we need to check again due to retry
+    if (retryCount > 0 && paymentProcessingId) {
+      checkPaymentStatus();
+      return;
+    }
+    
+    // Don't re-check if we're already checking or have completed
+    if (!isChecking && !paymentSuccess) {
       checkPaymentStatus();
     }
-  }, [navigate, redirectOnSuccess, retryCount]);
+  }, [navigate, redirectOnSuccess, retryCount, isChecking, paymentSuccess, paymentProcessingId]);
 
   return {
     isChecking,

@@ -39,7 +39,8 @@ serve(async (req) => {
       isRegistration,
       registrationData,
       isRecurring = false,
-      freeTrialDays = 0
+      freeTrialDays = 0,
+      idempotencyKey // Optional key to prevent duplicate transactions
     } = requestData;
     
     console.log('Creating payment session for:', { 
@@ -49,7 +50,8 @@ serve(async (req) => {
       userEmail, 
       userId,
       isRecurring,
-      freeTrialDays
+      freeTrialDays,
+      idempotencyKey
     });
 
     // Get the Cardcom API credentials
@@ -65,6 +67,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
+    
+    // Check for an idempotency key first if provided
+    if (idempotencyKey) {
+      const { data: existingSession } = await supabaseClient
+        .from('payment_sessions')
+        .select('*')
+        .eq('payment_details->idempotencyKey', idempotencyKey)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+        
+      if (existingSession) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            lowProfileId: existingSession.payment_details?.lowProfileId,
+            url: existingSession.payment_details?.url,
+            sessionId: existingSession.id,
+            alreadyExists: true
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+    }
     
     // Check for and expire any existing active payment sessions for this user
     if (userId) {
@@ -96,8 +124,13 @@ serve(async (req) => {
     
     // Define the success and error redirect URLs
     const origin = new URL(req.url).origin;
-    const successUrl = `${origin}/subscription?success=true&planId=${planId}`;
-    const errorUrl = `${origin}/subscription?error=true&planId=${planId}`;
+    const baseUrl = origin.includes('edge-runtime.supabase') 
+      ? 'https://your-app-url.com' // Replace with your production URL
+      : origin;
+      
+    // Create more descriptive redirect URLs with query params
+    const successUrl = `${baseUrl}/subscription?success=true&planId=${planId}&lowProfileId={{LowProfileId}}`;
+    const errorUrl = `${baseUrl}/subscription?error=true&planId=${planId}&errorCode={{ResponseCode}}&errorDesc={{Description}}`;
     
     // Prepare the Cardcom request data
     const cardcomData = {
@@ -108,13 +141,21 @@ serve(async (req) => {
       Amount: operationType === 3 ? 0 : amount,
       SuccessRedirectUrl: successUrl,
       FailedRedirectUrl: errorUrl,
-      WebHookUrl: `${origin}/api/cardcom-webhook`, // This should be a valid endpoint that can receive Cardcom webhooks
+      WebHookUrl: `${baseUrl}/api/cardcom-webhook`, // This should be a valid endpoint that can receive Cardcom webhooks
       ProductName: planName || "Subscription",
       Language: "he",
       Operation: operationType.toString(),
       UIDefinition: {
         CardOwnerNameValue: userName || "",
         CardOwnerEmailValue: userEmail || "",
+      },
+      // Make sure to prevent processing the same payment multiple times
+      UTM: {
+        Source: "webapp",
+        Medium: "subscription",
+        Campaign: planId,
+        Content: userId || "guest",
+        Term: idempotencyKey || new Date().getTime().toString()
       }
     };
     
@@ -132,7 +173,10 @@ serve(async (req) => {
       terminalNumber: cardcomData.TerminalNumber,
       operation: cardcomData.Operation,
       amount: cardcomData.Amount,
-      isRecurring
+      isRecurring,
+      successUrl: cardcomData.SuccessRedirectUrl,
+      errorUrl: cardcomData.FailedRedirectUrl,
+      webhookUrl: cardcomData.WebHookUrl
     });
     
     // Make request to Cardcom API
@@ -176,11 +220,14 @@ serve(async (req) => {
         email: userEmail || null,
         payment_details: {
           lowProfileId: cardcomResponse.LowProfileId,
+          url: cardcomResponse.Url,
           amount: amount,
           planType: planId,
           isRecurring,
           operationType,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          status: 'pending',
+          idempotencyKey: idempotencyKey || null
         }
       };
       

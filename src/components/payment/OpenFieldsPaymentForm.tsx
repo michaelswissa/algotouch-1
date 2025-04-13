@@ -70,7 +70,15 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     const cleanUpPaymentSessions = async () => {
       try {
         if (user?.id) {
-          await supabase.rpc('cleanup_stale_payment_sessions', { user_id_param: user.id });
+          // Using RPC - let's add this function to the database
+          // This function needs to be created in the Supabase database
+          const { error } = await supabase.rpc('cleanup_user_payment_sessions', { 
+            user_id_param: user.id 
+          });
+          
+          if (error) {
+            console.error('Error cleaning up payment sessions:', error);
+          }
         }
       } catch (err) {
         console.error('Error cleaning up payment sessions:', err);

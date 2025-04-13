@@ -109,7 +109,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         .from('payment_sessions')
         .update({ 
           expires_at: new Date().toISOString(),  // Expire the session immediately
-          payment_details: { ...sessionId, status: 'completed' }
+          payment_details: { status: 'completed' } // Fix: Don't spread sessionId which is a string
         })
         .eq('id', sid);
     } catch (err) {
