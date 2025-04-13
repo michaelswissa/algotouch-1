@@ -48,17 +48,37 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
     
-    // Make request to Cardcom API to get transaction status
-    const response = await fetch("https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // Append the parameters as query string
-      // Note: This is how Cardcom expects the parameters for this endpoint
-      // We're using URLSearchParams to properly encode the parameters
-      url: `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx?terminalnumber=${terminalNumber}&username=${apiName}&lowprofilecode=${lowProfileId}&codepage=65001`,
-    });
+    // First, check if we've already processed this payment
+    const { data: existingPayment } = await supabaseClient
+      .from('user_payment_logs')
+      .select('*')
+      .eq('token', lowProfileId)
+      .eq('status', 'completed')
+      .maybeSingle();
+    
+    if (existingPayment) {
+      console.log('Payment already processed for this lowProfileId:', existingPayment);
+      return new Response(
+        JSON.stringify({
+          ResponseCode: 0,
+          Description: 'Payment already processed',
+          TranzactionInfo: {
+            TranzactionId: existingPayment.transaction_details?.transaction_id || 0
+          },
+          Operation: existingPayment.transaction_details?.operation || 1
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+    
+    // Construct the URL for making the request to Cardcom's API
+    const cardcomUrl = `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx?terminalnumber=${terminalNumber}&username=${apiName}&lowprofilecode=${lowProfileId}&codepage=65001`;
+    
+    // Make the request to Cardcom's API
+    const response = await fetch(cardcomUrl);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -93,6 +113,30 @@ serve(async (req) => {
           // Get transaction details
           const transactionId = responseData.InternalDealNumber;
           const amount = responseData.Amount || 0;
+          
+          // Record the payment in user_payment_logs
+          if (transactionId) {
+            const { error: logError } = await supabaseClient
+              .from('user_payment_logs')
+              .insert([{
+                user_id: userId,
+                token: lowProfileId,
+                amount: amount,
+                status: 'completed',
+                approval_code: responseData.ApprovalNumber71 || '',
+                transaction_details: {
+                  transaction_id: transactionId,
+                  plan_type: planType,
+                  operation: responseData.Operation || 1,
+                  card_last_four: responseData.CardNumber5 || '',
+                  timestamp: new Date().toISOString()
+                }
+              }]);
+              
+            if (logError) {
+              console.error('Error recording payment log:', logError);
+            }
+          }
           
           // Update the user's subscription in the database
           if (userId) {

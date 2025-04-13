@@ -21,7 +21,15 @@ export const usePaymentStatus = (
       const lowProfileId = params.get('lowProfileId');
       const planId = params.get('planId');
       
+      // Clear any stale payment data from localStorage
+      if (localStorage.getItem('payment_processing')) {
+        localStorage.removeItem('payment_processing');
+      }
+      
       if (success === 'true' && lowProfileId) {
+        // Store that we're processing a payment to avoid duplicate checks
+        localStorage.setItem('payment_processing', lowProfileId);
+        
         setIsChecking(true);
         try {
           console.log('Checking payment status for lowProfileId:', lowProfileId);
@@ -50,6 +58,9 @@ export const usePaymentStatus = (
               toast.success('התשלום התקבל בהצלחה!');
             }
             
+            // Clean up the payment processing flag
+            localStorage.removeItem('payment_processing');
+            
             // Allow toasts to be shown before redirecting
             setTimeout(() => {
               navigate(redirectOnSuccess, { replace: true });
@@ -62,6 +73,9 @@ export const usePaymentStatus = (
               setRetryCount(prevCount => prevCount + 1);
             }, (retryCount + 1) * 2000);
           } else {
+            // Clean up after max retries
+            localStorage.removeItem('payment_processing');
+            
             setPaymentError(data.Description || 'אירעה שגיאה בתהליך התשלום');
             toast.error('אירעה שגיאה בתהליך התשלום');
           }
@@ -73,12 +87,16 @@ export const usePaymentStatus = (
               setRetryCount(prevCount => prevCount + 1);
             }, (retryCount + 1) * 2000);
           } else {
+            // Clean up after max retries
+            localStorage.removeItem('payment_processing');
+            
             setPaymentError(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
             toast.error('אירעה שגיאה בבדיקת סטטוס התשלום');
           }
         } finally {
           if (retryCount >= 3) {
             setIsChecking(false);
+            localStorage.removeItem('payment_processing');
           }
         }
       } else if (error === 'true') {
@@ -87,7 +105,11 @@ export const usePaymentStatus = (
       }
     };
     
-    checkPaymentStatus();
+    // Check if we're already processing a payment to prevent duplicate checks
+    const isProcessing = localStorage.getItem('payment_processing');
+    if (!isProcessing) {
+      checkPaymentStatus();
+    }
   }, [navigate, redirectOnSuccess, retryCount]);
 
   return {

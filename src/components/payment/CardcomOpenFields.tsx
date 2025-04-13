@@ -1,656 +1,503 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from 'lucide-react';
-import { Spinner } from "@/components/ui/spinner";
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { getSubscriptionPlans } from './utils/paymentHelpers';
+import { useNavigate } from 'react-router-dom';
 
 interface CardcomOpenFieldsProps {
   planId: string;
-  planName: string;
-  amount: number;
-  onSuccess?: (transactionId: string) => void;
+  amount?: number;
+  onPaymentComplete?: (transactionId: string) => void;
   onError?: (error: string) => void;
-  onCancel?: () => void;
   onPaymentStart?: () => void;
 }
 
-const CARDCOM_IFRAME_URL = 'https://secure.cardcom.solutions/api/openfields';
-
 const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   planId,
-  planName,
   amount,
-  onSuccess,
+  onPaymentComplete,
   onError,
-  onCancel,
   onPaymentStart
 }) => {
-  const [lowProfileCode, setLowProfileCode] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [processingPayment, setProcessingPayment] = useState<boolean>(false);
-  
-  const masterFrameRef = useRef<HTMLIFrameElement>(null);
-  const cardNumberFrameRef = useRef<HTMLIFrameElement>(null);
-  const cvvFrameRef = useRef<HTMLIFrameElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  
-  const [cardOwnerName, setCardOwnerName] = useState('');
-  const [cardOwnerEmail, setCardOwnerEmail] = useState('');
-  const [expirationMonth, setExpirationMonth] = useState('');
-  const [expirationYear, setExpirationYear] = useState('');
-  const [iframesReady, setIframesReady] = useState(false);
-  
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const plans = getSubscriptionPlans();
-  const plan = plans[planId as keyof typeof plans] || plans.monthly;
-  
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
-    
-    if (success === 'true') {
-      const lowProfileId = urlParams.get('lowProfileId');
-      if (lowProfileId) {
-        console.log('Transaction success, checking status with lowProfileId:', lowProfileId);
-        checkTransactionStatus(lowProfileId);
-      }
-    } else if (error === 'true') {
-      setError('התשלום נכשל. אנא נסה שנית.');
+  // Create refs for the iframe and the payment session
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const paymentInitialized = useRef(false);
+
+  // Function to handle messages from the CardCom iframe
+  const handleIframeMessages = (event: MessageEvent) => {
+    // Validate the origin for security (only accept messages from CardCom)
+    if (event.origin !== 'https://secure.cardcom.solutions') {
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    const getUserDetails = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        try {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .maybeSingle();
+    console.info('Message from iframe:', event.data);
+
+    try {
+      const message = event.data;
+
+      // Handle validation messages
+      if (message.action === 'handleValidations') {
+        console.log(`Field ${message.field} validation:`, message.isValid);
+      } 
+      // Handle errors from the iframe
+      else if (message.action === 'HandleEror') {
+        console.error('CardCom error:', message);
+        setIsLoading(false);
+        
+        if (message.message && message.message.includes('העסקה כבר הושלמה')) {
+          // Handle the case where the transaction was already completed
+          toast.error('שגיאה: העסקה כבר הושלמה, אנא רענן את הדף ונסה שנית');
           
-          if (profile) {
-            const firstName = profile.first_name || '';
-            const lastName = profile.last_name || '';
-            if (firstName || lastName) {
-              setCardOwnerName(`${firstName} ${lastName}`.trim());
-            }
-            
-            setCardOwnerEmail(data.user.email || '');
-          } else {
-            setCardOwnerEmail(data.user.email || '');
+          // Clean up the session on this error
+          if (sessionId) {
+            cleanupPaymentSession(sessionId);
           }
-        } catch (err) {
-          console.error('Error fetching profile:', err);
-          setCardOwnerEmail(data.user.email || '');
+          
+          if (onError) onError('העסקה כבר הושלמה, אנא רענן את הדף ונסה שנית');
+          return;
+        }
+        
+        setError(message.message || 'שגיאה בתהליך התשלום');
+        if (onError) onError(message.message || 'שגיאה בתהליך התשלום');
+      } 
+      // Handle successful payment from the iframe
+      else if (message.action === 'HandleSubmit') {
+        console.log('Payment successful:', message.data);
+        
+        if (message.data && message.data.IsSuccess) {
+          // Process the successful payment
+          setIsLoading(false);
+          
+          // Clean up the session on success
+          if (sessionId) {
+            cleanupPaymentSession(sessionId);
+          }
+          
+          // Call the onPaymentComplete callback if provided
+          if (onPaymentComplete) {
+            onPaymentComplete(message.data.InternalDealNumber?.toString() || '');
+          }
+        } else {
+          setIsLoading(false);
+          setError('שגיאה בתהליך התשלום');
+          if (onError) onError('שגיאה בתהליך התשלום');
         }
       }
+    } catch (err) {
+      console.error('Error handling iframe message:', err);
+      setIsLoading(false);
+      setError('שגיאה בתהליך התשלום');
+      if (onError) onError('שגיאה בעיבוד תשובת התשלום');
+    }
+  };
+
+  // Clean up payment session
+  const cleanupPaymentSession = async (sid: string) => {
+    try {
+      await supabase
+        .from('payment_sessions')
+        .update({ 
+          expires_at: new Date().toISOString(),  // Expire the session immediately
+          payment_details: { ...sessionId, status: 'completed' }
+        })
+        .eq('id', sid);
+    } catch (err) {
+      console.error('Error cleaning up payment session:', err);
+    }
+  };
+
+  // Initialize the Cardcom iframe
+  const initializeCardcom = async () => {
+    if (paymentInitialized.current) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Check if there's an existing active payment session for this user and plan
+      if (user?.id) {
+        const { data: existingSessions } = await supabase
+          .from('payment_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('plan_id', planId)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false });
+          
+        // If there are existing sessions, clean them up
+        if (existingSessions && existingSessions.length > 0) {
+          console.log('Found existing payment sessions, cleaning up...');
+          for (const session of existingSessions) {
+            await cleanupPaymentSession(session.id);
+          }
+        }
+      }
+      
+      // Start a new payment session with Cardcom
+      let planAmount = amount;
+      if (!planAmount) {
+        // Determine amount based on plan if not provided
+        switch (planId) {
+          case 'monthly':
+            planAmount = 0; // Free trial
+            break;
+          case 'annual':
+            planAmount = 3371; // Annual price in ILS
+            break;
+          case 'vip':
+            planAmount = 13121; // VIP price in ILS
+            break;
+          default:
+            planAmount = 0;
+        }
+      }
+      
+      // Get user details for the payment
+      const userName = user?.user_metadata?.name || '';
+      const userEmail = user?.email || '';
+      
+      // Get the plan name for display
+      let planName = '';
+      switch (planId) {
+        case 'monthly':
+          planName = 'מנוי חודשי - חודש ניסיון חינם';
+          break;
+        case 'annual':
+          planName = 'מנוי שנתי';
+          break;
+        case 'vip':
+          planName = 'מנוי VIP - לכל החיים';
+          break;
+        default:
+          planName = 'מנוי';
+      }
+
+      // Create payment session using the edge function
+      const { data, error: sessionError } = await supabase.functions.invoke('cardcom-openfields', {
+        body: {
+          planId,
+          planName,
+          amount: planAmount,
+          userEmail,
+          userName,
+          userId: user?.id || null,
+          isRecurring: planId === 'monthly' || planId === 'annual',
+          freeTrialDays: planId === 'monthly' ? 30 : 0
+        }
+      });
+      
+      if (sessionError) {
+        throw new Error(sessionError.message);
+      }
+      
+      if (!data || !data.lowProfileId) {
+        throw new Error('No payment session created');
+      }
+      
+      console.log('Payment session created:', data);
+      setSessionId(data.lowProfileId);
+      
+      // Wait for iframe to be loaded
+      setTimeout(() => {
+        if (iframeRef.current && iframeRef.current.contentWindow) {
+          // Add required CSS for the CardCom fields
+          const cardCss = `
+            .cardNumberField {
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              height: 40px;
+              width: 100%;
+              padding: 0 10px;
+              font-size: 16px;
+              box-sizing: border-box;
+            }
+            .cardNumberField:focus {
+              border-color: #3498db;
+              outline: none;
+              box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+            }
+          `;
+          
+          const cvvCss = `
+            .cvvField {
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              height: 40px;
+              width: 100%;
+              padding: 0 10px;
+              font-size: 16px;
+              text-align: center;
+              box-sizing: border-box;
+            }
+            .cvvField:focus {
+              border-color: #3498db;
+              outline: none;
+              box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+            }
+          `;
+
+          // Initialize the iframe with our configuration
+          iframeRef.current.contentWindow.postMessage({
+            action: 'init',
+            lowProfileCode: data.lowProfileId,
+            cardFieldCSS: cardCss,
+            cvvFieldCSS: cvvCss,
+            language: 'he',
+            placeholder: '0000-0000-0000-0000',
+            cvvPlaceholder: '123',
+            captchaFieldCSS: ''
+          }, 'https://secure.cardcom.solutions');
+          
+          setIframeLoaded(true);
+          paymentInitialized.current = true;
+        }
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Error initializing Cardcom:', err);
+      setError(err instanceof Error ? err.message : 'שגיאה ביצירת תהליך התשלום');
+      if (onError) onError(err instanceof Error ? err.message : 'שגיאה ביצירת תהליך התשלום');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Set up message listeners when the component mounts
+  useEffect(() => {
+    window.addEventListener('message', handleIframeMessages);
+    
+    // Load the CardCom iframe script
+    const cardcomScript = document.createElement('script');
+    cardcomScript.src = `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${new Date().getTime()}`;
+    document.head.appendChild(cardcomScript);
+    
+    // Initialize after script is loaded
+    cardcomScript.onload = () => {
+      initializeCardcom();
     };
     
-    getUserDetails();
-    initializePaymentSession();
-  }, [planId, amount]);
-
-  useEffect(() => {
-    const cardcom3DSScript = document.createElement('script');
-    const time = new Date().getTime();
-    cardcom3DSScript.setAttribute('src', `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${time}`);
-    document.head.appendChild(cardcom3DSScript);
-    
+    // Clean up event listeners and references when the component unmounts
     return () => {
-      if (document.head.contains(cardcom3DSScript)) {
-        document.head.removeChild(cardcom3DSScript);
+      window.removeEventListener('message', handleIframeMessages);
+      paymentInitialized.current = false;
+      
+      // Clean up the session if component unmounts without completing
+      if (sessionId) {
+        cleanupPaymentSession(sessionId);
+      }
+      
+      // Remove the script
+      if (document.head.contains(cardcomScript)) {
+        document.head.removeChild(cardcomScript);
       }
     };
   }, []);
 
-  useEffect(() => {
-    if (lowProfileCode && masterFrameRef.current) {
-      const timer = setTimeout(() => {
-        console.log('Initializing iframes with lowProfileCode:', lowProfileCode);
-        initializeIframeFields();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [lowProfileCode]);
-
-  const initializePaymentSession = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { data: registrationData } = await supabase
-        .from('temp_registration_data')
-        .select('*')
-        .eq('used', false)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-        
-      const requestData = {
-        planId,
-        planName,
-        amount: plan.displayPrice,
-        userEmail: cardOwnerEmail || (user?.email || ''),
-        userName: cardOwnerName || (user?.user_metadata?.full_name || ''),
-        userId: user?.id || null,
-        isRegistration: !!registrationData,
-        registrationData: registrationData?.registration_data || null,
-        enable3DS: true, // Enable 3DS processing
-        // Add isRecurring flag to handle monthly/annual subscriptions correctly
-        isRecurring: planId === 'monthly' || planId === 'annual',
-        // For monthly plans, we want a free trial for the first month
-        freeTrialDays: planId === 'monthly' ? 30 : 0
-      };
-      
-      console.log('Initializing payment session with data:', requestData);
-      
-      const { data, error: functionError } = await supabase.functions.invoke('cardcom-openfields', {
-        body: requestData
-      });
-      
-      if (functionError) {
-        console.error('Error from cardcom-openfields function:', functionError);
-        throw new Error(functionError.message || 'Failed to create payment session');
-      }
-      
-      if (!data.success || !data.lowProfileId) {
-        throw new Error(data.error || 'Failed to create payment session');
-      }
-      
-      console.log('Payment session created successfully with ID:', data.lowProfileId);
-      
-      setLowProfileCode(data.lowProfileId);
-    } catch (error) {
-      console.error('Error initializing payment session:', error);
-      setError(error instanceof Error ? error.message : 'Failed to initialize payment');
-      onError?.(error instanceof Error ? error.message : 'Failed to initialize payment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const initializeIframeFields = async () => {
-    if (!masterFrameRef.current) {
-      console.error('Master iframe reference not available');
-      setError('שגיאה באתחול טופס התשלום - חסרים מרכיבי מסגרת הטופס');
-      return;
-    }
-
-    if (!lowProfileCode) {
-      console.error('LowProfileCode is required but not available');
-      setError('שגיאה בהתחברות למערכת התשלומים. קוד עסקה חסר.');
-      return;
-    }
-
-    try {
-      console.log('Starting iframe initialization with lowProfileCode:', lowProfileCode);
-      
-      const cardNumberCssResponse = await fetch('/assets/styles/cardNumber.css');
-      const cardNumberCss = await cardNumberCssResponse.text();
-      
-      const cvvCssResponse = await fetch('/assets/styles/cvvField.css');
-      const cvvCss = await cvvCssResponse.text();
-
-      const message = {
-        action: 'init',
-        lowProfileCode: lowProfileCode,
-        cardFieldCSS: cardNumberCss, 
-        cvvFieldCSS: cvvCss,
-        placeholder: "0000 0000 0000 0000",
-        cvvPlaceholder: "123",
-        language: "he",
-        // 3DS configuration
-        is3DSEnabled: true
-      };
-      
-      console.log('Sending initialization message to iframe:', { 
-        action: message.action, 
-        lowProfileCode: lowProfileCode,
-        hasCardCSS: !!message.cardFieldCSS,
-        hasCvvCSS: !!message.cvvFieldCSS,
-        is3DSEnabled: message.is3DSEnabled
-      });
-      
-      if (masterFrameRef.current.contentWindow) {
-        masterFrameRef.current.contentWindow.postMessage(message, '*');
-        console.log('Initialization message sent to iframe');
-        setIframesReady(true);
-      } else {
-        console.error('Master iframe contentWindow not available');
-        setError('שגיאה באתחול מערכת התשלום - חלון הטופס לא זמין');
-      }
-    } catch (error) {
-      console.error('Error loading CSS files or initializing iframes:', error);
-      setError('שגיאה בטעינת סגנונות הטופס');
-    }
-  };
-
-  useEffect(() => {
-    const handleFrameMessages = (event: MessageEvent) => {
-      if (!event.origin.includes('cardcom.solutions')) {
-        return;
-      }
-      
-      const msg = event.data;
-      console.log('Message from iframe:', msg);
-      
-      switch (msg.action) {
-        case "HandleSubmit":
-          console.log("Payment submitted successfully:", msg.data);
-          handlePaymentSuccess(msg.data);
-          break;
-        case "HandleEror":
-          console.error("Payment error:", msg.message);
-          setProcessingPayment(false);
-          setError(msg.message || 'שגיאה בעיבוד התשלום');
-          onError?.(msg.message || 'שגיאה בעיבוד התשלום');
-          break;
-        case "handleValidations":
-          if (msg.field === "cvv") {
-            setCvvFieldClass(msg.isValid);
-          }
-          if (msg.field === "cardNumber") {
-            setCardNumberClass(msg.isValid);
-          }
-          if (msg.field === "reCaptcha") {
-            console.log('reCaptcha validation:', msg.isValid);
-          }
-          break;
-        case "handle3DSProcess": // Handle 3DS specific events
-          console.log('3DS process event:', msg.status);
-          if (msg.status === 'started') {
-            // The 3DS verification has started
-            console.log('3DS verification process has started');
-          } else if (msg.status === 'completed') {
-            // The 3DS verification has completed successfully
-            console.log('3DS verification completed successfully');
-          } else if (msg.status === 'failed') {
-            // The 3DS verification has failed
-            console.error('3DS verification failed:', msg.error);
-            setError('אימות 3DS נכשל: ' + (msg.error || 'שגיאה לא ידועה'));
-            onError?.('אימות 3DS נכשל: ' + (msg.error || 'שגיאה לא ידועה'));
-          }
-          break;
-        default:
-          console.log('Other message from iframe:', msg);
-          break;
-      }
-    };
-
-    window.addEventListener("message", handleFrameMessages);
-    return () => {
-      window.removeEventListener("message", handleFrameMessages);
-    };
-  }, [onSuccess, onError]);
-
-  const setCvvFieldClass = (isValid: boolean) => {
-    if (!masterFrameRef.current) return;
-    
-    if (!isValid) {
-      masterFrameRef.current.contentWindow?.postMessage({
-        action: 'addCvvFieldClass',
-        className: "invalid"
-      }, '*');
-    } else {
-      masterFrameRef.current.contentWindow?.postMessage({
-        action: 'removeCvvFieldClass',
-        className: "invalid"
-      }, '*');
-    }
-  };
-
-  const setCardNumberClass = (isValid: boolean) => {
-    if (!masterFrameRef.current) return;
-    
-    if (isValid) {
-      masterFrameRef.current.contentWindow?.postMessage({ 
-        action: 'removeCardNumberFieldClass', 
-        className: "invalid" 
-      }, '*');
-    } else {
-      masterFrameRef.current.contentWindow?.postMessage({ 
-        action: 'addCardNumberFieldClass', 
-        className: "invalid" 
-      }, '*');
-    }
-  };
-
-  const validateFields = () => {
-    let isValid = true;
-    
-    if (!cardOwnerName.trim()) {
-      setError('שם בעל הכרטיס הוא שדה חובה');
-      isValid = false;
-    } else if (!expirationMonth || !expirationYear) {
-      setError('תאריך תפוגה הוא שדה חובה');
-      isValid = false;
-    } else if (!/^\d{2}$/.test(expirationMonth) || parseInt(expirationMonth) < 1 || parseInt(expirationMonth) > 12) {
-      setError('חודש תפוגה לא תקין');
-      isValid = false;
-    } else if (!/^\d{2}$/.test(expirationYear)) {
-      setError('שנת תפוגה לא תקינה');
-      isValid = false;
-    }
-    
-    if (masterFrameRef.current) {
-      masterFrameRef.current.contentWindow?.postMessage({ action: "validateCardNumber" }, '*');
-      masterFrameRef.current.contentWindow?.postMessage({ action: "validateCvv" }, '*');
-    }
-    
-    return isValid;
-  };
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Function to handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!lowProfileCode) {
-      setError('לא ניתן לבצע תשלום - חסר קוד חיוב (lowProfileCode)');
+    if (isLoading || !iframeLoaded) {
       return;
     }
     
-    if (!validateFields()) {
+    setIsLoading(true);
+    if (onPaymentStart) onPaymentStart();
+    
+    // Get card details from the form
+    const expirationMonth = (document.getElementById('expirationMonth') as HTMLInputElement)?.value;
+    const expirationYear = (document.getElementById('expirationYear') as HTMLInputElement)?.value;
+    const cardOwnerName = (document.getElementById('cardOwnerName') as HTMLInputElement)?.value;
+    const cardOwnerID = (document.getElementById('cardOwnerID') as HTMLInputElement)?.value || '000000000';
+    
+    if (!cardOwnerName || !expirationMonth || !expirationYear) {
+      setIsLoading(false);
+      setError('נא למלא את כל השדות הנדרשים');
+      if (onError) onError('נא למלא את כל השדות הנדרשים');
       return;
     }
     
-    if (!iframesReady) {
-      setError('טופס התשלום עדיין בטעינה. אנא המתן רגע ונסה שוב.');
+    // Validate expiration date
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear() % 100;
+    const expMonth = parseInt(expirationMonth);
+    const expYear = parseInt(expirationYear);
+    
+    if (isNaN(expMonth) || isNaN(expYear) || expMonth < 1 || expMonth > 12) {
+      setIsLoading(false);
+      setError('תאריך תפוגה אינו תקין');
+      if (onError) onError('תאריך תפוגה אינו תקין');
       return;
     }
     
-    setProcessingPayment(true);
-    setError(null);
-    
-    if (onPaymentStart) {
-      onPaymentStart();
-    }
-    
-    if (!masterFrameRef.current) {
-      setError('שגיאה באתחול טופס התשלום');
-      setProcessingPayment(false);
+    if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
+      setIsLoading(false);
+      setError('כרטיס האשראי פג תוקף');
+      if (onError) onError('כרטיס האשראי פג תוקף');
       return;
     }
     
-    const cardOwnerData = {
-      cardOwnerName,
-      cardOwnerEmail,
-      cardOwnerPhone: ''
-    };
-    
-    console.log('Setting card owner details:', cardOwnerData);
-    masterFrameRef.current.contentWindow?.postMessage({ 
-      action: 'setCardOwnerDetails', 
-      data: cardOwnerData 
-    }, '*');
-    
-    const formProps = {
-      action: 'doTransaction',
-      lowProfileCode: lowProfileCode,
-      cardOwnerName,
-      cardOwnerEmail,
-      expirationMonth,
-      expirationYear,
-      cardOwnerId: '000000000',
-      cardOwnerPhone: '',
-      numberOfPayments: "1",
-      document: createDocument(),
-      is3DSEnabled: true  // Enable 3DS for the transaction
-    };
-    
-    console.log('Submitting payment transaction with params:', {
-      action: formProps.action,
-      lowProfileCode: lowProfileCode,
-      cardOwnerName: formProps.cardOwnerName,
-      hasExpiry: !!formProps.expirationMonth && !!formProps.expirationYear,
-      hasDocument: !!formProps.document,
-      is3DSEnabled: formProps.is3DSEnabled
-    });
-    
-    masterFrameRef.current.contentWindow?.postMessage(formProps, '*');
-  };
-
-  const createDocument = () => {
-    return {
-      Name: cardOwnerName || "Customer",
-      Email: cardOwnerEmail || "",
-      IsSendByEmail: true,
-      IsAllowEditDocument: false,
-      IsShowOnlyDocument: false,
-      Language: "he",
-      Products: [{
-        Description: planName || "Subscription Plan",
-        Quantity: 1,
-        UnitCost: amount,
-        TotalLineCost: amount,
-        IsVatFree: false
-      }]
-    };
-  };
-
-  const handlePaymentSuccess = (data: any) => {
-    setProcessingPayment(false);
-    
-    if (!data || !data.IsSuccess) {
-      setError(data?.Description || 'התשלום נכשל ללא שגיאה ספציפית');
-      onError?.(data?.Description || 'התשלום נכשל ללא שגיאה ספציפית');
-      return;
-    }
-    
-    console.log('Payment successful:', data);
-    
-    if (onSuccess && data.TranzactionId) {
-      onSuccess(data.TranzactionId.toString());
-    } else {
-      // Make sure to include the lowProfileCode in the URL to verify the transaction
-      navigate(`/subscription?success=true&planId=${planId}&lowProfileId=${lowProfileCode}`);
-    }
-  };
-
-  const checkTransactionStatus = async (lowProfileId: string) => {
+    // Process the payment through the iframe
     try {
-      const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
-        body: { lowProfileId }
-      });
-      
-      if (error) {
-        console.error('Error checking transaction status:', error);
-        throw new Error(error.message);
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        // Set card owner details for the transaction
+        iframeRef.current.contentWindow.postMessage({
+          action: 'setCardOwnerDetails',
+          data: {
+            cardOwnerName,
+            cardOwnerEmail: user?.email || '',
+            cardOwnerPhone: ''
+          }
+        }, 'https://secure.cardcom.solutions');
+        
+        // Submit the transaction
+        iframeRef.current.contentWindow.postMessage({
+          action: 'doTransaction',
+          cardOwnerId: cardOwnerID,
+          cardOwnerName: cardOwnerName,
+          cardOwnerEmail: user?.email || '',
+          expirationMonth,
+          expirationYear,
+          cardOwnerPhone: '',
+          numberOfPayments: planId === 'monthly' ? "1" : planId === 'annual' ? "1" : "1",
+        }, 'https://secure.cardcom.solutions');
       }
-      
-      console.log('Transaction status:', data);
-      
-      if (data.ResponseCode === 0 && data.TranzactionInfo?.TranzactionId) {
-        handlePaymentSuccess({
-          IsSuccess: true,
-          TranzactionId: data.TranzactionInfo.TranzactionId,
-          Description: data.Description
-        });
-      } else if (data.ResponseCode !== 0) {
-        setError(data.Description || 'התשלום נכשל');
-        onError?.(data.Description || 'התשלום נכשל');
-      }
-    } catch (error) {
-      console.error('Error checking transaction status:', error);
-      setError(error instanceof Error ? error.message : 'שגיאה באימות סטטוס התשלום');
+    } catch (err) {
+      console.error('Error submitting payment:', err);
+      setIsLoading(false);
+      setError('שגיאה בשליחת התשלום');
+      if (onError) onError('שגיאה בשליחת התשלום');
     }
   };
-  
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <Spinner className="h-8 w-8 text-primary" />
-        <p className="mt-4 text-center">מאתחל טופס תשלום...</p>
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="p-4">
+  return (
+    <div className="space-y-6">
+      {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <div className="mt-4 flex justify-center">
-          <Button variant="outline" onClick={onCancel} className="mx-2">
-            בחר אמצעי תשלום אחר
-          </Button>
-          <Button variant="default" onClick={() => initializePaymentSession()} className="mx-2">
-            נסה שוב
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col p-4 space-y-4" dir="rtl">
-      {/* Master iframe - THIS is the main frame that manages the payment process */}
-      <iframe 
-        id="CardComMasterFrame" 
-        name="CardComMasterFrame"
-        ref={masterFrameRef}
-        src={`${CARDCOM_IFRAME_URL}/master`}
-        style={{ display: 'none', width: '0px', height: '0px' }} 
-      />
+      )}
       
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label htmlFor="cardOwnerName" className="block text-sm font-medium">
+      <form onSubmit={handleSubmit} id="payment-form" className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          {/* Card Owner Name */}
+          <div>
+            <label htmlFor="cardOwnerName" className="block text-sm font-medium mb-1">
               שם בעל הכרטיס
             </label>
             <input
+              type="text"
               id="cardOwnerName"
-              type="text"
-              value={cardOwnerName}
-              onChange={(e) => setCardOwnerName(e.target.value)}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
+              className="w-full p-2 border rounded-md"
               placeholder="שם מלא כפי שמופיע על הכרטיס"
-              disabled={processingPayment || !lowProfileCode}
               required
             />
           </div>
           
-          <div className="space-y-2">
-            <label htmlFor="cardOwnerEmail" className="block text-sm font-medium">
-              דוא"ל
+          {/* ID Number */}
+          <div>
+            <label htmlFor="cardOwnerID" className="block text-sm font-medium mb-1">
+              מספר ת.ז.
             </label>
             <input
-              id="cardOwnerEmail"
-              type="email"
-              value={cardOwnerEmail}
-              onChange={(e) => setCardOwnerEmail(e.target.value)}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
-              placeholder="your@email.com"
-              disabled={processingPayment || !lowProfileCode}
-            />
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="CardComCardNumber" className="block text-sm font-medium">
-            מספר כרטיס אשראי
-          </label>
-          <div className="card-number-container">
-            {/* Add specific ID and name that Cardcom requires */}
-            <iframe
-              id="CardComCardNumber"
-              name="CardComCardNumber"
-              ref={cardNumberFrameRef}
-              src={`${CARDCOM_IFRAME_URL}/cardNumber`}
-              style={{ width: '100%', height: '40px', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: 'white' }}
-              title="Card Number"
-            />
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label htmlFor="expirationMonth" className="block text-sm font-medium">
-              חודש תפוגה
-            </label>
-            <input
-              id="expirationMonth"
               type="text"
-              value={expirationMonth}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 2);
-                setExpirationMonth(value);
-              }}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
-              placeholder="MM"
-              disabled={processingPayment || !lowProfileCode}
-              required
-              maxLength={2}
+              id="cardOwnerID"
+              className="w-full p-2 border rounded-md"
+              placeholder="מספר תעודת זהות (אופציונלי)"
             />
           </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="expirationYear" className="block text-sm font-medium">
-              שנת תפוגה
+
+          {/* Card Number */}
+          <div>
+            <label htmlFor="CardComCardNumber" className="block text-sm font-medium mb-1">
+              מספר כרטיס
             </label>
-            <input
-              id="expirationYear"
-              type="text"
-              value={expirationYear}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 2);
-                setExpirationYear(value);
-              }}
-              className="w-full p-2 border rounded-md focus:ring-primary focus:border-primary bg-white text-black"
-              placeholder="YY"
-              disabled={processingPayment || !lowProfileCode}
-              required
-              maxLength={2}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="CardComCvv" className="block text-sm font-medium">
-              קוד אבטחה (CVV)
-            </label>
-            <div className="cvv-container">
-              {/* Add specific ID and name that Cardcom requires */}
+            <div className="payment-field-container relative">
+              {/* This iframe will be replaced with the Cardcom iframe */}
               <iframe
-                id="CardComCvv"
-                name="CardComCvv"
-                ref={cvvFrameRef}
-                src={`${CARDCOM_IFRAME_URL}/cvv`}
-                style={{ width: '100%', height: '40px', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: 'white' }}
-                title="CVV"
+                ref={iframeRef}
+                id="CardComMasterFrame"
+                src="https://secure.cardcom.solutions/External/lowProfileClearing/OpenFieldsFrame.html"
+                style={{ width: '100%', height: '300px', border: 'none', overflow: 'hidden' }}
+                title="CardCom Payment Form"
               />
+              {!iframeLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+                  <div className="h-8 w-8 rounded-full border-2 border-t-primary animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card Expiration */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="expirationMonth" className="block text-sm font-medium mb-1">
+                חודש תפוגה
+              </label>
+              <select
+                id="expirationMonth"
+                className="w-full p-2 border rounded-md"
+                required
+              >
+                <option value="">חודש</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                  <option key={month} value={month < 10 ? `0${month}` : month}>
+                    {month < 10 ? `0${month}` : month}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="expirationYear" className="block text-sm font-medium mb-1">
+                שנת תפוגה
+              </label>
+              <select
+                id="expirationYear"
+                className="w-full p-2 border rounded-md"
+                required
+              >
+                <option value="">שנה</option>
+                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() % 100 + i).map(year => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
-        
+
         <Button 
           type="submit" 
           className="w-full" 
-          disabled={processingPayment || !lowProfileCode}
+          disabled={isLoading || !iframeLoaded}
         >
-          {processingPayment ? (
-            <span className="flex items-center">
-              <Spinner className="h-4 w-4 mr-2" />
+          {isLoading ? (
+            <>
+              <span className="h-4 w-4 mr-2 rounded-full border-2 border-t-white animate-spin" />
               מעבד תשלום...
-            </span>
+            </>
           ) : (
-            planId === 'monthly' 
-              ? 'התחל תקופת ניסיון חינם' 
-              : 'בצע תשלום'
+            planId === 'monthly' ? 'התחל תקופת ניסיון' : 'אשר תשלום'
           )}
         </Button>
+        
+        <p className="text-xs text-center text-muted-foreground">
+          התשלום מאובטח ומוצפן באמצעות Cardcom
+        </p>
       </form>
     </div>
   );

@@ -66,6 +66,28 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
     
+    // Check for and expire any existing active payment sessions for this user
+    if (userId) {
+      try {
+        const now = new Date();
+        const { error: updateError } = await supabaseClient
+          .from('payment_sessions')
+          .update({ 
+            expires_at: now.toISOString(),
+            payment_details: { status: 'expired', expired_at: now.toISOString() }
+          })
+          .eq('user_id', userId)
+          .gt('expires_at', now.toISOString());
+          
+        if (updateError) {
+          console.error('Error expiring existing payment sessions:', updateError);
+        }
+      } catch (err) {
+        console.error('Error handling existing sessions:', err);
+        // Continue anyway, as we don't want to block the payment creation
+      }
+    }
+    
     // Determine the operation type based on the plan and recurring flag
     // 1 = Charge only (For VIP plan)
     // 2 = Charge and create token (For annual plan)
@@ -137,51 +159,41 @@ serve(async (req) => {
     
     console.log('Cardcom response:', cardcomResponse);
     
-    // Store the pending subscription information in the database
-    if (userId) {
-      try {
-        const { data: existingSubscription, error: getError } = await supabaseClient
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-          
-        if (getError) {
-          console.error('Error checking existing subscription:', getError);
+    // Generate a unique session ID
+    const sessionId = crypto.randomUUID();
+    
+    // Store the payment session information in the database
+    try {
+      // Set expiration time (1 hour from now)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1);
+      
+      const sessionData = {
+        id: sessionId,
+        user_id: userId || null,
+        plan_id: planId,
+        expires_at: expiresAt.toISOString(),
+        email: userEmail || null,
+        payment_details: {
+          lowProfileId: cardcomResponse.LowProfileId,
+          amount: amount,
+          planType: planId,
+          isRecurring,
+          operationType,
+          created_at: new Date().toISOString()
         }
+      };
+      
+      const { error: insertError } = await supabaseClient
+        .from('payment_sessions')
+        .insert(sessionData);
         
-        // Only create a new subscription if one doesn't exist or if it's cancelled
-        if (!existingSubscription || existingSubscription.status === 'cancelled') {
-          // For monthly plans with trial, set up a trial subscription
-          const now = new Date();
-          const subscriptionData = {
-            user_id: userId,
-            plan_type: planId,
-            status: planId === 'monthly' ? 'trial' : 'pending',
-            current_period_starts_at: now.toISOString(),
-            // If it's a trial, set the end date accordingly
-            trial_ends_at: freeTrialDays > 0 ? 
-              new Date(now.setDate(now.getDate() + freeTrialDays)).toISOString() : 
-              null,
-            // Set the next charge date to after the trial ends
-            next_charge_date: freeTrialDays > 0 ? 
-              new Date(now.setDate(now.getDate() + freeTrialDays)).toISOString() : 
-              null,
-            cardcom_profile_id: cardcomResponse.LowProfileId,
-          };
-          
-          const { error: insertError } = await supabaseClient
-            .from('subscriptions')
-            .upsert(subscriptionData);
-            
-          if (insertError) {
-            console.error('Error creating subscription:', insertError);
-          }
-        }
-      } catch (dbError) {
-        console.error('Database error:', dbError);
-        // Continue anyway, as we don't want to block the payment process
+      if (insertError) {
+        console.error('Error storing payment session:', insertError);
       }
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      // Continue anyway, as we don't want to block the payment process
     }
     
     // Return the success response
@@ -189,7 +201,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         lowProfileId: cardcomResponse.LowProfileId,
-        url: cardcomResponse.Url
+        url: cardcomResponse.Url,
+        sessionId: sessionId
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
