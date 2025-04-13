@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/card';
+import { Button } from '@/components/ui/button'; // Corrected import path
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
@@ -485,6 +485,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           src="https://secure.cardcom.solutions/External/lowProfileClearing/OpenFieldsFrame.html"
           style={{ display: 'none', width: '0px', height: '0px' }}
           title="CardCom Master Frame"
+          onLoad={() => console.log('Master frame loaded')}
         />
 
         {/* Card Number iframe */}
@@ -500,6 +501,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               src="https://secure.cardcom.solutions/api/openfields/cardNumber"
               style={{ width: '100%', height: '45px', border: 'none' }}
               title="Credit Card Number"
+              onLoad={() => setCardNumberFrameLoaded(true)}
             />
           </div>
         </div>
@@ -555,11 +557,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
               src="https://secure.cardcom.solutions/api/openfields/CVV"
               style={{ width: '100%', height: '45px', border: 'none' }}
               title="CVV"
+              onLoad={() => setCvvFrameLoaded(true)}
             />
           </div>
         </div>
         
-        {/* reCAPTCHA and Google Pay are positioned here but not visible until master frame initializes them */}
+        {/* reCAPTCHA container */}
         <div id="reCaptchaContainer" className="flex justify-center my-4">
           {/* reCAPTCHA will appear here once initialized */}
         </div>
