@@ -70,7 +70,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     const cleanUpPaymentSessions = async () => {
       try {
         if (user?.id) {
-          // Using RPC - let's add this function to the database
           const { error } = await supabase.rpc('cleanup_user_payment_sessions', { 
             user_id_param: user.id 
           });
@@ -86,21 +85,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     
     cleanUpPaymentSessions();
   }, [user, planId]);
-
-  // Load the 3DS script when the component mounts
-  useEffect(() => {
-    const cardcom3DSScript = document.createElement('script');
-    const time = new Date().getTime();
-    cardcom3DSScript.setAttribute('src', `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${time}`);
-    document.head.appendChild(cardcom3DSScript);
-    
-    // Clean up the script when the component unmounts
-    return () => {
-      if (document.head.contains(cardcom3DSScript)) {
-        document.head.removeChild(cardcom3DSScript);
-      }
-    };
-  }, []);
 
   const handleSuccess = (transactionId: string) => {
     setProcessingPayment(false);
@@ -246,6 +230,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           onPaymentComplete={handleSuccess}
           onError={handleError}
           onPaymentStart={handlePaymentStart}
+          onCancel={onCancel}
         />
       </CardContent>
     </Card>

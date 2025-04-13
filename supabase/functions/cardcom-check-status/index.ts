@@ -99,9 +99,9 @@ serve(async (req) => {
 
     // Call Cardcom API to get transaction status
     const queryParams = new URLSearchParams({
-      TerminalNumber: terminalNumber,
-      UserName: apiName,
-      LowProfileCode: lowProfileId
+      terminalnumber: terminalNumber,
+      username: apiName,
+      lowprofilecode: lowProfileId
     });
 
     const cardcomUrl = `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx?${queryParams}`;
@@ -114,14 +114,36 @@ serve(async (req) => {
       throw new Error(`Cardcom API error: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
+    // Parse response from Cardcom
+    const text = await response.text();
+    
+    // Try to parse as JSON first
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      // If not JSON, it might be a form-encoded response
+      // Parse the form-encoded response
+      const formData = new URLSearchParams(text);
+      data = Object.fromEntries(formData);
+      
+      // Convert string values to appropriate types
+      if (data.ResponseCode) data.ResponseCode = parseInt(data.ResponseCode);
+      if (data.OperationResponse) data.OperationResponse = data.OperationResponse.toString();
+    }
+    
     console.log('Received Cardcom API response:', data);
     
     // Check if transaction was successful
-    if ((data.ResponseCode === 0 || data.OperationResponse === '0') && data.TranzactionInfo) {
+    const isSuccess = data.ResponseCode === 0 || data.OperationResponse === "0" || 
+                     (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0);
+    
+    if (isSuccess) {
       // Transaction was successful, update our records if not already updated by webhook
       if (!paymentLog) {
         console.log('Payment not yet recorded, saving transaction details');
+        
+        const transactionInfo = data.TranzactionInfo || {};
         
         await supabaseClient
           .from('user_payment_logs')
@@ -130,16 +152,86 @@ serve(async (req) => {
             token: lowProfileId,
             amount: session.payment_details?.amount || 0,
             status: 'completed',
-            approval_code: data.TranzactionInfo?.ApprovalNumber || '',
-            transaction_details: data.TranzactionInfo
+            approval_code: transactionInfo.ApprovalNumber || '',
+            transaction_details: transactionInfo
           });
+          
+        // Also process subscription update (simpler version than in webhook)
+        const now = new Date();
+        let currentPeriodEndsAt = null;
+        
+        if (session.plan_id === 'monthly') {
+          // Create trial period
+          const trialEndsAt = new Date(now);
+          trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+          currentPeriodEndsAt = new Date(trialEndsAt);
+          currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
+          
+          await supabaseClient
+            .from('subscriptions')
+            .upsert({
+              user_id: session.user_id,
+              plan_type: session.plan_id,
+              status: 'trial',
+              trial_ends_at: trialEndsAt.toISOString(),
+              current_period_ends_at: currentPeriodEndsAt.toISOString(),
+              contract_signed: true,
+              contract_signed_at: now.toISOString()
+            });
+        } else if (session.plan_id === 'annual') {
+          currentPeriodEndsAt = new Date(now);
+          currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+          
+          await supabaseClient
+            .from('subscriptions')
+            .upsert({
+              user_id: session.user_id,
+              plan_type: session.plan_id,
+              status: 'active',
+              current_period_ends_at: currentPeriodEndsAt.toISOString(),
+              contract_signed: true,
+              contract_signed_at: now.toISOString()
+            });
+            
+          // Record payment for annual plan
+          await supabaseClient
+            .from('payment_history')
+            .insert({
+              user_id: session.user_id,
+              subscription_id: session.user_id,
+              amount: session.payment_details?.amount || 0,
+              currency: 'ILS',
+              status: 'completed'
+            });
+        } else if (session.plan_id === 'vip') {
+          // VIP plan - lifetime access
+          await supabaseClient
+            .from('subscriptions')
+            .upsert({
+              user_id: session.user_id,
+              plan_type: session.plan_id,
+              status: 'active',
+              contract_signed: true,
+              contract_signed_at: now.toISOString()
+            });
+            
+          // Record payment for VIP plan
+          await supabaseClient
+            .from('payment_history')
+            .insert({
+              user_id: session.user_id,
+              subscription_id: session.user_id,
+              amount: session.payment_details?.amount || 0,
+              currency: 'ILS',
+              status: 'completed'
+            });
+        }
       }
       
-      // Update session
+      // Update session status
       await supabaseClient
         .from('payment_sessions')
         .update({
-          expires_at: new Date().toISOString(),
           payment_details: {
             ...session.payment_details,
             status: 'completed',

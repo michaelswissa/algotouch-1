@@ -55,7 +55,7 @@ serve(async (req) => {
     // Generate a unique session ID
     const sessionId = generateRandomId();
     
-    // Create a unique low profile ID
+    // Create a payment session with Cardcom
     const lowProfileId = generateRandomId();
 
     // Determine operation based on plan
@@ -101,6 +101,8 @@ serve(async (req) => {
         success: true,
         lowProfileId,
         sessionId,
+        terminalNumber,
+        apiName,
         webhookUrl,
         message: 'Payment session created successfully'
       }),
