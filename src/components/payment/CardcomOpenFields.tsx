@@ -110,9 +110,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
 
       // Clean up any existing payment sessions if user is logged in
       if (user?.id) {
-        await supabase.rpc('cleanup_user_payment_sessions', { 
-          user_id_param: user.id 
-        }).catch(err => console.error('Error cleaning up sessions:', err));
+        try {
+          await supabase.rpc('cleanup_user_payment_sessions', { 
+            user_id_param: user.id 
+          });
+        } catch (err) {
+          console.error('Error cleaning up sessions:', err);
+        }
       }
       
       // Calculate amount based on plan type
