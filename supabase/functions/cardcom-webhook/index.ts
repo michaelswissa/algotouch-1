@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
 // Handle CORS preflight requests
@@ -21,52 +21,46 @@ function handleCors(req: Request) {
 }
 
 serve(async (req) => {
-  // Handle CORS
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
-
   try {
-    // Log the incoming webhook
-    console.log('Webhook received from Cardcom');
+    console.log("Webhook request received");
     
-    // Parse the webhook data
-    let webhookData;
-    try {
-      const contentType = req.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        webhookData = await req.json();
-      } else {
-        // For form-urlencoded or other content types
-        const formData = await req.formData();
-        webhookData = {};
-        for (const [key, value] of formData.entries()) {
-          webhookData[key] = value;
-        }
+    // Handle CORS
+    const corsResponse = handleCors(req);
+    if (corsResponse) return corsResponse;
+
+    // Parse request data - support both URL params and JSON
+    let paymentData;
+    const contentType = req.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      paymentData = await req.json();
+      console.log("Received JSON webhook data");
+    } else {
+      // Handle application/x-www-form-urlencoded or query parameters
+      const url = new URL(req.url);
+      const params = req.method === 'POST' 
+        ? new URLSearchParams(await req.text())
+        : url.searchParams;
+      
+      // Convert URLSearchParams to object
+      paymentData = {};
+      for (const [key, value] of params.entries()) {
+        paymentData[key] = value;
       }
-    } catch (error) {
-      console.error('Error parsing webhook data:', error);
-      return new Response(JSON.stringify({ error: 'Invalid request data' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.log("Received URL-encoded webhook data");
     }
     
-    console.log('Parsed webhook data:', webhookData);
+    console.log("Payment webhook data:", paymentData);
     
-    // Extract user_id and plan_id from the ReturnValue field (userId_planId_timestamp)
-    const returnValue = webhookData.ReturnValue || '';
-    let userId = null;
-    let planId = null;
+    // Extract important data
+    const lowProfileId = paymentData.LowProfileId || paymentData.lowProfileId || paymentData.lowprofileid || '';
+    const operationResponse = paymentData.OperationResponse || paymentData.operationResponse || '';
+    const transactionId = paymentData.TranzactionId || paymentData.InternalDealNumber || '';
     
-    if (returnValue) {
-      const parts = returnValue.split('_');
-      if (parts.length >= 2) {
-        userId = parts[0];
-        planId = parts[1];
-      }
+    if (!lowProfileId) {
+      console.error("Missing LowProfileId in webhook data");
+      throw new Error('Missing LowProfileId in webhook data');
     }
-    
-    console.log('Extracted from ReturnValue:', { userId, planId });
     
     // Create Supabase client
     const supabaseClient = createClient(
@@ -74,136 +68,158 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // Check if the payment was successful
-    const isSuccess = webhookData.OperationResponse === '0' || 
-        (webhookData.TranzactionInfo && webhookData.TranzactionInfo.ResponseCode === 0);
+    // Check if this is a successful payment
+    const isSuccessful = operationResponse === '0' || paymentData.ResponseCode === 0;
     
-    if (isSuccess) {
-      console.log(`Payment successful for ReturnValue: ${returnValue}`);
+    // Get the payment session
+    const { data: sessionData, error: sessionError } = await supabaseClient
+      .from('payment_sessions')
+      .select('*')
+      .eq('id', lowProfileId)
+      .single();
       
-      // Extract transaction information
-      const transactionId = webhookData.TranzactionInfo?.TranzactionId || 
-                           webhookData.InternalDealNumber || 
-                           webhookData.TranzactionId || null;
+    if (sessionError) {
+      console.error('Error retrieving payment session:', sessionError);
+    }
+    
+    // Update payment logs with webhook data
+    const status = isSuccessful ? 'completed' : 'failed';
+    
+    // Update existing log or create new one
+    const { data: existingLog } = await supabaseClient
+      .from('payment_logs')
+      .select('id')
+      .eq('lowprofile_id', lowProfileId)
+      .maybeSingle();
       
-      // Record the successful payment
-      const { error: paymentLogError } = await supabaseClient
+    if (existingLog?.id) {
+      // Update existing log
+      await supabaseClient
+        .from('payment_logs')
+        .update({
+          status,
+          transaction_id: transactionId || null,
+          payment_data: paymentData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingLog.id);
+    } else {
+      // Create new log
+      await supabaseClient
         .from('payment_logs')
         .insert({
-          lowprofile_id: webhookData.LowProfileId || returnValue,
-          user_id: userId,
-          status: 'completed',
-          transaction_id: transactionId,
-          plan_id: planId,
-          payment_data: webhookData
+          lowprofile_id: lowProfileId,
+          user_id: sessionData?.user_id || null,
+          status,
+          transaction_id: transactionId || null,
+          plan_id: sessionData?.plan_id || null,
+          payment_data: paymentData
         });
+    }
+    
+    // If successful payment, update user subscription
+    if (isSuccessful && sessionData) {
+      console.log("Processing successful payment for user:", sessionData.user_id);
       
-      if (paymentLogError) {
-        console.error('Error creating payment log:', paymentLogError);
-      }
+      const userId = sessionData.user_id;
+      const planId = sessionData.plan_id;
+      const planDetails = sessionData.payment_details?.planDetails || {};
       
-      // If we have a user ID and plan ID, update the user's subscription
-      if (userId && userId !== 'guest' && planId) {
-        try {
-          // Calculate subscription details
-          const now = new Date();
-          let currentPeriodEndsAt = null;
-          let trialEndsAt = null;
-          let status = 'active';
+      // Only process if we have a user ID
+      if (userId) {
+        // Calculate subscription details based on plan
+        const now = new Date();
+        let trialEndsAt = null;
+        let periodEndsAt = null;
+        
+        if (planId === 'monthly') {
+          // Monthly plan with trial period
+          trialEndsAt = new Date(now);
+          trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
           
-          if (planId === 'annual') {
-            const oneYear = new Date(now);
-            oneYear.setFullYear(oneYear.getFullYear() + 1);
-            currentPeriodEndsAt = oneYear.toISOString();
-          } else if (planId === 'monthly') {
-            const oneMonth = new Date(now);
-            oneMonth.setMonth(oneMonth.getMonth() + 1);
-            trialEndsAt = oneMonth.toISOString();
-            status = 'trial';
-          }
+          // After trial, subscription period is monthly
+          periodEndsAt = new Date(trialEndsAt);
+          periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+        } 
+        else if (planId === 'annual') {
+          // Annual plan, no trial
+          periodEndsAt = new Date(now);
+          periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+        }
+        else if (planId === 'vip') {
+          // VIP plan is permanent (set far in the future)
+          periodEndsAt = new Date(now);
+          periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 100);
+        }
+        
+        // Check if user already has a subscription
+        const { data: existingSubscription } = await supabaseClient
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
           
-          // Extract payment method details
-          const paymentMethod = {
-            lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigits || 
-                            webhookData.Last4CardDigits || 
-                            webhookData.CardNumber5 || '****',
-            cardType: webhookData.TranzactionInfo?.Brand || 
-                      webhookData.Mutag_24 || 
-                      webhookData.ExtShvaParams?.Mutag24 || 'unknown'
-          };
-          
-          // Extract token if creating a token was part of the operation
-          let paymentTokenId = null;
-          if (webhookData.TokenInfo && webhookData.TokenInfo.Token) {
-            // Store token in payment_tokens table
-            const { data: tokenData, error: tokenError } = await supabaseClient
-              .from('payment_tokens')
-              .insert({
-                user_id: userId,
-                token: webhookData.TokenInfo.Token,
-                token_expiry: webhookData.TokenInfo.TokenExDate,
-                card_last_four: paymentMethod.lastFourDigits,
-                card_brand: paymentMethod.cardType
-              })
-              .select('id')
-              .single();
-            
-            if (tokenError) {
-              console.error('Error storing payment token:', tokenError);
-            } else if (tokenData) {
-              paymentTokenId = tokenData.id;
-            }
-          }
-          
-          // Update or create subscription
-          const { error: subscriptionError } = await supabaseClient
+        if (existingSubscription) {
+          // Update existing subscription
+          await supabaseClient
             .from('subscriptions')
-            .upsert({
+            .update({
+              plan_type: planId,
+              status: planId === 'monthly' ? 'trial' : 'active',
+              trial_ends_at: trialEndsAt?.toISOString() || null,
+              current_period_ends_at: periodEndsAt?.toISOString() || null,
+              payment_method: {
+                provider: 'cardcom',
+                transaction_id: transactionId,
+                last_four: paymentData.CardNumber5 || null
+              },
+              updated_at: now.toISOString()
+            })
+            .eq('user_id', userId);
+        } else {
+          // Create new subscription
+          await supabaseClient
+            .from('subscriptions')
+            .insert({
               user_id: userId,
               plan_type: planId,
-              status: status,
-              trial_ends_at: trialEndsAt,
-              current_period_ends_at: currentPeriodEndsAt,
-              payment_method: paymentMethod,
-              payment_token_id: paymentTokenId,
-              contract_signed: true,
-              contract_signed_at: new Date().toISOString()
+              status: planId === 'monthly' ? 'trial' : 'active',
+              trial_ends_at: trialEndsAt?.toISOString() || null,
+              current_period_ends_at: periodEndsAt?.toISOString() || null,
+              payment_method: {
+                provider: 'cardcom',
+                transaction_id: transactionId,
+                last_four: paymentData.CardNumber5 || null
+              }
             });
-          
-          if (subscriptionError) {
-            console.error('Error updating subscription:', subscriptionError);
-          }
-        } catch (error) {
-          console.error('Error updating user subscription:', error);
         }
-      }
-    } else {
-      console.log(`Payment failed for ReturnValue: ${returnValue}`);
-      
-      // Record the failed payment
-      const { error: paymentLogError } = await supabaseClient
-        .from('payment_logs')
-        .insert({
-          lowprofile_id: webhookData.LowProfileId || returnValue,
-          user_id: userId,
-          status: 'failed',
-          plan_id: planId,
-          payment_data: webhookData
-        });
-      
-      if (paymentLogError) {
-        console.error('Error creating payment log for failed payment:', paymentLogError);
+        
+        // Add payment record
+        await supabaseClient
+          .from('payment_history')
+          .insert({
+            user_id: userId,
+            subscription_id: userId, // Using user_id as subscription_id for simplicity
+            amount: paymentData.Sum36 || sessionData.payment_details?.amount || 0,
+            currency: 'ILS',
+            status: 'completed',
+            payment_method: {
+              provider: 'cardcom',
+              transaction_id: transactionId,
+              last_four: paymentData.CardNumber5 || null
+            }
+          })
+          .catch(error => console.error('Error creating payment history:', error));
       }
     }
     
-    // Acknowledge the webhook
-    return new Response(JSON.stringify({ success: true }), {
+    // Return success response for Cardcom
+    return new Response("OK", {
+      headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('Webhook processing error:', error);
     
     return new Response(
       JSON.stringify({ 
@@ -211,8 +227,8 @@ serve(async (req) => {
         error: error instanceof Error ? error.message : 'An unexpected error occurred' 
       }),
       {
-        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
       }
     );
   }

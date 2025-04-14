@@ -30,8 +30,10 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lowProfileId, setLowProfileId] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(600);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Initialize payment session and get iframe URL
   useEffect(() => {
@@ -50,17 +52,21 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
           isRecurring: planId !== 'vip'
         };
         
+        console.log('Initializing payment with data:', paymentData);
+        
         // Call the edge function to create a Cardcom LowProfile page
         const { data, error: apiError } = await supabase.functions.invoke('cardcom-payment', {
           body: paymentData
         });
         
         if (apiError) {
+          console.error('Edge function error:', apiError);
           throw new Error(`Error initializing payment: ${apiError.message}`);
         }
         
-        if (!data.success || !data.url) {
-          throw new Error(data.error || 'Failed to generate payment URL');
+        if (!data || !data.success || !data.url) {
+          console.error('Payment initialization failed:', data);
+          throw new Error(data?.error || 'Failed to generate payment URL');
         }
         
         console.log('Payment session initialized:', data);
@@ -68,12 +74,20 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
         
         // Store the session ID for reference
         if (data.lowProfileId) {
+          setLowProfileId(data.lowProfileId);
           localStorage.setItem('payment_pending_id', data.lowProfileId);
           localStorage.setItem('payment_pending_plan', planId);
           localStorage.setItem('payment_session_created', new Date().toISOString());
         }
       } catch (error) {
         console.error('Error initializing payment:', error);
+        
+        if (retryCount < 2) {
+          console.log(`Retry attempt ${retryCount + 1}...`);
+          setRetryCount(prev => prev + 1);
+          return;
+        }
+        
         setError(error instanceof Error ? error.message : 'Failed to initialize payment');
         onError(error instanceof Error ? error.message : 'Failed to initialize payment');
       } finally {
@@ -82,7 +96,7 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
     };
     
     initPayment();
-  }, [planId, amount, user, userName, userEmail, onError]);
+  }, [planId, amount, user, userName, userEmail, onError, retryCount]);
 
   // Handle iframe messages
   useEffect(() => {
@@ -120,6 +134,13 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
     return () => window.removeEventListener('message', handleMessage);
   }, [onSuccess, onError]);
 
+  // If we have a lowProfileId but the iframe is not showing properly, provide a direct link
+  const handleRedirectToPayment = () => {
+    if (iframeUrl) {
+      window.open(iframeUrl, '_blank');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -131,10 +152,21 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
 
   if (error) {
     return (
-      <Alert variant="destructive" className="mb-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <div className="space-y-4">
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        
+        <div className="flex justify-center gap-2 mt-4">
+          <Button variant="outline" onClick={onCancel} size="sm">
+            חזור
+          </Button>
+          <Button onClick={() => setRetryCount(prev => prev + 1)} size="sm">
+            נסה שוב
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -162,13 +194,21 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
         />
       </div>
 
-      <Button 
-        variant="outline" 
-        onClick={onCancel} 
-        className="self-center"
-      >
-        חזור
-      </Button>
+      <div className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={onCancel} 
+        >
+          חזור
+        </Button>
+        
+        <Button 
+          variant="default"
+          onClick={handleRedirectToPayment}
+        >
+          פתח בחלון נפרד
+        </Button>
+      </div>
     </div>
   );
 };

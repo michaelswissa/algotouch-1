@@ -21,26 +21,19 @@ function handleCors(req: Request) {
 }
 
 serve(async (req) => {
-  // Handle CORS
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
-
   try {
+    console.log("Payment status check request received");
+    
+    // Handle CORS
+    const corsResponse = handleCors(req);
+    if (corsResponse) return corsResponse;
+
     const requestData = await req.json();
     const { lowProfileId, planId } = requestData;
     
-    if (!lowProfileId && !planId) {
-      throw new Error('Missing required parameters: lowProfileId or planId is required');
-    }
-    
-    console.log('Checking payment status for:', { lowProfileId, planId });
-    
-    // Get the Cardcom API credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
-    const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
-    
-    if (!terminalNumber || !apiName) {
-      throw new Error('Missing Cardcom API credentials');
+    if (!lowProfileId) {
+      console.error("Missing lowProfileId parameter");
+      throw new Error('Missing lowProfileId parameter');
     }
     
     // Create Supabase client
@@ -49,21 +42,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // First, check if we have a payment log for this transaction
-    const { data: paymentLog, error: paymentLogError } = await supabaseClient
+    // Check payment log status
+    const { data: paymentLog } = await supabaseClient
       .from('payment_logs')
       .select('*')
       .eq('lowprofile_id', lowProfileId)
-      .order('created_at', { ascending: false })
       .maybeSingle();
-    
+      
+    // If payment log exists and status is completed, return success
     if (paymentLog && paymentLog.status === 'completed') {
-      console.log('Found completed payment log:', paymentLog);
+      console.log("Found completed payment in logs:", paymentLog.id);
       return new Response(
         JSON.stringify({ 
-          ResponseCode: 0, 
-          paymentLog,
-          message: 'Payment was successful' 
+          success: true, 
+          ResponseCode: 0,
+          OperationResponse: '0',
+          paymentLog
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -72,47 +66,106 @@ serve(async (req) => {
       );
     }
     
-    // If no payment log was found or payment failed, check with Cardcom
-    if (lowProfileId) {
+    // Get payment session details
+    const { data: sessionData } = await supabaseClient
+      .from('payment_sessions')
+      .select('*')
+      .eq('id', lowProfileId)
+      .maybeSingle();
+    
+    // If we don't have a session, try to get status directly from Cardcom
+    if (!sessionData && !paymentLog) {
+      console.log("No session or payment log found, checking with Cardcom directly");
+      
+      // Get the Cardcom API credentials
+      const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
+      const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
+      
+      if (!terminalNumber || !apiName) {
+        throw new Error('Missing Cardcom API credentials');
+      }
+      
+      // Prepare parameters for Cardcom status check
+      const formData = new FormData();
+      formData.append('TerminalNumber', terminalNumber);
+      formData.append('UserName', apiName);
+      formData.append('LowProfileCode', lowProfileId);
+      
+      // Call Cardcom API to check payment status
       try {
-        // Prepare parameters for LowProfile status check
-        const params = new URLSearchParams({
-          terminalnumber: terminalNumber,
-          username: apiName,
-          lowprofilecode: lowProfileId
-        });
-        
-        // Call Cardcom API to check transaction status
         const cardcomResponse = await fetch(
-          `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx?${params.toString()}`,
-          { method: 'GET' }
+          'https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx',
+          { method: 'POST', body: formData }
         );
         
-        if (!cardcomResponse.ok) {
-          throw new Error(`Cardcom API error: ${cardcomResponse.status} ${cardcomResponse.statusText}`);
+        // Get response text
+        const responseText = await cardcomResponse.text();
+        console.log("Cardcom status response:", responseText);
+        
+        let statusData;
+        try {
+          // Try to parse as JSON first
+          statusData = JSON.parse(responseText);
+        } catch (parseError) {
+          // If not JSON, try to parse URL parameters
+          const params = new URLSearchParams(responseText);
+          statusData = {};
+          for (const [key, value] of params.entries()) {
+            statusData[key] = value;
+          }
         }
         
-        const cardcomData = await cardcomResponse.json();
-        console.log('Cardcom status response:', cardcomData);
+        // Update payment log with status data
+        if (paymentLog) {
+          await supabaseClient
+            .from('payment_logs')
+            .update({
+              status: statusData.OperationResponse === '0' ? 'completed' : 'failed',
+              payment_data: statusData,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', paymentLog.id);
+        } else {
+          // Create new payment log if none exists
+          await supabaseClient
+            .from('payment_logs')
+            .insert({
+              lowprofile_id: lowProfileId,
+              status: statusData.OperationResponse === '0' ? 'completed' : 'failed',
+              plan_id: planId || null,
+              payment_data: statusData
+            });
+        }
         
-        // Return the Cardcom response directly
+        // Return the status data
         return new Response(
-          JSON.stringify(cardcomData),
+          JSON.stringify(statusData),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           }
         );
-      } catch (error) {
-        console.error('Error checking with Cardcom:', error);
-        throw error;
+      } catch (fetchError) {
+        console.error("Error fetching status from Cardcom:", fetchError);
+        throw fetchError;
       }
     }
     
-    // If we can't find a payment record and couldn't check with Cardcom
-    throw new Error('Could not verify payment status');
+    // Return session data if no specific status found
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        sessionData,
+        paymentLog,
+        message: "Payment status pending or unknown"
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error) {
-    console.error('Error checking payment status:', error);
+    console.error('Status check error:', error);
     
     return new Response(
       JSON.stringify({ 
