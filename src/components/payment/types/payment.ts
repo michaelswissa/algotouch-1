@@ -1,4 +1,3 @@
-
 export const PaymentStatus = {
   IDLE: 'idle' as const,
   INITIALIZING: 'initializing' as const,
@@ -8,14 +7,6 @@ export const PaymentStatus = {
 } as const;
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
-
-export interface PaymentState {
-  terminalNumber: string;
-  cardcomUrl: string;
-  paymentStatus: PaymentStatusType;
-  sessionId: string;
-  lowProfileCode: string;
-}
 
 export interface PaymentResponse {
   success: boolean;
@@ -43,4 +34,12 @@ export interface InitConfig {
   cardFieldCSS: string;
   cvvFieldCSS: string;
   language: string;
+}
+
+export interface PaymentState {
+  terminalNumber: string;
+  cardcomUrl: string;
+  paymentStatus: PaymentStatusType;
+  sessionId: string;
+  lowProfileCode: string;
 }

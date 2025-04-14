@@ -510,6 +510,39 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_payments: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_4_digits: string | null
+          status: string
+          token: string
+          token_expiry: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_4_digits?: string | null
+          status?: string
+          token: string
+          token_expiry: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_4_digits?: string | null
+          status?: string
+          token?: string
+          token_expiry?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           cancelled_at: string | null
@@ -613,6 +646,53 @@ export type Database = {
             columns: ["badge_id"]
             isOneToOne: false
             referencedRelation: "community_badges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_payment_logs: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          id: string
+          payment_data: Json | null
+          status: string
+          subscription_id: string | null
+          token: string
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          payment_data?: Json | null
+          status: string
+          subscription_id?: string | null
+          token: string
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          payment_data?: Json | null
+          status?: string
+          subscription_id?: string | null
+          token?: string
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_payment_logs_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]

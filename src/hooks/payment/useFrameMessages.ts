@@ -1,6 +1,6 @@
 
 import { useEffect } from 'react';
-import { PaymentStatus, PaymentStatusType, CardComMessage } from '@/components/payment/types/payment';
+import { PaymentStatus, CardComMessage } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {

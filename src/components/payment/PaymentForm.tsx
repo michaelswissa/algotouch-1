@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,11 +76,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               className="w-full" 
               onClick={initializePayment}
             >
-              {paymentStatus === PaymentStatus.INITIALIZING ? (
+              {paymentStatus === PaymentStatus.INITIALIZING && (
                 <span className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> טוען...
                 </span>
-              ) : 'שלם עכשיו'}
+              )}
+              {paymentStatus === PaymentStatus.IDLE && 'שלם עכשיו'}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               {plan.hasTrial ? 'לא יבוצע חיוב במהלך תקופת הניסיון' : 'החיוב יבוצע מיידית'}
