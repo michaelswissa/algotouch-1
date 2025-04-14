@@ -128,7 +128,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
         Relationships: [];
       };
       
-      // Add our new community tables
+      // Add our community tables
       community_reputation: OriginalDatabase['public']['Tables']['community_reputation'];
       community_badges: OriginalDatabase['public']['Tables']['community_badges'];
       user_badges: OriginalDatabase['public']['Tables']['user_badges'];
@@ -138,14 +138,11 @@ export interface ExtendedDatabase extends OriginalDatabase {
       user_streaks: OriginalDatabase['public']['Tables']['user_streaks'];
       community_comments: OriginalDatabase['public']['Tables']['community_comments'];
       community_tags: OriginalDatabase['public']['Tables']['community_tags'];
-      payment_tokens: OriginalDatabase['public']['Tables']['payment_tokens'];
       post_tags: OriginalDatabase['public']['Tables']['post_tags'];
       temp_registration_data: OriginalDatabase['public']['Tables']['temp_registration_data'];
-      user_payment_logs: OriginalDatabase['public']['Tables']['user_payment_logs'];
     };
     Views: OriginalDatabase['public']['Views'];
     Functions: {
-      increment_user_points: OriginalDatabase['public']['Functions']['increment_user_points'];
       is_admin: OriginalDatabase['public']['Functions']['is_admin'];
       check_row_exists: OriginalDatabase['public']['Functions']['check_row_exists'];
       increment: OriginalDatabase['public']['Functions']['increment'];
