@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,20 +25,36 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      if (!lowProfileId && !planId) {
+      // Get payment parameters from URL if not provided
+      const params = new URLSearchParams(window.location.search);
+      const success = params.get('success');
+      const error = params.get('error');
+      const urlLowProfileId = params.get('lowProfileId');
+      const urlPlanId = params.get('planId');
+      
+      // Use provided values or fall back to URL params or localStorage
+      const profileIdToCheck = lowProfileId || 
+                              urlLowProfileId || 
+                              localStorage.getItem('payment_pending_id');
+      
+      const planIdToCheck = planId || 
+                           urlPlanId || 
+                           localStorage.getItem('payment_pending_plan');
+      
+      if (!profileIdToCheck) {
         setStatus('error');
         setErrorMessage('מזהה תשלום חסר, לא ניתן לאמת את סטטוס התשלום');
         return;
       }
 
       try {
-        console.log('Checking payment status for:', { lowProfileId, planId });
+        console.log('Checking payment status for:', { profileIdToCheck, planIdToCheck });
         
         // Check payment status with the dedicated function
         const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
           body: { 
-            lowProfileId,
-            planId
+            lowProfileId: profileIdToCheck,
+            planId: planIdToCheck
           }
         });
         
@@ -59,14 +74,31 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
           setStatus('success');
           
           // Success toast based on plan type
-          if (planId === 'monthly') {
+          if (planIdToCheck === 'monthly') {
             toast.success('נרשמת בהצלחה לתקופת ניסיון!');
-          } else if (planId === 'annual') {
+          } else if (planIdToCheck === 'annual') {
             toast.success('נרשמת בהצלחה למנוי שנתי!');
-          } else if (planId === 'vip') {
+          } else if (planIdToCheck === 'vip') {
             toast.success('נרשמת בהצלחה למנוי VIP!');
           } else {
             toast.success('התשלום התקבל בהצלחה!');
+          }
+          
+          // Clean up stored payment session data
+          localStorage.removeItem('payment_pending_id');
+          localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
+          
+          // Process registration data if this was part of registration
+          const storedData = sessionStorage.getItem('registration_data');
+          if (storedData) {
+            try {
+              console.log('Registration completed successfully, removing stored data');
+              sessionStorage.removeItem('registration_data');
+              sessionStorage.removeItem('contract_data');
+            } catch (err) {
+              console.error('Error processing registration data:', err);
+            }
           }
           
           // Allow time for the toast to show before redirecting
@@ -74,8 +106,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
             navigate(redirectOnSuccess, { replace: true });
           }, 2000);
         } else if (retryCount < 3) {
-          // Sometimes the transaction might not be processed immediately
-          // Retry a few times
+          // Retry a few times if payment not yet processed
           setTimeout(() => {
             setRetryCount(prevCount => prevCount + 1);
           }, (retryCount + 1) * 1500);
@@ -104,7 +135,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
   if (status === 'checking') {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
-        <Spinner size="lg" className="text-primary" />
+        <div className="h-8 w-8 border-4 border-t-primary animate-spin rounded-full"></div>
         <p className="text-lg">בודק את סטטוס התשלום...</p>
         {retryCount > 0 && (
           <p className="text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -40,7 +40,7 @@ serve(async (req) => {
     } = requestData;
     
     // Validate required parameters
-    if (!planId || !amount || !email) {
+    if (!amount || !email) {
       console.error("Missing required payment parameters:", { planId, amount, email });
       throw new Error('Missing required payment parameters');
     }
@@ -50,7 +50,6 @@ serve(async (req) => {
     // Get the Cardcom API credentials
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
     const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
-    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD");
     
     if (!terminalNumber || !apiName) {
       console.error("Missing Cardcom API credentials");
@@ -58,7 +57,6 @@ serve(async (req) => {
     }
 
     // Determine app URL for redirects and webhooks
-    // Use actual hostname from the request if possible
     const appUrl = (() => {
       try {
         const url = new URL(req.url);
@@ -82,30 +80,53 @@ serve(async (req) => {
     
     // Prepare parameters for Cardcom Low Profile payment
     const formData = new FormData();
+    
+    // Required parameters according to documentation
     formData.append('TerminalNumber', terminalNumber);
     formData.append('ApiName', apiName);
+    formData.append('Operation', isRecurring ? '2' : '1'); // 1=Charge only, 2=Charge+token
     formData.append('SumToBill', amount.toString());
     formData.append('CoinID', '1'); // ILS
     formData.append('Language', 'he');
-    formData.append('Operation', isRecurring ? '2' : '1'); // Charge and create token or charge only
-    formData.append('SuccessRedirectUrl', `${appUrl}/subscription/success`);
-    formData.append('FailedRedirectUrl', `${appUrl}/subscription/error`);
-    formData.append('WebHookUrl', `${appUrl}/functions/v1/cardcom-webhook`);
-    formData.append('ReturnValue', returnValue || `${userId || 'guest'}_${planId}_${Date.now()}`);
-    formData.append('ProductName', `${planId} Subscription`);
-    formData.append('APILevel', '10');
+    formData.append('APILevel', '10'); // Latest API version
+    formData.append('Codepage', '65001'); // UTF-8
     
-    // Set default payment option
-    if (planId === 'monthly' || planId === 'annual') {
-      formData.append('DefaultNumOfPayments', planId === 'monthly' ? '1' : '12');
-    }
-
-    // Append optional user details if available
+    // Redirect URLs - using HTTPS as required
+    const successUrl = `${appUrl}/subscription/success?lowProfileId={LowProfileCode}&planId=${planId}`;
+    const errorUrl = `${appUrl}/subscription/error?error=true&planId=${planId}`;
+    const webhookUrl = `${appUrl}/functions/v1/cardcom-webhook`;
+    
+    formData.append('SuccessRedirectUrl', successUrl);
+    formData.append('FailedRedirectUrl', errorUrl);
+    formData.append('WebHookUrl', webhookUrl);
+    
+    // User details
     if (userName) {
       formData.append('CardOwnerName', userName);
     }
     if (email) {
       formData.append('CardOwnerEmail', email);
+      formData.append('ReqCardOwnerEmail', 'true'); // Make email a required field
+      formData.append('ShowCardOwnerEmail', 'true'); // Show email field
+    }
+    
+    // Product information
+    const productName = planId === 'monthly' ? 'מנוי חודשי' : 
+                         planId === 'annual' ? 'מנוי שנתי' : 
+                         planId === 'vip' ? 'מנוי VIP' : 
+                         'מנוי';
+    formData.append('ProductName', productName);
+    
+    // ReturnValue - used to identify the transaction
+    const transactionId = returnValue || `${userId || 'guest'}_${planId}_${Date.now()}`;
+    formData.append('ReturnValue', transactionId);
+    
+    // Payment configuration
+    if (planId === 'monthly') {
+      formData.append('DefaultNumOfPayments', '1');
+    } else if (planId === 'annual') {
+      formData.append('DefaultNumOfPayments', '1'); 
+      // Can be set to 12 if supporting payment in installments
     }
     
     // Call Cardcom API to create payment session
@@ -118,44 +139,33 @@ serve(async (req) => {
       }
     );
     
-    // Get raw response text for debugging
+    // Get raw response text
     const responseText = await cardcomResponse.text();
     console.log("Cardcom raw response:", responseText);
     
-    // Parse JSON response (with error handling)
+    // Parse the response which may be URL-encoded or JSON
     let cardcomData;
     try {
+      // Try parsing as JSON first
       cardcomData = JSON.parse(responseText);
-    } catch (error) {
-      console.error("Error parsing Cardcom response:", error);
-      console.error("Raw response was:", responseText);
+    } catch (jsonError) {
+      console.log("Response is not JSON, trying URL-encoded format");
       
-      // Check if response contains error text
-      if (responseText.includes("ResponseCode") && responseText.includes("Description")) {
-        // This might be a URL-encoded string response
-        try {
-          const params = new URLSearchParams(responseText);
-          const responseCode = params.get("ResponseCode");
-          const description = params.get("Description");
-          
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: `Cardcom error: ${description || 'Unknown error'}`,
-              responseCode,
-              responseText
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400,
-            }
-          );
-        } catch (parseError) {
-          console.error("Error parsing URL params:", parseError);
-        }
+      try {
+        // Parse URL-encoded response
+        const urlParams = new URLSearchParams(responseText);
+        cardcomData = {
+          ResponseCode: Number(urlParams.get("ResponseCode")),
+          Description: urlParams.get("Description"),
+          LowProfileCode: urlParams.get("LowProfileCode"),
+          Url: urlParams.get("url") || urlParams.get("Url"),
+          UrlToPayPal: urlParams.get("PayPalUrl"),
+          UrlToBit: urlParams.get("BitUrl")
+        };
+      } catch (urlError) {
+        console.error("Error parsing URL params:", urlError);
+        throw new Error(`Failed to parse Cardcom response: ${responseText}`);
       }
-      
-      throw new Error(`Failed to parse Cardcom response: ${responseText}`);
     }
     
     // Check if Cardcom returned an error
@@ -164,9 +174,18 @@ serve(async (req) => {
       throw new Error(`Cardcom error: ${cardcomData.Description || 'Unknown error'}`);
     }
     
+    // Extract the relevant data from the response
+    const lowProfileId = cardcomData.LowProfileCode;
+    const paymentUrl = cardcomData.Url || cardcomData.url;
+    
+    if (!lowProfileId || !paymentUrl) {
+      console.error("Missing required data in Cardcom response");
+      throw new Error("Missing required data in Cardcom response");
+    }
+    
     console.log('Payment session created:', {
-      lowProfileId: cardcomData.LowProfileCode,
-      url: cardcomData.Url || cardcomData.url
+      lowProfileId,
+      url: paymentUrl
     });
     
     // Create Supabase client
@@ -179,7 +198,7 @@ serve(async (req) => {
     const { error: sessionError } = await supabaseClient
       .from('payment_sessions')
       .insert({
-        id: cardcomData.LowProfileCode,
+        id: lowProfileId,
         user_id: userId || null,
         email: email,
         plan_id: planId,
@@ -195,7 +214,7 @@ serve(async (req) => {
     await supabaseClient
       .from('payment_logs')
       .insert({
-        lowprofile_id: cardcomData.LowProfileCode,
+        lowprofile_id: lowProfileId,
         user_id: userId || null,
         status: 'created',
         plan_id: planId,
@@ -212,8 +231,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        url: cardcomData.Url || cardcomData.url,
-        lowProfileId: cardcomData.LowProfileCode 
+        url: paymentUrl,
+        lowProfileId 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

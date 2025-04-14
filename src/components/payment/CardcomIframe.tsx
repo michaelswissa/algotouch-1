@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -31,7 +31,6 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lowProfileId, setLowProfileId] = useState<string | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(600);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -96,12 +95,12 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
     };
     
     initPayment();
-  }, [planId, amount, user, userName, userEmail, onError, retryCount]);
+  }, [planId, amount, user?.id, userName, userEmail, onError, retryCount]);
 
   // Handle iframe messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Only process messages from Cardcom domains
+      // Only process messages from trusted domains
       if (!event.origin.includes('cardcom.solutions')) {
         return;
       }
@@ -183,14 +182,14 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
     <div className="flex flex-col space-y-4">
       <div className="w-full rounded-md overflow-hidden border border-gray-200">
         <iframe
-          ref={iframeRef}
           src={iframeUrl}
           width="100%"
           height={iframeHeight}
           frameBorder="0"
-          title="Payment Form"
+          title="טופס תשלום"
           allow="payment"
           className="w-full"
+          style={{ minHeight: "600px" }}
         />
       </div>
 
