@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Handle CORS preflight requests
@@ -26,152 +26,261 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    // Parse webhook data from Cardcom
+    console.log('Received webhook callback from Cardcom');
+    
     const webhookData = await req.json();
-    console.log('Received webhook data from Cardcom:', webhookData);
+    console.log('Webhook data:', JSON.stringify(webhookData));
     
-    // Extract the lowProfileId from the webhook data
-    const lowProfileId = webhookData.LowProfileId;
-    if (!lowProfileId) {
-      throw new Error('Missing LowProfileId in webhook data');
+    // Check if this is a valid webhook notification
+    if (!webhookData || !webhookData.LowProfileId) {
+      throw new Error('Invalid webhook data: Missing LowProfileId');
     }
-
-    // Check if payment was successful
-    const isPaymentSuccessful = 
-      webhookData.OperationResponse === "0" || 
-      (webhookData.TranzactionInfo && webhookData.TranzactionInfo.ResponseCode === 0);
     
-    if (!isPaymentSuccessful) {
-      console.log('Payment was unsuccessful', {
-        lowProfileId,
-        responseCode: webhookData.OperationResponse || webhookData.TranzactionInfo?.ResponseCode,
-        description: webhookData.Description || webhookData.TranzactionInfo?.Description
-      });
+    // Initialize Supabase client with service role key
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    
+    // First check if we've already processed this payment
+    const { data: existingPayment } = await supabaseClient
+      .from('user_payment_logs')
+      .select('id')
+      .eq('token', webhookData.LowProfileId)
+      .maybeSingle();
       
-      // Handle failed payment - log but don't throw error
+    if (existingPayment) {
+      console.log(`Payment ${webhookData.LowProfileId} has already been processed`);
       return new Response(
-        JSON.stringify({ success: false, message: 'Payment unsuccessful' }),
+        JSON.stringify({ success: true, status: 'already_processed' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200, // Return 200 to acknowledge receipt
+          status: 200,
         }
       );
     }
-
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Get the payment session
-    const { data: session, error: sessionError } = await supabaseClient
+    
+    // Check if this is a successful transaction
+    let isSuccessful = false;
+    if (
+      webhookData.OperationResponse === '0' ||
+      webhookData.ResponseCode === 0 ||
+      (webhookData.TranzactionInfo && webhookData.TranzactionInfo.ResponseCode === 0)
+    ) {
+      isSuccessful = true;
+    }
+    
+    console.log(`Transaction status: ${isSuccessful ? 'Successful' : 'Failed'}`);
+    
+    // Check if this payment is associated with a payment session
+    const { data: paymentSession } = await supabaseClient
       .from('payment_sessions')
       .select('*')
-      .eq('payment_details->lowProfileId', lowProfileId)
-      .single();
-
-    if (sessionError || !session) {
-      console.error('Error retrieving payment session:', sessionError);
-      throw new Error('Payment session not found');
-    }
-
-    console.log('Found payment session:', {
-      id: session.id,
-      userId: session.user_id,
-      planId: session.plan_id,
-      isRegistrationFlow: session.payment_details?.registrationData ? true : false
-    });
-
-    // Extract transaction details
-    const transactionId = webhookData.TranzactionId || webhookData.TranzactionInfo?.TranzactionId;
-    const approvalNumber = 
-      webhookData.TranzactionInfo?.ApprovalNumber || 
-      webhookData.TokenInfo?.TokenApprovalNumber || 
-      '';
-
-    // Extract payment method details for subscription
-    let paymentMethod = {};
-
-    if (webhookData.TokenInfo) {
-      // Extract token for recurring payments
-      paymentMethod = {
-        token: webhookData.TokenInfo.Token,
-        tokenExpiryDate: webhookData.TokenInfo.TokenExDate,
-        lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigits?.toString() || 
-                        webhookData.TranzactionInfo?.Last4CardDigitsString || '',
-        cardHolderName: webhookData.UIValues?.CardOwnerName || '',
-        cardHolderEmail: webhookData.UIValues?.CardOwnerEmail || '',
-        cardHolderPhone: webhookData.UIValues?.CardOwnerPhone || '',
-        cardBrand: webhookData.TranzactionInfo?.Brand || '',
-      };
-    } else if (webhookData.TranzactionInfo) {
-      // Extract card details for one-time payments
-      paymentMethod = {
-        lastFourDigits: webhookData.TranzactionInfo.Last4CardDigits?.toString() || 
-                        webhookData.TranzactionInfo.Last4CardDigitsString || '',
-        cardHolderName: webhookData.UIValues?.CardOwnerName || 
-                        webhookData.TranzactionInfo.CardOwnerName || '',
-        cardBrand: webhookData.TranzactionInfo.Brand || '',
-        approvalNumber
-      };
-    }
-
-    // Update the payment session with transaction details
-    await supabaseClient
-      .from('payment_sessions')
-      .update({
-        payment_details: {
-          ...session.payment_details,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          transaction_id: transactionId,
-          approval_number: approvalNumber,
-          payment_method: paymentMethod
-        }
-      })
-      .eq('id', session.id);
-
-    // Process the payment based on session information
-    // Handle both logged-in users and registration flow
-    if (session.user_id) {
-      // Case 1: User is logged in
-      await processExistingUserPayment(supabaseClient, session, webhookData, paymentMethod);
+      .filter('payment_details->lowProfileId', 'eq', webhookData.LowProfileId)
+      .maybeSingle();
       
-      // Log the payment in user_payment_logs
-      await supabaseClient
-        .from('user_payment_logs')
-        .insert({
-          user_id: session.user_id,
-          token: lowProfileId,
-          amount: session.payment_details.amount || 0,
-          approval_code: approvalNumber,
-          status: 'completed',
-          transaction_details: webhookData
-        });
-        
-      console.log('Payment logged for existing user:', session.user_id);
-    } else if (session.payment_details?.registrationData) {
-      // Case 2: Registration flow - create the user first
-      const { userId, success } = await processNewUserRegistration(supabaseClient, session, webhookData, paymentMethod);
+    if (paymentSession) {
+      console.log('Found associated payment session:', paymentSession.id);
       
-      if (success && userId) {
-        // Log the payment in user_payment_logs with the newly created user ID
-        await supabaseClient
-          .from('user_payment_logs')
-          .insert({
+      // Check if this was a registration flow
+      const registrationData = paymentSession.payment_details?.registrationData;
+      const planId = paymentSession.payment_details?.planId || paymentSession.plan_id;
+      const userId = paymentSession.user_id;
+      
+      if (isSuccessful) {
+        if (registrationData && !userId) {
+          // This was a registration flow
+          console.log('Processing registration payment');
+          
+          try {
+            // Save contract signature if available
+            if (registrationData.contractDetails) {
+              const contractDetails = registrationData.contractDetails;
+              console.log('Saving contract signature from registration data');
+              
+              const { error: contractError } = await supabaseClient
+                .from('contract_signatures')
+                .insert({
+                  plan_id: planId,
+                  full_name: contractDetails.fullName || `${registrationData.userData.firstName} ${registrationData.userData.lastName}`,
+                  email: registrationData.email,
+                  phone: registrationData.userData.phone,
+                  signature: contractDetails.signature,
+                  contract_html: contractDetails.contractHtml,
+                  contract_version: contractDetails.contractVersion || '1.0',
+                  agreed_to_terms: contractDetails.agreedToTerms || false,
+                  agreed_to_privacy: contractDetails.agreedToPrivacy || false,
+                  browser_info: contractDetails.browserInfo || {},
+                  user_id: userId || null // Will be updated after user creation
+                });
+                
+              if (contractError) {
+                console.error('Error saving contract signature:', contractError);
+              }
+            }
+            
+            // Record payment (even without user)
+            await supabaseClient
+              .from('user_payment_logs')
+              .insert({
+                token: webhookData.LowProfileId,
+                status: 'completed',
+                amount: paymentSession.payment_details?.amount || 0,
+                transaction_details: {
+                  webhookData,
+                  paymentSession: paymentSession.id,
+                  planId
+                }
+              });
+              
+          } catch (err) {
+            console.error('Error processing registration payment:', err);
+          }
+        } else if (userId) {
+          // This was a payment for an existing user
+          console.log('Processing existing user payment for user:', userId);
+          
+          // Get current date
+          const now = new Date();
+          
+          // Prepare subscription data
+          let subscriptionData: any = {
             user_id: userId,
-            token: lowProfileId,
-            amount: session.payment_details.amount || 0,
-            approval_code: approvalNumber,
+            plan_type: planId,
+            status: planId === 'monthly' ? 'trial' : 'active',
+            payment_method: webhookData.UIValues || {},
+            updated_at: now.toISOString()
+          };
+          
+          // Set contract signed data if available in payment_details
+          if (paymentSession.payment_details?.contractSigned) {
+            subscriptionData.contract_signed = true;
+            subscriptionData.contract_signed_at = paymentSession.payment_details.contractSignedAt || now.toISOString();
+          }
+          
+          // Set appropriate dates based on plan
+          if (planId === 'monthly') {
+            // Trial period - 1 month
+            const trialEnd = new Date(now);
+            trialEnd.setMonth(trialEnd.getMonth() + 1);
+            subscriptionData.trial_ends_at = trialEnd.toISOString();
+            subscriptionData.next_charge_date = trialEnd.toISOString();
+          } else if (planId === 'annual') {
+            // Annual subscription - 1 year
+            const yearEnd = new Date(now);
+            yearEnd.setFullYear(yearEnd.getFullYear() + 1);
+            subscriptionData.current_period_ends_at = yearEnd.toISOString();
+            subscriptionData.next_charge_date = yearEnd.toISOString();
+          } else if (planId === 'vip') {
+            // VIP subscription - lifetime
+            subscriptionData.current_period_ends_at = null;
+            subscriptionData.next_charge_date = null;
+          }
+          
+          // Update or create subscription
+          const { error: subscriptionError } = await supabaseClient
+            .from('subscriptions')
+            .upsert(subscriptionData);
+            
+          if (subscriptionError) {
+            console.error('Error updating subscription:', subscriptionError);
+          }
+          
+          // Record the payment
+          await supabaseClient.from('user_payment_logs').insert({
+            user_id: userId,
+            token: webhookData.LowProfileId,
             status: 'completed',
+            amount: paymentSession.payment_details?.amount || 0,
+            approval_code: webhookData.TranzactionInfo?.ApprovalNumber || null,
             transaction_details: webhookData
           });
           
-        console.log('Payment logged for new user:', userId);
+          // If there was a contract in the payment details, save it
+          if (paymentSession.payment_details?.contractDetails) {
+            const contractDetails = paymentSession.payment_details.contractDetails;
+            console.log('Saving contract signature from payment_details');
+            
+            // First check if contract already exists
+            const { data: existingContract } = await supabaseClient
+              .from('contract_signatures')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('plan_id', planId)
+              .maybeSingle();
+              
+            if (!existingContract) {
+              const { error: contractError } = await supabaseClient
+                .from('contract_signatures')
+                .insert({
+                  user_id: userId,
+                  plan_id: planId,
+                  full_name: contractDetails.fullName || '',
+                  email: paymentSession.email || '',
+                  signature: contractDetails.signature,
+                  contract_html: contractDetails.contractHtml,
+                  contract_version: contractDetails.contractVersion || '1.0',
+                  agreed_to_terms: contractDetails.agreedToTerms || false,
+                  agreed_to_privacy: contractDetails.agreedToPrivacy || false,
+                  browser_info: contractDetails.browserInfo || {}
+                });
+                
+              if (contractError) {
+                console.error('Error saving contract signature:', contractError);
+              }
+            }
+          }
+        }
+      } else {
+        // Failed payment
+        console.log('Recording failed payment');
+        
+        // Record the failed payment
+        await supabaseClient.from('user_payment_logs').insert({
+          user_id: userId || null,
+          token: webhookData.LowProfileId,
+          status: 'failed',
+          amount: paymentSession.payment_details?.amount || 0,
+          transaction_details: webhookData
+        });
+        
+        // Record payment error
+        await supabaseClient.from('payment_errors').insert({
+          user_id: userId || paymentSession.email || '',
+          error_code: webhookData.ResponseCode.toString() || '0',
+          error_message: webhookData.Description || 'Unknown error',
+          payment_details: {
+            webhookData,
+            paymentSession: paymentSession.id
+          },
+          context: 'webhook'
+        });
       }
+      
+      // Mark the session as expired
+      await supabaseClient
+        .from('payment_sessions')
+        .update({
+          payment_details: {
+            ...paymentSession.payment_details,
+            status: isSuccessful ? 'completed' : 'failed',
+            webhookProcessed: true,
+            webhookData
+          },
+          expires_at: new Date().toISOString()
+        })
+        .eq('id', paymentSession.id);
     } else {
-      console.error('Invalid session state - no user_id or registration data');
+      // No associated payment session found
+      console.log('No payment session found for lowProfileId:', webhookData.LowProfileId);
+      
+      // Still record the webhook data
+      await supabaseClient.from('user_payment_logs').insert({
+        token: webhookData.LowProfileId,
+        status: isSuccessful ? 'completed' : 'failed',
+        amount: webhookData.TranzactionInfo?.Amount || 0,
+        transaction_details: webhookData
+      });
     }
 
     return new Response(
@@ -181,397 +290,19 @@ serve(async (req) => {
         status: 200,
       }
     );
-    
   } catch (error) {
     console.error('Error processing webhook:', error);
     
+    // Always return 200 to Cardcom to acknowledge receipt
     return new Response(
       JSON.stringify({ 
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
+        success: false, 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred' 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 200, // Always return 200 even on error to acknowledge receipt
       }
     );
   }
 });
-
-async function processExistingUserPayment(supabaseClient, session, webhookData, paymentMethod) {
-  try {
-    const userId = session.user_id;
-    const planId = session.plan_id;
-    const planDetails = session.payment_details;
-    const now = new Date();
-    
-    console.log('Processing payment for existing user:', {
-      userId,
-      planId,
-      amount: planDetails.amount
-    });
-    
-    // Determine subscription type and end dates
-    let periodEndsAt = null;
-    let trialEndsAt = null;
-    let status = 'active';
-    
-    if (planId === 'monthly') {
-      if (planDetails.freeTrialDays && planDetails.freeTrialDays > 0) {
-        status = 'trial';
-        trialEndsAt = new Date(now);
-        trialEndsAt.setDate(trialEndsAt.getDate() + planDetails.freeTrialDays);
-        
-        // Set next charge date to after trial period
-        periodEndsAt = new Date(trialEndsAt);
-        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
-      } else {
-        // Regular monthly subscription
-        periodEndsAt = new Date(now);
-        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
-      }
-    } else if (planId === 'annual') {
-      periodEndsAt = new Date(now);
-      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
-    } else if (planId === 'vip') {
-      // VIP is lifetime, no end date
-      status = 'active';
-    }
-    
-    // Save or update subscription
-    const { data: existingSubscription, error: findError } = await supabaseClient
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    if (findError) {
-      console.error('Error finding subscription:', findError);
-      throw findError;
-    }
-    
-    if (existingSubscription) {
-      // Update existing subscription
-      await supabaseClient
-        .from('subscriptions')
-        .update({
-          plan_type: planId,
-          status: status,
-          payment_method: paymentMethod,
-          trial_ends_at: trialEndsAt?.toISOString() || null,
-          current_period_ends_at: periodEndsAt?.toISOString() || null,
-          next_charge_date: periodEndsAt?.toISOString() || null,
-          updated_at: now.toISOString(),
-          cancelled_at: null, // Clear cancelled status if user is resubscribing
-        })
-        .eq('id', existingSubscription.id);
-        
-      console.log('Updated existing subscription for user:', userId);
-    } else {
-      // Create new subscription
-      const { data: newSubscription, error: subError } = await supabaseClient
-        .from('subscriptions')
-        .insert({
-          user_id: userId,
-          plan_type: planId,
-          status: status,
-          payment_method: paymentMethod,
-          trial_ends_at: trialEndsAt?.toISOString() || null,
-          current_period_ends_at: periodEndsAt?.toISOString() || null,
-          next_charge_date: periodEndsAt?.toISOString() || null,
-          contract_signed: true,
-          contract_signed_at: now.toISOString()
-        })
-        .select()
-        .single();
-        
-      if (subError) {
-        console.error('Error creating subscription:', subError);
-        throw subError;
-      }
-      
-      console.log('Created new subscription for user:', userId);
-    }
-    
-    // Record payment in payment_history
-    // Skip if it's a free trial with no charge
-    if (planId !== 'monthly' || status !== 'trial') {
-      await supabaseClient
-        .from('payment_history')
-        .insert({
-          user_id: userId,
-          subscription_id: existingSubscription?.id || userId, // Use subscription ID if available
-          amount: planDetails.amount || 0,
-          currency: 'ILS',
-          status: 'completed',
-          payment_method: paymentMethod,
-          payment_date: now.toISOString()
-        });
-        
-      console.log('Payment history recorded for user:', userId);
-    }
-
-    console.log('Successfully processed payment for existing user:', userId);
-    return { success: true, userId };
-  } catch (error) {
-    console.error('Error processing existing user payment:', error);
-    throw error;
-  }
-}
-
-async function processNewUserRegistration(supabaseClient, session, webhookData, paymentMethod) {
-  try {
-    const registrationData = session.payment_details.registrationData;
-    const planId = session.plan_id;
-    const planDetails = session.payment_details;
-    
-    if (!registrationData) {
-      throw new Error('Missing registration data');
-    }
-
-    const userEmail = registrationData.email;
-    if (!userEmail) {
-      throw new Error('Missing email in registration data');
-    }
-    
-    console.log('Processing new user registration with payment:', { 
-      planId, 
-      email: userEmail 
-    });
-    
-    // Check if user already exists with this email
-    const { data: existingUsers } = await supabaseClient.auth.admin.listUsers({
-      filter: {
-        email: userEmail
-      }
-    });
-    
-    let userId;
-    
-    // If user already exists, use that ID
-    if (existingUsers && existingUsers.users && existingUsers.users.length > 0) {
-      userId = existingUsers.users[0].id;
-      console.log('Using existing user account:', userId);
-    } else {
-      // Create the user account
-      const { data: userData, error: userError } = await supabaseClient.auth.admin.createUser({
-        email: userEmail,
-        password: registrationData.password,
-        email_confirm: true, // Auto-confirm email for better UX
-        user_metadata: {
-          first_name: registrationData.userData?.firstName,
-          last_name: registrationData.userData?.lastName,
-          registration_complete: true,
-          signup_step: 'completed',
-          signup_date: new Date().toISOString()
-        }
-      });
-      
-      if (userError) {
-        console.error('Error creating user:', userError);
-        throw userError;
-      }
-      
-      if (!userData.user) {
-        throw new Error('Failed to create user account');
-      }
-      
-      userId = userData.user.id;
-      console.log('Created new user account:', userId);
-    }
-    
-    // Update the payment session with the created user_id
-    await supabaseClient
-      .from('payment_sessions')
-      .update({ user_id: userId })
-      .eq('id', session.id);
-    
-    // Set up dates based on plan type
-    const now = new Date();
-    let periodEndsAt = null;
-    let trialEndsAt = null;
-    let status = 'active';
-    
-    if (planId === 'monthly') {
-      if (planDetails.freeTrialDays && planDetails.freeTrialDays > 0) {
-        status = 'trial';
-        trialEndsAt = new Date(now);
-        trialEndsAt.setDate(trialEndsAt.getDate() + planDetails.freeTrialDays);
-        
-        // Set next charge date to after trial period
-        periodEndsAt = new Date(trialEndsAt);
-        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
-      } else {
-        // Regular monthly subscription
-        periodEndsAt = new Date(now);
-        periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
-      }
-    } else if (planId === 'annual') {
-      periodEndsAt = new Date(now);
-      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
-    } else if (planId === 'vip') {
-      // VIP is lifetime, no end date
-      status = 'active';
-    }
-    
-    // Check for existing subscription first
-    const { data: existingSubscription } = await supabaseClient
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-      
-    if (existingSubscription) {
-      // Update existing subscription
-      await supabaseClient
-        .from('subscriptions')
-        .update({
-          plan_type: planId,
-          status: status,
-          payment_method: paymentMethod,
-          trial_ends_at: trialEndsAt?.toISOString() || null,
-          current_period_ends_at: periodEndsAt?.toISOString() || null,
-          next_charge_date: periodEndsAt?.toISOString() || null,
-          updated_at: now.toISOString(),
-          cancelled_at: null, // Clear cancelled status if user is resubscribing
-          contract_signed: true,
-          contract_signed_at: now.toISOString()
-        })
-        .eq('id', existingSubscription.id);
-        
-      console.log('Updated existing subscription for new user:', userId);
-    } else {
-      // Create subscription record
-      const { error: subscriptionError } = await supabaseClient
-        .from('subscriptions')
-        .insert({
-          user_id: userId,
-          plan_type: planId,
-          status: status,
-          payment_method: paymentMethod,
-          trial_ends_at: trialEndsAt?.toISOString() || null,
-          current_period_ends_at: periodEndsAt?.toISOString() || null,
-          next_charge_date: periodEndsAt?.toISOString() || null,
-          contract_signed: true,
-          contract_signed_at: now.toISOString()
-        });
-      
-      if (subscriptionError) {
-        console.error('Error creating subscription:', subscriptionError);
-        throw subscriptionError;
-      }
-      
-      console.log('Created subscription for new user:', userId);
-    }
-    
-    // Record payment history
-    // Skip if it's a free trial with no charge
-    if (planId !== 'monthly' || status !== 'trial') {
-      await supabaseClient
-        .from('payment_history')
-        .insert({
-          user_id: userId,
-          subscription_id: userId,
-          amount: planDetails.amount || 0,
-          currency: 'ILS',
-          status: 'completed',
-          payment_method: paymentMethod,
-          payment_date: now.toISOString()
-        });
-        
-      console.log('Payment history recorded for new user:', userId);
-    } else {
-      // Record trial started
-      await supabaseClient
-        .from('payment_history')
-        .insert({
-          user_id: userId,
-          subscription_id: userId,
-          amount: 0,
-          currency: 'ILS',
-          status: 'trial_started',
-          payment_method: paymentMethod,
-          payment_date: now.toISOString()
-        });
-        
-      console.log('Trial started recorded for new user:', userId);
-    }
-
-    // Update profile information
-    const { error: profileError } = await supabaseClient
-      .from('profiles')
-      .update({
-        first_name: registrationData.userData?.firstName,
-        last_name: registrationData.userData?.lastName,
-        phone: registrationData.userData?.phone || null
-      })
-      .eq('id', userId);
-    
-    if (profileError) {
-      console.error('Error updating profile:', profileError);
-      // Non-critical error, don't throw
-    }
-    
-    // If there's contract data, store it
-    if (registrationData.contractDetails) {
-      try {
-        // Check if contract already exists for this user
-        const { data: existingContract } = await supabaseClient
-          .from('contract_signatures')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('plan_id', planId)
-          .maybeSingle();
-          
-        if (existingContract) {
-          // Update existing contract
-          await supabaseClient
-            .from('contract_signatures')
-            .update({
-              signature: registrationData.contractDetails.signature,
-              contract_html: registrationData.contractDetails.contractHtml,
-              updated_at: now.toISOString()
-            })
-            .eq('id', existingContract.id);
-            
-          console.log('Updated existing contract for user:', userId);
-        } else {
-          // Create new contract record
-          const { error: contractError } = await supabaseClient
-            .from('contract_signatures')
-            .insert({
-              user_id: userId,
-              plan_id: planId,
-              full_name: `${registrationData.userData?.firstName} ${registrationData.userData?.lastName}`,
-              email: userEmail,
-              phone: registrationData.userData?.phone || null,
-              signature: registrationData.contractDetails.signature,
-              contract_html: registrationData.contractDetails.contractHtml,
-              ip_address: null,
-              user_agent: registrationData.contractDetails.browserInfo?.userAgent,
-              browser_info: registrationData.contractDetails.browserInfo || null,
-              contract_version: registrationData.contractDetails.contractVersion || "1.0",
-              agreed_to_terms: registrationData.contractDetails.agreedToTerms || false,
-              agreed_to_privacy: registrationData.contractDetails.agreedToPrivacy || false,
-            });
-            
-          if (contractError) {
-            console.error('Error storing contract signature:', contractError);
-            // Non-critical error, don't throw
-          } else {
-            console.log('Contract signature stored for new user:', userId);
-          }
-        }
-      } catch (signatureError) {
-        console.error('Exception storing signature:', signatureError);
-        // Continue with registration even if there's an error storing the contract
-      }
-    }
-    
-    console.log('Successfully processed registration and payment for new user:', userId);
-    return { success: true, userId };
-  } catch (error) {
-    console.error('Error processing registration with payment:', error);
-    return { success: false, error: error.message };
-  }
-}

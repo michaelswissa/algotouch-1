@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/auth';
 
 export const usePaymentStatus = (
   redirectOnSuccess: string = '/my-subscription'
@@ -13,14 +14,15 @@ export const usePaymentStatus = (
   const [retryCount, setRetryCount] = useState(0);
   const [paymentProcessingId, setPaymentProcessingId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
       const params = new URLSearchParams(window.location.search);
       const success = params.get('success');
       const error = params.get('error');
-      const lowProfileId = params.get('lowProfileId');
-      const planId = params.get('planId');
+      const lowProfileId = params.get('lowProfileId') || localStorage.getItem('payment_pending_id');
+      const planId = params.get('planId') || localStorage.getItem('payment_pending_plan');
       
       // Check if we're already processing this payment
       const storedProcessingId = localStorage.getItem('payment_processing');
@@ -67,6 +69,8 @@ export const usePaymentStatus = (
             
             // Clean up the payment processing flag
             localStorage.removeItem('payment_processing');
+            localStorage.removeItem('payment_pending_id');
+            localStorage.removeItem('payment_pending_plan');
             setPaymentProcessingId(null);
             
             // Allow toasts to be shown before redirecting
@@ -89,14 +93,94 @@ export const usePaymentStatus = (
           
           console.log('Received payment status response:', data);
           
-          // Check if the transaction was successful either from ResponseCode or from TranzactionInfo
+          // Check if the transaction was successful
           if (data.ResponseCode === 0 || 
               (data.OperationResponse === '0') || 
               (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0)) {
             
+            // If this is a registration flow, process the registration data
+            const storedData = sessionStorage.getItem('registration_data');
+            if (storedData && !user) {
+              try {
+                const registrationData = JSON.parse(storedData);
+                
+                // Record successful payment in the database
+                await supabase.from('user_payment_logs').insert({
+                  token: lowProfileId,
+                  status: 'completed',
+                  amount: registrationData.planPrice || 0,
+                  transaction_details: {
+                    planId,
+                    registrationData,
+                    cardcomResponse: data
+                  }
+                });
+                
+                console.log('Payment recorded for registration flow');
+              } catch (err) {
+                console.error('Error processing registration data:', err);
+              }
+            } else if (user) {
+              // For authenticated users, update their subscription status
+              const now = new Date();
+              
+              // Prepare subscription data based on plan
+              let subscriptionData: any = {
+                user_id: user.id,
+                plan_type: planId,
+                status: planId === 'monthly' ? 'trial' : 'active',
+                payment_method: data.UIValues || {},
+                contract_signed: true,
+                contract_signed_at: now.toISOString()
+              };
+              
+              // Set appropriate dates based on plan
+              if (planId === 'monthly') {
+                // Trial period - 1 month
+                const trialEnd = new Date(now);
+                trialEnd.setMonth(trialEnd.getMonth() + 1);
+                subscriptionData.trial_ends_at = trialEnd.toISOString();
+                subscriptionData.next_charge_date = trialEnd.toISOString();
+              } else if (planId === 'annual') {
+                // Annual subscription - 1 year
+                const yearEnd = new Date(now);
+                yearEnd.setFullYear(yearEnd.getFullYear() + 1);
+                subscriptionData.current_period_ends_at = yearEnd.toISOString();
+                subscriptionData.next_charge_date = yearEnd.toISOString();
+              } else if (planId === 'vip') {
+                // VIP subscription - lifetime
+                subscriptionData.status = 'active';
+                subscriptionData.current_period_ends_at = null;
+                subscriptionData.next_charge_date = null;
+              }
+              
+              // Record the subscription in the database
+              const { error: subscriptionError } = await supabase
+                .from('subscriptions')
+                .upsert(subscriptionData);
+                
+              if (subscriptionError) {
+                console.error('Error recording subscription:', subscriptionError);
+              }
+              
+              // Record the payment
+              await supabase.from('user_payment_logs').insert({
+                user_id: user.id,
+                token: lowProfileId,
+                status: 'completed',
+                amount: data.TranzactionInfo?.Amount || 0,
+                transaction_details: {
+                  planId,
+                  cardcomResponse: data
+                }
+              });
+              
+              console.log('Payment and subscription recorded for user:', user.id);
+            }
+            
             setPaymentSuccess(true);
             
-            // Customize success message based on plan type
+            // Success message based on plan type
             if (planId === 'monthly') {
               toast.success('נרשמת בהצלחה לחודש ניסיון חינם!');
             } else if (planId === 'annual') {
@@ -107,8 +191,13 @@ export const usePaymentStatus = (
               toast.success('התשלום התקבל בהצלחה!');
             }
             
-            // Clean up the payment processing flag
+            // Clean up the payment processing flag and stored data
             localStorage.removeItem('payment_processing');
+            localStorage.removeItem('payment_pending_id');
+            localStorage.removeItem('payment_pending_plan');
+            if (storedData) {
+              sessionStorage.removeItem('registration_data');
+            }
             setPaymentProcessingId(null);
             
             // Allow toasts to be shown before redirecting
@@ -125,6 +214,8 @@ export const usePaymentStatus = (
           } else {
             // Clean up after max retries
             localStorage.removeItem('payment_processing');
+            localStorage.removeItem('payment_pending_id');
+            localStorage.removeItem('payment_pending_plan');
             setPaymentProcessingId(null);
             
             setPaymentError(data.Description || 'אירעה שגיאה בתהליך התשלום');
@@ -140,6 +231,8 @@ export const usePaymentStatus = (
           } else {
             // Clean up after max retries
             localStorage.removeItem('payment_processing');
+            localStorage.removeItem('payment_pending_id');
+            localStorage.removeItem('payment_pending_plan');
             setPaymentProcessingId(null);
             
             setPaymentError(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
@@ -149,6 +242,8 @@ export const usePaymentStatus = (
           if (retryCount >= 3) {
             setIsChecking(false);
             localStorage.removeItem('payment_processing');
+            localStorage.removeItem('payment_pending_id');
+            localStorage.removeItem('payment_pending_plan');
             setPaymentProcessingId(null);
           }
         }
@@ -168,7 +263,7 @@ export const usePaymentStatus = (
     if (!isChecking && !paymentSuccess) {
       checkPaymentStatus();
     }
-  }, [navigate, redirectOnSuccess, retryCount, isChecking, paymentSuccess, paymentProcessingId]);
+  }, [navigate, redirectOnSuccess, retryCount, isChecking, paymentSuccess, paymentProcessingId, user]);
 
   return {
     isChecking,

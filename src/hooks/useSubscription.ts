@@ -41,50 +41,76 @@ export const useSubscription = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchSubscription = useCallback(async () => {
-    if (user?.id) {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (error) {
-          throw error;
-        }
-        
-        // Convert Supabase data to our Subscription type
-        if (data) {
-          const formattedSubscription: Subscription = {
-            id: data.id,
-            plan_type: data.plan_type,
-            status: data.status,
-            trial_ends_at: data.trial_ends_at,
-            current_period_ends_at: data.current_period_ends_at,
-            next_charge_date: data.next_charge_date,
-            payment_method: data.payment_method
-          };
-          setSubscription(formattedSubscription);
-          
-          // Process the subscription details
-          const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
-          setDetails(subscriptionDetails);
-        } else {
-          setSubscription(null);
-          setDetails(null);
-        }
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-      } finally {
-        setLoading(false);
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) {
+        throw error;
       }
-    } else {
+      
+      // Convert Supabase data to our Subscription type
+      if (data) {
+        const formattedSubscription: Subscription = {
+          id: data.id,
+          plan_type: data.plan_type,
+          status: data.status,
+          trial_ends_at: data.trial_ends_at,
+          current_period_ends_at: data.current_period_ends_at,
+          next_charge_date: data.next_charge_date,
+          payment_method: data.payment_method
+        };
+        
+        // Check if subscription is expired
+        const now = new Date();
+        const isExpired = 
+          (data.trial_ends_at && new Date(data.trial_ends_at) < now) || 
+          (data.current_period_ends_at && new Date(data.current_period_ends_at) < now);
+        
+        // VIP subscriptions never expire
+        const isVip = data.plan_type === 'vip';
+        
+        // Override status if expired (except for VIP)
+        if (isExpired && !isVip && data.status !== 'cancelled') {
+          formattedSubscription.status = 'expired';
+          
+          // Update the status in the database
+          await supabase
+            .from('subscriptions')
+            .update({ status: 'expired' })
+            .eq('id', data.id);
+        }
+        
+        setSubscription(formattedSubscription);
+        
+        // Process the subscription details
+        const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
+        setDetails(subscriptionDetails);
+      } else {
+        setSubscription(null);
+        setDetails(null);
+      }
+    } catch (error: any) {
+      console.error('Error fetching subscription:', error);
+      setError(error.message);
+    } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
   
   useEffect(() => {
     fetchSubscription();
@@ -120,6 +146,11 @@ export const useSubscription = () => {
       
       statusText = 'בתקופת ניסיון';
       nextBillingDate = format(trialEndDate, 'dd/MM/yyyy', { locale: he });
+    } else if (sub.status === 'expired') {
+      statusText = 'פג תוקף';
+      nextBillingDate = 'המנוי הסתיים';
+      progressValue = 100;
+      daysLeft = 0;
     } else if (sub.next_charge_date) {
       // Use next_charge_date if available
       const nextChargeDate = parseISO(sub.next_charge_date);
@@ -176,7 +207,8 @@ export const useSubscription = () => {
 
   return { 
     subscription, 
-    loading, 
+    loading,
+    error,
     details,
     refetch: fetchSubscription
   };
