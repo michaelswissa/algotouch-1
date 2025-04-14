@@ -58,18 +58,27 @@ export const usePaymentStatus = (
       try {
         console.log('Checking payment status for lowProfileId:', lowProfileId);
         
-        // First check if we already have this payment recorded through the webhook
-        const { data: existingPayment, error: checkError } = await supabase.rpc('check_duplicate_payment', {
-          low_profile_id: lowProfileId
+        // Check payment status with the dedicated function
+        const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
+          body: { 
+            lowProfileId,
+            planId: paymentPlanId
+          }
         });
         
-        if (checkError) {
-          console.error('Error checking for duplicate payment:', checkError);
-          throw new Error(checkError.message);
+        if (error) {
+          console.error('Error from cardcom-check-status function:', error);
+          throw new Error(error.message);
         }
         
-        if (existingPayment) {
-          console.log('Payment already processed via webhook');
+        console.log('Received payment status response:', data);
+        
+        // Check if the transaction was successful
+        if (data.ResponseCode === 0 || 
+            data.OperationResponse === '0' || 
+            (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0) ||
+            (data.paymentLog && data.paymentLog.status === 'completed')) {
+          
           setPaymentSuccess(true);
           
           // Success message based on plan type
@@ -90,143 +99,39 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_session_created');
           setPaymentProcessingId(null);
           
+          // If this was a registration flow, finalize user registration
+          const storedData = sessionStorage.getItem('registration_data');
+          if (storedData) {
+            try {
+              // Registration was completed successfully
+              console.log('Registration completed successfully, removing stored data');
+              sessionStorage.removeItem('registration_data');
+              
+              // If we have login credentials, we could auto-login the user here
+              const registrationData = JSON.parse(storedData);
+              if (registrationData.email && registrationData.password) {
+                console.log('Auto-logging in newly registered user');
+                
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                  email: registrationData.email,
+                  password: registrationData.password,
+                });
+                
+                if (signInError) {
+                  console.error('Auto-login failed:', signInError);
+                }
+              }
+            } catch (err) {
+              console.error('Error processing registration data:', err);
+            }
+          }
+          
           // Allow toasts to be shown before redirecting
           setTimeout(() => {
             navigate(redirectOnSuccess, { replace: true });
           }, 2000);
           
           return;
-        }
-
-        // If not already processed by webhook, check status with the API
-        const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
-          body: { 
-            lowProfileId,
-            planId: paymentPlanId // Pass along the plan ID for better context
-          }
-        });
-        
-        if (error) {
-          console.error('Error from cardcom-check-status function:', error);
-          throw new Error(error.message);
-        }
-        
-        console.log('Received payment status response:', data);
-        
-        // Check if the transaction was successful
-        if (data.ResponseCode === 0 || 
-            (data.OperationResponse === '0') || 
-            (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0)) {
-          
-          // If this is a registration flow, process the registration data
-          const storedData = sessionStorage.getItem('registration_data');
-          if (storedData && !user) {
-            try {
-              const registrationData = JSON.parse(storedData);
-              
-              // Record successful payment in the database
-              await supabase.from('user_payment_logs').insert({
-                token: lowProfileId,
-                status: 'completed',
-                amount: registrationData.planPrice || 0,
-                transaction_details: {
-                  planId: paymentPlanId,
-                  registrationData,
-                  cardcomResponse: data
-                }
-              });
-              
-              console.log('Payment recorded for registration flow');
-            } catch (err) {
-              console.error('Error processing registration data:', err);
-            }
-          } else if (user) {
-            // For authenticated users, update their subscription status
-            const now = new Date();
-            
-            // Prepare subscription data based on plan
-            let subscriptionData: any = {
-              user_id: user.id,
-              plan_type: paymentPlanId,
-              status: paymentPlanId === 'monthly' ? 'trial' : 'active',
-              payment_method: data.UIValues || {},
-              contract_signed: true,
-              contract_signed_at: now.toISOString(),
-              updated_at: now.toISOString()
-            };
-            
-            // Set appropriate dates based on plan
-            if (paymentPlanId === 'monthly') {
-              // Trial period - 1 month
-              const trialEnd = new Date(now);
-              trialEnd.setMonth(trialEnd.getMonth() + 1);
-              subscriptionData.trial_ends_at = trialEnd.toISOString();
-              subscriptionData.next_charge_date = trialEnd.toISOString();
-            } else if (paymentPlanId === 'annual') {
-              // Annual subscription - 1 year
-              const yearEnd = new Date(now);
-              yearEnd.setFullYear(yearEnd.getFullYear() + 1);
-              subscriptionData.current_period_ends_at = yearEnd.toISOString();
-              subscriptionData.next_charge_date = yearEnd.toISOString();
-            } else if (paymentPlanId === 'vip') {
-              // VIP subscription - lifetime
-              subscriptionData.status = 'active';
-              subscriptionData.current_period_ends_at = null;
-              subscriptionData.next_charge_date = null;
-            }
-            
-            // Record the subscription in the database
-            const { error: subscriptionError } = await supabase
-              .from('subscriptions')
-              .upsert(subscriptionData);
-              
-            if (subscriptionError) {
-              console.error('Error recording subscription:', subscriptionError);
-            }
-            
-            // Record the payment
-            await supabase.from('user_payment_logs').insert({
-              user_id: user.id,
-              token: lowProfileId,
-              status: 'completed',
-              amount: data.TranzactionInfo?.Amount || 0,
-              approval_code: data.TranzactionInfo?.ApprovalNumber || null,
-              transaction_details: {
-                planId: paymentPlanId,
-                cardcomResponse: data
-              }
-            });
-            
-            console.log('Payment and subscription recorded for user:', user.id);
-          }
-          
-          setPaymentSuccess(true);
-          
-          // Success message based on plan type
-          if (paymentPlanId === 'monthly') {
-            toast.success('נרשמת בהצלחה לחודש ניסיון חינם!');
-          } else if (paymentPlanId === 'annual') {
-            toast.success('נרשמת בהצלחה למנוי שנתי!');
-          } else if (paymentPlanId === 'vip') {
-            toast.success('נרשמת בהצלחה למנוי VIP לכל החיים!');
-          } else {
-            toast.success('התשלום התקבל בהצלחה!');
-          }
-          
-          // Clean up the payment processing flag and stored data
-          localStorage.removeItem('payment_processing');
-          localStorage.removeItem('payment_pending_id');
-          localStorage.removeItem('payment_pending_plan');
-          localStorage.removeItem('payment_session_created');
-          if (storedData) {
-            sessionStorage.removeItem('registration_data');
-          }
-          setPaymentProcessingId(null);
-          
-          // Allow toasts to be shown before redirecting
-          setTimeout(() => {
-            navigate(redirectOnSuccess, { replace: true });
-          }, 2000);
         } else if (retryCount < 3) {
           // Sometimes the transaction might not be processed immediately
           // Try a few times with increasing delays

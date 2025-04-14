@@ -71,15 +71,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
-      // Use auth context to sign up
-      await signUp({
-        email,
-        password,
-        firstName,
-        lastName,
-        phone
-      });
-      
       // Store registration data in session storage for the subscription flow
       const registrationData = {
         email,

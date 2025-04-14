@@ -41,7 +41,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     try {
       const storedData = sessionStorage.getItem('registration_data');
       if (storedData) {
-        console.log('Found registration data in CardcomOpenFields:', JSON.parse(storedData));
+        console.log('Found registration data in CardcomOpenFields');
         setRegistrationData(JSON.parse(storedData));
       }
     } catch (err) {
@@ -88,10 +88,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           planId,
           planName: selectedPlan.name,
           amount: selectedPlan.price,
-          email, // Make sure email is sent
+          userEmail: email, // Explicitly send userEmail
           userName: fullName,
           userId: user?.id,
-          userEmail: email, // Explicitly add userEmail field that the function requires
           isRecurring: planId === 'monthly',
           freeTrialDays: planId === 'monthly' ? 30 : 0,
           registrationData: !user ? registrationData : null,
@@ -145,9 +144,16 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         }
       }
 
-      // Get URL from response or build it
-      const paymentUrl = data.url || 
-        `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
+      // Use URL from response if provided
+      if (data.url) {
+        console.log('Redirecting to payment URL from response');
+        window.location.href = data.url;
+        return;
+      }
+
+      console.log('Redirecting to constructed payment URL');
+      // Use redirect provided by server or build our own
+      window.location.href = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
         `TerminalNumber=${data.terminalNumber}&` + 
         `UserName=${data.apiName}&` +
         `APILevel=10&` +
@@ -159,12 +165,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         `SuccessRedirectUrl=${encodeURIComponent(`${window.location.origin}/subscription?success=true&planId=${planId}&lowProfileId=${data.lowProfileId}`)}&` +
         `ErrorRedirectUrl=${encodeURIComponent(`${window.location.origin}/subscription?error=true`)}&` +
         `IndicatorUrl=${encodeURIComponent(data.webhookUrl || `${window.location.origin}/functions/v1/cardcom-webhook`)}`;
-
-      console.log('Redirecting to payment URL:', paymentUrl);
-      
-      // Open payment page
-      setPaymentUrl(paymentUrl);
-      window.location.href = paymentUrl;
       
     } catch (err) {
       setIsProcessing(false);

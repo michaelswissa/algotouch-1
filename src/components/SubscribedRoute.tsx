@@ -21,6 +21,18 @@ const SubscribedRoute: React.FC<SubscribedRouteProps> = ({ children }) => {
   const [isChecking, setIsChecking] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
 
+  // Check for in-progress registration
+  const [hasRegistrationInProgress, setHasRegistrationInProgress] = useState(false);
+  
+  useEffect(() => {
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      setHasRegistrationInProgress(!!storedData);
+    } catch (err) {
+      console.error('Error checking registration data:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (error && !isRetrying) {
       console.error('Error fetching subscription status:', error);
@@ -42,6 +54,11 @@ const SubscribedRoute: React.FC<SubscribedRouteProps> = ({ children }) => {
       setIsChecking(false);
     }
   }, [initialized, loading, subscriptionLoading]);
+
+  // If registration is in progress, redirect to subscription page
+  if (hasRegistrationInProgress) {
+    return <Navigate to="/subscription" state={{ from: location, isRegistering: true }} replace />;
+  }
 
   // Show loading spinner while checking auth and subscription status
   if (isChecking) {

@@ -24,6 +24,16 @@ function generateRandomId() {
   return crypto.randomUUID();
 }
 
+// Helper function to validate required fields
+function validateRequiredParams(data: any, requiredFields: string[]): string | null {
+  for (const field of requiredFields) {
+    if (!data[field]) {
+      return `Missing required parameter: ${field}`;
+    }
+  }
+  return null;
+}
+
 serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
@@ -41,17 +51,22 @@ serve(async (req) => {
       userEmail, // Accept both email and userEmail for backward compatibility
       isRecurring, 
       freeTrialDays,
-      registrationData // Registration data for non-authenticated users
+      registrationData, // Registration data for non-authenticated users
+      successRedirectUrl,
+      errorRedirectUrl
     } = requestBody;
+    
+    // Validate required parameters
+    const requiredParams = ['planId', 'amount'];
+    const validationError = validateRequiredParams(requestBody, requiredParams);
+    if (validationError) {
+      throw new Error(validationError);
+    }
     
     // Use either email or userEmail (prefer userEmail if both exist)
     const effectiveEmail = userEmail || email;
     
-    // Validate essential parameters
-    if (!planId) {
-      throw new Error('Missing required parameter: planId');
-    }
-    
+    // Email is required
     if (!effectiveEmail) {
       throw new Error('Missing required parameter: userEmail');
     }
@@ -149,14 +164,34 @@ serve(async (req) => {
     }
     
     const webhookUrl = `${origin}/functions/v1/cardcom-webhook`;
+    
+    // Set up redirect URLs for after payment
+    let success_url = successRedirectUrl || `${origin}/subscription?success=true&planId=${planId}&lowProfileId=${lowProfileId}`;
+    let error_url = errorRedirectUrl || `${origin}/subscription?error=true`;
 
     console.log('Payment session created successfully', { 
       lowProfileId, 
       sessionId, 
       webhookUrl,
       operation,
-      isRegistrationFlow: !!registrationData
+      isRegistrationFlow: !!registrationData,
+      success_url,
+      error_url
     });
+    
+    // Construct the payment URL for Cardcom
+    const paymentUrl = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
+      `TerminalNumber=${terminalNumber}&` + 
+      `UserName=${apiName}&` +
+      `APILevel=10&` +
+      `ReturnValue=${lowProfileId}&` +
+      `SumToBill=${amount}&` +
+      `ProductName=${encodeURIComponent(planName || 'Subscription')}&` +
+      `Language=he&` +
+      `CoinID=1&` +
+      `SuccessRedirectUrl=${encodeURIComponent(success_url)}&` +
+      `ErrorRedirectUrl=${encodeURIComponent(error_url)}&` +
+      `IndicatorUrl=${encodeURIComponent(webhookUrl)}`;
     
     return new Response(
       JSON.stringify({
@@ -166,6 +201,7 @@ serve(async (req) => {
         terminalNumber,
         apiName,
         webhookUrl,
+        url: paymentUrl,
         message: 'Payment session created successfully'
       }),
       {
