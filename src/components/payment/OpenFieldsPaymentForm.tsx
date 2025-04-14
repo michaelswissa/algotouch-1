@@ -84,7 +84,11 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
       }
     };
     
-    checkExistingSubscription();
+    checkExistingSubscription().catch(err => {
+      console.error('Error in checkExistingSubscription:', err);
+      setError('Failed to check subscription status');
+      setIsCheckingSubscription(false);
+    });
   }, [user?.id, planId]);
 
   const handleRetry = () => {
