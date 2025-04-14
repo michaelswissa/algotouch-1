@@ -24,12 +24,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   const handleSignContract = async (contractData: any) => {
     try {
       setIsProcessing(true);
-      console.log('Contract signed, saving to session storage before payment');
-      
-      // Save contract data to session storage for use during payment
-      // This way it can be retrieved by the payment process but doesn't 
-      // need to be passed in the URL or payment parameters
-      sessionStorage.setItem('contract_data', JSON.stringify(contractData));
+      console.log('Contract signed, forwarding data to parent component');
       
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));

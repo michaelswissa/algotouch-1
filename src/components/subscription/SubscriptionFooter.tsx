@@ -1,62 +1,18 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { XCircle } from 'lucide-react';
 
-interface SubscriptionFooterProps {
-  subscriptionId: string;
-  status: string;
-  planType: string;
-  onCancelClick?: () => void;
-}
-
-const SubscriptionFooter: React.FC<SubscriptionFooterProps> = ({ 
-  subscriptionId, 
-  status, 
-  planType,
-  onCancelClick
-}) => {
-  const navigate = useNavigate();
-  
-  const isActive = status === 'active' || status === 'trial';
-  const canUpgrade = isActive && planType !== 'vip';
-  const canCancel = isActive && planType !== 'vip';
-  
-  const handleUpgrade = () => {
-    navigate('/subscription');
-  };
-  
+const SubscriptionFooter: React.FC = () => {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 justify-between mt-6">
-      {canUpgrade && (
-        <Button 
-          variant="outline" 
-          onClick={handleUpgrade}
-          className="flex-1"
-        >
-          שדרג מנוי
-        </Button>
-      )}
-      
-      {canCancel && (
-        <Button 
-          variant="outline" 
-          className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-1"
-          onClick={onCancelClick}
-        >
-          בטל מנוי
-        </Button>
-      )}
-      
-      {!isActive && (
-        <Button 
-          variant="default" 
-          onClick={() => navigate('/subscription')}
-          className="flex-1"
-        >
-          {status === 'cancelled' ? 'חדש מנוי' : 'רכוש מנוי חדש'}
-        </Button>
-      )}
+    <div className="border-t bg-muted/20 p-3 flex justify-between">
+      <Button variant="ghost" size="sm" className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
+        <XCircle className="h-4 w-4" />
+        ביטול מנוי
+      </Button>
+      <Button variant="outline" size="sm">
+        שינוי תכנית
+      </Button>
     </div>
   );
 };
