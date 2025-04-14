@@ -6,7 +6,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
 // Handle CORS preflight requests
@@ -26,158 +25,113 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const requestBody = await req.json();
-    const { lowProfileId, planId } = requestBody;
+    console.log('Checking payment status');
+    
+    // Parse request body
+    const { lowProfileId, planId } = await req.json();
     
     if (!lowProfileId) {
       throw new Error('Missing lowProfileId parameter');
     }
     
-    console.log(`Checking payment status for lowProfileId: ${lowProfileId}, planId: ${planId || 'not provided'}`);
+    console.log(`Checking payment status for: ${lowProfileId}`);
     
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+    // Create Supabase admin client
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
     
-    // Check if there's a payment log record for this lowProfileId
-    const { data: paymentLog, error: paymentLogError } = await supabaseClient
-      .from('payment_logs')
+    // Check for payment in user_payment_logs
+    const { data: paymentLog, error: paymentError } = await supabaseAdmin
+      .from('user_payment_logs')
       .select('*')
-      .eq('lowprofile_id', lowProfileId)
-      .single();
-      
-    if (paymentLogError) {
-      console.log(`No payment log found for lowProfileId: ${lowProfileId}`);
+      .eq('token', lowProfileId)
+      .maybeSingle();
+    
+    if (paymentError) {
+      console.error('Error checking payment logs:', paymentError);
+      throw new Error(`Error checking payment logs: ${paymentError.message}`);
     }
     
-    // Check if there's a payment session for this lowProfileId
-    const { data: paymentSession, error: paymentSessionError } = await supabaseClient
-      .from('payment_sessions')
-      .select('payment_details')
-      .filter('payment_details->lowProfileId', 'eq', lowProfileId)
-      .single();
+    if (paymentLog) {
+      console.log('Found payment log:', {
+        status: paymentLog.status,
+        amount: paymentLog.amount,
+        userId: paymentLog.user_id,
+        transactionDetails: !!paymentLog.transaction_details
+      });
       
-    if (paymentSessionError) {
-      console.log(`No payment session found for lowProfileId: ${lowProfileId}`);
-    }
-    
-    // If we have a completed payment log, return success
-    if (paymentLog && paymentLog.status === 'completed') {
-      console.log(`Found completed payment log for lowProfileId: ${lowProfileId}`);
+      const isSuccess = paymentLog.status === 'completed';
+      
       return new Response(
         JSON.stringify({
-          ResponseCode: 0,
-          Description: "Payment completed successfully",
+          ResponseCode: isSuccess ? 0 : 1,
+          Description: isSuccess ? 'Payment completed successfully' : 'Payment failed',
+          OperationResponse: isSuccess ? '0' : '1',
           paymentLog,
-          paymentSession: paymentSession || null
+          planId
         }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    // If the payment is still processing or has failed, attempt to get status from Cardcom
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "";
-    const apiName = Deno.env.get("CARDCOM_API_NAME") || "";
-    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD") || "";
+    // If not found in payment logs, check the payment session
+    const { data: sessionData, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .select('*')
+      .eq('payment_details->lowProfileId', lowProfileId)
+      .maybeSingle();
     
-    if (!terminalNumber || !apiName) {
-      throw new Error('Missing Cardcom API credentials in environment variables');
+    if (sessionError) {
+      console.error('Error checking payment session:', sessionError);
     }
     
-    // Call Cardcom API to check payment status
-    const cardcomUrl = "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx";
-    const params = new URLSearchParams({
-      terminalnumber: terminalNumber,
-      username: apiName,
-      lowprofilecode: lowProfileId,
-      codepage: '65001'
-    });
-    
-    console.log(`Calling Cardcom API to check payment status for lowProfileId: ${lowProfileId}`);
-    
-    const response = await fetch(`${cardcomUrl}?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Cardcom API returned error: ${response.status} ${response.statusText}`);
+    if (sessionData) {
+      const sessionStatus = sessionData.payment_details?.status || 'pending';
+      const isCompleted = sessionStatus === 'completed';
+      
+      console.log('Found session data:', {
+        id: sessionData.id,
+        status: sessionStatus,
+        userId: sessionData.user_id,
+        planId: sessionData.payment_details?.planId
+      });
+      
+      return new Response(
+        JSON.stringify({
+          ResponseCode: isCompleted ? 0 : 1,
+          Description: isCompleted ? 'Payment completed successfully' : 'Payment pending or failed',
+          OperationResponse: isCompleted ? '0' : '1',
+          paymentSession: sessionData,
+          planId: sessionData.payment_details?.planId
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
-    // Parse the response
-    const responseData = await response.json();
-    console.log(`Received response from Cardcom API:`, responseData);
-    
-    // Check if payment was successful
-    if (responseData.OperationResponse === '0' || 
-        (responseData.TranzactionInfo && responseData.TranzactionInfo.ResponseCode === 0)) {
-      
-      console.log(`Payment successful! Updating database records for lowProfileId: ${lowProfileId}`);
-      
-      // Update or create payment log
-      if (!paymentLog) {
-        await supabaseClient
-          .from('payment_logs')
-          .insert({
-            lowprofile_id: lowProfileId,
-            status: 'completed',
-            plan_id: planId || responseData.plan_id || null,
-            transaction_id: responseData.TranzactionInfo?.TranzactionId || null,
-            payment_data: responseData
-          });
-      } else if (paymentLog.status !== 'completed') {
-        await supabaseClient
-          .from('payment_logs')
-          .update({
-            status: 'completed',
-            transaction_id: responseData.TranzactionInfo?.TranzactionId || null,
-            payment_data: responseData
-          })
-          .eq('id', paymentLog.id);
-      }
-      
-      // Check if user is doing this as part of registration
-      if (paymentSession?.payment_details?.isRegistrationFlow && 
-          paymentSession?.payment_details?.registrationData) {
-        
-        console.log('Processing registration flow completion...');
-        
-        // Complete the registration process if needed
-        // Additional logic for registration completion can be added here if needed
-      }
-    }
-    
-    // Return the response data
+    // No payment found
     return new Response(
       JSON.stringify({
-        ...responseData,
-        paymentLog: paymentLog || null,
-        paymentSession: paymentSession?.payment_details || null
+        ResponseCode: 1,
+        Description: 'Payment not found',
+        OperationResponse: '1'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-    
+
   } catch (error) {
     console.error('Error checking payment status:', error);
     
     return new Response(
       JSON.stringify({ 
-        ResponseCode: -1,
-        Description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        error: true
+        ResponseCode: 999,
+        Description: error instanceof Error ? error.message : 'Unknown error processing payment check',
+        OperationResponse: '999'
       }),
-      {
+      { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 500
       }
     );
   }

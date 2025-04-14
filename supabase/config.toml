@@ -43,3 +43,11 @@ verify_jwt = false
 verify_jwt = false
 [functions.cardcom-webhook]
 verify_jwt = false
+[functions.cardcom-payment]
+verify_jwt = false
+[functions.gmail-sender]
+verify_jwt = false
+[functions.generate-insight]
+verify_jwt = false
+[functions.financial-news]
+verify_jwt = false
