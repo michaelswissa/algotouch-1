@@ -45,11 +45,11 @@ serve(async (req) => {
     // First check if we've already processed this payment
     const { data: existingPayment } = await supabaseClient
       .from('user_payment_logs')
-      .select('id')
+      .select('id, status')
       .eq('token', webhookData.LowProfileId)
       .maybeSingle();
       
-    if (existingPayment) {
+    if (existingPayment && existingPayment.status === 'completed') {
       console.log(`Payment ${webhookData.LowProfileId} has already been processed`);
       return new Response(
         JSON.stringify({ success: true, status: 'already_processed' }),
@@ -58,6 +58,11 @@ serve(async (req) => {
           status: 200,
         }
       );
+    }
+
+    // Update existing payment log if it exists, but wasn't completed
+    if (existingPayment) {
+      console.log(`Found existing payment log ${existingPayment.id}, updating...`);
     }
     
     // Check if this is a successful transaction
@@ -94,28 +99,36 @@ serve(async (req) => {
           
           try {
             // Save contract signature if available
-            if (registrationData.contractDetails) {
-              const contractDetails = registrationData.contractDetails;
+            if (registrationData.contractDetails || paymentSession.payment_details?.contractDetails) {
+              const contractDetails = registrationData.contractDetails || paymentSession.payment_details?.contractDetails;
               console.log('Saving contract signature from registration data');
               
-              const { error: contractError } = await supabaseClient
-                .from('contract_signatures')
-                .insert({
-                  plan_id: planId,
-                  full_name: contractDetails.fullName || `${registrationData.userData.firstName} ${registrationData.userData.lastName}`,
-                  email: registrationData.email,
-                  phone: registrationData.userData.phone,
-                  signature: contractDetails.signature,
-                  contract_html: contractDetails.contractHtml,
-                  contract_version: contractDetails.contractVersion || '1.0',
-                  agreed_to_terms: contractDetails.agreedToTerms || false,
-                  agreed_to_privacy: contractDetails.agreedToPrivacy || false,
-                  browser_info: contractDetails.browserInfo || {},
-                  user_id: userId || null // Will be updated after user creation
-                });
-                
-              if (contractError) {
-                console.error('Error saving contract signature:', contractError);
+              // Verify contract data for fields
+              if (contractDetails && contractDetails.signature) {
+                const { error: contractError } = await supabaseClient
+                  .from('contract_signatures')
+                  .insert({
+                    plan_id: planId,
+                    full_name: contractDetails.fullName || 
+                      `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim() || 'Customer',
+                    email: registrationData.email,
+                    phone: registrationData.userData?.phone,
+                    signature: contractDetails.signature,
+                    contract_html: contractDetails.contractHtml,
+                    contract_version: contractDetails.contractVersion || '1.0',
+                    agreed_to_terms: contractDetails.agreedToTerms || false,
+                    agreed_to_privacy: contractDetails.agreedToPrivacy || false,
+                    browser_info: contractDetails.browserInfo || {},
+                    user_id: userId || null // Will be updated after user creation
+                  });
+                  
+                if (contractError) {
+                  console.error('Error saving contract signature:', contractError);
+                } else {
+                  console.log('Contract signature saved successfully');
+                }
+              } else {
+                console.log('Contract data missing required fields (signature)');
               }
             }
             
@@ -125,7 +138,7 @@ serve(async (req) => {
               .insert({
                 token: webhookData.LowProfileId,
                 status: 'completed',
-                amount: paymentSession.payment_details?.amount || 0,
+                amount: paymentSession.payment_details?.amount || webhookData.TranzactionInfo?.Amount || 0,
                 transaction_details: {
                   webhookData,
                   paymentSession: paymentSession.id,
@@ -153,7 +166,8 @@ serve(async (req) => {
           };
           
           // Set contract signed data if available in payment_details
-          if (paymentSession.payment_details?.contractSigned) {
+          if (paymentSession.payment_details?.contractDetails || 
+              paymentSession.payment_details?.contractSigned) {
             subscriptionData.contract_signed = true;
             subscriptionData.contract_signed_at = paymentSession.payment_details.contractSignedAt || now.toISOString();
           }
@@ -184,17 +198,32 @@ serve(async (req) => {
             
           if (subscriptionError) {
             console.error('Error updating subscription:', subscriptionError);
+          } else {
+            console.log('Subscription updated successfully for user:', userId);
           }
           
           // Record the payment
-          await supabaseClient.from('user_payment_logs').insert({
+          const paymentLogData = {
             user_id: userId,
             token: webhookData.LowProfileId,
             status: 'completed',
-            amount: paymentSession.payment_details?.amount || 0,
+            amount: paymentSession.payment_details?.amount || webhookData.TranzactionInfo?.Amount || 0,
             approval_code: webhookData.TranzactionInfo?.ApprovalNumber || null,
             transaction_details: webhookData
-          });
+          };
+
+          if (existingPayment) {
+            await supabaseClient
+              .from('user_payment_logs')
+              .update(paymentLogData)
+              .eq('id', existingPayment.id);
+          } else {
+            await supabaseClient
+              .from('user_payment_logs')
+              .insert(paymentLogData);
+          }
+          
+          console.log('Payment logged successfully');
           
           // If there was a contract in the payment details, save it
           if (paymentSession.payment_details?.contractDetails) {
@@ -210,24 +239,34 @@ serve(async (req) => {
               .maybeSingle();
               
             if (!existingContract) {
-              const { error: contractError } = await supabaseClient
-                .from('contract_signatures')
-                .insert({
-                  user_id: userId,
-                  plan_id: planId,
-                  full_name: contractDetails.fullName || '',
-                  email: paymentSession.email || '',
-                  signature: contractDetails.signature,
-                  contract_html: contractDetails.contractHtml,
-                  contract_version: contractDetails.contractVersion || '1.0',
-                  agreed_to_terms: contractDetails.agreedToTerms || false,
-                  agreed_to_privacy: contractDetails.agreedToPrivacy || false,
-                  browser_info: contractDetails.browserInfo || {}
-                });
-                
-              if (contractError) {
-                console.error('Error saving contract signature:', contractError);
+              // Verify contract data for required fields
+              if (contractDetails && contractDetails.signature) {
+                const { error: contractError } = await supabaseClient
+                  .from('contract_signatures')
+                  .insert({
+                    user_id: userId,
+                    plan_id: planId,
+                    full_name: contractDetails.fullName || '',
+                    email: paymentSession.email || '',
+                    signature: contractDetails.signature,
+                    contract_html: contractDetails.contractHtml,
+                    contract_version: contractDetails.contractVersion || '1.0',
+                    agreed_to_terms: contractDetails.agreedToTerms || false,
+                    agreed_to_privacy: contractDetails.agreedToPrivacy || false,
+                    browser_info: contractDetails.browserInfo || {},
+                    created_at: now.toISOString()
+                  });
+                  
+                if (contractError) {
+                  console.error('Error saving contract signature:', contractError);
+                } else {
+                  console.log('Contract signature saved successfully');
+                }
+              } else {
+                console.log('Contract data missing required fields (signature)');
               }
+            } else {
+              console.log('Contract already exists, skipping save');
             }
           }
         }
@@ -236,18 +275,29 @@ serve(async (req) => {
         console.log('Recording failed payment');
         
         // Record the failed payment
-        await supabaseClient.from('user_payment_logs').insert({
+        const paymentLogData = {
           user_id: userId || null,
           token: webhookData.LowProfileId,
           status: 'failed',
           amount: paymentSession.payment_details?.amount || 0,
           transaction_details: webhookData
-        });
+        };
+
+        if (existingPayment) {
+          await supabaseClient
+            .from('user_payment_logs')
+            .update(paymentLogData)
+            .eq('id', existingPayment.id);
+        } else {
+          await supabaseClient
+            .from('user_payment_logs')
+            .insert(paymentLogData);
+        }
         
         // Record payment error
         await supabaseClient.from('payment_errors').insert({
           user_id: userId || paymentSession.email || '',
-          error_code: webhookData.ResponseCode.toString() || '0',
+          error_code: (webhookData.ResponseCode || webhookData.OperationResponse || '0').toString(),
           error_message: webhookData.Description || 'Unknown error',
           payment_details: {
             webhookData,
@@ -265,11 +315,14 @@ serve(async (req) => {
             ...paymentSession.payment_details,
             status: isSuccessful ? 'completed' : 'failed',
             webhookProcessed: true,
-            webhookData
+            webhookData,
+            processedAt: new Date().toISOString()
           },
           expires_at: new Date().toISOString()
         })
         .eq('id', paymentSession.id);
+        
+      console.log(`Payment session ${paymentSession.id} marked as ${isSuccessful ? 'completed' : 'failed'}`);
     } else {
       // No associated payment session found
       console.log('No payment session found for lowProfileId:', webhookData.LowProfileId);
@@ -281,6 +334,8 @@ serve(async (req) => {
         amount: webhookData.TranzactionInfo?.Amount || 0,
         transaction_details: webhookData
       });
+      
+      console.log('Payment logged without session');
     }
 
     return new Response(

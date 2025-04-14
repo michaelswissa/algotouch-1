@@ -19,6 +19,8 @@ interface Subscription {
     expiryMonth: string;
     expiryYear: string;
   } | Json | null;
+  contract_signed: boolean;
+  contract_signed_at: string | null;
 }
 
 // Interface for processed subscription details
@@ -34,6 +36,8 @@ export interface SubscriptionDetails {
     expiryMonth: string;
     expiryYear: string;
   } | null;
+  isExpired: boolean;
+  contractSigned: boolean;
 }
 
 export const useSubscription = () => {
@@ -72,14 +76,22 @@ export const useSubscription = () => {
           trial_ends_at: data.trial_ends_at,
           current_period_ends_at: data.current_period_ends_at,
           next_charge_date: data.next_charge_date,
-          payment_method: data.payment_method
+          payment_method: data.payment_method,
+          contract_signed: data.contract_signed || false,
+          contract_signed_at: data.contract_signed_at
         };
         
         // Check if subscription is expired
         const now = new Date();
-        const isExpired = 
-          (data.trial_ends_at && new Date(data.trial_ends_at) < now) || 
-          (data.current_period_ends_at && new Date(data.current_period_ends_at) < now);
+        let isExpired = false;
+        
+        if (data.status !== 'vip') {
+          if (data.status === 'trial' && data.trial_ends_at) {
+            isExpired = new Date(data.trial_ends_at) < now;
+          } else if (data.current_period_ends_at) {
+            isExpired = new Date(data.current_period_ends_at) < now;
+          }
+        }
         
         // VIP subscriptions never expire
         const isVip = data.plan_type === 'vip';
@@ -93,12 +105,25 @@ export const useSubscription = () => {
             .from('subscriptions')
             .update({ status: 'expired' })
             .eq('id', data.id);
+            
+          // Log the expiration
+          await supabase.from('user_payment_logs').insert({
+            user_id: user.id,
+            status: 'expired',
+            amount: 0,
+            token: `exp-${data.id}`,
+            transaction_details: {
+              subscription_id: data.id,
+              expiration_date: now.toISOString(),
+              plan_type: data.plan_type
+            }
+          });
         }
         
         setSubscription(formattedSubscription);
         
         // Process the subscription details
-        const subscriptionDetails = getSubscriptionDetails(formattedSubscription);
+        const subscriptionDetails = getSubscriptionDetails(formattedSubscription, isExpired);
         setDetails(subscriptionDetails);
       } else {
         setSubscription(null);
@@ -114,9 +139,17 @@ export const useSubscription = () => {
   
   useEffect(() => {
     fetchSubscription();
+    
+    // Set up interval to check subscription status every 30 minutes
+    // This is important for detecting expired subscriptions
+    const checkInterval = setInterval(() => {
+      fetchSubscription();
+    }, 30 * 60 * 1000); // 30 minutes
+    
+    return () => clearInterval(checkInterval);
   }, [fetchSubscription]);
 
-  const getSubscriptionDetails = (sub: Subscription | null): SubscriptionDetails | null => {
+  const getSubscriptionDetails = (sub: Subscription | null, isExpired: boolean): SubscriptionDetails | null => {
     if (!sub) return null;
     
     // Get Hebrew plan name and actual price in ILS
@@ -144,7 +177,7 @@ export const useSubscription = () => {
       daysLeft = Math.max(0, differenceInDays(trialEndDate, new Date()));
       progressValue = Math.max(0, Math.min(100, (30 - daysLeft) / 30 * 100));
       
-      statusText = 'בתקופת ניסיון';
+      statusText = isExpired ? 'תקופת הניסיון הסתיימה' : 'בתקופת ניסיון';
       nextBillingDate = format(trialEndDate, 'dd/MM/yyyy', { locale: he });
     } else if (sub.status === 'expired') {
       statusText = 'פג תוקף';
@@ -157,7 +190,7 @@ export const useSubscription = () => {
       nextBillingDate = format(nextChargeDate, 'dd/MM/yyyy', { locale: he });
       
       if (sub.status === 'active') {
-        statusText = 'פעיל';
+        statusText = isExpired ? 'פג תוקף' : 'פעיל';
         
         // Calculate days left and progress based on either current_period_ends_at or next_charge_date
         const endDate = sub.current_period_ends_at 
@@ -173,6 +206,11 @@ export const useSubscription = () => {
         progressValue = Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
       } else if (sub.status === 'cancelled') {
         statusText = 'מבוטל';
+        // For cancelled subscriptions, show days until access is revoked
+        if (sub.current_period_ends_at) {
+          const endDate = parseISO(sub.current_period_ends_at);
+          daysLeft = Math.max(0, differenceInDays(endDate, new Date()));
+        }
       }
     } else if (sub.status === 'active' && sub.plan_type === 'vip') {
       // VIP plan has no end date
@@ -201,7 +239,9 @@ export const useSubscription = () => {
       nextBillingDate,
       progressValue,
       daysLeft,
-      paymentMethod: paymentMethodDetails
+      paymentMethod: paymentMethodDetails,
+      isExpired,
+      contractSigned: sub.contract_signed || false
     };
   };
 
