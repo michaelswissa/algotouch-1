@@ -1,68 +1,66 @@
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-interface RegistrationData {
-  planId?: string;
-  email?: string;
-  contractSigned?: boolean;
-  contractSignedAt?: string;
-  contractDetails?: any;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-export function useRegistrationData() {
-  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
+export const useRegistrationData = () => {
+  const [registrationData, setRegistrationData] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [selectedPlan, setSelectedPlan] = useState<string | undefined>(undefined);
+  const [selectedPlan, setSelectedPlan] = useState<string>('');
+  const navigate = useNavigate();
 
-  // Load registration data from session storage on initial load
   useEffect(() => {
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setRegistrationData(parsedData);
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      if (storedData) {
+        const data = JSON.parse(storedData);
+        setRegistrationData(data);
         
-        // If plan already selected, update state
-        if (parsedData.planId) {
-          setSelectedPlan(parsedData.planId);
+        // If plan was already selected in a previous session, set it
+        if (data.planId) {
+          setSelectedPlan(data.planId);
+          setCurrentStep(data.lastCompletedStep ? data.lastCompletedStep + 1 : 2);
         }
-        
-        // Determine current step based on stored data
-        if (parsedData.contractSigned) {
-          setCurrentStep(3); // Payment step
-        } else if (parsedData.planId) {
-          setCurrentStep(2); // Contract step
-        }
-      } catch (e) {
-        console.error('Error parsing registration data:', e);
       }
+    } catch (error) {
+      console.error('Error parsing registration data:', error);
     }
   }, []);
 
-  // Update registration data and save to session storage
-  const updateRegistrationData = (newData: Partial<RegistrationData>) => {
-    setRegistrationData(prevData => {
-      const updatedData = { ...prevData, ...newData } as RegistrationData;
+  const updateRegistrationData = (newData: any) => {
+    try {
+      const updatedData = {
+        ...registrationData,
+        ...newData,
+        lastUpdated: new Date().toISOString()
+      };
       
-      // Save to session storage
+      setRegistrationData(updatedData);
       sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
       
-      return updatedData;
-    });
+      // If this is the first time setting registration data, record registration time
+      if (!registrationData?.registrationTime) {
+        const registrationTimeData = {
+          ...updatedData,
+          registrationTime: new Date().toISOString()
+        };
+        setRegistrationData(registrationTimeData);
+        sessionStorage.setItem('registration_data', JSON.stringify(registrationTimeData));
+      }
+    } catch (error) {
+      console.error('Error updating registration data:', error);
+    }
   };
 
-  // Clear registration data
   const clearRegistrationData = () => {
     sessionStorage.removeItem('registration_data');
     setRegistrationData(null);
     setCurrentStep(1);
-    setSelectedPlan(undefined);
+    setSelectedPlan('');
+  };
+
+  const completeStep = (step: number) => {
+    updateRegistrationData({ lastCompletedStep: step });
+    setCurrentStep(step + 1);
   };
 
   return {
@@ -72,6 +70,7 @@ export function useRegistrationData() {
     currentStep,
     setCurrentStep,
     selectedPlan,
-    setSelectedPlan
+    setSelectedPlan,
+    completeStep
   };
-}
+};

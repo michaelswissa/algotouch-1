@@ -115,6 +115,67 @@ serve(async (req) => {
       const cardcomResult = await cardcomResponse.json();
       console.log('Cardcom API response:', cardcomResult);
 
+      // Check if the payment is successful
+      const isSuccessful = 
+        cardcomResult.ResponseCode === 0 || 
+        cardcomResult.OperationResponse === "0" ||
+        (cardcomResult.TranzactionInfo && cardcomResult.TranzactionInfo.ResponseCode === 0);
+      
+      // If payment is successful but not yet in our database, let's log it
+      if (isSuccessful) {
+        // Extract transaction details from Cardcom response
+        const transactionId = cardcomResult.TranzactionId || 
+                             (cardcomResult.TranzactionInfo && cardcomResult.TranzactionInfo.TranzactionId);
+        
+        const approvalNumber = 
+          (cardcomResult.TranzactionInfo && cardcomResult.TranzactionInfo.ApprovalNumber) || 
+          (cardcomResult.TokenInfo && cardcomResult.TokenInfo.TokenApprovalNumber) || '';
+        
+        // Get the amount from transaction info
+        const amount = cardcomResult.TranzactionInfo ? cardcomResult.TranzactionInfo.Amount : 0;
+        
+        // Check if we have a payment session for this transaction in our database
+        const { data: paymentSession } = await supabaseClient
+          .from('payment_sessions')
+          .select('*, users:user_id(*)')
+          .eq('payment_details->lowProfileId', lowProfileId)
+          .maybeSingle();
+        
+        if (paymentSession) {
+          // Log the payment
+          const { error: logInsertError } = await supabaseClient
+            .from('user_payment_logs')
+            .insert({
+              user_id: paymentSession.user_id,
+              token: lowProfileId,
+              amount: amount || paymentSession.payment_details?.amount || 0,
+              status: 'completed',
+              approval_code: approvalNumber,
+              transaction_details: cardcomResult
+            });
+          
+          if (logInsertError) {
+            console.error('Error logging payment:', logInsertError);
+          } else {
+            console.log('Payment logged successfully');
+          }
+          
+          // Update the payment session status
+          await supabaseClient
+            .from('payment_sessions')
+            .update({
+              payment_details: {
+                ...paymentSession.payment_details,
+                status: 'completed',
+                transactionId,
+                approvalNumber,
+                completedAt: new Date().toISOString()
+              }
+            })
+            .eq('id', paymentSession.id);
+        }
+      }
+
       // Check if the payment session exists in our database
       const { data: paymentSession } = await supabaseClient
         .from('payment_sessions')
@@ -126,6 +187,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           ...cardcomResult,
+          isSuccessful,
           paymentSessionExists: !!paymentSession,
           paymentSessionId: paymentSession?.id || null
         }),
