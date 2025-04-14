@@ -2,8 +2,10 @@
 export interface SubscriptionPlan {
   name: string;
   price: number;
-  description: string;
+  description?: string;
   currency?: string;
+  freeTrialDays?: number;
+  hasTrial?: boolean;
 }
 
 export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
@@ -13,18 +15,22 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
       price: 99,
       currency: '$',
       description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
+      freeTrialDays: 30,
+      hasTrial: true
     },
     annual: {
       name: 'שנתי',
       price: 899,
       currency: '$',
       description: '25% הנחה | שלושה חודשים מתנה',
+      hasTrial: false
     },
     vip: {
       name: 'VIP',
       price: 3499,
       currency: '$',
       description: 'גישה לכל החיים בתשלום חד פעמי',
+      hasTrial: false
     },
   };
 };
@@ -39,10 +45,11 @@ export interface TokenData {
 }
 
 export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
+  const expiryParts = expiryDate.split('/');
   return {
     lastFourDigits: cardNumber.slice(-4),
-    expiryMonth: expiryDate.split('/')[0],
-    expiryYear: `20${expiryDate.split('/')[1]}`,
+    expiryMonth: expiryParts[0] || '',
+    expiryYear: expiryParts[1] ? `20${expiryParts[1]}` : '',
     cardholderName
   };
 };

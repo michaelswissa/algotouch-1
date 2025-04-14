@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionCont
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import PaymentForm from '@/components/payment/PaymentForm';
+import { Spinner } from '@/components/ui/spinner';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -27,28 +29,19 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [iframeHeight, setIframeHeight] = useState(650);
 
   const initiateCardcomPayment = async () => {
-    if (!user) {
-      toast.error('יש להתחבר כדי להמשיך');
+    if (!user && !email) {
+      toast.error('יש להתחבר או למלא את פרטי המייל כדי להמשיך');
       return;
     }
 
     setIsLoading(true);
     try {
-      let operationType = 3; // Default: token creation only (for monthly trial)
-      
-      if (selectedPlan === 'annual') {
-        operationType = 2; // Charge and create token
-      } else if (selectedPlan === 'vip') {
-        operationType = 1; // Charge only
-      }
-
       const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
         body: {
           planId: selectedPlan,
-          userId: user.id,
+          userId: user?.id,
           fullName: fullName || '',
-          email: email || user.email || '',
-          operationType,
+          email: email || user?.email || '',
           successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${selectedPlan}`,
           errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${selectedPlan}`
         }
@@ -141,7 +134,14 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
                 disabled={isLoading}
                 className="mt-2"
               >
-                {isLoading ? 'מעבד...' : 'המשך לתשלום מאובטח של Cardcom'}
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Spinner size="sm" />
+                    מעבד...
+                  </div>
+                ) : (
+                  'המשך לתשלום מאובטח של Cardcom'
+                )}
               </Button>
             </div>
           </CardContent>
