@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -33,6 +34,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     apiName: string;
   } | null>(null);
   const [registrationData, setRegistrationData] = useState<any>(null);
+  const [registrationDataLoaded, setRegistrationDataLoaded] = useState(false);
 
   // Create refs for the iframe elements
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
@@ -47,6 +49,9 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [cvvFrameLoaded, setCvvFrameLoaded] = useState(false);
   const [processing3DS, setProcessing3DS] = useState(false);
 
+  // Add a timeout reference to handle loading states
+  const loadingTimeoutRef = useRef<number | null>(null);
+
   // Get registration data from session storage if available
   useEffect(() => {
     try {
@@ -56,14 +61,19 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         console.log('Found registration data in CardcomOpenFields:', parsedData);
         setRegistrationData(parsedData);
       }
+      // Mark registration data as loaded even if none was found
+      setRegistrationDataLoaded(true);
     } catch (err) {
       console.error('Error parsing registration data:', err);
+      setRegistrationDataLoaded(true); // Still mark as loaded even on error
     }
   }, []);
 
   useEffect(() => {
-    // Initialize the payment session when the component mounts
-    initializePaymentSession();
+    // Only initialize payment session when registration data status is determined
+    if (registrationDataLoaded) {
+      initializePaymentSession();
+    }
 
     // Add event listener for messages from the iframe
     window.addEventListener('message', handleIframeMessages);
@@ -81,12 +91,17 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         document.head.removeChild(cardcom3DSScript);
       }
       
+      // Clear any pending timeout
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+      }
+      
       // Clean up the session if component unmounts without completing
       if (sessionId) {
         cleanupPaymentSession();
       }
     };
-  }, []);
+  }, [registrationDataLoaded]);
 
   const initializePaymentSession = async () => {
     try {
@@ -164,6 +179,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           planName = 'מנוי';
       }
 
+      // Set a timeout to reset loading state if the request takes too long
+      loadingTimeoutRef.current = window.setTimeout(() => {
+        setIsLoading(false);
+        setError('תקלת תקשורת - נא לנסות שוב');
+        if (onError) onError('תקלת תקשורת - נא לנסות שוב');
+      }, 15000); // 15 seconds timeout
+
       // Call our edge function to create a payment session
       const { data, error } = await supabase.functions.invoke('cardcom-openfields', {
         body: {
@@ -178,6 +200,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           registrationData: !userId ? registrationData : null // Pass registration data if user is not logged in
         }
       });
+      
+      // Clear the timeout since request completed
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
       
       if (error) {
         console.error('Error creating payment session:', error);
@@ -205,6 +233,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       console.error('Error initializing payment session:', err);
       setError(err instanceof Error ? err.message : 'שגיאה ביצירת תהליך התשלום');
       if (onError) onError(err instanceof Error ? err.message : 'שגיאה ביצירת תהליך התשלום');
+      
+      // Clear any timeout
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
     } finally {
       setIsLoading(false);
     }
@@ -235,7 +269,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       return;
     }
 
-    // CSS for card number field
+    // CSS for card number field - improved contrast and dark mode support
     const cardCss = `
       .cardNumberField {
         border: 1px solid #e2e8f0;
@@ -263,9 +297,21 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       .cardNumberField.invalid {
         border-color: #e53e3e;
       }
+      
+      /* Ensure text is visible in dark mode */
+      @media (prefers-color-scheme: dark) {
+        .cardNumberField {
+          background-color: #1a202c;
+          color: #f7fafc;
+          border-color: #4a5568;
+        }
+        .cardNumberField:focus {
+          border-color: #63b3ed;
+        }
+      }
     `;
     
-    // CSS for CVV field
+    // CSS for CVV field - improved contrast and dark mode support
     const cvvCss = `
       .cvvField {
         border: 1px solid #e2e8f0;
@@ -291,6 +337,18 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       }
       .cvvField.invalid {
         border-color: #e53e3e;
+      }
+      
+      /* Ensure text is visible in dark mode */
+      @media (prefers-color-scheme: dark) {
+        .cvvField {
+          background-color: #1a202c;
+          color: #f7fafc;
+          border-color: #4a5568;
+        }
+        .cvvField:focus {
+          border-color: #63b3ed;
+        }
       }
     `;
 
@@ -345,12 +403,26 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         console.log('3DS process started');
         setProcessing3DS(true);
         if (onPaymentStart) onPaymentStart();
+        
+        // Set a timeout to reset loading state if the 3DS takes too long
+        loadingTimeoutRef.current = window.setTimeout(() => {
+          setProcessing3DS(false);
+          setIsLoading(false);
+          setError('תקלת תקשורת בתהליך אימות ה-3DS - נא לנסות שוב');
+          if (onError) onError('תקלת תקשורת בתהליך אימות ה-3DS - נא לנסות שוב');
+        }, 60000); // 60 seconds timeout for 3DS
       }
       else if (message.action === 'HandleEror') {
         // Handle errors from iframe
         console.error('Cardcom error:', message);
         setIsLoading(false);
         setProcessing3DS(false);
+        
+        // Clear any timeout
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
         
         // Check for already completed transaction error
         if (message.message && message.message.includes('העסקה כבר הושלמה')) {
@@ -370,6 +442,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         // Handle successful payment
         console.log('Payment successful:', message.data);
         setProcessing3DS(false);
+        
+        // Clear any timeout
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
         
         if (message.data && message.data.IsSuccess) {
           // Process the successful payment
@@ -395,6 +473,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       console.error('Error handling iframe message:', err);
       setIsLoading(false);
       setProcessing3DS(false);
+      
+      // Clear any timeout
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      
       setError('שגיאה בתהליך התשלום');
       if (onError) onError('שגיאה בעיבוד תשובת התשלום');
     }
@@ -409,6 +494,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     }
     
     setIsLoading(true);
+    setError(null); // Clear any previous errors
     if (onPaymentStart) onPaymentStart();
     
     try {
@@ -425,6 +511,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         if (onError) onError('נא למלא את כל השדות הנדרשים');
         return;
       }
+      
+      // Set a timeout to reset loading state if the transaction takes too long
+      loadingTimeoutRef.current = window.setTimeout(() => {
+        setIsLoading(false);
+        setError('תקלת תקשורת - נא לנסות שוב');
+        if (onError) onError('תקלת תקשורת - נא לנסות שוב');
+      }, 30000); // 30 seconds timeout
       
       // If the master iframe is loaded, send the transaction request
       if (masterFrameRef.current?.contentWindow) {
@@ -467,6 +560,13 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
     } catch (err) {
       console.error('Error submitting payment:', err);
       setIsLoading(false);
+      
+      // Clear any timeout
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      
       setError('שגיאה בשליחת התשלום');
       if (onError) onError('שגיאה בשליחת התשלום');
     }
@@ -476,6 +576,16 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const isAuthenticated = !!user?.id;
   const isRegistering = !!registrationData;
   const isValidUser = isAuthenticated || isRegistering;
+  
+  // If we're still checking registration data, show loading
+  if (!registrationDataLoaded) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin" />
+        <span className="mr-4">טוען נתונים...</span>
+      </div>
+    );
+  }
 
   if (!isValidUser) {
     return (
@@ -501,7 +611,10 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
         <div className="flex justify-center">
-          <Button onClick={initializePaymentSession} className="w-full">
+          <Button onClick={() => {
+            setError(null); 
+            initializePaymentSession();
+          }} className="w-full">
             נסה שנית
           </Button>
         </div>
@@ -527,7 +640,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <input
             type="text"
             id="cardOwnerName"
-            className="w-full p-2 border rounded-md"
+            className="w-full p-2 border rounded-md text-gray-900 dark:text-white dark:bg-gray-800"
             placeholder="שם מלא כפי שמופיע על הכרטיס"
             defaultValue={user?.user_metadata?.first_name && user?.user_metadata?.last_name ? 
               `${user.user_metadata.first_name} ${user.user_metadata.last_name}` : 
@@ -546,7 +659,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           <input
             type="text"
             id="cardOwnerID"
-            className="w-full p-2 border rounded-md"
+            className="w-full p-2 border rounded-md text-gray-900 dark:text-white dark:bg-gray-800"
             placeholder="מספר תעודת זהות (אופציונלי)"
             pattern="[0-9]*"
             inputMode="numeric"
@@ -590,7 +703,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             </label>
             <select
               id="expirationMonth"
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border rounded-md text-gray-900 dark:text-white dark:bg-gray-800"
               required
             >
               <option value="">חודש</option>
@@ -607,7 +720,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             </label>
             <select
               id="expirationYear"
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border rounded-md text-gray-900 dark:text-white dark:bg-gray-800"
               required
             >
               <option value="">שנה</option>

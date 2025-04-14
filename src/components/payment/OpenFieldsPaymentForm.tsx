@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
 
 interface OpenFieldsPaymentFormProps {
   planId: string;
@@ -28,10 +29,12 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
 }) => {
   const { user } = useAuth();
   const [registrationData, setRegistrationData] = useState<any>(null);
+  const [registrationDataChecked, setRegistrationDataChecked] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Check for registration data
   useEffect(() => {
@@ -41,8 +44,10 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
         console.log('Found registration data in OpenFieldsPaymentForm');
         setRegistrationData(JSON.parse(storedData));
       }
+      setRegistrationDataChecked(true);
     } catch (err) {
       console.error('Error parsing registration data:', err);
+      setRegistrationDataChecked(true);
     }
   }, []);
 
@@ -70,6 +75,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           }
         } catch (err) {
           console.error('Error checking subscription:', err);
+          setError('Error checking subscription status');
         } finally {
           setIsCheckingSubscription(false);
         }
@@ -81,11 +87,68 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     checkExistingSubscription();
   }, [user?.id, planId]);
 
-  if (isCheckingSubscription) {
+  const handleRetry = () => {
+    setError(null);
+    // If we're checking auth or registration, retry that process
+    if (!registrationDataChecked) {
+      try {
+        const storedData = sessionStorage.getItem('registration_data');
+        if (storedData) {
+          setRegistrationData(JSON.parse(storedData));
+        }
+        setRegistrationDataChecked(true);
+      } catch (err) {
+        console.error('Error parsing registration data:', err);
+      }
+    }
+    // If we're checking subscription, retry that
+    else if (isCheckingSubscription && user?.id) {
+      setIsCheckingSubscription(true);
+      supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) throw error;
+          
+          if (data && data.status !== 'cancelled') {
+            setHasSubscription(true);
+            
+            // Check if user is changing plan
+            if (data.plan_type !== planId) {
+              setIsChangingPlan(true);
+            }
+          }
+          setIsCheckingSubscription(false);
+        })
+        .catch((err) => {
+          console.error('Error checking subscription:', err);
+          setError('Error checking subscription status');
+          setIsCheckingSubscription(false);
+        });
+    }
+  };
+
+  if (isCheckingSubscription || !registrationDataChecked) {
     return (
-      <div className="flex justify-center py-8">
-        <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin"></div>
-        <span className="mr-4">בודק פרטי מנוי...</span>
+      <div className="flex flex-col items-center justify-center py-8 space-y-4">
+        <Spinner size="lg" className="border-primary" />
+        <span>{isCheckingSubscription ? 'בודק פרטי מנוי...' : 'טוען נתונים...'}</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={handleRetry} variant="outline" className="w-full">
+          נסה שנית
+        </Button>
       </div>
     );
   }
