@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -28,11 +28,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     paymentStatus,
     masterFrameRef,
     initializePayment,
-    handleRetry
+    handleRetry,
+    submitPayment
   } = usePayment({
     planId,
     onPaymentComplete
   });
+
+  // Initialize payment on component mount
+  useEffect(() => {
+    if (paymentStatus === PaymentStatus.IDLE) {
+      initializePayment();
+    }
+  }, [paymentStatus, initializePayment]);
   
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -70,20 +78,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.INITIALIZING) && (
+        {paymentStatus === PaymentStatus.PROCESSING && (
           <>
             <Button 
               type="button" 
               className="w-full" 
-              onClick={initializePayment}
-              disabled={paymentStatus === PaymentStatus.INITIALIZING}
+              onClick={submitPayment}
+              disabled={paymentStatus === PaymentStatus.PROCESSING}
             >
-              {paymentStatus === PaymentStatus.INITIALIZING ? (
+              {paymentStatus === PaymentStatus.PROCESSING ? (
                 <span className="flex items-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> טוען...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...
                 </span>
               ) : (
-                'שלם עכשיו'
+                'אשר תשלום'
               )}
             </Button>
             <p className="text-xs text-center text-muted-foreground">

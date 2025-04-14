@@ -1,5 +1,5 @@
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
@@ -58,6 +58,17 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }, 500);
   };
 
+  const submitPayment = () => {
+    // Only send message if frame is ready
+    if (masterFrameRef.current?.contentWindow) {
+      masterFrameRef.current.contentWindow.postMessage(
+        { action: 'submitPayment' },
+        'https://secure.cardcom.solutions'
+      );
+      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+    }
+  };
+
   return {
     ...state,
     masterFrameRef,
@@ -68,6 +79,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         }
       });
     },
-    handleRetry
+    handleRetry,
+    submitPayment
   };
 };
