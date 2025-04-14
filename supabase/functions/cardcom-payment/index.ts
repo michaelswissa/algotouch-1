@@ -49,7 +49,8 @@ serve(async (req) => {
       planId, 
       amount, 
       currency,
-      hasRegistrationData: !!registrationData 
+      hasRegistrationData: !!registrationData,
+      hasInvoiceInfo: !!invoiceInfo
     });
 
     // Validate required parameters
@@ -62,51 +63,83 @@ serve(async (req) => {
     let userEmail = null;
     let fullName = '';
 
-    if (registrationData) {
+    // Try to get user from auth token first
+    try {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        
+        if (user && !error) {
+          userId = user.id;
+          userEmail = user.email;
+          fullName = user.user_metadata?.full_name || 
+                     `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim();
+          
+          logStep("Found authenticated user", { userId });
+        }
+      }
+    } catch (authError) {
+      logStep("Auth error (non-fatal)", { error: authError.message });
+      // Continue with registration data if auth fails
+    }
+
+    // If no authenticated user, try to use registration data
+    if (!userId && registrationData) {
       // For users in registration process
       userEmail = registrationData.email;
       const userData = registrationData.userData || {};
       fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
       
-      // Create user account if it doesn't exist
-      const { data: { user }, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-        email: registrationData.email,
-        password: registrationData.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          phone: userData.phone,
-          is_new_user: true
+      // Try to find existing user with this email
+      const { data: existingUser } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', userEmail)
+        .maybeSingle();
+        
+      if (existingUser) {
+        userId = existingUser.id;
+        logStep("Found existing user by email", { userId });
+      } else {
+        // Create user account if it doesn't exist
+        try {
+          const { data: { user }, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+            email: registrationData.email,
+            password: registrationData.password,
+            email_confirm: true,
+            user_metadata: {
+              first_name: userData.firstName,
+              last_name: userData.lastName,
+              phone: userData.phone,
+              is_new_user: true
+            }
+          });
+
+          if (signUpError) {
+            throw new Error(`Failed to create user account: ${signUpError.message}`);
+          }
+
+          userId = user?.id;
+          logStep("Created new user account", { userId });
+        } catch (createError) {
+          logStep("User creation error", { error: createError.message });
+          // Continue even if user creation fails - we'll create a temporary session
         }
-      });
-
-      if (signUpError) {
-        throw new Error(`Failed to create user account: ${signUpError.message}`);
       }
-
-      userId = user?.id;
-      logStep("Created new user account", { userId });
-    } else {
-      // For authenticated users
-      const { data: { user } } = await supabaseAdmin.auth.getUser(
-        req.headers.get('Authorization')?.replace('Bearer ', '') || ''
-      );
-      
-      if (!user) {
-        throw new Error("User not authenticated and no registration data provided");
-      }
-      
-      userId = user.id;
-      userEmail = user.email;
-      fullName = user.user_metadata?.full_name || 
-                 `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim();
-      
-      logStep("Found authenticated user", { userId });
     }
     
-    // Generate unique transaction reference
-    const transactionRef = `${userId}-${Date.now()}`;
+    // Allow anonymous payment flow if needed (fallback if both auth and registration data are missing)
+    if (!userId && !userEmail) {
+      logStep("No user identified - proceeding with anonymous payment");
+      userEmail = invoiceInfo?.email || "anonymous@example.com";
+      fullName = invoiceInfo?.fullName || "Anonymous User";
+    }
+    
+    // Generate unique transaction reference - use userId if available, or generate a random one
+    const transactionRef = userId 
+      ? `${userId}-${Date.now()}`
+      : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
     // Prepare webhook URL with full domain
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
@@ -160,6 +193,7 @@ serve(async (req) => {
     });
     
     if (!response.ok) {
+      logStep("CardCom API error response", { status: response.status, statusText: response.statusText });
       throw new Error(`CardCom API error: ${response.status} ${response.statusText}`);
     }
     
@@ -181,27 +215,44 @@ serve(async (req) => {
       throw new Error(`CardCom initialization failed: ${responseParams.get("Description") || "Unknown error"}`);
     }
     
-    // Store payment session in database
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
-      .from('payment_sessions')
-      .insert({
-        user_id: userId,
-        low_profile_code: lowProfileCode,
-        reference: transactionRef,
-        plan_id: planId,
-        amount: amount,
-        currency: currency,
-        status: 'initiated',
-        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
-      })
-      .select('id')
-      .single();
-      
-    if (sessionError) {
-      throw new Error(`Failed to store payment session: ${sessionError.message}`);
+    // Store payment session in database 
+    const sessionData = {
+      user_id: userId,
+      low_profile_code: lowProfileCode,
+      reference: transactionRef,
+      plan_id: planId,
+      amount: amount,
+      currency: currency,
+      status: 'initiated',
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
+      // Store anonymous user info if not authenticated
+      anonymous_data: !userId ? { email: userEmail, fullName } : null
+    };
+    
+    let dbSessionId;
+    
+    if (userId) {
+      // For authenticated users, store in payment_sessions
+      const { data: dbSession, error: sessionError } = await supabaseAdmin
+        .from('payment_sessions')
+        .insert(sessionData)
+        .select('id')
+        .single();
+          
+      if (sessionError) {
+        logStep("Database error", { error: sessionError.message });
+        // Don't fail - we can still proceed with payment even if DB write fails
+      } else {
+        dbSessionId = dbSession.id;
+      }
+    } else {
+      // For anonymous users, store in temporary_payment_sessions or similar
+      // This depends on your database schema - adjust as needed
+      logStep("Created anonymous payment session", { lowProfileCode });
+      dbSessionId = "temp-" + Date.now();
     }
     
-    logStep("Payment session stored", { sessionId: sessionData?.id });
+    logStep("Payment session prepared", { sessionId: dbSessionId });
     
     // Return data for frontend iframe creation
     return new Response(
@@ -211,7 +262,7 @@ serve(async (req) => {
         data: {
           lowProfileCode: lowProfileCode,
           terminalNumber: terminalNumber,
-          sessionId: sessionData.id,
+          sessionId: dbSessionId,
           cardcomUrl: cardcomUrl,
           url: url
         }

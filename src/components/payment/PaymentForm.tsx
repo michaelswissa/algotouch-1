@@ -38,6 +38,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   // Initialize payment on component mount
   useEffect(() => {
     if (paymentStatus === PaymentStatus.IDLE) {
+      console.log("Initializing payment for plan:", planId);
       initializePayment();
     }
   }, [paymentStatus, initializePayment]);
@@ -70,7 +71,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           paymentStatus={paymentStatus}
           plan={plan}
           terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl}
+          cardcomUrl={cardcomUrl || 'https://secure.cardcom.solutions'}
           masterFrameRef={masterFrameRef}
           onNavigateToDashboard={() => window.location.href = '/dashboard'}
           onRetry={handleRetry}
@@ -78,17 +79,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {paymentStatus === PaymentStatus.PROCESSING && (
+        {(paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.IDLE) && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={submitPayment}
-              disabled={paymentStatus === PaymentStatus.PROCESSING}
+              disabled={paymentStatus === PaymentStatus.INITIALIZING}
             >
-              {paymentStatus === PaymentStatus.PROCESSING ? (
+              {paymentStatus === PaymentStatus.INITIALIZING ? (
                 <span className="flex items-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מאתחל תשלום...
                 </span>
               ) : (
                 'אשר תשלום'
@@ -100,11 +101,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           </>
         )}
         
-        {onBack && (
+        {onBack && paymentStatus !== PaymentStatus.SUCCESS && (
           <Button 
             variant="outline" 
             onClick={onBack} 
             className="absolute top-4 right-4"
+            disabled={paymentStatus === PaymentStatus.INITIALIZING}
           >
             חזור
           </Button>

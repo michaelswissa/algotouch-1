@@ -20,6 +20,7 @@ export const useFrameMessages = ({
 }: UseFrameMessagesProps) => {
   
   const handleFrameMessages = (event: MessageEvent) => {
+    // Validate the origin for security
     if (!event.origin.includes('cardcom.solutions')) {
       return;
     }
@@ -29,30 +30,58 @@ export const useFrameMessages = ({
 
     switch (msg.action) {
       case 'HandleSubmit':
+        console.log('Payment successful:', msg.data);
         handlePaymentSuccess(msg.data);
         break;
+        
       case '3DSProcessStarted':
+        console.log('3DS process started');
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
         break;
+        
       case '3DSProcessCompleted':
-        checkPaymentStatus(lowProfileCode, sessionId);
+        console.log('3DS process completed, checking payment status');
+        // After 3DS is completed, check the payment status
+        if (lowProfileCode && sessionId) {
+          // Add slight delay to allow CardCom to process the payment
+          setTimeout(() => {
+            checkPaymentStatus(lowProfileCode, sessionId);
+          }, 1500);
+        } else {
+          console.error('Missing lowProfileCode or sessionId for payment status check');
+        }
         break;
+        
       case 'HandleError':
-        console.error('Payment error:', msg);
+        console.error('Payment error from CardCom:', msg);
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
         toast.error(msg.message || 'אירעה שגיאה בעיבוד התשלום');
         break;
+        
       case 'handleValidations':
+        console.log('Field validation from CardCom:', msg);
         if (msg.field === 'cardNumber') {
           if (!msg.isValid && msg.message) {
-            toast.error(msg.message);
+            // Don't show toast for every validation error, but you could log it
+            console.warn('Card validation error:', msg.message);
+          } else if (msg.isValid && msg.cardType) {
+            // Card type information can be used to show card brand logo
+            console.log('Card type detected:', msg.cardType);
           }
+        } else if (msg.field === 'cvv') {
+          // CVV validation
+          console.log('CVV validation:', msg.isValid);
         }
+        break;
+        
+      default:
+        console.log('Unhandled message from CardCom iframe:', msg);
         break;
     }
   };
 
   useEffect(() => {
+    console.log('Setting up message listener with:', { lowProfileCode, sessionId });
     window.addEventListener('message', handleFrameMessages);
     return () => {
       window.removeEventListener('message', handleFrameMessages);
