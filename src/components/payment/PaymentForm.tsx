@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
-import { PaymentStatus } from './utils/paymentHelpers';
+import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 
 interface PaymentFormProps {

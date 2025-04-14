@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { PaymentStatusType, PaymentStatus } from '@/components/payment/utils/paymentHelpers';
+import { PaymentState, PaymentStatus, PaymentStatusType } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UsePaymentStatusProps {
@@ -8,10 +8,10 @@ interface UsePaymentStatusProps {
 }
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) => {
-  const [state, setState] = useState({
+  const [state, setState] = useState<PaymentState>({
     terminalNumber: '',
     cardcomUrl: '',
-    paymentStatus: PaymentStatus.IDLE as PaymentStatusType,
+    paymentStatus: PaymentStatus.IDLE,
     sessionId: '',
     lowProfileCode: '',
   });

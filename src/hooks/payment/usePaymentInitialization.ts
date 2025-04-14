@@ -1,8 +1,7 @@
-
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { PaymentStatus } from '@/components/payment/utils/paymentHelpers';
+import { PaymentStatus, PaymentResponse, InitConfig } from '@/components/payment/types/payment';
 
 interface UsePaymentInitializationProps {
   planId: string;
@@ -10,10 +9,10 @@ interface UsePaymentInitializationProps {
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
 }
 
-export const usePaymentInitialization = ({ 
-  planId, 
-  setState, 
-  masterFrameRef 
+export const usePaymentInitialization = ({
+  planId,
+  setState,
+  masterFrameRef
 }: UsePaymentInitializationProps) => {
   const navigate = useNavigate();
 
@@ -92,7 +91,7 @@ export const usePaymentInitialization = ({
     lowProfileCode: string,
     sessionId: string
   ) => {
-    const initMessage = {
+    const initMessage: InitConfig = {
       action: 'init',
       lowProfileCode,
       sessionId,

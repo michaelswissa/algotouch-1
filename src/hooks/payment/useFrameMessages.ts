@@ -1,5 +1,6 @@
 
 import { useEffect } from 'react';
+import { PaymentStatusType, CardComMessage } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {
@@ -23,7 +24,7 @@ export const useFrameMessages = ({
       return;
     }
 
-    const msg = event.data;
+    const msg = event.data as CardComMessage;
     console.log('Received message from CardCom iframe:', msg);
 
     switch (msg.action) {

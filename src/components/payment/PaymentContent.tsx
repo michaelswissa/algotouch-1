@@ -1,13 +1,12 @@
-
 import React from 'react';
-import { PaymentStatusType } from './utils/paymentHelpers';
+import { PaymentStatusType } from './types/payment';
+import { SubscriptionPlan } from './utils/paymentHelpers';
 import InitializingPayment from './states/InitializingPayment';
 import ProcessingPayment from './states/ProcessingPayment';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
-import { SubscriptionPlan } from './utils/paymentHelpers';
 
 interface PaymentContentProps {
   paymentStatus: PaymentStatusType;
