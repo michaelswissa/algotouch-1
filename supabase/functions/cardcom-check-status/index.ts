@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -42,11 +42,11 @@ serve(async (req) => {
       .eq('lowprofile_id', lowProfileId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     
     if (logError) {
       console.log(`No payment log found, checking with Cardcom API directly`);
-    } else {
+    } else if (paymentLog) {
       console.log(`Found payment log: ${paymentLog.status}`);
       
       // If we have a completed payment log, return success
@@ -111,19 +111,21 @@ serve(async (req) => {
     }
     
     // Store the response in payment_logs
-    await supabaseClient
-      .from('payment_logs')
-      .insert({
-        lowprofile_id: lowProfileId,
-        status: responseData.OperationResponse === '0' ? 'completed' : 'pending',
-        plan_id: planId || undefined,
-        payment_data: responseData,
-        transaction_id: responseData.InternalDealNumber
-      })
-      .catch(error => console.error('Error logging payment check:', error));
+    if (responseData) {
+      await supabaseClient
+        .from('payment_logs')
+        .insert({
+          lowprofile_id: lowProfileId,
+          status: responseData.OperationResponse === '0' ? 'completed' : 'pending',
+          plan_id: planId || undefined,
+          payment_data: responseData,
+          transaction_id: responseData.InternalDealNumber
+        })
+        .catch(error => console.error('Error logging payment check:', error));
+    }
     
     // Update subscription if payment is successful
-    if (responseData.OperationResponse === '0') {
+    if (responseData && responseData.OperationResponse === '0') {
       // Get user_id from payment_sessions
       const { data: session } = await supabaseClient
         .from('payment_sessions')
