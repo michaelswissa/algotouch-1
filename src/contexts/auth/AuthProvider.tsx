@@ -102,11 +102,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Sign in successful');
       toast.success('התחברת בהצלחה!');
       
-      // Use setTimeout to prevent immediate navigation
-      // This helps prevent state update loops and flickering
-      setTimeout(() => {
+      // Check for contract data to determine where to navigate
+      const contractData = sessionStorage.getItem('contract_data');
+      if (contractData) {
+        console.log('Found contract data, redirecting to subscription');
+        navigate('/subscription', { replace: true });
+      } else {
         navigate('/dashboard', { replace: true });
-      }, 300);
+      }
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;

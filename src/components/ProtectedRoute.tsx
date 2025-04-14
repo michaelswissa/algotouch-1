@@ -23,7 +23,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   
   useEffect(() => {
     try {
-      // Get both registration and contract data
+      // Validate registration data
       const registrationData = sessionStorage.getItem('registration_data');
       const contractData = sessionStorage.getItem('contract_data');
       
@@ -33,20 +33,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         const now = new Date();
         const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
         
-        // Registration data is valid if less than 30 minutes old
         const isRegistrationValid = timeDiffInMinutes < 30;
         setHasRegistrationData(isRegistrationValid);
         
         if (!isRegistrationValid) {
-          toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
+          console.log('Registration data expired');
           sessionStorage.removeItem('registration_data');
           sessionStorage.removeItem('contract_data');
+          toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
         }
       }
       
-      // Consider the flow valid if we have contract data from a registered user
-      // or if we have valid registration data (for new users)
-      const isValidFlow = Boolean(contractData) || (registrationData && hasRegistrationData);
+      // Consider the flow valid if:
+      // 1. User is authenticated OR
+      // 2. Has valid contract data OR
+      // 3. Has valid registration data and is in the signup process
+      const isValidFlow = isAuthenticated || 
+                         Boolean(contractData) || 
+                         (registrationData && hasRegistrationData);
+                         
       setHasValidFlow(isValidFlow);
       
     } catch (error) {
@@ -56,7 +61,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       sessionStorage.removeItem('registration_data');
       sessionStorage.removeItem('contract_data');
     }
-  }, [location.pathname]);
+  }, [location.pathname, isAuthenticated]);
 
   // Show loading state while checking auth
   if (!initialized || loading) {
@@ -69,10 +74,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Special handling for subscription flow
   if (location.pathname.startsWith('/subscription')) {
-    // Allow access if:
-    // 1. User is authenticated OR
-    // 2. Has valid registration flow OR
-    // 3. Has valid contract data
     if (isAuthenticated || hasValidFlow) {
       console.log("ProtectedRoute: Allowing access to subscription path", {
         isAuthenticated,
@@ -82,7 +83,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return <>{children}</>;
     }
     
-    // If no valid state, redirect to auth
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
