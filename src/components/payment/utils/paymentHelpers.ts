@@ -1,4 +1,3 @@
-
 // Subscription plan definitions
 export interface SubscriptionPlan {
   id: string;
@@ -80,11 +79,12 @@ export const formatPrice = (amount: number, currencyCode = 'ILS'): string => {
   return formatter.format(amount);
 };
 
-// Change enum to use string values for better comparisons
-export enum PaymentStatus {
-  IDLE = 'idle',
-  INITIALIZING = 'initializing',
-  PROCESSING = 'processing',
-  SUCCESS = 'success',
-  FAILED = 'failed',
-}
+export const PaymentStatus = {
+  IDLE: 'idle',
+  INITIALIZING: 'initializing',
+  PROCESSING: 'processing',
+  SUCCESS: 'success',
+  FAILED: 'failed'
+} as const;
+
+export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];

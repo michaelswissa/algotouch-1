@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
-import { getSubscriptionPlans, PaymentStatus } from './utils/paymentHelpers';
+import { getSubscriptionPlans, PaymentStatus, PaymentStatusType } from './utils/paymentHelpers';
 
 interface PaymentFormProps {
   planId: string;
@@ -25,7 +24,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const navigate = useNavigate();
   const [terminalNumber, setTerminalNumber] = useState<string>('');
   const [cardcomUrl, setCardcomUrl] = useState<string>('');
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.IDLE);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusType>(PaymentStatus.IDLE);
   const [sessionId, setSessionId] = useState<string>('');
   const [lowProfileCode, setLowProfileCode] = useState<string>('');
   const statusCheckTimerRef = useRef<number | null>(null);
@@ -102,8 +101,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
-    // Fix: Use strict string comparison since we've changed the enum to use string values
-    if (paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.INITIALIZING) {
+    if (
+      paymentStatus === PaymentStatus.PROCESSING || 
+      paymentStatus === PaymentStatus.INITIALIZING
+    ) {
       return;
     }
     
