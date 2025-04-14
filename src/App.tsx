@@ -10,11 +10,7 @@ import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
-import MySubscriptionPage from './pages/MySubscriptionPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import SubscribedRoute from './components/SubscribedRoute';
-import Subscription from './pages/Subscription';
-import SubscriptionSuccess from './pages/SubscriptionSuccess';
 
 const queryClient = new QueryClient();
 
@@ -27,17 +23,11 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/subscription" element={<Subscription />} />
-              <Route path="/subscription/:planId" element={<Subscription />} />
-              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-              <Route path="/my-subscription" element={<MySubscriptionPage />} />
               <Route
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <SubscribedRoute>
-                      <Dashboard />
-                    </SubscribedRoute>
+                    <Dashboard />
                   </ProtectedRoute>
                 }
               />
@@ -45,9 +35,7 @@ const App = () => {
                 path="/settings"
                 element={
                   <ProtectedRoute>
-                    <SubscribedRoute>
-                      <Settings />
-                    </SubscribedRoute>
+                    <Settings />
                   </ProtectedRoute>
                 }
               />
