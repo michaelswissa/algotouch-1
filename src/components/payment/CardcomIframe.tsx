@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CardcomIframeProps {
   planId: string;
@@ -50,7 +51,7 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
         };
         
         // Call the edge function to initialize payment
-        const { data, error: apiError } = await window.supabase.functions.invoke('cardcom-openfields', {
+        const { data, error: apiError } = await supabase.functions.invoke('cardcom-openfields', {
           body: paymentData
         });
         
