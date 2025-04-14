@@ -441,7 +441,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
             <span className="font-semibold">סך הכל לתשלום:</span>
             <span className="font-bold">{plan.price} ₪</span>
           </div>
-          {planId !== 'vip' && plan.freeTrialDays > 0 && (
+          {planId !== 'vip' && plan.hasTrial && (plan.freeTrialDays ?? 0) > 0 && (
             <div className="text-sm text-green-600 mt-2">
               * החיוב הראשון יהיה לאחר {plan.freeTrialDays} ימי ניסיון בחינם
             </div>
@@ -470,7 +470,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
                 <span className="h-5 w-5 border-2 border-t-background animate-spin rounded-full mr-2"></span>
                 מעבד תשלום...
               </>
-            ) : planId !== 'vip' && plan.freeTrialDays > 0 ? (
+            ) : planId !== 'vip' && plan.hasTrial && (plan.freeTrialDays ?? 0) > 0 ? (
               'התחל תקופת ניסיון'
             ) : (
               'אישור תשלום'

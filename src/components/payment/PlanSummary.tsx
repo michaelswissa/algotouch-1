@@ -10,6 +10,7 @@ interface PlanSummaryProps {
   displayPrice?: number;
   displayCurrency?: string;
   hasTrial?: boolean;
+  freeTrialDays?: number;
 }
 
 const PlanSummary: React.FC<PlanSummaryProps> = ({ 
@@ -19,7 +20,8 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
   currency = '₪',
   displayPrice,
   displayCurrency = '$',
-  hasTrial = false
+  hasTrial = false,
+  freeTrialDays = 0
 }) => {
   // Function to get the icon based on plan name
   const getPlanIcon = () => {
@@ -57,10 +59,10 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
       <div className="p-4">
         <p className="text-muted-foreground mb-3">{description}</p>
         
-        {hasTrial && (
+        {hasTrial && freeTrialDays > 0 && (
           <div className="flex items-center gap-2 text-primary bg-primary/10 p-2 rounded-md">
             <Check className="h-4 w-4" />
-            <p className="text-sm font-medium">חודש ניסיון חינם</p>
+            <p className="text-sm font-medium">{freeTrialDays} ימי ניסיון חינם</p>
           </div>
         )}
       </div>

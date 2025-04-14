@@ -14,6 +14,7 @@ export interface Plan {
   icon: React.ReactNode;
   features: PlanFeatureProps[];
   hasTrial?: boolean;
+  freeTrialDays?: number;
   recommended?: boolean;
 }
 
@@ -41,6 +42,7 @@ export const getPlansData = (): Plan[] => {
         { name: 'הטבה של 300$ בעמלות', icon: '💵', description: 'למצטרפים חדשים בלבד.', included: true },
       ],
       hasTrial: true,
+      freeTrialDays: 30,
     },
     {
       id: 'annual',
@@ -60,6 +62,7 @@ export const getPlansData = (): Plan[] => {
         { name: 'רצף עבודה שנתי', icon: '🔁', description: 'בלי הפרעות, בלי התנתקויות, בלי לאבד מומנטום.', included: true },
       ],
       hasTrial: false,
+      freeTrialDays: 0,
     },
     {
       id: 'vip',
@@ -79,6 +82,7 @@ export const getPlansData = (): Plan[] => {
         { name: 'אירועי VIP וקבוצות Mastermind', icon: '🔑', description: 'נטוורקינג איכותי, שיתופי פעולה ולמידה ממיטב הסוחרים בתחום.', included: true },
       ],
       hasTrial: false,
+      freeTrialDays: 0,
     }
   ];
 };

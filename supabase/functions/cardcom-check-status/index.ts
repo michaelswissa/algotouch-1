@@ -1,6 +1,6 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -20,12 +20,6 @@ function handleCors(req: Request) {
   return null;
 }
 
-// Helper to sanitize and trim strings
-function sanitizeString(str: string | null | undefined): string {
-  if (!str) return '';
-  return String(str).trim();
-}
-
 serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
@@ -36,42 +30,47 @@ serve(async (req) => {
     const { lowProfileId, planId } = requestBody;
     
     if (!lowProfileId) {
-      throw new Error('lowProfileId is required');
+      throw new Error('Missing lowProfileId parameter');
     }
-
-    console.log('Checking payment status for', { lowProfileId, planId });
     
-    // Get Cardcom credentials
-    const terminalNumber = sanitizeString(Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL"));
-    const userName = sanitizeString(Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME"));
+    console.log(`Checking payment status for lowProfileId: ${lowProfileId}, planId: ${planId || 'not provided'}`);
     
-    if (!terminalNumber || !userName) {
-      throw new Error('Missing Cardcom API credentials in environment variables');
-    }
-
     // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
     
-    // First check if payment was already processed through webhook
-    const { data: paymentLog, error: logError } = await supabaseClient
-      .from('user_payment_logs')
+    // Check if there's a payment log record for this lowProfileId
+    const { data: paymentLog, error: paymentLogError } = await supabaseClient
+      .from('payment_logs')
       .select('*')
-      .eq('token', lowProfileId)
-      .maybeSingle();
-    
-    if (logError) {
-      console.error('Error checking payment log:', logError);
-    } else if (paymentLog) {
-      console.log('Payment already recorded in logs:', paymentLog);
+      .eq('lowprofile_id', lowProfileId)
+      .single();
       
+    if (paymentLogError) {
+      console.log(`No payment log found for lowProfileId: ${lowProfileId}`);
+    }
+    
+    // Check if there's a payment session for this lowProfileId
+    const { data: paymentSession, error: paymentSessionError } = await supabaseClient
+      .from('payment_sessions')
+      .select('payment_details')
+      .filter('payment_details->lowProfileId', 'eq', lowProfileId)
+      .single();
+      
+    if (paymentSessionError) {
+      console.log(`No payment session found for lowProfileId: ${lowProfileId}`);
+    }
+    
+    // If we have a completed payment log, return success
+    if (paymentLog && paymentLog.status === 'completed') {
+      console.log(`Found completed payment log for lowProfileId: ${lowProfileId}`);
       return new Response(
         JSON.stringify({
-          ResponseCode: 0, 
-          Description: 'Payment already processed',
-          paymentLog
+          ResponseCode: 0,
+          Description: "Payment completed successfully",
+          paymentLog,
+          paymentSession: paymentSession || null
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,158 +79,101 @@ serve(async (req) => {
       );
     }
     
-    // Make request to Cardcom API to check status - using encodeURIComponent for all parameters
-    const url = `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx`;
-    const params = new URLSearchParams();
-    params.append('terminalnumber', terminalNumber);
-    params.append('username', userName);
-    params.append('lowprofilecode', lowProfileId);
-    params.append('codepage', '65001');
+    // If the payment is still processing or has failed, attempt to get status from Cardcom
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "";
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || "";
+    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD") || "";
     
-    console.log('Making request to Cardcom API:', url + '?' + params.toString());
+    if (!terminalNumber || !apiName) {
+      throw new Error('Missing Cardcom API credentials in environment variables');
+    }
     
-    const response = await fetch(`${url}?${params.toString()}`, {
+    // Call Cardcom API to check payment status
+    const cardcomUrl = "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx";
+    const params = new URLSearchParams({
+      terminalnumber: terminalNumber,
+      username: apiName,
+      lowprofilecode: lowProfileId,
+      codepage: '65001'
+    });
+    
+    console.log(`Calling Cardcom API to check payment status for lowProfileId: ${lowProfileId}`);
+    
+    const response = await fetch(`${cardcomUrl}?${params.toString()}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     });
     
     if (!response.ok) {
-      throw new Error(`Cardcom API returned status ${response.status}`);
+      throw new Error(`Cardcom API returned error: ${response.status} ${response.statusText}`);
     }
     
-    const responseData = await response.text();
-    console.log('Raw cardcom response:', responseData);
+    // Parse the response
+    const responseData = await response.json();
+    console.log(`Received response from Cardcom API:`, responseData);
     
-    // Parse the response data
-    const parsedResponse: any = {};
-    responseData.split('&').forEach((pair) => {
-      const [key, value] = pair.split('=');
-      if (key && value) {
-        try {
-          parsedResponse[key] = decodeURIComponent(value);
-        } catch (e) {
-          // If decoding fails, use the raw value
-          parsedResponse[key] = value;
-        }
-      }
-    });
-    
-    console.log('Parsed cardcom response:', parsedResponse);
-    
-    // Save the payment data if transaction was successful
-    if (parsedResponse.OperationResponse === '0' || parsedResponse.DealResponse === '0') {
-      console.log('Payment was successful, recording in database');
+    // Check if payment was successful
+    if (responseData.OperationResponse === '0' || 
+        (responseData.TranzactionInfo && responseData.TranzactionInfo.ResponseCode === 0)) {
       
-      // Check if we have a payment session with this lowProfileId
-      const { data: sessionData } = await supabaseClient
-        .from('payment_sessions')
-        .select('*')
-        .eq('payment_details->lowProfileId', lowProfileId)
-        .maybeSingle();
+      console.log(`Payment successful! Updating database records for lowProfileId: ${lowProfileId}`);
       
-      if (sessionData) {
-        console.log('Found payment session:', sessionData);
-        
-        // Record the payment
-        const { error: paymentError } = await supabaseClient
-          .from('user_payment_logs')
+      // Update or create payment log
+      if (!paymentLog) {
+        await supabaseClient
+          .from('payment_logs')
           .insert({
-            user_id: sessionData.user_id,
-            token: lowProfileId,
+            lowprofile_id: lowProfileId,
             status: 'completed',
-            amount: sessionData.payment_details.amount || 0,
-            approval_code: parsedResponse.ApprovalNumber || null,
-            transaction_details: {
-              paymentSession: sessionData.id,
-              planId: planId || sessionData.payment_details.planId,
-              cardcomResponse: parsedResponse
-            }
+            plan_id: planId || responseData.plan_id || null,
+            transaction_id: responseData.TranzactionInfo?.TranzactionId || null,
+            payment_data: responseData
           });
-          
-        if (paymentError) {
-          console.error('Error recording payment:', paymentError);
-        }
+      } else if (paymentLog.status !== 'completed') {
+        await supabaseClient
+          .from('payment_logs')
+          .update({
+            status: 'completed',
+            transaction_id: responseData.TranzactionInfo?.TranzactionId || null,
+            payment_data: responseData
+          })
+          .eq('id', paymentLog.id);
+      }
+      
+      // Check if user is doing this as part of registration
+      if (paymentSession?.payment_details?.isRegistrationFlow && 
+          paymentSession?.payment_details?.registrationData) {
         
-        // Process registration data if present
-        if (sessionData.payment_details.isRegistrationFlow && sessionData.payment_details.registrationData) {
-          console.log('Processing registration data for new user');
-          // Registration data processing would happen here
-        }
+        console.log('Processing registration flow completion...');
         
-        // Update subscription status for authenticated users
-        if (sessionData.user_id) {
-          const { error: subscriptionError } = await supabaseClient
-            .from('subscriptions')
-            .upsert({
-              user_id: sessionData.user_id,
-              plan_type: planId || sessionData.plan_id,
-              status: sessionData.payment_details.isRecurring && sessionData.payment_details.freeTrialDays > 0 
-                ? 'trial' 
-                : 'active',
-              payment_method: {
-                cardInfo: parsedResponse.CardInfo,
-                lastFourDigits: parsedResponse.CardNumber5 || '****',
-                expiryMonth: parsedResponse.CardValidityMonth || '**',
-                expiryYear: parsedResponse.CardValidityYear || '**'
-              },
-              updated_at: new Date().toISOString(),
-              trial_ends_at: sessionData.payment_details.freeTrialDays > 0 ? (() => {
-                const date = new Date();
-                date.setDate(date.getDate() + (sessionData.payment_details.freeTrialDays || 0));
-                return date.toISOString();
-              })() : null,
-              current_period_ends_at: !sessionData.payment_details.freeTrialDays && planId !== 'vip' ? (() => {
-                const date = new Date();
-                if (planId === 'annual') {
-                  date.setFullYear(date.getFullYear() + 1);
-                } else {
-                  date.setMonth(date.getMonth() + 1);
-                }
-                return date.toISOString();
-              })() : null,
-              next_charge_date: sessionData.payment_details.freeTrialDays > 0 ? (() => {
-                const date = new Date();
-                date.setDate(date.getDate() + (sessionData.payment_details.freeTrialDays || 0));
-                return date.toISOString();
-              })() : planId !== 'vip' ? (() => {
-                const date = new Date();
-                if (planId === 'annual') {
-                  date.setFullYear(date.getFullYear() + 1);
-                } else {
-                  date.setMonth(date.getMonth() + 1);
-                }
-                return date.toISOString();
-              })() : null
-            });
-          
-          if (subscriptionError) {
-            console.error('Error updating subscription:', subscriptionError);
-          }
-        }
+        // Complete the registration process if needed
+        // Additional logic for registration completion can be added here if needed
       }
     }
     
-    // Return the Cardcom response
+    // Return the response data
     return new Response(
       JSON.stringify({
-        ...parsedResponse,
-        lowProfileId,
-        planId
+        ...responseData,
+        paymentLog: paymentLog || null,
+        paymentSession: paymentSession?.payment_details || null
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
+    
   } catch (error) {
     console.error('Error checking payment status:', error);
     
     return new Response(
       JSON.stringify({ 
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
+        ResponseCode: -1,
+        Description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        error: true
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
