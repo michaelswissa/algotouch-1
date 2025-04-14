@@ -1,14 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Loader2, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-
-import PaymentDetails from './PaymentDetails';
-import PlanSummary from './PlanSummary';
+import PaymentContent from './PaymentContent';
 import { getSubscriptionPlans, PaymentStatus, PaymentStatusType } from './utils/paymentHelpers';
 
 interface PaymentFormProps {
@@ -29,6 +26,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const [sessionId, setSessionId] = useState<string>('');
   const [lowProfileCode, setLowProfileCode] = useState<string>('');
   const statusCheckTimerRef = useRef<number | null>(null);
+  const masterFrameRef = useRef<HTMLIFrameElement>(null);
 
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -36,8 +34,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     : planId === 'vip' 
       ? planDetails.vip 
       : planDetails.monthly;
-
-  const masterFrameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -112,7 +108,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('אנא התחבר לחשבונך כדי להמשיך');
+        toast.error('אנא התח��ר לחשבונך כדי להמשיך');
         navigate('/auth');
         return;
       }
@@ -294,68 +290,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           title="CardCom Master Frame"
         />
         
-        <PlanSummary 
-          planName={plan.name} 
-          planId={plan.id}
-          price={plan.price}
-          displayPrice={plan.displayPrice}
-          description={plan.description} 
-          hasTrial={plan.hasTrial}
-          freeTrialDays={plan.freeTrialDays}
+        <PaymentContent
+          paymentStatus={paymentStatus}
+          plan={plan}
+          terminalNumber={terminalNumber}
+          cardcomUrl="https://secure.cardcom.solutions"
+          masterFrameRef={masterFrameRef}
+          onNavigateToDashboard={() => navigate('/dashboard')}
+          onRetry={handleRetry}
         />
-        
-        {paymentStatus === PaymentStatus.IDLE && (
-          <PaymentDetails 
-            terminalNumber={terminalNumber}
-            cardcomUrl={"https://secure.cardcom.solutions"}
-            masterFrameRef={masterFrameRef}
-          />
-        )}
-        
-        {paymentStatus === PaymentStatus.INITIALIZING && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p>אנא המתן, מאתחל תהליך תשלום...</p>
-          </div>
-        )}
-        
-        {paymentStatus === PaymentStatus.PROCESSING && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p>מעבד את התשלום, אנא המתן...</p>
-            <p className="text-sm text-muted-foreground mt-2">אל תסגור את החלון זה</p>
-          </div>
-        )}
-        
-        {paymentStatus === PaymentStatus.SUCCESS && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">התשלום בוצע בהצלחה!</h3>
-            <p className="text-muted-foreground">
-              {plan.id === 'vip'
-                ? 'המנוי שלך הופעל לכל החיים'
-                : `המנוי שלך הופעל ויחודש אוטומטית בכל ${plan.id === 'monthly' ? 'חודש' : 'שנה'}`}
-            </p>
-          </div>
-        )}
-        
-        {paymentStatus === PaymentStatus.FAILED && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full mb-4">
-              <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">התשלום נכשל</h3>
-            <p className="text-muted-foreground mb-4">
-              אירעה שגיאה בעיבוד התשלום. אנא נסה שנית או פנה לתמיכה.
-            </p>
-            <Button variant="outline" onClick={handleRetry} className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" />
-              נסה שנית
-            </Button>
-          </div>
-        )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
@@ -376,16 +319,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               {plan.hasTrial ? 'לא יבוצע חיוב במהלך תקופת הניסיון' : 'החיוב יבוצע מיידית'}
             </p>
           </>
-        )}
-        
-        {paymentStatus === PaymentStatus.SUCCESS && (
-          <Button 
-            type="button" 
-            className="w-full" 
-            onClick={() => navigate('/dashboard')}
-          >
-            המשך למערכת
-          </Button>
         )}
         
         {onBack && (
