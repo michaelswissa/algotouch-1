@@ -61,7 +61,7 @@ export async function getAllBadges(): Promise<Badge[]> {
       return [];
     }
     
-    return (data as Badge[]) || [];
+    return data as Badge[] || [];
   } catch (error) {
     console.error('Exception in getAllBadges:', error);
     return [];
