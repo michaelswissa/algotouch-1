@@ -1,6 +1,6 @@
 
 import { useRef } from 'react';
-import { PaymentStatusType } from '@/components/payment/utils/paymentHelpers';
+import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
@@ -44,7 +44,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const handleRetry = () => {
     setState(prev => ({
       ...prev,
-      paymentStatus: 'idle',
+      paymentStatus: PaymentStatus.IDLE,
       sessionId: '',
       lowProfileCode: ''
     }));
