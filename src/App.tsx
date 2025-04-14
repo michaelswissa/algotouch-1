@@ -10,6 +10,8 @@ import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import Subscription from './pages/Subscription';
+import MySubscriptionPage from './pages/MySubscriptionPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const queryClient = new QueryClient();
@@ -23,6 +25,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/subscription" element={<Subscription />} />
               <Route
                 path="/dashboard"
                 element={
@@ -36,6 +39,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-subscription"
+                element={
+                  <ProtectedRoute>
+                    <MySubscriptionPage />
                   </ProtectedRoute>
                 }
               />
