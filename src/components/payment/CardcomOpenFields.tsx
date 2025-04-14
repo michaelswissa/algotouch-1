@@ -82,6 +82,19 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         hasRegistrationData: !!registrationData
       });
 
+      // Get contract data if it exists
+      let contractData = null;
+      try {
+        const contractDataStr = sessionStorage.getItem('contract_data');
+        if (contractDataStr) {
+          const parsedContract = JSON.parse(contractDataStr);
+          console.log('Found contract data, will store in Supabase');
+          contractData = parsedContract;
+        }
+      } catch (err) {
+        console.warn('Error parsing contract data, continuing without it:', err);
+      }
+
       // Create payment session
       const { data, error: apiError } = await supabase.functions.invoke('cardcom-openfields', {
         body: { 
@@ -94,6 +107,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
           isRecurring: planId === 'monthly',
           freeTrialDays: planId === 'monthly' ? 30 : 0,
           registrationData: !user ? registrationData : null,
+          // Pass contract ID reference instead of full details
+          contractDetails: contractData,
           successRedirectUrl: `${window.location.origin}/subscription?success=true&planId=${planId}`,
           errorRedirectUrl: `${window.location.origin}/subscription?error=true`
         }
@@ -121,29 +136,6 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         localStorage.setItem('payment_session_created', new Date().toISOString());
       }
 
-      // Create contract-payment link
-      const contractData = sessionStorage.getItem('contract_data');
-      if (contractData) {
-        try {
-          const parsedContract = JSON.parse(contractData);
-          
-          // Store contract with payment session
-          await supabase.from('payment_sessions')
-            .update({
-              payment_details: {
-                ...data,
-                contractDetails: parsedContract,
-                contractSigned: true,
-                contractSignedAt: new Date().toISOString()
-              }
-            })
-            .eq('id', data.sessionId);
-        } catch (err) {
-          console.warn('Failed to attach contract to payment session:', err);
-          // Continue anyway - not critical
-        }
-      }
-
       // Use URL from response if provided
       if (data.url) {
         console.log('Redirecting to payment URL from response');
@@ -154,11 +146,11 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       console.log('Redirecting to constructed payment URL');
       // Use redirect provided by server or build our own
       window.location.href = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
-        `TerminalNumber=${data.terminalNumber}&` + 
-        `UserName=${data.apiName}&` +
+        `TerminalNumber=${encodeURIComponent(data.terminalNumber)}&` + 
+        `UserName=${encodeURIComponent(data.apiName)}&` +
         `APILevel=10&` +
-        `ReturnValue=${data.lowProfileId}&` +
-        `SumToBill=${selectedPlan.price}&` +
+        `ReturnValue=${encodeURIComponent(data.lowProfileId)}&` +
+        `SumToBill=${encodeURIComponent(String(selectedPlan.price))}&` +
         `ProductName=${encodeURIComponent(selectedPlan.name)}&` +
         `Language=he&` +
         `CoinID=1&` +

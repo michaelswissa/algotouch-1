@@ -24,6 +24,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
   const { isChecking, paymentSuccess, paymentError, manualCheckPayment } = usePaymentStatus(redirectOnSuccess);
   const [manuallyChecking, setManuallyChecking] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   // Check payment status manually if lowProfileId is provided directly
   useEffect(() => {
@@ -46,6 +47,13 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
     }
   }, [lowProfileId, planId, paymentError, retryCount, manualCheckPayment]);
 
+  // Enter recovery mode if payment fails after retries
+  useEffect(() => {
+    if (paymentError && retryCount >= 3) {
+      setRecoveryMode(true);
+    }
+  }, [paymentError, retryCount]);
+
   const handleRetry = () => {
     navigate('/subscription');
   };
@@ -56,6 +64,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
 
   const handleManualCheck = async () => {
     setManuallyChecking(true);
+    setRetryCount(0); // Reset retry count for fresh attempt
     
     try {
       // Try to manually check for payment if we have lowProfileId
@@ -79,17 +88,74 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
             
           if (recentPayments && recentPayments[0]) {
             manualCheckPayment(recentPayments[0].token);
+          } else {
+            // If no payment found, go to recovery mode
+            setRecoveryMode(true);
           }
         }
       }
     } catch (error) {
       console.error('Error in manual payment check:', error);
+      setRecoveryMode(true);
     } finally {
       setTimeout(() => {
         setManuallyChecking(false);
       }, 5000); // Reset after 5 seconds to allow for retrying
     }
   };
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent('תקלה בתהליך תשלום');
+    const body = encodeURIComponent(`
+שלום,
+
+נתקלתי בבעיה בתהליך התשלום.
+
+פרטי התקלה:
+- מזהה תשלום: ${lowProfileId || 'לא ידוע'}
+- סוג מנוי: ${planId || 'לא ידוע'}
+
+אשמח לקבלת עזרה.
+    `);
+    window.location.href = `mailto:Support@algotouch.co.il?subject=${subject}&body=${body}`;
+  };
+  
+  // Recovery mode UI - when all automatic attempts fail
+  if (recoveryMode) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="text-center">נדרשת התערבות</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert variant="destructive">
+            <XCircle className="h-5 w-5" />
+            <AlertDescription>
+              לא הצלחנו לאמת את סטטוס התשלום שלך.
+            </AlertDescription>
+          </Alert>
+          
+          <div className="text-center space-y-4">
+            <p>יש לבחור אחת מהאפשרויות הבאות:</p>
+            
+            <div className="flex flex-col gap-3">
+              <Button onClick={handleRetry}>
+                נסה שוב את תהליך התשלום
+              </Button>
+              
+              <Button variant="outline" onClick={handleContactSupport}>
+                צור קשר עם התמיכה
+              </Button>
+              
+              <Button variant="ghost" onClick={() => navigate('/')}>
+                חזור לדף הבית
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card className="max-w-lg mx-auto">
@@ -118,7 +184,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
           </Alert>
         )}
         
-        {paymentError && (
+        {paymentError && !recoveryMode && (
           <div className="space-y-4">
             <Alert variant="destructive">
               <XCircle className="h-5 w-5" />
@@ -143,28 +209,10 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
                 )}
               </Button>
               
-              <Button onClick={handleRetry}>
-                נסה שוב
+              <Button variant="ghost" onClick={handleRetry}>
+                נסה תשלום שוב
               </Button>
             </div>
-          </div>
-        )}
-        
-        {!isChecking && !paymentSuccess && !paymentError && (
-          <div className="flex flex-col items-center justify-center py-6">
-            <Button onClick={handleManualCheck} disabled={manuallyChecking}>
-              {manuallyChecking ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  בודק סטטוס תשלום...
-                </>
-              ) : (
-                'בדוק סטטוס תשלום'
-              )}
-            </Button>
-            <p className="text-sm text-muted-foreground mt-4">
-              אם ביצעת תשלום, לחץ על הכפתור כדי לבדוק את סטטוס התשלום.
-            </p>
           </div>
         )}
       </CardContent>

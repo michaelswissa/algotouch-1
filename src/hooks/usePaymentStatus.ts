@@ -106,6 +106,7 @@ export const usePaymentStatus = (
               // Registration was completed successfully
               console.log('Registration completed successfully, removing stored data');
               sessionStorage.removeItem('registration_data');
+              sessionStorage.removeItem('contract_data'); // Also clear contract data
               
               // If we have login credentials, we could auto-login the user here
               const registrationData = JSON.parse(storedData);
@@ -147,8 +148,10 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_session_created');
           setPaymentProcessingId(null);
           
-          setPaymentError(data.Description || 'אירעה שגיאה בתהליך התשלום');
-          toast.error('אירעה שגיאה בתהליך התשלום');
+          // Check for specific error codes from Cardcom
+          const errorMsg = data.Description || 'אירעה שגיאה בתהליך התשלום';
+          setPaymentError(errorMsg);
+          toast.error(errorMsg);
         }
       } catch (err) {
         console.error('Error checking payment status:', err);
@@ -180,7 +183,18 @@ export const usePaymentStatus = (
       }
     } else if (error === 'true') {
       setPaymentError('התשלום נכשל');
-      toast.error('התשלום נכשל');
+      toast.error('התשלום נכשל, נא לנסות שוב');
+      
+      // Add details on what to do next
+      setTimeout(() => {
+        toast.info('אנא נסה שוב או צור קשר עם התמיכה', {
+          duration: 5000,
+          action: {
+            label: 'נסה שוב',
+            onClick: () => navigate('/subscription')
+          }
+        });
+      }, 1000);
     }
   }, [navigate, redirectOnSuccess, retryCount, user]);
   
