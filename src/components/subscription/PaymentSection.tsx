@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import OpenFieldsPaymentForm from '@/components/payment/OpenFieldsPaymentForm';
 import { useNavigate } from 'react-router-dom';
 import usePaymentStatus from '@/hooks/usePaymentStatus';
-import { Spinner } from '@/components/ui/spinner';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -29,24 +28,21 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
 
   // Use hook to check payment status from URL parameters
   const { isChecking, paymentSuccess: urlPaymentSuccess, paymentError: urlPaymentError } = usePaymentStatus();
 
   // Check for registration data in session storage on component mount
   useEffect(() => {
-    try {
-      const storedData = sessionStorage.getItem('registration_data');
-      if (storedData) {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
+      try {
         const data = JSON.parse(storedData);
         console.log('Found registration data in PaymentSection:', data);
         setRegistrationData(data);
+      } catch (error) {
+        console.error('Error parsing registration data:', error);
       }
-    } catch (error) {
-      console.error('Error parsing registration data:', error);
-    } finally {
-      setIsInitializing(false);
     }
   }, []);
 
@@ -94,17 +90,15 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const isRegistering = !!registrationData;
   const isValidUser = isAuthenticated || isRegistering;
 
-  // Show loading spinner while checking auth status or initializing
-  if (isChecking || isInitializing) {
+  if (isChecking) {
     return (
       <div className="flex justify-center items-center py-8">
-        <Spinner size="lg" />
+        <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin" />
         <span className="mr-4">בודק סטטוס תשלום...</span>
       </div>
     );
   }
 
-  // Once we've checked everything, if user is still not valid, show error
   if (!isValidUser) {
     return (
       <Alert variant="destructive" className="max-w-lg mx-auto">
