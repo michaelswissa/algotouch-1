@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }
     };
   }, [cardcomUrl]);
+
+  // Function to handle successful payment
+  const handlePaymentSuccess = (data: any) => {
+    console.log('Payment successful:', data);
+    setPaymentStatus(PaymentStatus.SUCCESS);
+    toast.success('התשלום בוצע בהצלחה!');
+    
+    // Check payment status to confirm
+    checkPaymentStatus(lowProfileCode, sessionId);
+    
+    // Call the onPaymentComplete callback
+    setTimeout(() => {
+      onPaymentComplete();
+    }, 1000);
+  };
 
   // Enhanced message handler
   const handleFrameMessages = (event: MessageEvent) => {
