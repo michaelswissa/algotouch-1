@@ -1,3 +1,4 @@
+
 // Subscription plan definitions
 export interface SubscriptionPlan {
   id: string;
