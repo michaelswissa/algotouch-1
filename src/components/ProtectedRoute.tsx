@@ -1,8 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from 'sonner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -36,7 +36,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         setIsValidRegistration(isValid);
         
         if (!isValid) {
-          console.log("ProtectedRoute: Registration data is stale");
+          toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
+          sessionStorage.removeItem('registration_data');
         }
       } catch (error) {
         console.error("Error parsing registration data:", error);
@@ -49,7 +50,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }, [location.pathname]);
 
-  // Show consistent loader while auth is initializing
+  // Show loading state while checking auth
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -58,8 +59,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Check for registration in progress from location state
-  const isRegistering = location.state?.isRegistering === true;
+  // Special case for subscription page - allow access if:
+  // 1. User is authenticated OR
+  // 2. User is in registration process OR
+  // 3. Has valid registration data
+  if (location.pathname.startsWith('/subscription')) {
+    if (isAuthenticated || (hasRegistrationData && isValidRegistration)) {
+      console.log("ProtectedRoute: Allowing access to subscription path", {
+        isAuthenticated,
+        hasRegistrationData,
+        isValidRegistration
+      });
+      return <>{children}</>;
+    }
+    return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
+  }
 
   // Allow access to public paths regardless of auth status
   if (isPublicPath(location.pathname, publicPaths)) {
@@ -71,12 +85,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // 2. User is in registration process (has valid data in sessionStorage) OR
   // 3. User is redirected directly from signup (isRegistering state)
   if (isSubscriptionPath(location.pathname)) {
-    if (isAuthenticated || (hasRegistrationData && isValidRegistration) || isRegistering) {
+    if (isAuthenticated) {
       console.log("ProtectedRoute: Allowing access to subscription path", {
         isAuthenticated,
         hasRegistrationData,
-        isValidRegistration,
-        isRegistering
+        isValidRegistration
       });
       return <>{children}</>;
     }

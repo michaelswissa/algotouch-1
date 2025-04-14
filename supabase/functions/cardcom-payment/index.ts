@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -27,65 +28,87 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-    
-    // Create admin client for database operations that bypass RLS
+    // Create Supabase admin client for database operations that bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // Get current user
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
-    
-    if (!user) {
-      // Check for registration data in progress
-      const { planId, registrationData } = await req.json();
-      
-      if (!registrationData) {
-        throw new Error("User not authenticated and no registration data found");
-      }
-      
-      console.log("Processing payment for registration in progress");
-    }
-    
-    // Parse request payload
+    // Parse request payload first to get all required data
     const { 
       planId, 
       amount, 
       currency = "ILS", 
       invoiceInfo, 
       operation = "ChargeAndCreateToken",
-      redirectUrls 
+      redirectUrls,
+      registrationData
     } = await req.json();
     
+    logStep("Received request data", { 
+      planId, 
+      amount, 
+      currency,
+      hasRegistrationData: !!registrationData 
+    });
+
+    // Validate required parameters
     if (!planId || !amount) {
       throw new Error("Missing required parameters: planId or amount");
     }
-    logStep("Validated request parameters", { planId, amount, operation });
+    
+    // Get user information - either from auth token or registration data
+    let userId = null;
+    let userEmail = null;
+    let fullName = '';
+
+    if (registrationData) {
+      // For users in registration process
+      userEmail = registrationData.email;
+      const userData = registrationData.userData || {};
+      fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+      
+      // Create user account if it doesn't exist
+      const { data: { user }, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+        email: registrationData.email,
+        password: registrationData.password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          phone: userData.phone,
+          is_new_user: true
+        }
+      });
+
+      if (signUpError) {
+        throw new Error(`Failed to create user account: ${signUpError.message}`);
+      }
+
+      userId = user?.id;
+      logStep("Created new user account", { userId });
+    } else {
+      // For authenticated users
+      const { data: { user } } = await supabaseAdmin.auth.getUser(
+        req.headers.get('Authorization')?.replace('Bearer ', '') || ''
+      );
+      
+      if (!user) {
+        throw new Error("User not authenticated and no registration data provided");
+      }
+      
+      userId = user.id;
+      userEmail = user.email;
+      fullName = user.user_metadata?.full_name || 
+                 `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim();
+      
+      logStep("Found authenticated user", { userId });
+    }
     
     // Generate unique transaction reference
-    const transactionRef = `${user.id}-${Date.now()}`;
+    const transactionRef = `${userId}-${Date.now()}`;
     
-    // Get user profile information if available
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('first_name, last_name')
-      .eq('id', user.id)
-      .single();
-    
-    const fullName = profile 
-      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-      : invoiceInfo?.fullName || '';
-    
-    // Prepare webhook URL
+    // Prepare webhook URL with full domain
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
     logStep("Preparing CardCom API request", { 
@@ -94,7 +117,7 @@ serve(async (req) => {
       operation
     });
     
-    // Create CardCom API request body according to their LowProfile API documentation
+    // Create CardCom API request body
     const cardcomPayload = new URLSearchParams({
       TerminalNumber: terminalNumber,
       ApiName: apiName,
@@ -108,8 +131,8 @@ serve(async (req) => {
       FailedRedirectUrl: redirectUrls?.failed || `${req.headers.get('origin')}/subscription/failed`,
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       APILevel: "10",
-      "InvoiceHead.CustName": fullName || user.email || '',
-      "InvoiceHead.Email": invoiceInfo?.email || user.email || '',
+      "InvoiceHead.CustName": fullName || userEmail || '',
+      "InvoiceHead.Email": invoiceInfo?.email || userEmail || '',
       "InvoiceHead.Language": "he",
       "InvoiceHead.SendByEmail": "true",
       "InvoiceHead.CoinID": currency === "ILS" ? "1" : "2",
@@ -127,7 +150,7 @@ serve(async (req) => {
     
     logStep("Sending request to CardCom");
     
-    // Initialize LowProfile session with CardCom
+    // Initialize payment session with CardCom
     const response = await fetch(`${cardcomUrl}/Interface/LowProfile.aspx`, {
       method: "POST",
       headers: {
@@ -158,11 +181,11 @@ serve(async (req) => {
       throw new Error(`CardCom initialization failed: ${responseParams.get("Description") || "Unknown error"}`);
     }
     
-    // Store transaction details in Supabase
+    // Store payment session in database
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         low_profile_code: lowProfileCode,
         reference: transactionRef,
         plan_id: planId,

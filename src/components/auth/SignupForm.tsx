@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,19 +86,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       sessionStorage.removeItem('registration_data');
       sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
       
-      const { success } = await signUp({
-        email,
-        password,
-        firstName,
-        lastName,
-        phone
-      });
+      console.log('Registration data saved, proceeding to subscription');
+      toast.success('הפרטים נשמרו בהצלחה');
       
-      if (success) {
-        console.log('Registration successful, proceeding to subscription');
-        // Navigate directly to subscription page
-        navigate('/subscription', { replace: true, state: { isRegistering: true } });
-      }
+      // Navigate directly to subscription page bypassing the ProtectedRoute check
+      navigate('/subscription', { replace: true, state: { isRegistering: true } });
       
       if (onSignupSuccess) {
         onSignupSuccess();
