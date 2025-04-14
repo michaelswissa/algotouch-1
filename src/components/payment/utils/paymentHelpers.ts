@@ -24,6 +24,7 @@ export const getSubscriptionPlans = () => ({
     displayPrice: 899, // Display price in USD
     description: 'תשלום שנתי של 3,371 ₪ (חיסכון של 25%). חיוב אוטומטי מידי שנה.',
     features: ['גישה לכל התכונות', 'חיסכון של 25%', 'תמיכה מועדפת'],
+    hasTrial: false,
     freeTrialDays: 0, // No free trial for annual plan
   },
   vip: {
@@ -32,6 +33,7 @@ export const getSubscriptionPlans = () => ({
     displayPrice: 3499, // Display price in USD
     description: 'תשלום חד פעמי של 13,121 ₪ לגישה ללא הגבלת זמן וליווי VIP.',
     features: ['גישה לכל החיים', 'תמיכה VIP', 'ייעוץ אישי'],
+    hasTrial: false,
     freeTrialDays: 0, // No free trial for VIP plan
   },
 });
