@@ -1,223 +1,184 @@
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import usePaymentStatus from '@/hooks/usePaymentStatus';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PaymentStatusProps {
-  redirectOnSuccess?: string;
   lowProfileId?: string;
   planId?: string;
+  redirectOnSuccess?: string;
 }
 
 const PaymentStatus: React.FC<PaymentStatusProps> = ({ 
-  redirectOnSuccess = '/my-subscription',
-  lowProfileId,
-  planId
+  lowProfileId, 
+  planId, 
+  redirectOnSuccess = '/my-subscription' 
 }) => {
   const navigate = useNavigate();
-  const { isChecking, paymentSuccess, paymentError, manualCheckPayment } = usePaymentStatus(redirectOnSuccess);
-  const [manuallyChecking, setManuallyChecking] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [checkCount, setCheckCount] = useState(0);
 
-  // Check payment status manually if lowProfileId is provided directly
   useEffect(() => {
-    if (lowProfileId && !isChecking && !paymentSuccess && !manuallyChecking) {
-      setManuallyChecking(true);
-      manualCheckPayment(lowProfileId, planId);
-    }
-  }, [lowProfileId, planId, isChecking, paymentSuccess, manualCheckPayment, manuallyChecking]);
-
-  // Retry payment verification if we have lowProfileId
-  useEffect(() => {
-    if (lowProfileId && paymentError && retryCount < 3) {
-      const timer = setTimeout(() => {
-        console.log(`Manually retrying payment check (${retryCount + 1}/3)...`);
-        setRetryCount(prev => prev + 1);
-        setManuallyChecking(true);
-        manualCheckPayment(lowProfileId, planId);
-      }, (retryCount + 1) * 3000); // Exponential backoff
-      
-      return () => clearTimeout(timer);
-    }
-  }, [lowProfileId, planId, paymentError, retryCount, manualCheckPayment]);
-
-  // Enter recovery mode if payment fails after retries
-  useEffect(() => {
-    if (paymentError && retryCount >= 3) {
-      setRecoveryMode(true);
-      setManuallyChecking(false);
-    }
-  }, [paymentError, retryCount]);
-
-  const handleRetry = () => {
-    navigate('/subscription');
-  };
-  
-  const handleGoToSubscription = () => {
-    navigate(redirectOnSuccess);
-  };
-
-  const handleManualCheck = async () => {
-    setManuallyChecking(true);
-    setRetryCount(0); // Reset retry count for fresh attempt
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success') === 'true';
+    const errorParam = params.get('error') === 'true';
+    const profileId = lowProfileId || params.get('lowProfileId') || localStorage.getItem('payment_pending_id');
+    const paymentPlanId = planId || params.get('planId') || localStorage.getItem('payment_pending_plan');
     
-    try {
-      // Try to manually check for payment if we have lowProfileId
-      if (lowProfileId) {
-        manualCheckPayment(lowProfileId, planId);
-      } else {
-        // Get from URL or localStorage
-        const params = new URLSearchParams(window.location.search);
-        const urlLowProfileId = params.get('lowProfileId') || localStorage.getItem('payment_pending_id');
-        const urlPlanId = params.get('planId') || localStorage.getItem('payment_pending_plan');
+    if (success) {
+      handleSuccess();
+      return;
+    }
+    
+    if (errorParam) {
+      handleError('התשלום נכשל או בוטל על ידי המשתמש.');
+      return;
+    }
+    
+    if (!profileId) {
+      handleError('מזהה עסקה חסר. לא ניתן לאמת את התשלום.');
+      return;
+    }
+    
+    const checkPaymentStatus = async () => {
+      try {
+        setIsChecking(true);
         
-        if (urlLowProfileId) {
-          manualCheckPayment(urlLowProfileId, urlPlanId || undefined);
-        } else {
-          // Try checking recent payment logs
-          const { data: recentPayments } = await supabase
-            .from('user_payment_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1);
-            
-          if (recentPayments && recentPayments[0]) {
-            manualCheckPayment(recentPayments[0].token);
-          } else {
-            // If no payment found, go to recovery mode
-            setRecoveryMode(true);
+        const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
+          body: { 
+            lowProfileId: profileId,
+            planId: paymentPlanId
           }
+        });
+        
+        if (error) {
+          throw new Error(`שגיאה בבדיקת סטטוס תשלום: ${error.message}`);
+        }
+        
+        console.log('Payment check response:', data);
+        
+        // Check if payment was successful
+        if (data.ResponseCode === 0 || 
+            data.OperationResponse === '0' || 
+            (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0) ||
+            (data.paymentLog && data.paymentLog.status === 'completed')) {
+          
+          handleSuccess();
+          
+          // Clean up local storage payment tracking
+          localStorage.removeItem('payment_pending_id');
+          localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
+          localStorage.removeItem('payment_processing');
+          
+          return;
+        }
+        
+        // Handle ongoing check logic
+        if (checkCount < 3) {
+          // Try again after a delay
+          setTimeout(() => {
+            setCheckCount(prev => prev + 1);
+          }, 2000);
+        } else {
+          handleError('לא ניתן לאמת את סטטוס התשלום. אנא פנה לתמיכה או נסה שוב.');
+        }
+      } catch (err) {
+        console.error('Error checking payment status:', err);
+        
+        if (checkCount < 3) {
+          // Try again after delay
+          setTimeout(() => {
+            setCheckCount(prev => prev + 1);
+          }, 2000);
+        } else {
+          handleError(err instanceof Error ? err.message : 'שגיאה בבדיקת סטטוס התשלום');
+        }
+      } finally {
+        if (checkCount >= 3) {
+          setIsChecking(false);
         }
       }
-    } catch (error) {
-      console.error('Error in manual payment check:', error);
-      setRecoveryMode(true);
-    } finally {
-      setTimeout(() => {
-        setManuallyChecking(false);
-      }, 5000); // Reset after 5 seconds to allow for retrying
-    }
-  };
-
-  const handleContactSupport = () => {
-    const subject = encodeURIComponent('תקלה בתהליך תשלום');
-    const body = encodeURIComponent(`
-שלום,
-
-נתקלתי בבעיה בתהליך התשלום.
-
-פרטי התקלה:
-- מזהה תשלום: ${lowProfileId || localStorage.getItem('payment_pending_id') || 'לא ידוע'}
-- סוג מנוי: ${planId || localStorage.getItem('payment_pending_plan') || 'לא ידוע'}
-- שגיאה: ${paymentError || 'לא ידוע'}
-
-אשמח לקבלת עזרה.
-    `);
-    window.location.href = `mailto:Support@algotouch.co.il?subject=${subject}&body=${body}`;
+    };
+    
+    checkPaymentStatus();
+  }, [lowProfileId, planId, checkCount, navigate, redirectOnSuccess]);
+  
+  const handleSuccess = () => {
+    setIsSuccess(true);
+    setIsChecking(false);
+    toast.success('התשלום בוצע בהצלחה!');
+    
+    // Give some time for the user to see the success message
+    setTimeout(() => {
+      navigate(redirectOnSuccess, { replace: true });
+    }, 3000);
   };
   
-  // Recovery mode UI - when all automatic attempts fail
-  if (recoveryMode) {
-    return (
-      <Card className="max-w-lg mx-auto">
-        <CardHeader>
-          <CardTitle className="text-center">נדרשת התערבות</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Alert variant="destructive">
-            <XCircle className="h-5 w-5" />
-            <AlertDescription>
-              לא הצלחנו לאמת את סטטוס התשלום שלך. יתכן שהתשלום התבצע בהצלחה אך המערכת לא קיבלה עדכון.
-            </AlertDescription>
-          </Alert>
-          
-          <div className="text-center space-y-4">
-            <p>יש לבחור אחת מהאפשרויות הבאות:</p>
-            
-            <div className="flex flex-col gap-3">
-              <Button onClick={handleRetry}>
-                נסה שוב את תהליך התשלום
-              </Button>
-              
-              <Button variant="outline" onClick={handleContactSupport}>
-                צור קשר עם התמיכה
-              </Button>
-              
-              <Button variant="ghost" onClick={() => navigate('/')}>
-                חזור לדף הבית
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleError = (message: string) => {
+    setError(message);
+    setIsChecking(false);
+    toast.error(message);
+  };
   
   return (
-    <Card className="max-w-lg mx-auto">
+    <Card className="mx-auto max-w-md">
       <CardHeader>
-        <CardTitle className="text-center">סטטוס תשלום</CardTitle>
+        <CardTitle className="text-center">
+          {isChecking ? 'בודק סטטוס תשלום...' : 
+           isSuccess ? 'התשלום התקבל בהצלחה!' : 
+           'שגיאה בתהליך התשלום'}
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {(isChecking || manuallyChecking) && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <div className="h-8 w-8 border-4 border-t-primary animate-spin rounded-full mb-4"></div>
-            <p className="text-center">מאמת את פרטי התשלום...</p>
-            {retryCount > 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                ניסיון {retryCount + 1}/4...
-              </p>
-            )}
+      
+      <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+        {isChecking && (
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <p>מעבד את פרטי התשלום...</p>
           </div>
         )}
         
-        {paymentSuccess && (
-          <Alert className="bg-green-50 border-green-200">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <AlertDescription className="text-green-700">
-              התשלום התקבל בהצלחה! מועבר לדף המנוי שלך...
-            </AlertDescription>
-          </Alert>
+        {isSuccess && (
+          <div className="flex flex-col items-center space-y-4">
+            <CheckCircle2 className="h-16 w-16 text-green-500" />
+            <p>תודה על הרכישה! מעבד את הפרטים ומעביר אותך למנוי שלך...</p>
+          </div>
         )}
         
-        {paymentError && !recoveryMode && (
-          <div className="space-y-4">
-            <Alert variant="destructive">
-              <XCircle className="h-5 w-5" />
-              <AlertDescription>
-                {paymentError}
-              </AlertDescription>
-            </Alert>
-            
-            <div className="flex justify-center space-x-4 gap-2 flex-wrap">
-              <Button variant="outline" onClick={handleGoToSubscription}>
-                המשך למנוי
-              </Button>
-              
-              <Button variant="outline" onClick={handleManualCheck} disabled={manuallyChecking}>
-                {manuallyChecking ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    בודק...
-                  </>
-                ) : (
-                  'בדוק שוב'
-                )}
-              </Button>
-              
-              <Button variant="outline" onClick={handleRetry}>
-                נסה שנית
-              </Button>
-            </div>
+        {error && (
+          <div className="flex flex-col items-center space-y-4">
+            <XCircle className="h-16 w-16 text-destructive" />
+            <p>{error}</p>
           </div>
         )}
       </CardContent>
+      
+      <CardFooter className="flex justify-center">
+        {!isChecking && !isSuccess && (
+          <div className="flex space-x-2 space-x-reverse">
+            <Button 
+              variant="default" 
+              onClick={() => navigate('/subscription')}
+            >
+              נסה שוב
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/my-subscription')}
+            >
+              חזור למנוי שלי
+            </Button>
+          </div>
+        )}
+      </CardFooter>
     </Card>
   );
 };

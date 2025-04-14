@@ -6,10 +6,11 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { toast } from 'sonner';
-import OpenFieldsPaymentForm from '@/components/payment/OpenFieldsPaymentForm';
+import CardcomIframe from '@/components/payment/CardcomIframe';
 import { useNavigate } from 'react-router-dom';
 import usePaymentStatus from '@/hooks/usePaymentStatus';
 import PaymentStatus from '@/components/payment/PaymentStatus';
+import { getSubscriptionPlans } from '@/components/payment/utils/paymentHelpers';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -29,6 +30,14 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Get plan details
+  const planDetails = getSubscriptionPlans();
+  const plan = selectedPlan === 'annual' 
+    ? planDetails.annual 
+    : selectedPlan === 'vip' 
+      ? planDetails.vip 
+      : planDetails.monthly;
 
   // Use hook to check payment status from URL parameters
   const { isChecking, paymentSuccess: urlPaymentSuccess, paymentError: urlPaymentError } = usePaymentStatus();
@@ -94,6 +103,9 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const isAuthenticated = !!user;
   const isRegistering = !!registrationData;
   const isValidUser = isAuthenticated || isRegistering;
+  
+  // Determine user email for payment
+  const userEmail = email || (user?.email) || (registrationData?.email) || '';
 
   // If we're returning from a payment redirect, show the payment status component
   if (hasPaymentParams) {
@@ -138,6 +150,17 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     );
   }
 
+  if (!userEmail) {
+    return (
+      <Alert variant="destructive" className="max-w-lg mx-auto">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          נדרשת כתובת אימייל לביצוע התשלום. נא להשלים את הפרטים ולנסות שוב.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {paymentError && (
@@ -149,24 +172,15 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         </Alert>
       )}
       
-      <OpenFieldsPaymentForm 
+      <CardcomIframe 
         planId={selectedPlan}
-        onPaymentComplete={handlePaymentSuccess}
-        onCancel={onBack}
-        onPaymentStart={handlePaymentStart}
+        amount={plan.price}
+        userName={fullName}
+        userEmail={userEmail}
+        onSuccess={handlePaymentSuccess}
         onError={handlePaymentError}
+        onCancel={onBack}
       />
-      
-      <div className="flex justify-start">
-        <Button 
-          variant="outline" 
-          onClick={onBack} 
-          className="mx-auto"
-          disabled={paymentProcessing}
-        >
-          חזור
-        </Button>
-      </div>
     </div>
   );
 };
