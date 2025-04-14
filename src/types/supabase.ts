@@ -1,4 +1,3 @@
-
 import { Database as OriginalDatabase, Json } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -8,9 +7,126 @@ export interface ExtendedDatabase extends OriginalDatabase {
       // Keep existing tables
       app_config: OriginalDatabase['public']['Tables']['app_config'];
       contract_signatures: OriginalDatabase['public']['Tables']['contract_signatures'];
-      payment_history: OriginalDatabase['public']['Tables']['payment_history'];
       profiles: OriginalDatabase['public']['Tables']['profiles'];
       subscriptions: OriginalDatabase['public']['Tables']['subscriptions'];
+      
+      // Update payment tables to match actual schema
+      payment_logs: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          lowprofile_id: string;
+          plan_id: string | null;
+          transaction_id: string | null;
+          payment_data: Json | null;
+          status: string;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          lowprofile_id: string;
+          plan_id?: string | null;
+          transaction_id?: string | null;
+          payment_data?: Json | null;
+          status: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          lowprofile_id?: string;
+          plan_id?: string | null;
+          transaction_id?: string | null;
+          payment_data?: Json | null;
+          status?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      payment_errors: {
+        Row: {
+          id: string;
+          user_id: string;
+          error_code: string | null;
+          error_message: string | null;
+          request_data: Json | null;
+          response_data: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          error_code?: string | null;
+          error_message?: string | null;
+          request_data?: Json | null;
+          response_data?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          error_code?: string | null;
+          error_message?: string | null;
+          request_data?: Json | null;
+          response_data?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      
+      payment_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          amount: number;
+          currency: string;
+          expires_at: string;
+          low_profile_code: string;
+          plan_id: string;
+          reference: string;
+          status: string;
+          transaction_data: Json | null;
+          transaction_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          amount: number;
+          currency?: string;
+          expires_at: string;
+          low_profile_code: string;
+          plan_id: string;
+          reference: string;
+          status?: string;
+          transaction_data?: Json | null;
+          transaction_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          amount?: number;
+          currency?: string;
+          expires_at?: string;
+          low_profile_code?: string;
+          plan_id?: string;
+          reference?: string;
+          status?: string;
+          transaction_data?: Json | null;
+          transaction_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       
       // Add our new community tables
       community_reputation: {
@@ -106,7 +222,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           comments: number;
           created_at: string;
           updated_at: string;
-          media_urls: string[] | null; // Added missing media_urls property
+          media_urls: string[] | null;
         };
         Insert: {
           id?: string;
@@ -117,7 +233,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           comments?: number;
           created_at?: string;
           updated_at?: string;
-          media_urls?: string[] | null; // Added to Insert
+          media_urls?: string[] | null;
         };
         Update: {
           id?: string;
@@ -128,7 +244,7 @@ export interface ExtendedDatabase extends OriginalDatabase {
           comments?: number;
           created_at?: string;
           updated_at?: string;
-          media_urls?: string[] | null; // Added to Update
+          media_urls?: string[] | null;
         };
         Relationships: [];
       };
@@ -228,7 +344,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
         };
         Relationships: [];
       };
-      // Update community_comments with the correct Relationships
       community_comments: {
         Row: {
           id: string;
@@ -292,69 +407,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
           id?: string;
           name?: string;
           created_at?: string;
-        };
-        Relationships: [];
-      };
-      payment_errors: {
-        Row: {
-          id: string;
-          user_id: string;
-          error_code: string | null;
-          error_message: string | null;
-          error_details: Json | null;
-          payment_details: Json | null;
-          context: string | null;
-          created_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          error_code?: string | null;
-          error_message?: string | null;
-          error_details?: Json | null;
-          payment_details?: Json | null;
-          context?: string | null;
-          created_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          error_code?: string | null;
-          error_message?: string | null;
-          error_details?: Json | null;
-          payment_details?: Json | null;
-          context?: string | null;
-          created_at?: string | null;
-        };
-        Relationships: [];
-      };
-      payment_sessions: {
-        Row: {
-          id: string;
-          user_id: string | null;
-          email: string | null;
-          plan_id: string;
-          payment_details: Json | null;
-          expires_at: string;
-          created_at: string | null;
-        };
-        Insert: {
-          id: string;
-          user_id?: string | null;
-          email?: string | null;
-          plan_id: string;
-          payment_details?: Json | null;
-          expires_at: string;
-          created_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string | null;
-          email?: string | null;
-          plan_id?: string;
-          payment_details?: Json | null;
-          expires_at?: string;
-          created_at?: string | null;
         };
         Relationships: [];
       };
@@ -481,43 +533,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
         };
         Relationships: [];
       };
-      // Add the missing payment_logs table definition
-      payment_logs: {
-        Row: {
-          id: string;
-          user_id: string | null;
-          lowprofile_id: string;
-          plan_id: string | null;
-          transaction_id: string | null;
-          payment_data: Json | null;
-          status: string;
-          created_at: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string | null;
-          lowprofile_id: string;
-          plan_id?: string | null;
-          transaction_id?: string | null;
-          payment_data?: Json | null;
-          status: string;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string | null;
-          lowprofile_id?: string;
-          plan_id?: string | null;
-          transaction_id?: string | null;
-          payment_data?: Json | null;
-          status?: string;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Relationships: [];
-      };
     };
     Views: OriginalDatabase['public']['Views'];
     Functions: {
@@ -532,7 +547,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
         };
       };
       is_admin: OriginalDatabase['public']['Functions']['is_admin'];
-      // Add the missing functions from the original database
       check_row_exists: {
         Args: {
           p_table_name: string;
@@ -558,7 +572,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
         };
         Returns: boolean;
       };
-      // Add our new functions
       cleanup_user_payment_sessions: {
         Args: {
           user_id_param: string;

@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
@@ -210,7 +211,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <p className="text-muted-foreground">
               {plan.id === 'vip'
                 ? 'המנוי שלך הופעל לכל החיים'
-                : `המנוי שלך הופעל ויחודש אוטומatically בכל ${plan.id === 'monthly' ? 'חודש' : 'שנה'}`}
+                : `המנוי שלך הופעל ויחודש אוטומטית בכל ${plan.id === 'monthly' ? 'חודש' : 'שנה'}`}
             </p>
           </div>
         )}
