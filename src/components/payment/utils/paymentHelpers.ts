@@ -1,99 +1,55 @@
+export interface SubscriptionPlan {
+  name: string;
+  price: number;
+  description: string;
+  currency?: string;
+}
 
-// Get subscription plan details
-export const getSubscriptionPlans = () => {
-  return [
-    {
-      id: 'monthly',
-      name: 'מנוי חודשי',
-      description: 'חודש ראשון בחינם, לאחר מכן 371₪ לחודש',
-      price: 371,
-      features: [
-        'גישה מלאה לכל התוכן',
-        'עדכונים מיידיים',
-        'תמיכה בדוא"ל'
-      ],
-      isFeatured: false,
-      freeTrialDays: 30,
-      isRecurring: true,
-      billingCycle: 'monthly'
-    },
-    {
-      id: 'annual',
-      name: 'מנוי שנתי',
-      description: '3,371₪ לשנה (חיסכון של 1,081₪)',
-      price: 3371,
-      features: [
-        'גישה מלאה לכל התוכן',
-        'עדכונים מיידיים',
-        'תמיכה בדוא"ל ובטלפון',
-        'תוכן בלעדי'
-      ],
-      isFeatured: true,
-      freeTrialDays: 0,
-      isRecurring: true,
-      billingCycle: 'yearly'
-    },
-    {
-      id: 'vip',
-      name: 'מנוי VIP לכל החיים',
-      description: 'תשלום חד פעמי של 13,121₪',
-      price: 13121,
-      features: [
-        'גישה לכל החיים לכל התוכן',
-        'עדכונים לכל החיים',
-        'תמיכה VIP',
-        'כל התוכן הבלעדי',
-        'גישה מוקדמת לתוכן חדש'
-      ],
-      isFeatured: false,
-      freeTrialDays: 0,
-      isRecurring: false,
-      billingCycle: 'once'
-    }
-  ];
-};
+export const getSubscriptionPlans = () => ({
+  monthly: {
+    name: 'חודשי',
+    price: 371, // Actual price in ILS
+    displayPrice: 99, // Display price in USD
+    description: 'חודש ניסיון חינם, אחר כך חיוב אוטומטי של 371 ₪ לחודש.',
+    features: ['גישה לכל התכונות', 'ביטול בכל עת', 'עדכונים שוטפים'],
+    hasTrial: true,
+  },
+  annual: {
+    name: 'שנתי',
+    price: 3371, // Actual price in ILS
+    displayPrice: 899, // Display price in USD
+    description: 'תשלום שנתי של 3,371 ₪ (חיסכון של 25%). חיוב אוטומטי מידי שנה.',
+    features: ['גישה לכל התכונות', 'חיסכון של 25%', 'תמיכה מועדפת'],
+  },
+  vip: {
+    name: 'VIP',
+    price: 13121, // Actual price in ILS
+    displayPrice: 3499, // Display price in USD
+    description: 'תשלום חד פעמי של 13,121 ₪ לגישה ללא הגבלת זמן וליווי VIP.',
+    features: ['גישה לכל החיים', 'תמיכה VIP', 'ייעוץ אישי'],
+  },
+});
 
-// Check if a subscription is active
-export const isSubscriptionActive = (
-  status: string, 
-  expiresAt: string | null, 
-  trialEndsAt: string | null
-): boolean => {
-  if (status !== 'active' && status !== 'trial') {
-    return false;
-  }
-  
-  const now = new Date();
-  
-  if (status === 'trial' && trialEndsAt) {
-    const trialEnd = new Date(trialEndsAt);
-    if (trialEnd < now) {
-      return false;
-    }
-  }
-  
-  if (expiresAt) {
-    const expiration = new Date(expiresAt);
-    if (expiration < now) {
-      return false;
-    }
-  }
-  
-  return true;
-};
+export interface TokenData {
+  lastFourDigits: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+  [key: string]: string | number | boolean;
+}
 
-// Format a price in the Israeli format
-export const formatPrice = (price: number): string => {
-  return new Intl.NumberFormat('he-IL', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(price);
-};
-
-// Get plan details by ID
-export const getPlanById = (planId: string) => {
-  const plans = getSubscriptionPlans();
-  return plans.find(plan => plan.id === planId);
+export const createTokenData = (
+  cardNumber: string,
+  expiryDate: string,
+  cardholderName: string
+): TokenData => {
+  const [expiryMonth, expiryYear] = expiryDate.split('/');
+  
+  return {
+    lastFourDigits: cardNumber.slice(-4),
+    expiryMonth,
+    expiryYear,
+    cardholderName,
+    tokenCreatedAt: new Date().toISOString(),
+  };
 };
