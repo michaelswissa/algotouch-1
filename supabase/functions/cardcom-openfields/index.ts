@@ -24,7 +24,17 @@ function generateRandomId() {
   return crypto.randomUUID();
 }
 
-// Helper function to sanitize and trim strings
+// Helper function to validate required fields
+function validateRequiredParams(data: any, requiredFields: string[]): string | null {
+  for (const field of requiredFields) {
+    if (data[field] === undefined || data[field] === null || data[field] === '') {
+      return `Missing required parameter: ${field}`;
+    }
+  }
+  return null;
+}
+
+// Helper to sanitize and trim strings
 function sanitizeString(str: string | null | undefined): string {
   if (!str) return '';
   return String(str).trim();
@@ -73,10 +83,19 @@ serve(async (req) => {
       userEmail, // Accept both email and userEmail for backward compatibility
       isRecurring, 
       freeTrialDays,
-      registrationData,
+      registrationData, // Registration data for non-authenticated users
       successRedirectUrl,
-      errorRedirectUrl
+      errorRedirectUrl,
+      contractDetails // Contract details if provided
     } = requestBody;
+    
+    // Validate required parameters
+    const requiredParams = ['planId', 'amount'];
+    const validationError = validateRequiredParams(requestBody, requiredParams);
+    if (validationError) {
+      console.error('Validation error:', validationError);
+      throw new Error(validationError);
+    }
     
     // Use either email or userEmail (prefer userEmail if both exist)
     const effectiveEmail = sanitizeString(userEmail || email);
@@ -96,27 +115,13 @@ serve(async (req) => {
       );
     }
 
-    // Check for required amount parameter
-    if (amount === undefined || amount === null) {
-      console.error('Missing amount in request');
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Missing required parameter: amount' 
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
-    }
-
     console.log('Creating payment session for:', { 
       planId, 
       userId, 
       userEmail: effectiveEmail, 
       userName, 
       hasRegistrationData: !!registrationData,
+      hasContractDetails: !!contractDetails,
       amount
     });
     
@@ -129,10 +134,7 @@ serve(async (req) => {
       throw new Error('Missing Cardcom API credentials in environment variables');
     }
 
-    console.log('Using Cardcom credentials:', {
-      terminalNumber: terminalNumber.substring(0, 2) + '...',
-      apiName: apiName.substring(0, 2) + '...'
-    });
+    console.log('Using Cardcom credentials:', {terminalNumber, apiName});
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -156,7 +158,42 @@ serve(async (req) => {
       operation = freeTrialDays > 0 ? "3" : "2"; // CreateTokenOnly or ChargeAndCreateToken
     }
     
-    // Payment details
+    // First, store contract details in separate table if provided
+    let contractId = null;
+    if (contractDetails) {
+      try {
+        console.log('Storing contract details separately...');
+        const { data: contractData, error: contractError } = await supabaseClient
+          .from('contract_signatures')
+          .insert({
+            user_id: userId || null,
+            plan_id: planId,
+            full_name: contractDetails.fullName || userName || '',
+            email: effectiveEmail,
+            signature: contractDetails.signature || '',
+            contract_html: contractDetails.contractHtml || '',
+            agreed_to_terms: contractDetails.agreedToTerms || false,
+            agreed_to_privacy: contractDetails.agreedToPrivacy || false,
+            contract_version: contractDetails.contractVersion || "1.0",
+            browser_info: contractDetails.browserInfo || null,
+            ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null
+          })
+          .select('id')
+          .single();
+        
+        if (contractError) {
+          console.error('Error storing contract:', contractError);
+        } else if (contractData) {
+          contractId = contractData.id;
+          console.log('Contract stored with ID:', contractId);
+        }
+      } catch (error) {
+        console.error('Exception while saving contract:', error);
+        // Continue with payment even if contract storage fails
+      }
+    }
+
+    // Payment details including reference to contract if saved
     const paymentDetails = {
       lowProfileId,
       amount,
@@ -168,7 +205,9 @@ serve(async (req) => {
       status: 'created',
       freeTrialDays,
       isRecurring,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      // Reference contract ID instead of storing full details
+      contractId: contractId
     };
 
     // If registration data provided, store it with the payment session
@@ -182,12 +221,7 @@ serve(async (req) => {
     }
 
     // Save payment session to database
-    console.log('Saving payment session to database', {
-      sessionId, 
-      userId, 
-      email: effectiveEmail, 
-      planId
-    });
+    console.log('Saving payment session to database', {sessionId, userId, email: effectiveEmail, planId});
     
     const { error: sessionError } = await supabaseClient
       .from('payment_sessions')
@@ -219,7 +253,7 @@ serve(async (req) => {
     
     const webhookUrl = `${origin}/functions/v1/cardcom-webhook`;
     
-    // Set up redirect URLs for after payment
+    // Set up redirect URLs for after payment - ensure they are properly encoded
     let success_url = successRedirectUrl || `${origin}/subscription?success=true&planId=${encodeParameter(planId)}&lowProfileId=${encodeParameter(lowProfileId)}`;
     let error_url = errorRedirectUrl || `${origin}/subscription?error=true`;
 
@@ -234,7 +268,7 @@ serve(async (req) => {
     });
     
     // Construct the payment URL for Cardcom - minimizing the amount of parameters
-    const paymentUrl = `https://secure.cardcom.solutions/Interface/LowProfile.aspx?` +
+    const paymentUrl = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
       `TerminalNumber=${encodeParameter(terminalNumber)}&` + 
       `UserName=${encodeParameter(apiName)}&` +
       `APILevel=10&` +
@@ -254,6 +288,9 @@ serve(async (req) => {
         success: true,
         lowProfileId,
         sessionId,
+        terminalNumber,
+        apiName,
+        webhookUrl,
         url: paymentUrl,
         message: 'Payment session created successfully'
       }),

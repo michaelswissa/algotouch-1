@@ -1,4 +1,3 @@
-
 import { Database as OriginalDatabase, Json } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
@@ -478,43 +477,6 @@ export interface ExtendedDatabase extends OriginalDatabase {
           approval_code?: string | null;
           transaction_details?: Json | null;
           created_at?: string | null;
-        };
-        Relationships: [];
-      };
-      // Add the payment_logs table definition
-      payment_logs: {
-        Row: {
-          id: string;
-          lowprofile_id: string;
-          user_id: string | null;
-          status: string;
-          transaction_id: string | null;
-          plan_id: string | null;
-          payment_data: Json | null;
-          created_at: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          lowprofile_id: string;
-          user_id?: string | null;
-          status: string;
-          transaction_id?: string | null;
-          plan_id?: string | null;
-          payment_data?: Json | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          lowprofile_id?: string;
-          user_id?: string | null;
-          status?: string;
-          transaction_id?: string | null;
-          plan_id?: string | null;
-          payment_data?: Json | null;
-          created_at?: string | null;
-          updated_at?: string | null;
         };
         Relationships: [];
       };

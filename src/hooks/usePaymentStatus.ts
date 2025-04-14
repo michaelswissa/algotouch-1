@@ -15,10 +15,8 @@ export const usePaymentStatus = (
   const [paymentProcessingId, setPaymentProcessingId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
-  
-  // Function to check payment status
+
   const checkPaymentStatus = useCallback(async (profileId?: string, planId?: string) => {
-    // Get payment parameters from URL or local storage
     const params = new URLSearchParams(window.location.search);
     const success = params.get('success');
     const error = params.get('error');
