@@ -1,77 +1,63 @@
 
-/**
- * Get price information for subscription plans
- */
-export const getSubscriptionPlans = () => {
-  return {
-    monthly: {
-      name: 'מנוי חודשי',
-      price: 99,
-      freeTrialDays: 14,
-      hasTrial: true
-    },
-    annual: {
-      name: 'מנוי שנתי',
-      price: 999,
-      freeTrialDays: 0,
-      hasTrial: false
-    },
-    vip: {
-      name: 'מנוי פרימיום',
-      price: 1999,
-      freeTrialDays: 0,
-      hasTrial: false
-    }
-  };
-};
+export interface SubscriptionPlan {
+  name: string;
+  price: number;
+  description: string;
+  currency?: string;
+  freeTrialDays?: number;
+  hasTrial?: boolean;
+}
 
-/**
- * Format currency
- */
-export const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('he-IL', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 0
-  }).format(amount);
-};
+export const getSubscriptionPlans = () => ({
+  monthly: {
+    name: 'חודשי',
+    price: 371, // Actual price in ILS
+    displayPrice: 99, // Display price in USD
+    description: 'חודש ניסיון חינם, אחר כך חיוב אוטומטי של 371 ₪ לחודש.',
+    features: ['גישה לכל התכונות', 'ביטול בכל עת', 'עדכונים שוטפים'],
+    hasTrial: true,
+    freeTrialDays: 30, // Adding free trial days
+  },
+  annual: {
+    name: 'שנתי',
+    price: 3371, // Actual price in ILS
+    displayPrice: 899, // Display price in USD
+    description: 'תשלום שנתי של 3,371 ₪ (חיסכון של 25%). חיוב אוטומטי מידי שנה.',
+    features: ['גישה לכל התכונות', 'חיסכון של 25%', 'תמיכה מועדפת'],
+    hasTrial: false,
+    freeTrialDays: 0, // No free trial for annual plan
+  },
+  vip: {
+    name: 'VIP',
+    price: 13121, // Actual price in ILS
+    displayPrice: 3499, // Display price in USD
+    description: 'תשלום חד פעמי של 13,121 ₪ לגישה ללא הגבלת זמן וליווי VIP.',
+    features: ['גישה לכל החיים', 'תמיכה VIP', 'ייעוץ אישי'],
+    hasTrial: false,
+    freeTrialDays: 0, // No free trial for VIP plan
+  },
+});
 
-/**
- * Check if a payment session is still valid
- */
-export const isPaymentSessionValid = () => {
-  const sessionCreated = localStorage.getItem('payment_session_created');
-  if (!sessionCreated) return false;
-  
-  const created = new Date(sessionCreated);
-  const now = new Date();
-  
-  // Session is valid for 30 minutes
-  return (now.getTime() - created.getTime()) < 30 * 60 * 1000;
-};
+export interface TokenData {
+  lastFourDigits: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+  [key: string]: string | number | boolean;
+}
 
-/**
- * Get pending payment details
- */
-export const getPendingPaymentDetails = () => {
-  const id = localStorage.getItem('payment_pending_id');
-  const plan = localStorage.getItem('payment_pending_plan');
-  const created = localStorage.getItem('payment_session_created');
-  
-  if (!id || !plan || !created) return null;
+export const createTokenData = (
+  cardNumber: string,
+  expiryDate: string,
+  cardholderName: string
+): TokenData => {
+  const [expiryMonth, expiryYear] = expiryDate.split('/');
   
   return {
-    lowProfileId: id,
-    planId: plan,
-    created: new Date(created)
+    lastFourDigits: cardNumber.slice(-4),
+    expiryMonth,
+    expiryYear,
+    cardholderName,
+    tokenCreatedAt: new Date().toISOString(),
   };
-};
-
-/**
- * Clear payment session data
- */
-export const clearPaymentSession = () => {
-  localStorage.removeItem('payment_pending_id');
-  localStorage.removeItem('payment_pending_plan');
-  localStorage.removeItem('payment_session_created');
 };
