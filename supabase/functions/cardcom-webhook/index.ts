@@ -12,6 +12,8 @@ const corsHeaders = {
 serve(async (req) => {
   try {
     console.log("Webhook request received");
+    console.log("Request method:", req.method);
+    console.log("Request URL:", req.url);
     
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
@@ -26,46 +28,46 @@ serve(async (req) => {
     
     try {
       // Try parsing as JSON first
-      paymentData = await req.json();
-    } catch (jsonError) {
-      console.log("Not JSON, trying URL parameters", jsonError);
+      const clonedRequest = req.clone(); // Clone request to read body multiple times if needed
+      const text = await clonedRequest.text();
+      console.log("Raw request body:", text);
       
-      // Parse URL parameters from either body or URL
-      const url = new URL(req.url);
-      paymentData = {};
-      
-      // Get params from URL query string
-      for (const [key, value] of url.searchParams.entries()) {
-        paymentData[key] = value;
-      }
-      
-      // If it's a POST request, try to get form data
-      if (req.method === 'POST') {
-        try {
-          const formData = await req.formData();
-          for (const [key, value] of formData.entries()) {
-            paymentData[key] = value;
-          }
-        } catch (formError) {
-          console.log("Not form data either", formError);
-          
-          // Try getting text and parsing as URL-encoded
-          try {
-            const text = await req.text();
-            console.log("Raw request body:", text);
-            
-            const params = new URLSearchParams(text);
-            for (const [key, value] of params.entries()) {
-              paymentData[key] = value;
-            }
-          } catch (textError) {
-            console.error("Error parsing request body:", textError);
-          }
+      try {
+        paymentData = JSON.parse(text);
+        console.log("Successfully parsed JSON data:", paymentData);
+      } catch (jsonError) {
+        console.log("Not valid JSON, trying as URL parameters:", jsonError);
+        
+        // Parse URL parameters
+        const params = new URLSearchParams(text);
+        paymentData = {};
+        
+        for (const [key, value] of params.entries()) {
+          paymentData[key] = value;
         }
+        
+        console.log("Parsed URL parameters:", paymentData);
+      }
+    } catch (error) {
+      console.error("Error processing webhook payload:", error);
+      
+      // Try getting URL parameters from the URL itself
+      try {
+        const url = new URL(req.url);
+        paymentData = {};
+        
+        // Get params from URL query string
+        for (const [key, value] of url.searchParams.entries()) {
+          paymentData[key] = value;
+        }
+        
+        console.log("Extracted parameters from URL:", paymentData);
+      } catch (urlError) {
+        console.error("Error parsing URL:", urlError);
       }
     }
     
-    console.log("Webhook payment data:", paymentData);
+    console.log("Final webhook payment data:", paymentData);
     
     // Validate we have the minimum required data
     if (!paymentData || (!paymentData.LowProfileCode && !paymentData.lowProfileId)) {
@@ -74,7 +76,7 @@ serve(async (req) => {
         JSON.stringify({ success: false, error: "Missing required payment data" }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
+          status: 200, // Return 200 so Cardcom doesn't retry
         }
       );
     }
@@ -97,8 +99,12 @@ serve(async (req) => {
       .eq('id', lowProfileId)
       .maybeSingle();
     
-    if (sessionError || !session) {
-      console.error('Payment session not found:', sessionError);
+    if (sessionError) {
+      console.error('Error fetching payment session:', sessionError);
+    }
+    
+    if (!session) {
+      console.warn('Payment session not found for lowProfileId:', lowProfileId);
       
       // Still log the webhook even if we can't find the session
       await supabaseClient
@@ -125,6 +131,8 @@ serve(async (req) => {
                      (paymentData.TranzactionInfo && paymentData.TranzactionInfo.ResponseCode === 0);
     
     const status = isSuccess ? 'completed' : 'failed';
+    
+    console.log(`Payment status determined as: ${status} (Success: ${isSuccess})`);
     
     // Update payment logs
     await supabaseClient
@@ -160,6 +168,9 @@ serve(async (req) => {
       } else if (planId === 'annual') {
         currentPeriodEndsAt = new Date(now);
         currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+      } else if (planId === 'vip') {
+        currentPeriodEndsAt = new Date(now);
+        currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
       }
       
       // Get payment method details from the transaction
@@ -172,13 +183,17 @@ serve(async (req) => {
                (paymentData.TokenInfo && paymentData.TokenInfo.Token)
       };
       
+      console.log("Updating subscription for user:", userId);
+      console.log("Payment method details:", paymentMethod);
+      console.log("Plan type:", planId);
+      
       // Update subscription
       const { error: subscriptionError } = await supabaseClient
         .from('subscriptions')
         .upsert({
           user_id: userId,
           plan_type: planId,
-          status: planId === 'monthly' ? 'trial' : planId === 'vip' ? 'active' : 'active',
+          status: planId === 'monthly' ? 'trial' : 'active',
           trial_ends_at: trialEndsAt?.toISOString() || null,
           current_period_ends_at: currentPeriodEndsAt?.toISOString() || null,
           payment_method: paymentMethod,
@@ -190,6 +205,8 @@ serve(async (req) => {
       
       if (subscriptionError) {
         console.error('Error updating subscription:', subscriptionError);
+      } else {
+        console.log('Subscription updated successfully');
       }
       
       // Record payment transaction if not a trial

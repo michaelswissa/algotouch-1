@@ -33,12 +33,15 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
   const [lowProfileId, setLowProfileId] = useState<string | null>(null);
   const [iframeHeight, setIframeHeight] = useState(600);
   const [retryCount, setRetryCount] = useState(0);
+  const [isPaymentInit, setIsPaymentInit] = useState(false);
 
   // Initialize payment session and get iframe URL
   useEffect(() => {
     const initPayment = async () => {
       try {
         setLoading(true);
+        setIsPaymentInit(true);
+        setError(null);
         
         // Prepare payment data
         const paymentData = {
@@ -87,15 +90,19 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
           return;
         }
         
-        setError(error instanceof Error ? error.message : 'Failed to initialize payment');
-        onError(error instanceof Error ? error.message : 'Failed to initialize payment');
+        const errorMessage = error instanceof Error ? error.message : 'Failed to initialize payment';
+        setError(errorMessage);
+        onError(errorMessage);
       } finally {
         setLoading(false);
+        setIsPaymentInit(false);
       }
     };
     
-    initPayment();
-  }, [planId, amount, user?.id, userName, userEmail, onError, retryCount]);
+    if (!isPaymentInit) {
+      initPayment();
+    }
+  }, [planId, amount, user?.id, userName, userEmail, onError, retryCount, isPaymentInit]);
 
   // Handle iframe messages
   useEffect(() => {
@@ -112,7 +119,7 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
         
         // Handle payment success
         if (data.status === 'success' || (data.ResponseCode === 0 && data.OperationResponse === '0')) {
-          const transactionId = data.TranzactionId || data.lowProfileId || 'unknown';
+          const transactionId = data.TranzactionId || data.lowProfileId || lowProfileId || 'unknown';
           onSuccess(transactionId);
         } 
         // Handle payment error
@@ -131,13 +138,82 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onSuccess, onError]);
+  }, [onSuccess, onError, lowProfileId]);
+
+  // Check payment status from localStorage on component mount
+  useEffect(() => {
+    const pendingId = localStorage.getItem('payment_pending_id');
+    const pendingPlan = localStorage.getItem('payment_pending_plan');
+    const sessionCreated = localStorage.getItem('payment_session_created');
+    
+    if (pendingId && pendingPlan && sessionCreated) {
+      // Check if the pending payment is for the current plan
+      if (pendingPlan === planId) {
+        const createdDate = new Date(sessionCreated);
+        const now = new Date();
+        const timeDiff = now.getTime() - createdDate.getTime();
+        
+        // If the session is less than 2 hours old, check its status
+        if (timeDiff < 2 * 60 * 60 * 1000) {
+          console.log(`Found pending payment session ${pendingId} for plan ${pendingPlan}`);
+          setLowProfileId(pendingId);
+          
+          // Check payment status after a short delay
+          setTimeout(() => {
+            checkPaymentStatus(pendingId, pendingPlan);
+          }, 1000);
+        } else {
+          // Session is too old, clear it
+          localStorage.removeItem('payment_pending_id');
+          localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
+        }
+      }
+    }
+  }, [planId]);
+
+  // Check payment status with edge function
+  const checkPaymentStatus = async (id: string, plan: string) => {
+    try {
+      console.log(`Checking payment status for ${id}, plan ${plan}`);
+      
+      const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
+        body: { lowProfileId: id, planId: plan }
+      });
+      
+      if (error) {
+        console.error('Error checking payment status:', error);
+        return;
+      }
+      
+      console.log('Payment status check response:', data);
+      
+      if (data.OperationResponse === '0' || (data.paymentLog && data.paymentLog.status === 'completed')) {
+        // Payment was successful
+        toast.success('התשלום הושלם בהצלחה!');
+        onSuccess(id);
+        
+        // Clear localStorage
+        localStorage.removeItem('payment_pending_id');
+        localStorage.removeItem('payment_pending_plan');
+        localStorage.removeItem('payment_session_created');
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+    }
+  };
 
   // If we have a lowProfileId but the iframe is not showing properly, provide a direct link
   const handleRedirectToPayment = () => {
     if (iframeUrl) {
       window.open(iframeUrl, '_blank');
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    setError(null);
+    setIsPaymentInit(false);
   };
 
   if (loading) {
@@ -161,7 +237,7 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
           <Button variant="outline" onClick={onCancel} size="sm">
             חזור
           </Button>
-          <Button onClick={() => setRetryCount(prev => prev + 1)} size="sm">
+          <Button onClick={handleRetry} size="sm">
             נסה שוב
           </Button>
         </div>

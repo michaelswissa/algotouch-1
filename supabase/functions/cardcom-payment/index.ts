@@ -35,20 +35,40 @@ serve(async (req) => {
     // Validate required parameters
     if (!amount || !email) {
       console.error("Missing required payment parameters:", { planId, amount, email });
-      throw new Error('Missing required payment parameters');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required payment parameters (amount or email)'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
     
     console.log('Initializing payment for:', { planId, amount, email });
     
-    // Get the Cardcom API credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
-    const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
+    // Get the Cardcom API credentials with verbose logging
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
+    const apiName = Deno.env.get("CARDCOM_API_NAME");
+    
+    console.log("Checking Cardcom credentials availability:");
+    console.log(`CARDCOM_TERMINAL_NUMBER available: ${Boolean(terminalNumber)}`);
+    console.log(`CARDCOM_API_NAME available: ${Boolean(apiName)}`);
     
     if (!terminalNumber || !apiName) {
       console.error("Missing Cardcom API credentials");
-      console.error(`CARDCOM_TERMINAL_NUMBER: ${Boolean(Deno.env.get("CARDCOM_TERMINAL_NUMBER"))} | CARDCOM_TERMINAL: ${Boolean(Deno.env.get("CARDCOM_TERMINAL"))}`);
-      console.error(`CARDCOM_API_NAME: ${Boolean(Deno.env.get("CARDCOM_API_NAME"))} | CARDCOM_USERNAME: ${Boolean(Deno.env.get("CARDCOM_USERNAME"))}`);
-      throw new Error('Missing Cardcom API credentials. Please check your Supabase secrets configuration.');
+      return new Response(
+        JSON.stringify({
+          success: false, 
+          error: 'Missing Cardcom API credentials. Please check your Supabase secrets configuration.'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
     }
 
     // Determine app URL for redirects and webhooks
@@ -115,9 +135,19 @@ serve(async (req) => {
     // ReturnValue - used to identify the transaction
     const transactionId = returnValue || `${userId || 'guest'}_${planId}_${Date.now()}`;
     formData.append('ReturnValue', transactionId);
+
+    // Log the full request details for debugging
+    console.log("Sending request to Cardcom API with parameters:");
+    console.log(`TerminalNumber: ${terminalNumber}`);
+    console.log(`ApiName: ${apiName}`);
+    console.log(`Operation: ${isRecurring ? '2' : '1'}`);
+    console.log(`SumToBill: ${amount}`);
+    console.log(`ProductName: ${productName}`);
+    console.log(`SuccessRedirectUrl: ${successUrl}`);
+    console.log(`FailedRedirectUrl: ${errorUrl}`);
+    console.log(`IndicatorUrl: ${webhookUrl}`);
     
     // Call Cardcom API to create payment session
-    console.log("Sending request to Cardcom API");
     const cardcomResponse = await fetch(
       'https://secure.cardcom.solutions/Interface/LowProfile.aspx', 
       { 
@@ -126,15 +156,32 @@ serve(async (req) => {
       }
     );
     
-    // Get raw response text
+    // Get raw response status and text
+    const responseStatus = cardcomResponse.status;
     const responseText = await cardcomResponse.text();
+    console.log(`Cardcom API responded with status ${responseStatus}`);
     console.log("Cardcom raw response:", responseText);
+    
+    if (responseStatus !== 200) {
+      console.error(`Cardcom API error: Status ${responseStatus}, Response: ${responseText}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Cardcom API returned status ${responseStatus}: ${responseText}`
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
     
     // Parse the response which may be URL-encoded or JSON
     let cardcomData;
     try {
       // Try parsing as JSON first
       cardcomData = JSON.parse(responseText);
+      console.log("Parsed response as JSON:", cardcomData);
     } catch (jsonError) {
       console.log("Response is not JSON, trying URL-encoded format");
       
@@ -149,16 +196,37 @@ serve(async (req) => {
           UrlToPayPal: urlParams.get("PayPalUrl"),
           UrlToBit: urlParams.get("BitUrl")
         };
+        console.log("Parsed response as URL params:", cardcomData);
       } catch (urlError) {
         console.error("Error parsing URL params:", urlError);
-        throw new Error(`Failed to parse Cardcom response: ${responseText}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Failed to parse Cardcom response: ${responseText}`,
+            rawResponse: responseText
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
       }
     }
     
     // Check if Cardcom returned an error
     if (cardcomData.ResponseCode !== 0) {
       console.error("Cardcom API error:", cardcomData);
-      throw new Error(`Cardcom error: ${cardcomData.Description || 'Unknown error'}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Cardcom error: ${cardcomData.Description || 'Unknown error'}`,
+          cardcomData
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
     }
     
     // Extract the relevant data from the response
@@ -166,11 +234,21 @@ serve(async (req) => {
     const paymentUrl = cardcomData.Url || cardcomData.url;
     
     if (!lowProfileId || !paymentUrl) {
-      console.error("Missing required data in Cardcom response");
-      throw new Error("Missing required data in Cardcom response");
+      console.error("Missing required data in Cardcom response:", cardcomData);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Missing required data in Cardcom response",
+          cardcomData
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
     }
     
-    console.log('Payment session created:', {
+    console.log('Payment session created successfully:', {
       lowProfileId,
       url: paymentUrl
     });
@@ -195,6 +273,7 @@ serve(async (req) => {
     
     if (sessionError) {
       console.error('Error creating payment session:', sessionError);
+      // Continue without failing - the payment process can still work even if logging fails
     }
     
     // Also log to payment_logs table for tracking
@@ -232,7 +311,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error instanceof Error ? error.message : 'An unexpected error occurred' 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+        stackTrace: error instanceof Error ? error.stack : undefined
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
