@@ -32,10 +32,15 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
     
     // Transform the data to match our UserBadge type
     const formattedData = data?.map(item => {
+      // Check if badge is an array or a direct object and handle accordingly
+      const badgeData = Array.isArray(item.badge) && item.badge.length > 0 
+        ? item.badge[0] 
+        : item.badge;
+      
       return {
         id: item.id,
         earned_at: item.earned_at,
-        badge: item.badge as Badge // Fix: item.badge is already a Badge object, not an array
+        badge: badgeData as Badge // Properly cast the badge data
       } as UserBadge;
     }) || [];
     
