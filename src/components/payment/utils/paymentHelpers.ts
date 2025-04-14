@@ -23,8 +23,8 @@ export const getSubscriptionPlans = (): SubscriptionPlans => {
     monthly: {
       id: 'monthly',
       name: 'מנוי חודשי',
-      price: 49.90,
-      displayPrice: '₪49.90',
+      price: 371,
+      displayPrice: '₪371',
       description: 'חיוב חודשי, ניתן לבטל בכל עת',
       hasTrial: true,
       freeTrialDays: 7,
@@ -37,15 +37,15 @@ export const getSubscriptionPlans = (): SubscriptionPlans => {
     annual: {
       id: 'annual',
       name: 'מנוי שנתי',
-      price: 499.00,
-      displayPrice: '₪499',
-      description: 'חיסכון של 15% בהשוואה לתשלום חודשי',
+      price: 3371,
+      displayPrice: '₪3,371',
+      description: 'חיסכון של 25% בהשוואה לתשלום חודשי',
       hasTrial: true,
       freeTrialDays: 14,
       isPopular: true,
       features: [
         'גישה לכל התכנים',
-        'חיסכון של 15% בהשוואה לתשלום חודשי',
+        'חיסכון של 25% בהשוואה לתשלום חודשי',
         'תמיכה טכנית מורחבת',
         'ניתן לבטל בכל עת עם החזר יחסי'
       ]
@@ -53,8 +53,8 @@ export const getSubscriptionPlans = (): SubscriptionPlans => {
     vip: {
       id: 'vip',
       name: 'מנוי לכל החיים',
-      price: 1999.00,
-      displayPrice: '₪1,999',
+      price: 13121,
+      displayPrice: '₪13,121',
       description: 'תשלום חד פעמי, גישה לכל החיים',
       hasTrial: false,
       freeTrialDays: 0,

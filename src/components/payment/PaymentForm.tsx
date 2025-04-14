@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,10 +102,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
-    if ([
-      PaymentStatus.PROCESSING, 
-      PaymentStatus.INITIALIZING
-    ].includes(paymentStatus)) {
+    // Fix TypeScript error with proper type checking
+    if (paymentStatus === PaymentStatus.PROCESSING || 
+        paymentStatus === PaymentStatus.INITIALIZING) {
       return;
     }
     
@@ -119,16 +119,26 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         return;
       }
 
+      // Set proper plan pricing according to the subscription requirements
+      let planPrice = 0;
+      if (planId === 'monthly') {
+        planPrice = 371;
+      } else if (planId === 'annual') {
+        planPrice = 3371;
+      } else if (planId === 'vip') {
+        planPrice = 13121;
+      }
+
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
-          amount: plan.price,
+          amount: planPrice,
           invoiceInfo: {
             fullName: user.user_metadata?.full_name || '',
             email: user.email || '',
           },
           currency: "ILS",
-          operation: "ChargeAndCreateToken",
+          operation: "ChargeAndCreateToken", // For recurring payments
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`

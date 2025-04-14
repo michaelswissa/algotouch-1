@@ -89,7 +89,7 @@ serve(async (req) => {
       operation
     });
     
-    // Create CardCom API request body
+    // Create CardCom API request body according to their LowProfile API documentation
     const cardcomPayload = new URLSearchParams({
       TerminalNumber: terminalNumber,
       ApiName: apiName,
@@ -110,7 +110,14 @@ serve(async (req) => {
       "InvoiceHead.CoinID": currency === "ILS" ? "1" : "2",
       "InvoiceLines1.Description": `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       "InvoiceLines1.Price": amount.toString(),
-      "InvoiceLines1.Quantity": "1"
+      "InvoiceLines1.Quantity": "1",
+      // CardCom-specific UI customization options
+      "UIDefinition.IsHideCardOwnerPhone": "false",
+      "UIDefinition.IsCardOwnerPhoneRequired": "true", 
+      "UIDefinition.IsHideCardOwnerEmail": "false",
+      "UIDefinition.IsCardOwnerEmailRequired": "true",
+      // Enable 3DS for better security
+      "AdvancedDefinition.ThreeDSecureState": "Enabled"
     }).toString();
     
     logStep("Sending request to CardCom");
