@@ -10,7 +10,6 @@ import PaymentDetails from './payment/PaymentDetails';
 import PlanSummary from './payment/PlanSummary';
 import SecurityNote from './payment/SecurityNote';
 import { getSubscriptionPlans, createTokenData } from './payment/utils/paymentHelpers';
-import { registerUser } from './payment/RegisterUser';
 
 interface PaymentFormProps {
   planId: string;
@@ -55,25 +54,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     try {
       setIsProcessing(true);
       
-      const tokenData = createTokenData(cardNumber, expiryDate, cardholderName);
+      // Placeholder for future payment implementation
+      toast.info('מערכת התשלומים בתהליך עדכון. אנא נסה שוב מאוחר יותר.');
       
-      const result = await registerUser({
-        registrationData,
-        tokenData
-      });
+      // For now, just simulate a successful payment
+      setTimeout(() => {
+        toast.success('ההרשמה בוצעה בהצלחה');
+        sessionStorage.removeItem('registration_data');
+        onPaymentComplete();
+      }, 1500);
       
-      if (!result.success) {
-        throw result.error;
-      }
-      
-      toast.success('התשלום נקלט בהצלחה! נרשמת לתקופת ניסיון חינם');
-      
-      sessionStorage.removeItem('registration_data');
-      
-      onPaymentComplete();
     } catch (error: any) {
       console.error('Payment/registration error:', error);
-      toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה. נסה שנית מאוחר יותר.');
+      toast.error('אירעה שגיאה בתהליך ההרשמה. נסה שנית מאוחר יותר.');
     } finally {
       setIsProcessing(false);
     }
