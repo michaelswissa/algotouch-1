@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,29 +33,48 @@ const Auth = () => {
 
   // Check if there's valid registration data in session storage
   useEffect(() => {
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        const data = JSON.parse(storedData);
-        const registrationTime = new Date(data.registrationTime);
-        const now = new Date();
-        const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
-        
-        // If registration is fresh (less than 30 minutes old) and explicitly coming from signup
-        if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
-          console.log("Auth: Valid registration data found, redirecting to subscription");
-          navigate('/subscription', { replace: true, state: { isRegistering: true } });
-        } else if (timeDiffInMinutes >= 30) {
-          // Clear stale registration data older than 30 minutes
-          console.log("Auth: Clearing stale registration data");
+    const checkSessionData = () => {
+      const contractData = sessionStorage.getItem('contract_data');
+      const registrationData = sessionStorage.getItem('registration_data');
+      
+      if (contractData || registrationData) {
+        try {
+          // If we have contract data, prioritize that
+          if (contractData) {
+            const data = JSON.parse(contractData);
+            if (data.selectedPlan) {
+              console.log("Auth: Valid contract data found, redirecting to subscription");
+              navigate('/subscription', { replace: true });
+              return;
+            }
+          }
+          
+          // Otherwise check registration data
+          if (registrationData) {
+            const data = JSON.parse(registrationData);
+            const registrationTime = new Date(data.registrationTime);
+            const now = new Date();
+            const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+            
+            if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
+              console.log("Auth: Valid registration data found, redirecting to subscription");
+              navigate('/subscription', { replace: true, state: { isRegistering: true } });
+            } else if (timeDiffInMinutes >= 30) {
+              console.log("Auth: Clearing stale registration data");
+              sessionStorage.removeItem('registration_data');
+              sessionStorage.removeItem('contract_data');
+              toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
+            }
+          }
+        } catch (error) {
+          console.error("Error checking session data:", error);
           sessionStorage.removeItem('registration_data');
-          toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
+          sessionStorage.removeItem('contract_data');
         }
-      } catch (error) {
-        console.error("Error parsing registration data:", error);
-        sessionStorage.removeItem('registration_data');
       }
-    }
+    };
+    
+    checkSessionData();
   }, [navigate, location.state]);
 
   // Show loading state while auth is initializing

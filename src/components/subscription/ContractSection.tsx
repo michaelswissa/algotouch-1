@@ -33,23 +33,25 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       const parsedRegistrationData = registrationData ? JSON.parse(registrationData) : null;
       
       // Save contract data to session storage for use during payment
-      // Include registration data reference if it exists
       const contractStateData = {
         ...contractData,
         registrationData: parsedRegistrationData,
         contractSignedAt: new Date().toISOString(),
-        isAuthenticated
+        isAuthenticated,
+        selectedPlan
       };
       
-      // Save contract state in session storage
+      // Save contract state in session storage and ensure it persists
       sessionStorage.setItem('contract_data', JSON.stringify(contractStateData));
       
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      // Pass the contract data up to the parent
       onSign(contractStateData);
     } catch (error) {
       console.error('Error signing contract:', error);
+      toast.error('אירעה שגיאה בשמירת החוזה');
     } finally {
       setIsProcessing(false);
     }

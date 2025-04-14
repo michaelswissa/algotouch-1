@@ -19,36 +19,42 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
   const [hasRegistrationData, setHasRegistrationData] = useState(false);
-  const [isValidRegistration, setIsValidRegistration] = useState(false);
+  const [hasValidFlow, setHasValidFlow] = useState(false);
   
   useEffect(() => {
-    // Check for registration data in session storage and validate it
-    const registrationData = sessionStorage.getItem('registration_data');
-    if (registrationData) {
-      try {
+    try {
+      // Get both registration and contract data
+      const registrationData = sessionStorage.getItem('registration_data');
+      const contractData = sessionStorage.getItem('contract_data');
+      
+      if (registrationData) {
         const data = JSON.parse(registrationData);
         const registrationTime = new Date(data.registrationTime);
         const now = new Date();
         const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
         
         // Registration data is valid if less than 30 minutes old
-        const isValid = timeDiffInMinutes < 30;
-        setHasRegistrationData(true);
-        setIsValidRegistration(isValid);
+        const isRegistrationValid = timeDiffInMinutes < 30;
+        setHasRegistrationData(isRegistrationValid);
         
-        if (!isValid) {
+        if (!isRegistrationValid) {
           toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
           sessionStorage.removeItem('registration_data');
+          sessionStorage.removeItem('contract_data');
         }
-      } catch (error) {
-        console.error("Error parsing registration data:", error);
-        setHasRegistrationData(false);
-        setIsValidRegistration(false);
-        sessionStorage.removeItem('registration_data');
       }
-    } else {
+      
+      // Consider the flow valid if we have contract data from a registered user
+      // or if we have valid registration data (for new users)
+      const isValidFlow = contractData || (registrationData && hasRegistrationData);
+      setHasValidFlow(isValidFlow);
+      
+    } catch (error) {
+      console.error("Error checking registration/contract data:", error);
       setHasRegistrationData(false);
-      setIsValidRegistration(false);
+      setHasValidFlow(false);
+      sessionStorage.removeItem('registration_data');
+      sessionStorage.removeItem('contract_data');
     }
   }, [location.pathname]);
 
@@ -61,49 +67,39 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Special case for contract signing and subscription flow
+  // Special handling for subscription flow
   if (location.pathname.startsWith('/subscription')) {
     // Allow access if:
     // 1. User is authenticated OR
-    // 2. Has valid registration data OR
-    // 3. Coming from contract signing (stored in session)
-    const hasContractData = sessionStorage.getItem('contract_data');
-    
-    if (isAuthenticated || (hasRegistrationData && isValidRegistration) || hasContractData) {
+    // 2. Has valid registration flow OR
+    // 3. Has valid contract data
+    if (isAuthenticated || hasValidFlow) {
       console.log("ProtectedRoute: Allowing access to subscription path", {
         isAuthenticated,
         hasRegistrationData,
-        isValidRegistration,
-        hasContractData
+        hasValidFlow
       });
       return <>{children}</>;
     }
-    return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
+    
+    // If no valid state, redirect to auth
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   // Allow access to public paths regardless of auth status
-  if (isPublicPath(location.pathname, publicPaths)) {
+  if (publicPaths.some(path => location.pathname === path || location.pathname.startsWith(`${path}/`))) {
     return <>{children}</>;
   }
 
   if (requireAuth && !isAuthenticated) {
-    console.log("ProtectedRoute: User is not authenticated, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
-    console.log("ProtectedRoute: User is already authenticated, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 };
-
-// Helper functions to improve readability
-function isPublicPath(path: string, publicPaths: string[]): boolean {
-  return publicPaths.some(publicPath => 
-    path === publicPath || path.startsWith(`${publicPath}/`)
-  );
-}
 
 export default ProtectedRoute;
