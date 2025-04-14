@@ -14,11 +14,7 @@ interface PaymentFormProps {
   onBack?: () => void;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ 
-  planId, 
-  onPaymentComplete, 
-  onBack 
-}) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 

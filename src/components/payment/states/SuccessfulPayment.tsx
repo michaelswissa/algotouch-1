@@ -17,7 +17,7 @@ const SuccessfulPayment: React.FC<SuccessfulPaymentProps> = ({ plan, onContinue 
       </div>
       <h3 className="text-xl font-semibold mb-2">התשלום בוצע בהצלחה!</h3>
       <p className="text-muted-foreground">
-        {plan.id === 'vip'
+        {plan.id === 'vip' 
           ? 'המנוי שלך הופעל לכל החיים'
           : `המנוי שלך הופעל ויחודש אוטומטית בכל ${plan.id === 'monthly' ? 'חודש' : 'שנה'}`}
       </p>
