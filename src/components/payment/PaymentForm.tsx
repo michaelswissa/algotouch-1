@@ -37,7 +37,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   // Initialize payment on component mount
   useEffect(() => {
-    if (paymentStatus === PaymentStatus.IDLE) {
+    if (paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.INITIALIZING) {
       console.log("Initializing payment for plan:", planId);
       initializePayment();
     }
