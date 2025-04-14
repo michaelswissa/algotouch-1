@@ -20,6 +20,7 @@ export const usePaymentStatus = (
     const params = new URLSearchParams(window.location.search);
     const success = params.get('success');
     const error = params.get('error');
+    const paymentId = params.get('paymentId');
     const lowProfileId = params.get('lowProfileId') || localStorage.getItem('payment_pending_id') || profileId;
     const paymentPlanId = params.get('planId') || localStorage.getItem('payment_pending_plan') || planId;
     
@@ -49,19 +50,20 @@ export const usePaymentStatus = (
       return;
     }
     
-    if ((success === 'true' || profileId) && lowProfileId) {
+    if ((success === 'true' || profileId || paymentId) && (lowProfileId || paymentId)) {
       // Store that we're processing a payment to avoid duplicate checks
-      localStorage.setItem('payment_processing', lowProfileId);
-      setPaymentProcessingId(lowProfileId);
+      const paymentIdentifier = lowProfileId || paymentId;
+      localStorage.setItem('payment_processing', paymentIdentifier);
+      setPaymentProcessingId(paymentIdentifier);
       
       setIsChecking(true);
       try {
-        console.log('Checking payment status for lowProfileId:', lowProfileId);
+        console.log('Checking payment status for:', paymentIdentifier);
         
         // Check payment status with the dedicated function
         const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
           body: { 
-            lowProfileId,
+            lowProfileId: paymentIdentifier,
             planId: paymentPlanId
           }
         });
