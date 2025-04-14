@@ -1,5 +1,5 @@
 
-import { serve } from "std/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 
 // Configure CORS headers
@@ -148,7 +148,6 @@ serve(async (req) => {
         
         console.log('Processing registration flow completion...');
         
-        // Complete the registration process if needed
         // Additional logic for registration completion can be added here if needed
       }
     }
