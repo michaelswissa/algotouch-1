@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -47,10 +46,16 @@ serve(async (req) => {
     } = await supabaseClient.auth.getUser();
     
     if (!user) {
-      throw new Error("User not authenticated");
+      // Check for registration data in progress
+      const { planId, registrationData } = await req.json();
+      
+      if (!registrationData) {
+        throw new Error("User not authenticated and no registration data found");
+      }
+      
+      console.log("Processing payment for registration in progress");
     }
-    logStep("User authenticated", { userId: user.id });
-
+    
     // Parse request payload
     const { 
       planId, 
@@ -192,7 +197,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
     

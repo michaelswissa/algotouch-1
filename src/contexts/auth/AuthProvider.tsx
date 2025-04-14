@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             phone: phone,
             is_new_user: true
           },
-          emailRedirectTo: `${window.location.origin}/auth?verification=success`
+          // Remove emailRedirectTo to disable email verification
         }
       });
       
@@ -147,10 +147,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      console.log('Sign up successful, user:', data.user);
+      // Store registration data for subscription flow
+      const registrationData = {
+        email,
+        password,
+        userData: {
+          firstName,
+          lastName,
+          phone
+        },
+        registrationTime: new Date().toISOString()
+      };
+      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
       
-      // We'll send welcome email after the confirmation (in onAuthStateChange)
-      toast.success('נרשמת בהצלחה! נא לאמת את כתובת הדוא"ל');
+      console.log('Sign up successful, proceeding to subscription');
+      toast.success('נרשמת בהצלחה!');
       
       return { success: true, user: data.user };
     } catch (error) {
