@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { toast } from 'sonner';
-import OpenFieldsPaymentForm from '@/components/payment/OpenFieldsPaymentForm';
+import CardcomIframe from '@/components/payment/CardcomIframe';
 import { useNavigate } from 'react-router-dom';
 import usePaymentStatus from '@/hooks/usePaymentStatus';
 
@@ -62,8 +62,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     setPaymentError(null);
   };
 
-  const handlePaymentSuccess = (transactionId: string) => {
-    console.log('Payment successful, transaction ID:', transactionId);
+  const handlePaymentSuccess = (lowProfileId: string) => {
+    console.log('Payment successful, lowProfileId:', lowProfileId);
     setPaymentProcessing(false);
     setPaymentSuccess(true);
     toast.success('התשלום התקבל בהצלחה!');
@@ -132,11 +132,12 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         </Alert>
       )}
       
-      <OpenFieldsPaymentForm 
+      <CardcomIframe
         planId={selectedPlan}
-        onPaymentComplete={handlePaymentSuccess}
-        onCancel={onBack}
-        onPaymentStart={handlePaymentStart}
+        userId={user?.id}
+        fullName={fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName}
+        email={email || registrationData?.email}
+        onComplete={handlePaymentSuccess}
         onError={handlePaymentError}
       />
       

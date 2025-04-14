@@ -401,6 +401,42 @@ export type Database = {
           },
         ]
       }
+      payment_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          lowprofile_id: string
+          payment_data: Json | null
+          plan_id: string | null
+          status: string
+          transaction_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lowprofile_id: string
+          payment_data?: Json | null
+          plan_id?: string | null
+          status: string
+          transaction_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lowprofile_id?: string
+          payment_data?: Json | null
+          plan_id?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       payment_sessions: {
         Row: {
           created_at: string | null

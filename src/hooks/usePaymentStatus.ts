@@ -153,7 +153,7 @@ export const usePaymentStatus = (
           setPaymentError(errorMsg);
           toast.error(errorMsg);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error checking payment status:', err);
         if (retryCount < 3) {
           // Retry on error as well
