@@ -6,6 +6,8 @@ export interface SubscriptionPlan {
   currency?: string;
   freeTrialDays?: number;
   hasTrial?: boolean;
+  displayPrice?: number;
+  displayCurrency?: string;
 }
 
 export const getSubscriptionPlans = () => ({
