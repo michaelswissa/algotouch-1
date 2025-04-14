@@ -46,12 +46,12 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
           userId: user?.id,
           userName: userName || '',
           email: userEmail,
-          userEmail: userEmail,
+          returnValue: `${user?.id || 'guest'}_${planId}_${new Date().getTime()}`,
           isRecurring: planId !== 'vip'
         };
         
-        // Call the edge function to initialize payment
-        const { data, error: apiError } = await supabase.functions.invoke('cardcom-openfields', {
+        // Call the edge function to create a Cardcom LowProfile page
+        const { data, error: apiError } = await supabase.functions.invoke('cardcom-payment', {
           body: paymentData
         });
         
@@ -94,6 +94,8 @@ const CardcomIframe: React.FC<CardcomIframeProps> = ({
       
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        console.log('Received message from iframe:', data);
         
         // Handle payment success
         if (data.status === 'success' || (data.ResponseCode === 0 && data.OperationResponse === '0')) {

@@ -1,9 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Spinner } from '@/components/ui/spinner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -14,172 +15,135 @@ interface PaymentStatusProps {
 }
 
 const PaymentStatus: React.FC<PaymentStatusProps> = ({ 
-  lowProfileId, 
-  planId, 
-  redirectOnSuccess = '/my-subscription' 
+  lowProfileId,
+  planId,
+  redirectOnSuccess = '/my-subscription'
 }) => {
   const navigate = useNavigate();
-  const [isChecking, setIsChecking] = useState(true);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [checkCount, setCheckCount] = useState(0);
+  const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const success = params.get('success') === 'true';
-    const errorParam = params.get('error') === 'true';
-    const profileId = lowProfileId || params.get('lowProfileId') || localStorage.getItem('payment_pending_id');
-    const paymentPlanId = planId || params.get('planId') || localStorage.getItem('payment_pending_plan');
-    
-    if (success) {
-      handleSuccess();
-      return;
-    }
-    
-    if (errorParam) {
-      handleError('התשלום נכשל או בוטל על ידי המשתמש.');
-      return;
-    }
-    
-    if (!profileId) {
-      handleError('מזהה עסקה חסר. לא ניתן לאמת את התשלום.');
-      return;
-    }
-    
     const checkPaymentStatus = async () => {
+      if (!lowProfileId && !planId) {
+        setStatus('error');
+        setErrorMessage('מזהה תשלום חסר, לא ניתן לאמת את סטטוס התשלום');
+        return;
+      }
+
       try {
-        setIsChecking(true);
+        console.log('Checking payment status for:', { lowProfileId, planId });
         
+        // Check payment status with the dedicated function
         const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
           body: { 
-            lowProfileId: profileId,
-            planId: paymentPlanId
+            lowProfileId,
+            planId
           }
         });
         
         if (error) {
-          throw new Error(`שגיאה בבדיקת סטטוס תשלום: ${error.message}`);
+          console.error('Error checking payment status:', error);
+          throw new Error(error.message);
         }
         
-        console.log('Payment check response:', data);
+        console.log('Payment status response:', data);
         
-        // Check if payment was successful
+        // Check if the transaction was successful
         if (data.ResponseCode === 0 || 
             data.OperationResponse === '0' || 
             (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0) ||
             (data.paymentLog && data.paymentLog.status === 'completed')) {
           
-          handleSuccess();
+          setStatus('success');
           
-          // Clean up local storage payment tracking
-          localStorage.removeItem('payment_pending_id');
-          localStorage.removeItem('payment_pending_plan');
-          localStorage.removeItem('payment_session_created');
-          localStorage.removeItem('payment_processing');
+          // Success toast based on plan type
+          if (planId === 'monthly') {
+            toast.success('נרשמת בהצלחה לתקופת ניסיון!');
+          } else if (planId === 'annual') {
+            toast.success('נרשמת בהצלחה למנוי שנתי!');
+          } else if (planId === 'vip') {
+            toast.success('נרשמת בהצלחה למנוי VIP!');
+          } else {
+            toast.success('התשלום התקבל בהצלחה!');
+          }
           
-          return;
-        }
-        
-        // Handle ongoing check logic
-        if (checkCount < 3) {
-          // Try again after a delay
+          // Allow time for the toast to show before redirecting
           setTimeout(() => {
-            setCheckCount(prev => prev + 1);
+            navigate(redirectOnSuccess, { replace: true });
           }, 2000);
+        } else if (retryCount < 3) {
+          // Sometimes the transaction might not be processed immediately
+          // Retry a few times
+          setTimeout(() => {
+            setRetryCount(prevCount => prevCount + 1);
+          }, (retryCount + 1) * 1500);
         } else {
-          handleError('לא ניתן לאמת את סטטוס התשלום. אנא פנה לתמיכה או נסה שוב.');
+          setStatus('error');
+          setErrorMessage(data.Description || 'אירעה שגיאה בתהליך התשלום');
+          toast.error('התשלום לא הושלם בהצלחה');
         }
       } catch (err) {
         console.error('Error checking payment status:', err);
         
-        if (checkCount < 3) {
-          // Try again after delay
+        if (retryCount < 3) {
           setTimeout(() => {
-            setCheckCount(prev => prev + 1);
-          }, 2000);
+            setRetryCount(prevCount => prevCount + 1);
+          }, (retryCount + 1) * 1500);
         } else {
-          handleError(err instanceof Error ? err.message : 'שגיאה בבדיקת סטטוס התשלום');
-        }
-      } finally {
-        if (checkCount >= 3) {
-          setIsChecking(false);
+          setStatus('error');
+          setErrorMessage(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
         }
       }
     };
-    
+
     checkPaymentStatus();
-  }, [lowProfileId, planId, checkCount, navigate, redirectOnSuccess]);
-  
-  const handleSuccess = () => {
-    setIsSuccess(true);
-    setIsChecking(false);
-    toast.success('התשלום בוצע בהצלחה!');
-    
-    // Give some time for the user to see the success message
-    setTimeout(() => {
-      navigate(redirectOnSuccess, { replace: true });
-    }, 3000);
-  };
-  
-  const handleError = (message: string) => {
-    setError(message);
-    setIsChecking(false);
-    toast.error(message);
-  };
-  
+  }, [lowProfileId, planId, navigate, redirectOnSuccess, retryCount]);
+
+  if (status === 'checking') {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <Spinner size="lg" className="text-primary" />
+        <p className="text-lg">בודק את סטטוס התשלום...</p>
+        {retryCount > 0 && (
+          <p className="text-sm text-muted-foreground">
+            ניסיון {retryCount + 1}/4. עיבוד התשלום יכול להימשך מספר שניות...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (status === 'success') {
+    return (
+      <Alert className="max-w-lg mx-auto bg-green-50 border-green-200">
+        <CheckCircle2 className="h-5 w-5 text-green-500" />
+        <AlertDescription className="text-green-700">
+          התשלום התקבל בהצלחה! מעבד את הנתונים...
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
-    <Card className="mx-auto max-w-md">
-      <CardHeader>
-        <CardTitle className="text-center">
-          {isChecking ? 'בודק סטטוס תשלום...' : 
-           isSuccess ? 'התשלום התקבל בהצלחה!' : 
-           'שגיאה בתהליך התשלום'}
-        </CardTitle>
-      </CardHeader>
+    <div className="space-y-4 max-w-lg mx-auto">
+      <Alert variant="destructive">
+        <AlertCircle className="h-5 w-5" />
+        <AlertDescription>
+          {errorMessage || 'אירעה שגיאה בתהליך התשלום'}
+        </AlertDescription>
+      </Alert>
       
-      <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-        {isChecking && (
-          <div className="flex flex-col items-center space-y-4">
-            <Loader2 className="h-16 w-16 animate-spin text-primary" />
-            <p>מעבד את פרטי התשלום...</p>
-          </div>
-        )}
-        
-        {isSuccess && (
-          <div className="flex flex-col items-center space-y-4">
-            <CheckCircle2 className="h-16 w-16 text-green-500" />
-            <p>תודה על הרכישה! מעבד את הפרטים ומעביר אותך למנוי שלך...</p>
-          </div>
-        )}
-        
-        {error && (
-          <div className="flex flex-col items-center space-y-4">
-            <XCircle className="h-16 w-16 text-destructive" />
-            <p>{error}</p>
-          </div>
-        )}
-      </CardContent>
-      
-      <CardFooter className="flex justify-center">
-        {!isChecking && !isSuccess && (
-          <div className="flex space-x-2 space-x-reverse">
-            <Button 
-              variant="default" 
-              onClick={() => navigate('/subscription')}
-            >
-              נסה שוב
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/my-subscription')}
-            >
-              חזור למנוי שלי
-            </Button>
-          </div>
-        )}
-      </CardFooter>
-    </Card>
+      <div className="flex justify-center gap-4">
+        <Button onClick={() => navigate('/subscription')} variant="outline">
+          נסה שוב
+        </Button>
+        <Button onClick={() => navigate('/dashboard')} variant="default">
+          חזרה לדף הבית
+        </Button>
+      </div>
+    </div>
   );
 };
 

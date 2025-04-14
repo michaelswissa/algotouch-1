@@ -53,11 +53,20 @@ serve(async (req) => {
     
     console.log('Parsed webhook data:', webhookData);
     
-    // Extract lowProfileId from the ReturnValue field
-    const lowProfileId = webhookData.ReturnValue || '';
-    if (!lowProfileId) {
-      throw new Error('Missing ReturnValue (lowProfileId) in webhook data');
+    // Extract user_id and plan_id from the ReturnValue field (userId_planId_timestamp)
+    const returnValue = webhookData.ReturnValue || '';
+    let userId = null;
+    let planId = null;
+    
+    if (returnValue) {
+      const parts = returnValue.split('_');
+      if (parts.length >= 2) {
+        userId = parts[0];
+        planId = parts[1];
+      }
     }
+    
+    console.log('Extracted from ReturnValue:', { userId, planId });
     
     // Create Supabase client
     const supabaseClient = createClient(
@@ -70,56 +79,81 @@ serve(async (req) => {
         (webhookData.TranzactionInfo && webhookData.TranzactionInfo.ResponseCode === 0);
     
     if (isSuccess) {
-      console.log(`Payment successful for lowProfileId: ${lowProfileId}`);
+      console.log(`Payment successful for ReturnValue: ${returnValue}`);
       
-      // Look up the payment session
-      const { data: paymentSession, error: sessionError } = await supabaseClient
-        .from('payment_sessions')
-        .select('*')
-        .filter('payment_details->lowProfileId', 'eq', lowProfileId)
-        .maybeSingle();
-      
-      if (sessionError) {
-        console.error('Error fetching payment session:', sessionError);
-      }
-      
-      // Get plan details
-      const planId = paymentSession?.payment_details?.planId || webhookData.planId;
-      const userId = paymentSession?.user_id;
+      // Extract transaction information
+      const transactionId = webhookData.TranzactionInfo?.TranzactionId || 
+                           webhookData.InternalDealNumber || 
+                           webhookData.TranzactionId || null;
       
       // Record the successful payment
       const { error: paymentLogError } = await supabaseClient
         .from('payment_logs')
         .insert({
-          lowprofile_id: lowProfileId,
+          lowprofile_id: webhookData.LowProfileId || returnValue,
           user_id: userId,
           status: 'completed',
-          transaction_id: webhookData.TranzactionInfo?.TranzactionId || webhookData.InternalDealNumber || null,
+          transaction_id: transactionId,
           plan_id: planId,
           payment_data: webhookData
-        })
-        .single();
+        });
       
       if (paymentLogError) {
         console.error('Error creating payment log:', paymentLogError);
       }
       
-      // Update user subscription if a user is associated with the payment
-      if (userId && planId) {
+      // If we have a user ID and plan ID, update the user's subscription
+      if (userId && userId !== 'guest' && planId) {
         try {
           // Calculate subscription details
           const now = new Date();
-          const currentPeriodEndsAt = planId === 'annual'
-            ? new Date(now.setFullYear(now.getFullYear() + 1)) // 1 year from now
-            : planId === 'monthly'
-            ? new Date(now.setMonth(now.getMonth() + 1)) // 1 month from now
-            : null; // Lifetime subscription (VIP)
+          let currentPeriodEndsAt = null;
+          let trialEndsAt = null;
+          let status = 'active';
           
-          const trialEndsAt = planId === 'monthly'
-            ? new Date(now.setDate(now.getDate() + 30)) // 30 days trial
-            : null;
+          if (planId === 'annual') {
+            const oneYear = new Date(now);
+            oneYear.setFullYear(oneYear.getFullYear() + 1);
+            currentPeriodEndsAt = oneYear.toISOString();
+          } else if (planId === 'monthly') {
+            const oneMonth = new Date(now);
+            oneMonth.setMonth(oneMonth.getMonth() + 1);
+            trialEndsAt = oneMonth.toISOString();
+            status = 'trial';
+          }
           
-          const status = planId === 'monthly' ? 'trial' : 'active';
+          // Extract payment method details
+          const paymentMethod = {
+            lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigits || 
+                            webhookData.Last4CardDigits || 
+                            webhookData.CardNumber5 || '****',
+            cardType: webhookData.TranzactionInfo?.Brand || 
+                      webhookData.Mutag_24 || 
+                      webhookData.ExtShvaParams?.Mutag24 || 'unknown'
+          };
+          
+          // Extract token if creating a token was part of the operation
+          let paymentTokenId = null;
+          if (webhookData.TokenInfo && webhookData.TokenInfo.Token) {
+            // Store token in payment_tokens table
+            const { data: tokenData, error: tokenError } = await supabaseClient
+              .from('payment_tokens')
+              .insert({
+                user_id: userId,
+                token: webhookData.TokenInfo.Token,
+                token_expiry: webhookData.TokenInfo.TokenExDate,
+                card_last_four: paymentMethod.lastFourDigits,
+                card_brand: paymentMethod.cardType
+              })
+              .select('id')
+              .single();
+            
+            if (tokenError) {
+              console.error('Error storing payment token:', tokenError);
+            } else if (tokenData) {
+              paymentTokenId = tokenData.id;
+            }
+          }
           
           // Update or create subscription
           const { error: subscriptionError } = await supabaseClient
@@ -128,12 +162,10 @@ serve(async (req) => {
               user_id: userId,
               plan_type: planId,
               status: status,
-              trial_ends_at: trialEndsAt?.toISOString() || null,
-              current_period_ends_at: currentPeriodEndsAt?.toISOString() || null,
-              payment_method: {
-                lastFourDigits: webhookData.Last4CardDigits || webhookData.CardNumber5 || '****',
-                cardType: webhookData.Mutag_24 || webhookData.ExtShvaParams?.Mutag24 || 'unknown'
-              },
+              trial_ends_at: trialEndsAt,
+              current_period_ends_at: currentPeriodEndsAt,
+              payment_method: paymentMethod,
+              payment_token_id: paymentTokenId,
               contract_signed: true,
               contract_signed_at: new Date().toISOString()
             });
@@ -145,30 +177,19 @@ serve(async (req) => {
           console.error('Error updating user subscription:', error);
         }
       }
-      
-      // Check if there's registration data that needs to be processed
-      if (paymentSession?.payment_details?.isRegistrationFlow && 
-          paymentSession?.payment_details?.registrationData) {
-        
-        try {
-          console.log('Found registration flow data, processing user registration...');
-          // Additional logic for completing registration could be added here
-        } catch (error) {
-          console.error('Error processing registration data:', error);
-        }
-      }
     } else {
-      console.log(`Payment failed for lowProfileId: ${lowProfileId}`);
+      console.log(`Payment failed for ReturnValue: ${returnValue}`);
       
       // Record the failed payment
       const { error: paymentLogError } = await supabaseClient
         .from('payment_logs')
         .insert({
-          lowprofile_id: lowProfileId,
+          lowprofile_id: webhookData.LowProfileId || returnValue,
+          user_id: userId,
           status: 'failed',
+          plan_id: planId,
           payment_data: webhookData
-        })
-        .single();
+        });
       
       if (paymentLogError) {
         console.error('Error creating payment log for failed payment:', paymentLogError);
