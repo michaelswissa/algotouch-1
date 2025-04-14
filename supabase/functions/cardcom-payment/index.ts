@@ -26,9 +26,7 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('Processing payment request');
     const requestData = await req.json();
-    
     const { 
       planId, 
       amount, 
@@ -36,144 +34,108 @@ serve(async (req) => {
       userName, 
       email, 
       returnValue,
-      isRecurring = false
+      isRecurring 
     } = requestData;
     
     // Validate required parameters
-    if (!amount || !email) {
-      throw new Error('Missing required parameters: amount and email are required');
+    if (!planId || !amount || !email) {
+      throw new Error('Missing required payment parameters');
     }
     
-    console.log('Payment request data:', {
-      planId,
-      amount,
-      userId,
-      email,
-      returnValue,
-      isRecurring
-    });
-
-    // Get the Cardcom API credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
-    const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
+    console.log('Initializing payment for:', { planId, amount, email });
     
-    if (!terminalNumber || !apiName) {
+    // Get the Cardcom API credentials
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
+    const apiName = Deno.env.get("CARDCOM_API_NAME");
+    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD");
+    
+    if (!terminalNumber || !apiName || !apiPassword) {
       throw new Error('Missing Cardcom API credentials');
     }
     
-    // Create the Supabase client
+    // Prepare parameters for Cardcom Low Profile payment
+    const params = new URLSearchParams({
+      TerminalNumber: terminalNumber,
+      ApiName: apiName,
+      SumToBill: amount.toString(),
+      CoinID: '1', // ILS
+      Language: 'he',
+      Operation: isRecurring ? '2' : '1', // Charge and create token or charge only
+      SuccessRedirectUrl: `${Deno.env.get('APP_URL') || 'https://localhost:5173'}/subscription/success`,
+      FailedRedirectUrl: `${Deno.env.get('APP_URL') || 'https://localhost:5173'}/subscription/error`,
+      WebHookUrl: `${Deno.env.get('APP_URL') || 'https://localhost:5173'}/api/cardcom-webhook`,
+      ReturnValue: returnValue || `${userId}_${planId}_${Date.now()}`,
+      // Optional parameters
+      ProductName: `${planId} Subscription`,
+      APILevel: '10',
+      DefaultNumOfPayments: planId === 'monthly' ? '1' : '12'
+    });
+
+    // Append optional user details if available
+    if (userName) {
+      params.append('CardOwnerName', userName);
+    }
+    if (email) {
+      params.append('CardOwnerEmail', email);
+    }
+    
+    // Call Cardcom API to create payment session
+    const cardcomResponse = await fetch(
+      'https://secure.cardcom.solutions/Interface/LowProfile.aspx', 
+      { 
+        method: 'POST', 
+        body: params 
+      }
+    );
+    
+    if (!cardcomResponse.ok) {
+      const errorText = await cardcomResponse.text();
+      console.error('Cardcom API error:', errorText);
+      throw new Error(`Cardcom API error: ${cardcomResponse.status} ${errorText}`);
+    }
+    
+    const cardcomData = await cardcomResponse.json();
+    
+    console.log('Payment session created:', {
+      lowProfileId: cardcomData.LowProfileCode,
+      url: cardcomData.url
+    });
+    
+    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // Determine operation type based on plan
-    let operation = "1"; // Default: Charge only
+    // Create a payment session record
+    const { error: sessionError } = await supabaseClient
+      .from('payment_sessions')
+      .insert({
+        id: cardcomData.LowProfileCode,
+        user_id: userId,
+        email: email,
+        plan_id: planId,
+        payment_details: cardcomData,
+        expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() // 2 hours
+      });
     
-    if (isRecurring) {
-      operation = "2"; // Charge and create token
+    if (sessionError) {
+      console.error('Error creating payment session:', sessionError);
     }
-    
-    // Store payment session
-    if (userId) {
-      try {
-        // Set expiration time (2 hours from now)
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 2);
-        
-        // Create payment session record
-        await supabaseClient
-          .from('payment_sessions')
-          .insert({
-            id: crypto.randomUUID(),
-            user_id: userId,
-            email: email,
-            plan_id: planId,
-            payment_details: {
-              amount,
-              planId,
-              isRecurring,
-              returnValue
-            },
-            expires_at: expiresAt.toISOString()
-          });
-      } catch (error) {
-        console.error('Error creating payment session:', error);
-        // Continue execution even if session creation fails
-      }
-    }
-    
-    // Create the request URL for Cardcom LowProfile
-    const cardcomBaseUrl = 'https://secure.cardcom.solutions/Interface/LowProfile.aspx';
-    
-    // Prepare query parameters
-    const params = new URLSearchParams();
-    params.append('TerminalNumber', terminalNumber);
-    params.append('UserName', apiName);
-    params.append('APILevel', '10');
-    params.append('SumToBill', amount.toString());
-    params.append('CoinID', '1'); // 1 = ILS
-    params.append('Language', 'he');
-    params.append('Codepage', '65001');
-    params.append('ShowInvoiceHead', 'true');
-    params.append('ReturnValue', returnValue);
-    params.append('Operation', operation);
-    
-    // Set success and error redirect URLs
-    const baseUrl = req.headers.get('origin') || 'https://algutrader.com';
-    const successRedirectUrl = `${baseUrl}/subscription?success=true&planId=${planId}`;
-    const errorRedirectUrl = `${baseUrl}/subscription?error=true&planId=${planId}`;
-    const indicatorUrl = `${baseUrl}/api/payment-callback`; // This should handle server-side payment notifications
-    
-    params.append('SuccessRedirectUrl', successRedirectUrl);
-    params.append('ErrorRedirectUrl', errorRedirectUrl);
-    params.append('IndicatorUrl', Deno.env.get('WEBHOOK_URL') || 'https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook');
-    
-    // If we have a user name, add it
-    if (userName) {
-      params.append('CardOwnerName', userName);
-    }
-    
-    // Add customer email
-    params.append('CardOwnerEmail', email);
-    params.append('ShowCardOwnerEmail', 'true');
-    params.append('ReqCardOwnerEmail', 'true');
-    
-    // Make the request to Cardcom
-    const cardcomResponse = await fetch(`${cardcomBaseUrl}?${params.toString()}`, {
-      method: 'GET',
-    });
-    
-    if (!cardcomResponse.ok) {
-      const errorText = await cardcomResponse.text();
-      throw new Error(`Cardcom API error: ${cardcomResponse.status} ${cardcomResponse.statusText} - ${errorText}`);
-    }
-    
-    const cardcomData = await cardcomResponse.json();
-    
-    if (cardcomData.ResponseCode !== 0) {
-      throw new Error(`Cardcom error: ${cardcomData.Description}`);
-    }
-    
-    // We successfully created a LowProfile page
-    const lowProfileResponse = {
-      success: true,
-      url: cardcomData.Url,
-      lowProfileId: cardcomData.LowProfileId,
-      planId: planId
-    };
-    
-    console.log('Successfully created LowProfile page:', lowProfileResponse);
     
     return new Response(
-      JSON.stringify(lowProfileResponse),
+      JSON.stringify({ 
+        success: true, 
+        url: cardcomData.url,
+        lowProfileId: cardcomData.LowProfileCode 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
   } catch (error) {
-    console.error('Error processing payment request:', error);
+    console.error('Payment initialization error:', error);
     
     return new Response(
       JSON.stringify({ 
