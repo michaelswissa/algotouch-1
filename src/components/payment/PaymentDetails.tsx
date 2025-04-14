@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -21,9 +22,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [cardDataValid, setCardDataValid] = useState(false);
-  const [errors, setErrors] = useState({ cardNumber: '' });
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [cardTypeInfo, setCardTypeInfo] = useState('');
 
+  // Handle validation messages coming from CardCom iframes
   const handleFieldValidation = (field: string, isValid: boolean, message?: string) => {
     if (!isValid && message) {
       setErrors(prev => ({
@@ -41,8 +43,11 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
   const handleCardNumberValidation = (event: MessageEvent) => {
     if (!event.origin.includes('cardcom.solutions')) return;
+    
     if (event.data?.action === 'handleValidations' && event.data?.field === 'cardNumber') {
       handleFieldValidation('cardNumber', event.data.isValid, event.data.message);
+      
+      // Set card type info if available
       if (event.data.cardType) {
         setCardTypeInfo(event.data.cardType);
       }
@@ -54,6 +59,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     return () => window.removeEventListener('message', handleCardNumberValidation);
   }, []);
 
+  // Submit payment data to master frame
   const handlePaymentSubmit = () => {
     if (masterFrameRef.current?.contentWindow) {
       const submitMessage = {
@@ -65,6 +71,16 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       masterFrameRef.current.contentWindow.postMessage(submitMessage, 'https://secure.cardcom.solutions');
     }
   };
+
+  // Validation logic
+  useEffect(() => {
+    const isValid = cardholderName.trim() !== '' && 
+                   expiryMonth !== '' && 
+                   expiryYear !== '' && 
+                   Object.keys(errors).length === 0;
+    
+    setCardDataValid(isValid);
+  }, [cardholderName, expiryMonth, expiryYear, errors]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -88,8 +104,9 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             </div>
           )}
           <iframe
-            id="card-number-frame"
-            src={`${cardcomUrl}/openFields/card-number.html?terminalnumber=${terminalNumber}&rtl=true`}
+            id="CardComCardNumber"
+            name="CardComCardNumber"
+            src={`${cardcomUrl}/External/openFields/card-number.html?terminalnumber=${terminalNumber}&rtl=true`}
             className="w-full h-[40px] border border-input rounded-md"
             onLoad={() => setCardNumberFrameLoaded(true)}
             title="מספר כרטיס"
@@ -157,8 +174,9 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             </div>
           )}
           <iframe
-            id="cvv-frame"
-            src={`${cardcomUrl}/openFields/cvv-field.html?terminalnumber=${terminalNumber}&rtl=true`}
+            id="CardComCvv"
+            name="CardComCvv"
+            src={`${cardcomUrl}/External/openFields/cvv-field.html?terminalnumber=${terminalNumber}&rtl=true`}
             className="w-full h-[40px] border border-input rounded-md"
             onLoad={() => setCvvFrameLoaded(true)}
             title="קוד אבטחה"

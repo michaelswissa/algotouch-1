@@ -14,7 +14,7 @@ import { getSubscriptionPlans, PaymentStatus } from './utils/paymentHelpers';
 interface PaymentFormProps {
   planId: string;
   onPaymentComplete: () => void;
-  onBack?: () => void;
+  onBack?: () => void; // Optional back handler
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ 
@@ -70,6 +70,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
   // Enhanced message handler
   const handleFrameMessages = (event: MessageEvent) => {
+    // Verify message origin for security
     if (!event.origin.includes('cardcom.solutions')) {
       return;
     }
@@ -91,6 +92,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         console.error('Payment error:', msg);
         setPaymentStatus(PaymentStatus.FAILED);
         toast.error(msg.message || 'אירעה שגיאה בעיבוד התשלום');
+        break;
+      case 'handleValidations':
+        // Handle card validation messages for real-time feedback
+        if (msg.field === 'cardNumber') {
+          if (!msg.isValid && msg.message) {
+            toast.error(msg.message);
+          }
+        }
         break;
     }
   };
@@ -116,12 +125,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         return;
       }
 
+      // Call edge function to initialize payment session with CardCom
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
           amount: plan.price,
-          invoiceInfo: null,
+          invoiceInfo: {
+            fullName: user.user_metadata?.full_name || '',
+            email: user.email || '',
+          },
           currency: "ILS",
+          operation: "ChargeAndCreateToken", // Important for recurring payments
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`
@@ -138,7 +152,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       setSessionId(data.data.sessionId);
       setLowProfileCode(data.data.lowProfileCode);
       setTerminalNumber(data.data.terminalNumber);
-      setCardcomUrl(data.data.cardcomUrl);
+      setCardcomUrl('https://secure.cardcom.solutions');
       setPaymentStatus(PaymentStatus.PROCESSING);
       
       // Initialize master frame
@@ -153,16 +167,42 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               font-size: 16px;
               text-align: right;
               direction: rtl;
+              padding: 8px 12px;
+              border-radius: 4px;
+              border: 1px solid #ccc;
+              width: 100%;
+              box-sizing: border-box;
             }
-            .invalid { border: 2px solid red; }
+            input:focus {
+              border-color: #3b82f6;
+              outline: none;
+              box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            }
+            .invalid { 
+              border: 2px solid #ef4444; 
+              box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+            }
           `,
           cvvFieldCSS: `
             input {
               font-family: 'Assistant', sans-serif;
               font-size: 16px;
               text-align: center;
+              padding: 8px 12px;
+              border-radius: 4px;
+              border: 1px solid #ccc;
+              width: 100%;
+              box-sizing: border-box;
             }
-            .invalid { border: 2px solid red; }
+            input:focus {
+              border-color: #3b82f6;
+              outline: none;
+              box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            }
+            .invalid { 
+              border: 2px solid #ef4444;
+              box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+            }
           `,
           language: "he"
         };
@@ -180,6 +220,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   };
   
   const startStatusCheck = (lpCode: string, sId: string) => {
+    // Start checking payment status after a short delay
     setTimeout(() => {
       checkPaymentStatus(lpCode, sId);
       
@@ -228,6 +269,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     setPaymentStatus(PaymentStatus.IDLE);
     setSessionId('');
     setLowProfileCode('');
+    
+    // Reinitialize payment if needed
+    setTimeout(() => {
+      initializePayment();
+    }, 500);
   };
 
   return (
@@ -250,7 +296,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
-          src={`${cardcomUrl}/openFields/master.html?terminalnumber=${terminalNumber}&rtl=true`}
+          src={`https://secure.cardcom.solutions/External/openFields/master.html?terminalnumber=${terminalNumber}&rtl=true`}
           style={{ display: 'none' }}
           title="CardCom Master Frame"
         />
@@ -265,10 +311,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           freeTrialDays={plan.freeTrialDays}
         />
         
-        {paymentStatus === PaymentStatus.IDLE && terminalNumber && cardcomUrl && (
+        {paymentStatus === PaymentStatus.IDLE && (
           <PaymentDetails 
             terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
+            cardcomUrl={"https://secure.cardcom.solutions"}
             masterFrameRef={masterFrameRef}
           />
         )}
@@ -326,9 +372,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               type="button" 
               className="w-full" 
               onClick={initializePayment}
-              disabled={!terminalNumber || !cardcomUrl}
             >
-              {!terminalNumber || !cardcomUrl ? (
+              {paymentStatus === PaymentStatus.INITIALIZING ? (
                 <span className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> טוען...
                 </span>
