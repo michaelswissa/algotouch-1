@@ -63,7 +63,7 @@ const Auth = () => {
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
-        <Spinner size="lg" />
+        <Spinner className="h-8 w-8" />
       </div>
     );
   }

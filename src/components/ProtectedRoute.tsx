@@ -53,7 +53,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Spinner size="lg" />
+        <Spinner className="h-8 w-8" />
       </div>
     );
   }

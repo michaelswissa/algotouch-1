@@ -71,18 +71,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
-      // Use auth context to sign up
-      await signUp({
-        email,
-        password,
-        firstName,
-        lastName,
-        phone
-      });
-      
       // Store registration data in session storage for the subscription flow
       const registrationData = {
         email,
+        password, // Include password for auto-login after payment
         userData: {
           firstName,
           lastName,
@@ -95,7 +87,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       sessionStorage.removeItem('registration_data');
       sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
       
-      console.log('Registration data saved to session storage');
+      console.log('Registration data saved to session storage:', {
+        email, 
+        firstName, 
+        lastName,
+        registrationTime: registrationData.registrationTime
+      });
+      
       toast.success('הפרטים נשמרו בהצלחה');
       
       // Navigate directly to subscription page bypassing the ProtectedRoute check

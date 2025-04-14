@@ -2,54 +2,62 @@
 export interface SubscriptionPlan {
   name: string;
   price: number;
-  description?: string;
+  description: string;
   currency?: string;
   freeTrialDays?: number;
   hasTrial?: boolean;
 }
 
-export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
-  return {
-    monthly: {
-      name: 'חודשי',
-      price: 99,
-      currency: '$',
-      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
-      freeTrialDays: 30,
-      hasTrial: true
-    },
-    annual: {
-      name: 'שנתי',
-      price: 899,
-      currency: '$',
-      description: '25% הנחה | שלושה חודשים מתנה',
-      hasTrial: false
-    },
-    vip: {
-      name: 'VIP',
-      price: 3499,
-      currency: '$',
-      description: 'גישה לכל החיים בתשלום חד פעמי',
-      hasTrial: false
-    },
-  };
-};
+export const getSubscriptionPlans = () => ({
+  monthly: {
+    name: 'חודשי',
+    price: 371, // Actual price in ILS
+    displayPrice: 99, // Display price in USD
+    description: 'חודש ניסיון חינם, אחר כך חיוב אוטומטי של 371 ₪ לחודש.',
+    features: ['גישה לכל התכונות', 'ביטול בכל עת', 'עדכונים שוטפים'],
+    hasTrial: true,
+    freeTrialDays: 30, // Adding free trial days
+  },
+  annual: {
+    name: 'שנתי',
+    price: 3371, // Actual price in ILS
+    displayPrice: 899, // Display price in USD
+    description: 'תשלום שנתי של 3,371 ₪ (חיסכון של 25%). חיוב אוטומטי מידי שנה.',
+    features: ['גישה לכל התכונות', 'חיסכון של 25%', 'תמיכה מועדפת'],
+    hasTrial: false,
+    freeTrialDays: 0, // No free trial for annual plan
+  },
+  vip: {
+    name: 'VIP',
+    price: 13121, // Actual price in ILS
+    displayPrice: 3499, // Display price in USD
+    description: 'תשלום חד פעמי של 13,121 ₪ לגישה ללא הגבלת זמן וליווי VIP.',
+    features: ['גישה לכל החיים', 'תמיכה VIP', 'ייעוץ אישי'],
+    hasTrial: false,
+    freeTrialDays: 0, // No free trial for VIP plan
+  },
+});
 
-// Updated to include index signature to make it compatible with Json type
 export interface TokenData {
   lastFourDigits: string;
   expiryMonth: string;
   expiryYear: string;
   cardholderName: string;
-  [key: string]: string | number | boolean | null | TokenData[]; // Adding index signature for Json compatibility
+  [key: string]: string | number | boolean;
 }
 
-export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
-  const expiryParts = expiryDate.split('/');
+export const createTokenData = (
+  cardNumber: string,
+  expiryDate: string,
+  cardholderName: string
+): TokenData => {
+  const [expiryMonth, expiryYear] = expiryDate.split('/');
+  
   return {
     lastFourDigits: cardNumber.slice(-4),
-    expiryMonth: expiryParts[0] || '',
-    expiryYear: expiryParts[1] ? `20${expiryParts[1]}` : '',
-    cardholderName
+    expiryMonth,
+    expiryYear,
+    cardholderName,
+    tokenCreatedAt: new Date().toISOString(),
   };
 };

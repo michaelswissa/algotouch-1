@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider } from "@/contexts/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import SubscribedRoute from "@/components/SubscribedRoute";
 import Dashboard from "./pages/Dashboard";
 import CalendarPage from "./pages/Calendar";
 import TradeJournal from "./pages/TradeJournal";
@@ -100,65 +101,67 @@ const App = () => {
                 </ProtectedRoute>
               } />
               
-              {/* Protected routes - require authentication */}
+              {/* Premium content routes - require subscription */}
+              <Route path="/calendar" element={
+                <SubscribedRoute>
+                  <CalendarPage />
+                </SubscribedRoute>
+              } />
+              <Route path="/trade-journal" element={
+                <SubscribedRoute>
+                  <TradeJournal />
+                </SubscribedRoute>
+              } />
+              <Route path="/monthly-report" element={
+                <SubscribedRoute>
+                  <MonthlyReport />
+                </SubscribedRoute>
+              } />
+              <Route path="/journal" element={
+                <SubscribedRoute>
+                  <Journal />
+                </SubscribedRoute>
+              } />
+              <Route path="/blog" element={
+                <SubscribedRoute>
+                  <Blog />
+                </SubscribedRoute>
+              } />
+              <Route path="/blog/:id" element={
+                <SubscribedRoute>
+                  <BlogPost />
+                </SubscribedRoute>
+              } />
+              <Route path="/ai-assistant" element={
+                <SubscribedRoute>
+                  <AIAssistant />
+                </SubscribedRoute>
+              } />
+              <Route path="/courses" element={
+                <SubscribedRoute>
+                  <Courses />
+                </SubscribedRoute>
+              } />
+              <Route path="/courses/:courseId" element={
+                <SubscribedRoute>
+                  <CourseDetail />
+                </SubscribedRoute>
+              } />
+              <Route path="/new-trade" element={
+                <SubscribedRoute>
+                  <NewTrade />
+                </SubscribedRoute>
+              } />
+              
+              {/* Protected routes that don't require subscription */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
               } />
-              <Route path="/calendar" element={
-                <ProtectedRoute>
-                  <CalendarPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/trade-journal" element={
-                <ProtectedRoute>
-                  <TradeJournal />
-                </ProtectedRoute>
-              } />
-              <Route path="/monthly-report" element={
-                <ProtectedRoute>
-                  <MonthlyReport />
-                </ProtectedRoute>
-              } />
-              <Route path="/journal" element={
-                <ProtectedRoute>
-                  <Journal />
-                </ProtectedRoute>
-              } />
-              <Route path="/blog" element={
-                <ProtectedRoute>
-                  <Blog />
-                </ProtectedRoute>
-              } />
-              <Route path="/blog/:id" element={
-                <ProtectedRoute>
-                  <BlogPost />
-                </ProtectedRoute>
-              } />
               <Route path="/community" element={
                 <ProtectedRoute>
                   <Community />
-                </ProtectedRoute>
-              } />
-              <Route path="/courses" element={
-                <ProtectedRoute>
-                  <Courses />
-                </ProtectedRoute>
-              } />
-              <Route path="/courses/:courseId" element={
-                <ProtectedRoute>
-                  <CourseDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/ai-assistant" element={
-                <ProtectedRoute>
-                  <AIAssistant />
-                </ProtectedRoute>
-              } />
-              <Route path="/new-trade" element={
-                <ProtectedRoute>
-                  <NewTrade />
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={
