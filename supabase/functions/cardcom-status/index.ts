@@ -30,7 +30,16 @@ serve(async (req) => {
     );
     
     // Parse request payload
-    const { lowProfileCode, sessionId } = await req.json();
+    let lowProfileCode, sessionId;
+    
+    try {
+      const payload = await req.json();
+      lowProfileCode = payload.lowProfileCode;
+      sessionId = payload.sessionId;
+    } catch (parseError) {
+      logStep("Error parsing request body", { error: parseError.message });
+      throw new Error("Invalid request format");
+    }
     
     if (!lowProfileCode) {
       throw new Error("Missing required parameter: lowProfileCode");
@@ -80,19 +89,24 @@ serve(async (req) => {
     // Determine payment success based on CardCom response
     const isSuccessful = operationResponse === '0';
     
-    if (isSuccessful && sessionId && !sessionId.startsWith('temp-')) {
-      // Update session status in database if available
+    // Update session status in database if available (even for temp sessions)
+    if (isSuccessful && sessionId) {
       try {
-        await supabaseAdmin
-          .from('payment_sessions')
-          .update({
-            status: 'completed',
-            transaction_id: transactionId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', sessionId);
-        
-        logStep("Updated payment session status", { sessionId, status: 'completed' });
+        // Only update real DB sessions (not temp ones)
+        if (!sessionId.startsWith('temp-')) {
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              status: 'completed',
+              transaction_id: transactionId,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId);
+          
+          logStep("Updated payment session status", { sessionId, status: 'completed' });
+        } else {
+          logStep("Skipping DB update for temporary session", { sessionId });
+        }
       } catch (dbError) {
         logStep("Database error (non-fatal)", { error: dbError.message });
         // Continue even if DB update fails

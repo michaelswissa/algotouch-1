@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [cardDataValid, setCardDataValid] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [cardTypeInfo, setCardTypeInfo] = useState('');
+  const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
 
   const handleFieldValidation = (field: string, isValid: boolean, message?: string) => {
     if (!isValid && message) {
@@ -57,61 +59,29 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   }, []);
 
   useEffect(() => {
-    const masterFrame = masterFrameRef.current;
-    if (masterFrame && masterFrame.contentWindow) {
-      setTimeout(() => {
-        const message = {
-          action: 'init',
-          cardFieldCSS: `
-            input {
-              font-family: 'Assistant', sans-serif;
-              font-size: 16px;
-              text-align: right;
-              direction: rtl;
-              padding: 8px 12px;
-              border-radius: 4px;
-              border: 1px solid #ccc;
-              width: 100%;
-              box-sizing: border-box;
-            }
-            input:focus {
-              border-color: #3b82f6;
-              outline: none;
-              box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-            }
-            .invalid { 
-              border: 2px solid #ef4444; 
-              box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-            }
-          `,
-          cvvFieldCSS: `
-            input {
-              font-family: 'Assistant', sans-serif;
-              font-size: 16px;
-              text-align: center;
-              padding: 8px 12px;
-              border-radius: 4px;
-              border: 1px solid #ccc;
-              width: 100%;
-              box-sizing: border-box;
-            }
-            input:focus {
-              border-color: #3b82f6;
-              outline: none;
-              box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-            }
-            .invalid { 
-              border: 2px solid #ef4444;
-              box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-            }
-          `,
-          language: "he"
-        };
-        
-        masterFrame.contentWindow.postMessage(message, 'https://secure.cardcom.solutions');
-      }, 500);
+    // Reset frame load status when terminal number changes
+    if (terminalNumber) {
+      setCardNumberFrameLoaded(false);
+      setCvvFrameLoaded(false);
+      setFrameLoadAttempts(0);
     }
-  }, [masterFrameRef]);
+  }, [terminalNumber]);
+
+  // Retry loading frames if they fail to load
+  useEffect(() => {
+    if (!cardNumberFrameLoaded || !cvvFrameLoaded) {
+      const maxAttempts = 3;
+      if (frameLoadAttempts < maxAttempts && terminalNumber) {
+        const timer = setTimeout(() => {
+          console.log(`Retrying frame load, attempt ${frameLoadAttempts + 1}`);
+          setFrameLoadAttempts(prev => prev + 1);
+          // Force iframe reload by updating a key or similar approach
+          // This will be triggered by the key change in the component render
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [cardNumberFrameLoaded, cvvFrameLoaded, frameLoadAttempts, terminalNumber]);
 
   const handlePaymentSubmit = () => {
     if (masterFrameRef.current?.contentWindow) {
@@ -121,7 +91,23 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         cardExpMonth: expiryMonth,
         cardExpYear: expiryYear
       };
-      masterFrameRef.current.contentWindow.postMessage(submitMessage, 'https://secure.cardcom.solutions');
+      
+      try {
+        console.log('Submitting payment with data:', { 
+          cardOwnerName: cardholderName,
+          hasExpMonth: !!expiryMonth,
+          hasExpYear: !!expiryYear
+        });
+        
+        masterFrameRef.current.contentWindow.postMessage(
+          submitMessage, 
+          'https://secure.cardcom.solutions'
+        );
+      } catch (error) {
+        console.error('Error sending payment submit message:', error);
+      }
+    } else {
+      console.error('Master frame not ready for submission');
     }
   };
 
@@ -162,6 +148,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             className="w-full h-[40px] border border-input rounded-md"
             onLoad={() => setCardNumberFrameLoaded(true)}
             title="מספר כרטיס"
+            key={`cardnumber-${frameLoadAttempts}`}
           />
           {errors.cardNumber && (
             <p className="mt-1 text-sm text-red-500">{errors.cardNumber}</p>
@@ -232,6 +219,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             className="w-full h-[40px] border border-input rounded-md"
             onLoad={() => setCvvFrameLoaded(true)}
             title="קוד אבטחה"
+            key={`cvv-${frameLoadAttempts}`}
           ></iframe>
         </div>
       </div>

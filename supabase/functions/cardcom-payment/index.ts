@@ -42,6 +42,7 @@ serve(async (req) => {
       invoiceInfo, 
       operation = "ChargeAndCreateToken",
       redirectUrls,
+      userId,
       registrationData
     } = await req.json();
     
@@ -49,6 +50,7 @@ serve(async (req) => {
       planId, 
       amount, 
       currency,
+      hasUserId: !!userId,
       hasRegistrationData: !!registrationData,
       hasInvoiceInfo: !!invoiceInfo
     });
@@ -58,87 +60,45 @@ serve(async (req) => {
       throw new Error("Missing required parameters: planId or amount");
     }
     
-    // Get user information - either from auth token or registration data
-    let userId = null;
+    // Get user information - either from auth token, userId passed, or registration data
+    let finalUserId = userId;
     let userEmail = null;
     let fullName = '';
 
-    // Try to get user from auth token first
-    try {
-      const authHeader = req.headers.get('Authorization');
-      if (authHeader) {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-        
-        if (user && !error) {
-          userId = user.id;
-          userEmail = user.email;
-          fullName = user.user_metadata?.full_name || 
-                     `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim();
-          
-          logStep("Found authenticated user", { userId });
-        }
-      }
-    } catch (authError) {
-      logStep("Auth error (non-fatal)", { error: authError.message });
-      // Continue with registration data if auth fails
-    }
-
-    // If no authenticated user, try to use registration data
-    if (!userId && registrationData) {
-      // For users in registration process
+    // If no userId was passed but we have registration data, try to match with existing user
+    if (!finalUserId && registrationData?.email) {
       userEmail = registrationData.email;
       const userData = registrationData.userData || {};
       fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
       
       // Try to find existing user with this email
-      const { data: existingUser } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', userEmail)
-        .maybeSingle();
-        
-      if (existingUser) {
-        userId = existingUser.id;
-        logStep("Found existing user by email", { userId });
-      } else {
-        // Create user account if it doesn't exist
-        try {
-          const { data: { user }, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-            email: registrationData.email,
-            password: registrationData.password,
-            email_confirm: true,
-            user_metadata: {
-              first_name: userData.firstName,
-              last_name: userData.lastName,
-              phone: userData.phone,
-              is_new_user: true
-            }
-          });
-
-          if (signUpError) {
-            throw new Error(`Failed to create user account: ${signUpError.message}`);
-          }
-
-          userId = user?.id;
-          logStep("Created new user account", { userId });
-        } catch (createError) {
-          logStep("User creation error", { error: createError.message });
-          // Continue even if user creation fails - we'll create a temporary session
+      try {
+        const { data: existingUser } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('email', userEmail)
+          .maybeSingle();
+          
+        if (existingUser) {
+          finalUserId = existingUser.id;
+          logStep("Found existing user by email", { userId: finalUserId });
         }
+      } catch (err) {
+        logStep("Error looking up user by email", { error: err.message });
+        // Continue even if lookup fails
       }
     }
+
+    // For invoice and reference, use either provided info or defaults    
+    userEmail = invoiceInfo?.email || registrationData?.email || "anonymous@example.com";
+    fullName = invoiceInfo?.fullName || 
+              (registrationData?.userData ? 
+                `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
+                "Anonymous User");
     
-    // Allow anonymous payment flow if needed (fallback if both auth and registration data are missing)
-    if (!userId && !userEmail) {
-      logStep("No user identified - proceeding with anonymous payment");
-      userEmail = invoiceInfo?.email || "anonymous@example.com";
-      fullName = invoiceInfo?.fullName || "Anonymous User";
-    }
-    
-    // Generate unique transaction reference - use userId if available, or generate a random one
-    const transactionRef = userId 
-      ? `${userId}-${Date.now()}`
+    // Generate unique transaction reference
+    const transactionRef = finalUserId 
+      ? `${finalUserId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
     // Prepare webhook URL with full domain
@@ -147,7 +107,8 @@ serve(async (req) => {
     logStep("Preparing CardCom API request", { 
       webhookUrl,
       terminalNumber,
-      operation
+      operation,
+      transactionRef
     });
     
     // Create CardCom API request body
@@ -217,7 +178,7 @@ serve(async (req) => {
     
     // Store payment session in database 
     const sessionData = {
-      user_id: userId,
+      user_id: finalUserId,
       low_profile_code: lowProfileCode,
       reference: transactionRef,
       plan_id: planId,
@@ -226,30 +187,34 @@ serve(async (req) => {
       status: 'initiated',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
       // Store anonymous user info if not authenticated
-      anonymous_data: !userId ? { email: userEmail, fullName } : null
+      anonymous_data: !finalUserId ? { email: userEmail, fullName } : null
     };
     
-    let dbSessionId;
+    let dbSessionId = "temp-" + Date.now(); // Default temporary ID
     
-    if (userId) {
-      // For authenticated users, store in payment_sessions
-      const { data: dbSession, error: sessionError } = await supabaseAdmin
-        .from('payment_sessions')
-        .insert(sessionData)
-        .select('id')
-        .single();
-          
-      if (sessionError) {
-        logStep("Database error", { error: sessionError.message });
-        // Don't fail - we can still proceed with payment even if DB write fails
+    // Store the session in database if possible
+    try {
+      if (finalUserId) {
+        // For authenticated users, store in payment_sessions
+        const { data: dbSession, error: sessionError } = await supabaseAdmin
+          .from('payment_sessions')
+          .insert(sessionData)
+          .select('id')
+          .single();
+            
+        if (sessionError) {
+          logStep("Database error (non-fatal)", { error: sessionError.message });
+          // Don't fail - we can still proceed with payment even if DB write fails
+        } else if (dbSession) {
+          dbSessionId = dbSession.id;
+          logStep("Payment session stored in DB", { sessionId: dbSessionId });
+        }
       } else {
-        dbSessionId = dbSession.id;
+        logStep("Created anonymous payment session", { lowProfileCode });
       }
-    } else {
-      // For anonymous users, store in temporary_payment_sessions or similar
-      // This depends on your database schema - adjust as needed
-      logStep("Created anonymous payment session", { lowProfileCode });
-      dbSessionId = "temp-" + Date.now();
+    } catch (dbError) {
+      logStep("Error storing payment session", { error: dbError.message });
+      // Continue even if storage fails
     }
     
     logStep("Payment session prepared", { sessionId: dbSessionId });

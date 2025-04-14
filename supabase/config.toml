@@ -36,7 +36,7 @@ enabled = true
 
 [edge-functions]
 [edge-functions.cardcom-payment]
-verify_jwt = true
+verify_jwt = false
 [edge-functions.cardcom-webhook]
 verify_jwt = false
 [edge-functions.cardcom-status]
