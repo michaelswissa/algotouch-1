@@ -68,7 +68,7 @@ serve(async (req) => {
     console.log("Webhook payment data:", paymentData);
     
     // Validate we have the minimum required data
-    if (!paymentData || !paymentData.LowProfileCode) {
+    if (!paymentData || (!paymentData.LowProfileCode && !paymentData.lowProfileId)) {
       console.error("Missing required payment data in webhook");
       return new Response(
         JSON.stringify({ success: false, error: "Missing required payment data" }),
@@ -79,7 +79,7 @@ serve(async (req) => {
       );
     }
     
-    const lowProfileId = paymentData.LowProfileCode;
+    const lowProfileId = paymentData.LowProfileCode || paymentData.lowProfileId;
     const operationResponse = paymentData.OperationResponse;
     
     console.log(`Processing webhook for lowProfileId: ${lowProfileId}, response: ${operationResponse}`);

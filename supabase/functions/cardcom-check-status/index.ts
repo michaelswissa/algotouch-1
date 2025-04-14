@@ -71,6 +71,8 @@ serve(async (req) => {
     const apiName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
     
     if (!terminalNumber || !apiName) {
+      console.error("Missing Cardcom API credentials");
+      console.error(`CARDCOM_TERMINAL_NUMBER: ${Boolean(Deno.env.get("CARDCOM_TERMINAL_NUMBER"))} | CARDCOM_TERMINAL: ${Boolean(Deno.env.get("CARDCOM_TERMINAL"))}`);
       throw new Error('Missing Cardcom API credentials');
     }
     
@@ -131,7 +133,7 @@ serve(async (req) => {
         .from('payment_sessions')
         .select('user_id, email')
         .eq('id', lowProfileId)
-        .single();
+        .maybeSingle();
       
       if (session?.user_id) {
         // Process successful payment (simplified version of what's in the webhook)

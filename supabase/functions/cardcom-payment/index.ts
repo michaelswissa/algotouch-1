@@ -53,7 +53,9 @@ serve(async (req) => {
     
     if (!terminalNumber || !apiName) {
       console.error("Missing Cardcom API credentials");
-      throw new Error('Missing Cardcom API credentials');
+      console.error(`CARDCOM_TERMINAL_NUMBER: ${Boolean(Deno.env.get("CARDCOM_TERMINAL_NUMBER"))} | CARDCOM_TERMINAL: ${Boolean(Deno.env.get("CARDCOM_TERMINAL"))}`);
+      console.error(`CARDCOM_API_NAME: ${Boolean(Deno.env.get("CARDCOM_API_NAME"))} | CARDCOM_USERNAME: ${Boolean(Deno.env.get("CARDCOM_USERNAME"))}`);
+      throw new Error('Missing Cardcom API credentials. Please check your Supabase secrets configuration.');
     }
 
     // Determine app URL for redirects and webhooks
@@ -98,7 +100,7 @@ serve(async (req) => {
     
     formData.append('SuccessRedirectUrl', successUrl);
     formData.append('FailedRedirectUrl', errorUrl);
-    formData.append('WebHookUrl', webhookUrl);
+    formData.append('IndicatorUrl', webhookUrl);
     
     // User details
     if (userName) {
@@ -120,14 +122,6 @@ serve(async (req) => {
     // ReturnValue - used to identify the transaction
     const transactionId = returnValue || `${userId || 'guest'}_${planId}_${Date.now()}`;
     formData.append('ReturnValue', transactionId);
-    
-    // Payment configuration
-    if (planId === 'monthly') {
-      formData.append('DefaultNumOfPayments', '1');
-    } else if (planId === 'annual') {
-      formData.append('DefaultNumOfPayments', '1'); 
-      // Can be set to 12 if supporting payment in installments
-    }
     
     // Call Cardcom API to create payment session
     console.log("Sending request to Cardcom API");
