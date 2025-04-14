@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import CardcomOpenFields from './CardcomOpenFields';
+import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
