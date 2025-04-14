@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,7 +102,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
-    if ([PaymentStatus.PROCESSING, PaymentStatus.INITIALIZING].includes(paymentStatus)) {
+    // Fix: Use strict string comparison since we've changed the enum to use string values
+    if (paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.INITIALIZING) {
       return;
     }
     
