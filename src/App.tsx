@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './components/ui/theme-provider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from './contexts/auth';
 
 import Index from './pages/Index';
 import Auth from './pages/Auth';
@@ -21,35 +23,37 @@ const App = () => {
     <ThemeProvider defaultTheme="dark" storageKey="theme-preference">
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/subscription" element={<Subscription />} />
-            <Route path="/subscription/:planId" element={<Subscription />} />
-            <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-            <Route path="/my-subscription" element={<MySubscriptionPage />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <SubscribedRoute>
-                    <Dashboard />
-                  </SubscribedRoute>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SubscribedRoute>
-                    <Settings />
-                  </SubscribedRoute>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-          <Toaster richColors position="top-center" />
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/subscription" element={<Subscription />} />
+              <Route path="/subscription/:planId" element={<Subscription />} />
+              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+              <Route path="/my-subscription" element={<MySubscriptionPage />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <SubscribedRoute>
+                      <Dashboard />
+                    </SubscribedRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <SubscribedRoute>
+                      <Settings />
+                    </SubscribedRoute>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+            <Toaster richColors position="top-center" />
+          </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>
     </ThemeProvider>
