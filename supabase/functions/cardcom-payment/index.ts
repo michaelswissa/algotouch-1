@@ -9,25 +9,18 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Handle CORS preflight requests
-function handleCors(req: Request) {
+serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders,
       status: 204,
     });
   }
-  return null;
-}
 
-serve(async (req) => {
   try {
     console.log("Payment request received");
     
-    // Handle CORS
-    const corsResponse = handleCors(req);
-    if (corsResponse) return corsResponse;
-
     const requestData = await req.json();
     const { 
       planId, 
