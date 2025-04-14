@@ -39,10 +39,4 @@ port = 54328
 [functions]
 [functions.ai-chatbot]
 verify_jwt = false
-[functions.cardcom-check-status]
-verify_jwt = false
-[functions.cardcom-webhook]
-verify_jwt = false
-[functions.cardcom-payment]
-verify_jwt = false
 
