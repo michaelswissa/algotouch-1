@@ -20,6 +20,12 @@ function handleCors(req: Request) {
   return null;
 }
 
+// Helper to sanitize and trim strings
+function sanitizeString(str: string | null | undefined): string {
+  if (!str) return '';
+  return String(str).trim();
+}
+
 serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
@@ -36,8 +42,8 @@ serve(async (req) => {
     console.log('Checking payment status for', { lowProfileId, planId });
     
     // Get Cardcom credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL");
-    const userName = Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME");
+    const terminalNumber = sanitizeString(Deno.env.get("CARDCOM_TERMINAL_NUMBER") || Deno.env.get("CARDCOM_TERMINAL"));
+    const userName = sanitizeString(Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME"));
     
     if (!terminalNumber || !userName) {
       throw new Error('Missing Cardcom API credentials in environment variables');
@@ -74,14 +80,13 @@ serve(async (req) => {
       );
     }
     
-    // Make request to Cardcom API to check status
+    // Make request to Cardcom API to check status - using encodeURIComponent for all parameters
     const url = `https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx`;
-    const params = new URLSearchParams({
-      terminalnumber: terminalNumber.toString(),
-      username: userName,
-      lowprofilecode: lowProfileId,
-      codepage: '65001'
-    });
+    const params = new URLSearchParams();
+    params.append('terminalnumber', terminalNumber);
+    params.append('username', userName);
+    params.append('lowprofilecode', lowProfileId);
+    params.append('codepage', '65001');
     
     console.log('Making request to Cardcom API:', url + '?' + params.toString());
     
@@ -104,14 +109,19 @@ serve(async (req) => {
     responseData.split('&').forEach((pair) => {
       const [key, value] = pair.split('=');
       if (key && value) {
-        parsedResponse[key] = decodeURIComponent(value);
+        try {
+          parsedResponse[key] = decodeURIComponent(value);
+        } catch (e) {
+          // If decoding fails, use the raw value
+          parsedResponse[key] = value;
+        }
       }
     });
     
     console.log('Parsed cardcom response:', parsedResponse);
     
     // Save the payment data if transaction was successful
-    if (parsedResponse.OperationResponse === '0' || parsedResponse.ResponseCode === '0') {
+    if (parsedResponse.OperationResponse === '0' || parsedResponse.DealResponse === '0') {
       console.log('Payment was successful, recording in database');
       
       // Check if we have a payment session with this lowProfileId
@@ -162,9 +172,9 @@ serve(async (req) => {
                 : 'active',
               payment_method: {
                 cardInfo: parsedResponse.CardInfo,
-                lastFourDigits: parsedResponse.CardNumEnd || '****',
-                expiryMonth: parsedResponse.CardMonth || '**',
-                expiryYear: parsedResponse.CardYear || '**'
+                lastFourDigits: parsedResponse.CardNumber5 || '****',
+                expiryMonth: parsedResponse.CardValidityMonth || '**',
+                expiryYear: parsedResponse.CardValidityYear || '**'
               },
               updated_at: new Date().toISOString(),
               trial_ends_at: sessionData.payment_details.freeTrialDays > 0 ? (() => {

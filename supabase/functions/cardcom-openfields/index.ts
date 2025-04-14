@@ -40,6 +40,14 @@ function sanitizeString(str: string | null | undefined): string {
   return String(str).trim();
 }
 
+// Helper to sanitize all URL parameters
+function encodeParameter(value: string | number | boolean): string {
+  // First convert to string if not already
+  const stringValue = typeof value !== 'string' ? String(value) : value;
+  // Then properly encode
+  return encodeURIComponent(stringValue.trim());
+}
+
 serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
@@ -157,9 +165,9 @@ serve(async (req) => {
     const paymentDetails = {
       lowProfileId,
       amount,
-      planName,
-      planId,
-      userName,
+      planName: sanitizeString(planName || ''),
+      planId: sanitizeString(planId || ''),
+      userName: sanitizeString(userName || ''),
       userEmail: effectiveEmail,
       operation,
       status: 'created',
@@ -211,7 +219,7 @@ serve(async (req) => {
     const webhookUrl = `${origin}/functions/v1/cardcom-webhook`;
     
     // Set up redirect URLs for after payment - ensure they are properly encoded
-    let success_url = successRedirectUrl || `${origin}/subscription?success=true&planId=${encodeURIComponent(planId)}&lowProfileId=${encodeURIComponent(lowProfileId)}`;
+    let success_url = successRedirectUrl || `${origin}/subscription?success=true&planId=${encodeParameter(planId)}&lowProfileId=${encodeParameter(lowProfileId)}`;
     let error_url = errorRedirectUrl || `${origin}/subscription?error=true`;
 
     console.log('Payment session created successfully', { 
@@ -224,19 +232,19 @@ serve(async (req) => {
       error_url
     });
     
-    // Construct the payment URL for Cardcom with properly encoded parameters
+    // Construct the payment URL for Cardcom - minimizing the amount of parameters
     const paymentUrl = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
-      `TerminalNumber=${encodeURIComponent(terminalNumber)}&` + 
-      `UserName=${encodeURIComponent(apiName)}&` +
+      `TerminalNumber=${encodeParameter(terminalNumber)}&` + 
+      `UserName=${encodeParameter(apiName)}&` +
       `APILevel=10&` +
-      `ReturnValue=${encodeURIComponent(lowProfileId)}&` +
-      `SumToBill=${encodeURIComponent(String(amount))}&` +
-      `ProductName=${encodeURIComponent(planName || 'Subscription')}&` +
+      `ReturnValue=${encodeParameter(lowProfileId)}&` +
+      `SumToBill=${encodeParameter(String(amount))}&` +
+      `ProductName=${encodeParameter(planName || 'Subscription')}&` +
       `Language=he&` +
       `CoinID=1&` +
-      `SuccessRedirectUrl=${encodeURIComponent(success_url)}&` +
-      `ErrorRedirectUrl=${encodeURIComponent(error_url)}&` +
-      `IndicatorUrl=${encodeURIComponent(webhookUrl)}`;
+      `SuccessRedirectUrl=${encodeParameter(success_url)}&` +
+      `ErrorRedirectUrl=${encodeParameter(error_url)}&` +
+      `IndicatorUrl=${encodeParameter(webhookUrl)}`;
     
     return new Response(
       JSON.stringify({

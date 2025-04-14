@@ -29,6 +29,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [lowProfileId, setLowProfileId] = useState('');
   const [registrationData, setRegistrationData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Get plan details
   const plans = getSubscriptionPlans();
@@ -49,6 +50,18 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       setError('אירעה שגיאה בקריאת נתוני ההרשמה');
     }
   }, []);
+
+  // Function to handle retry logic
+  const retryPaymentInitiation = async () => {
+    if (retryCount >= 3) {
+      setError('מספר נסיונות החיבור למערכת הסליקה נכשל. אנא נסה מאוחר יותר או צור קשר עם התמיכה.');
+      return;
+    }
+    
+    setRetryCount(prevCount => prevCount + 1);
+    setError(null);
+    await handlePaymentInitiation();
+  }
 
   const handlePaymentInitiation = async () => {
     if (isProcessing) return;
@@ -143,8 +156,8 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         return;
       }
 
+      // This is a fallback, should rarely be used now
       console.log('Redirecting to constructed payment URL');
-      // Use redirect provided by server or build our own
       window.location.href = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
         `TerminalNumber=${encodeURIComponent(data.terminalNumber)}&` + 
         `UserName=${encodeURIComponent(data.apiName)}&` +
@@ -170,7 +183,30 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       } else {
         toast.error(errorMessage);
       }
+
+      // Auto-retry once with a delay
+      if (retryCount < 1) {
+        toast.info('מנסה להתחבר שוב למערכת הסליקה...', { duration: 3000 });
+        setTimeout(() => retryPaymentInitiation(), 3000);
+      }
     }
+  };
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent('תקלה בתהליך תשלום');
+    const body = encodeURIComponent(`
+שלום,
+
+נתקלתי בבעיה בתהליך התשלום.
+
+פרטי התקלה:
+- מזהה תשלום: ${lowProfileId || 'לא ידוע'}
+- סוג מנוי: ${planId || 'לא ידוע'}
+- שגיאה: ${error || 'לא ידוע'}
+
+אשמח לקבלת עזרה.
+    `);
+    window.location.href = `mailto:Support@algotouch.co.il?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -179,6 +215,27 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+          
+          {retryCount >= 2 && (
+            <div className="mt-2 flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleContactSupport}
+                className="text-xs"
+              >
+                פנה לתמיכה
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => retryPaymentInitiation()}
+                disabled={retryCount >= 3 || isProcessing}
+                className="text-xs"
+              >
+                נסה שוב
+              </Button>
+            </div>
+          )}
         </Alert>
       )}
       
@@ -201,7 +258,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         <Button 
           onClick={handlePaymentInitiation}
           className="w-full" 
-          disabled={isProcessing}
+          disabled={isProcessing || retryCount >= 3}
         >
           {isProcessing ? 'מעבד...' : 'המשך לתשלום'}
         </Button>

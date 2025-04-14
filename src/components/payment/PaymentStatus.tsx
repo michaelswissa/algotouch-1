@@ -40,6 +40,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
       const timer = setTimeout(() => {
         console.log(`Manually retrying payment check (${retryCount + 1}/3)...`);
         setRetryCount(prev => prev + 1);
+        setManuallyChecking(true);
         manualCheckPayment(lowProfileId, planId);
       }, (retryCount + 1) * 3000); // Exponential backoff
       
@@ -51,6 +52,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
   useEffect(() => {
     if (paymentError && retryCount >= 3) {
       setRecoveryMode(true);
+      setManuallyChecking(false);
     }
   }, [paymentError, retryCount]);
 
@@ -112,8 +114,9 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
 נתקלתי בבעיה בתהליך התשלום.
 
 פרטי התקלה:
-- מזהה תשלום: ${lowProfileId || 'לא ידוע'}
-- סוג מנוי: ${planId || 'לא ידוע'}
+- מזהה תשלום: ${lowProfileId || localStorage.getItem('payment_pending_id') || 'לא ידוע'}
+- סוג מנוי: ${planId || localStorage.getItem('payment_pending_plan') || 'לא ידוע'}
+- שגיאה: ${paymentError || 'לא ידוע'}
 
 אשמח לקבלת עזרה.
     `);
@@ -131,7 +134,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
           <Alert variant="destructive">
             <XCircle className="h-5 w-5" />
             <AlertDescription>
-              לא הצלחנו לאמת את סטטוס התשלום שלך.
+              לא הצלחנו לאמת את סטטוס התשלום שלך. יתכן שהתשלום התבצע בהצלחה אך המערכת לא קיבלה עדכון.
             </AlertDescription>
           </Alert>
           
