@@ -1,6 +1,6 @@
 
 import { useEffect } from 'react';
-import { PaymentStatusType, CardComMessage } from '@/components/payment/types/payment';
+import { PaymentStatus, PaymentStatusType, CardComMessage } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {
@@ -32,14 +32,14 @@ export const useFrameMessages = ({
         handlePaymentSuccess(msg.data);
         break;
       case '3DSProcessStarted':
-        setState(prev => ({ ...prev, paymentStatus: 'processing' }));
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
         break;
       case '3DSProcessCompleted':
         checkPaymentStatus(lowProfileCode, sessionId);
         break;
       case 'HandleError':
         console.error('Payment error:', msg);
-        setState(prev => ({ ...prev, paymentStatus: 'failed' }));
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
         toast.error(msg.message || 'אירעה שגיאה בעיבוד התשלום');
         break;
       case 'handleValidations':
