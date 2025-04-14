@@ -46,10 +46,6 @@ serve(async (req) => {
     // Generate unique transaction reference
     const transactionRef = `${user.id}-${Date.now()}`;
     
-    // Get host URL from request for redirect and webhook URLs
-    const url = new URL(req.url);
-    const baseUrl = `${url.protocol}//${url.host}`;
-    
     // Prepare CardCom API request
     const cardcomPayload = {
       TerminalNumber: terminalNumber,
@@ -58,11 +54,11 @@ serve(async (req) => {
       Amount: amount,
       CoinID: currency === "ILS" ? 1 : 2,
       Language: "he",
-      SuccessRedirectUrl: `${baseUrl}/payment-success`,
-      FailedRedirectUrl: `${baseUrl}/payment-failed`,
-      WebHookUrl: `${baseUrl}/api/webhook/cardcom`,
+      SuccessRedirectUrl: `https://yourdomain.com/payment-success`,
+      FailedRedirectUrl: `https://yourdomain.com/payment-failed`,
+      WebHookUrl: `https://yourdomain.com/api/webhook/cardcom`,
       ProductName: `מנוי ${planId}`,
-      Operation: "ChargeOnly",
+      Operation: "ChargeAndCreateToken", // Allows future charges
       APILevel: "10",
     };
     
@@ -81,7 +77,6 @@ serve(async (req) => {
     }
     
     // Initialize LowProfile session
-    console.log("Initializing CardCom session with payload:", cardcomPayload);
     const response = await fetch(`${cardcomUrl}/Interface/LowProfile.aspx`, {
       method: "POST",
       headers: {
@@ -95,10 +90,8 @@ serve(async (req) => {
     }
     
     const responseText = await response.text();
-    console.log("CardCom API response:", responseText);
-    
-    // Parse response parameters
     const responseParams = new URLSearchParams(responseText);
+    
     const lowProfileCode = responseParams.get("LowProfileCode");
     const responseCode = responseParams.get("ResponseCode");
     
@@ -123,11 +116,10 @@ serve(async (req) => {
       .single();
       
     if (sessionError) {
-      console.error("Failed to store payment session:", sessionError);
       throw new Error("Failed to store payment session");
     }
     
-    // Return data needed for frontend iframe creation
+    // Return data for frontend iframe creation
     return new Response(
       JSON.stringify({
         success: true,

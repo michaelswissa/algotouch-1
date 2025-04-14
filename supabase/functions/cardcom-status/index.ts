@@ -58,27 +58,6 @@ serve(async (req) => {
       if (sessionData.user_id !== user.id) {
         throw new Error("Unauthorized access to payment session");
       }
-      
-      // If session is already completed or failed, return cached status
-      if (sessionData.status === 'completed') {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            status: 'completed',
-            message: "Payment completed successfully"
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } else if (sessionData.status === 'failed') {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            status: 'failed',
-            message: "Payment failed"
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
     }
     
     // Query CardCom API for transaction status
@@ -88,7 +67,6 @@ serve(async (req) => {
       lowprofilecode: lowProfileCode
     });
     
-    console.log("Checking payment status with CardCom API");
     const response = await fetch(
       `${cardcomUrl}/Interface/BillGoldGetLowProfileIndicator.aspx?${queryParams.toString()}`
     );
@@ -98,16 +76,12 @@ serve(async (req) => {
     }
     
     const responseText = await response.text();
-    console.log("CardCom status response:", responseText);
-    
-    // Parse response parameters
     const responseParams = new URLSearchParams(responseText);
     
     const operationResponse = responseParams.get("OperationResponse") || "";
-    const dealResponse = responseParams.get("DealResponse") || "";
     const isSuccessful = operationResponse === "0";
     
-    // If session ID is provided, update session status
+    // Update session status if session ID is provided
     if (sessionId) {
       const status = isSuccessful ? 'completed' : 'failed';
       const transactionId = responseParams.get("InternalDealNumber");
@@ -124,60 +98,6 @@ serve(async (req) => {
       if (updateError) {
         console.error("Failed to update session status:", updateError);
       }
-      
-      // If payment was successful and not already processed, update subscription
-      if (isSuccessful) {
-        // Check if subscription already exists
-        const { data: existingSubscription } = await supabaseClient
-          .from('subscriptions')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-          
-        if (!existingSubscription) {
-          // Get session details
-          const { data: sessionData } = await supabaseClient
-            .from('payment_sessions')
-            .select('plan_id, amount, currency')
-            .eq('id', sessionId)
-            .single();
-            
-          if (sessionData) {
-            // Create subscription
-            const { error: subscriptionError } = await supabaseClient
-              .from('subscriptions')
-              .insert({
-                user_id: user.id,
-                plan_type: sessionData.plan_id,
-                status: 'active',
-                payment_method: {
-                  type: 'credit_card',
-                  last_digits: responseParams.get("CardNumber5") || '****',
-                  provider: 'cardcom',
-                  transaction_id: transactionId
-                },
-                created_at: new Date().toISOString(),
-                current_period_ends_at: (() => {
-                  // Calculate subscription end date based on plan
-                  const date = new Date();
-                  if (sessionData.plan_id === 'monthly') {
-                    date.setMonth(date.getMonth() + 1);
-                  } else if (sessionData.plan_id === 'annual') {
-                    date.setFullYear(date.getFullYear() + 1);
-                  } else if (sessionData.plan_id === 'vip') {
-                    // Set far future date for lifetime plans
-                    date.setFullYear(date.getFullYear() + 100);
-                  }
-                  return date.toISOString();
-                })()
-              });
-              
-            if (subscriptionError) {
-              console.error("Failed to create subscription:", subscriptionError);
-            }
-          }
-        }
-      }
     }
     
     // Return payment status
@@ -190,8 +110,7 @@ serve(async (req) => {
           : `Payment failed: ${responseParams.get("Description") || "Unknown error"}`,
         data: {
           transactionId: responseParams.get("InternalDealNumber") || null,
-          responseCode: operationResponse,
-          dealResponse: dealResponse
+          responseCode: operationResponse
         }
       }),
       {

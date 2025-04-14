@@ -8,9 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Set up in the config.toml to bypass JWT verification
-// This webhook is called directly by CardCom
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -18,15 +15,13 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Received CardCom webhook request");
-    
     // Create Supabase client with service role
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // Get webhook data - CardCom sends data in request body using form-urlencoded format
+    // Get webhook data - CardCom sends data in request body 
     let webhookData;
     
     const contentType = req.headers.get('content-type') || '';
@@ -45,8 +40,6 @@ serve(async (req) => {
     const { 
       LowProfileId: lowProfileCode,
       OperationResponse: operationResponse,
-      DealResponse: dealResponse,
-      TerminalNumber: terminalNumber,
       ReturnValue: returnValue,
       InternalDealNumber: transactionId,
       TranzactionInfo: transactionInfo
@@ -70,6 +63,7 @@ serve(async (req) => {
     // Update payment status
     const isSuccessful = operationResponse === "0";
     const status = isSuccessful ? 'completed' : 'failed';
+    
     const { error: updateError } = await supabaseAdmin
       .from('payment_sessions')
       .update({
@@ -83,76 +77,50 @@ serve(async (req) => {
       throw new Error(`Failed to update payment session: ${updateError.message}`);
     }
     
-    // If payment was successful, update user's subscription
-    if (isSuccessful) {
-      const { error: subscriptionError } = await supabaseAdmin
-        .from('subscriptions')
-        .upsert({
-          user_id: sessionData.user_id,
-          plan_type: sessionData.plan_id,
-          status: 'active',
-          payment_method: {
-            type: 'credit_card',
-            last_digits: transactionInfo?.Last4CardDigits || '****',
-            provider: 'cardcom',
-            transaction_id: transactionId
-          },
-          created_at: new Date().toISOString(),
-          current_period_ends_at: (() => {
-            // Calculate subscription end date based on plan
-            const date = new Date();
-            if (sessionData.plan_id === 'monthly') {
-              date.setMonth(date.getMonth() + 1);
-            } else if (sessionData.plan_id === 'annual') {
-              date.setFullYear(date.getFullYear() + 1);
-            } else if (sessionData.plan_id === 'vip') {
-              // Set far future date for lifetime plans
-              date.setFullYear(date.getFullYear() + 100);
+    // Log the transaction
+    const { error: logError } = await supabaseAdmin
+      .from(isSuccessful ? 'payment_logs' : 'payment_errors')
+      .insert({
+        user_id: sessionData.user_id,
+        transaction_id: transactionId,
+        amount: sessionData.amount,
+        currency: sessionData.currency,
+        ...(isSuccessful 
+          ? { 
+              plan_id: sessionData.plan_id,
+              payment_status: 'succeeded',
+              payment_data: webhookData 
             }
-            return date.toISOString();
-          })()
-        }, {
-          onConflict: 'user_id'
-        });
-        
-      if (subscriptionError) {
-        console.error("Failed to update subscription:", subscriptionError);
-      }
-      
-      // Log successful payment
-      await supabaseAdmin
-        .from('payment_logs')
-        .insert({
-          user_id: sessionData.user_id,
-          transaction_id: transactionId,
-          amount: sessionData.amount,
-          currency: sessionData.currency,
-          plan_id: sessionData.plan_id,
-          payment_status: 'succeeded',
-          payment_data: webhookData
-        });
-    } else {
-      // Log failed payment
-      await supabaseAdmin
-        .from('payment_errors')
-        .insert({
-          user_id: sessionData.user_id,
-          error_code: dealResponse || operationResponse,
-          error_message: webhookData.Description || 'Payment failed',
-          request_data: { low_profile_code: lowProfileCode, return_value: returnValue },
-          response_data: webhookData
-        });
+          : { 
+              error_code: operationResponse,
+              error_message: webhookData.Description || 'Payment failed',
+              request_data: { low_profile_code: lowProfileCode, return_value: returnValue },
+              response_data: webhookData
+            })
+      });
+    
+    if (logError) {
+      console.error("Error logging transaction:", logError);
     }
     
     // Return success response to CardCom
-    return new Response("OK", { status: 200, headers: corsHeaders });
+    return new Response("OK", { 
+      status: 200, 
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/plain'
+      }
+    });
   } catch (error) {
     console.error("Error in cardcom-webhook function:", error);
     return new Response(
       error.message || "Webhook processing failed",
       {
         status: 500,
-        headers: corsHeaders,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        },
       }
     );
   }
