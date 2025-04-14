@@ -35,7 +35,7 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
       return {
         id: item.id,
         earned_at: item.earned_at,
-        badge: item.badge as Badge
+        badge: item.badge as Badge // Fix: item.badge is already a Badge object, not an array
       } as UserBadge;
     }) || [];
     
@@ -61,6 +61,7 @@ export async function getAllBadges(): Promise<Badge[]> {
       return [];
     }
     
+    // The correct way to handle this type conversion
     return data as Badge[] || [];
   } catch (error) {
     console.error('Exception in getAllBadges:', error);
