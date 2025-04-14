@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,11 +36,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Add master frame reference
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    // Load the 3DS script
     const script = document.createElement('script');
     script.src = `${cardcomUrl}/External/OpenFields/3DS.js?v=${Date.now()}`;
     document.head.appendChild(script);
@@ -53,24 +50,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     };
   }, [cardcomUrl]);
 
-  // Function to handle successful payment
   const handlePaymentSuccess = (data: any) => {
     console.log('Payment successful:', data);
     setPaymentStatus(PaymentStatus.SUCCESS);
     toast.success('התשלום בוצע בהצלחה!');
     
-    // Check payment status to confirm
     checkPaymentStatus(lowProfileCode, sessionId);
     
-    // Call the onPaymentComplete callback
     setTimeout(() => {
       onPaymentComplete();
     }, 1000);
   };
 
-  // Enhanced message handler
   const handleFrameMessages = (event: MessageEvent) => {
-    // Verify message origin for security
     if (!event.origin.includes('cardcom.solutions')) {
       return;
     }
@@ -94,7 +86,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         toast.error(msg.message || 'אירעה שגיאה בעיבוד התשלום');
         break;
       case 'handleValidations':
-        // Handle card validation messages for real-time feedback
         if (msg.field === 'cardNumber') {
           if (!msg.isValid && msg.message) {
             toast.error(msg.message);
@@ -110,8 +101,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
-    // Fix the problematic comparison - use strict equality instead
-    if (paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.INITIALIZING) {
+    if ([
+      PaymentStatus.PROCESSING, 
+      PaymentStatus.INITIALIZING
+    ].includes(paymentStatus)) {
       return;
     }
     
@@ -126,7 +119,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         return;
       }
 
-      // Call edge function to initialize payment session with CardCom
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
@@ -136,7 +128,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             email: user.email || '',
           },
           currency: "ILS",
-          operation: "ChargeAndCreateToken", // Important for recurring payments
+          operation: "ChargeAndCreateToken",
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`
@@ -156,7 +148,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       setCardcomUrl('https://secure.cardcom.solutions');
       setPaymentStatus(PaymentStatus.PROCESSING);
       
-      // Initialize master frame
       if (masterFrameRef.current?.contentWindow) {
         const initMessage = {
           action: 'init',
@@ -221,7 +212,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   };
   
   const startStatusCheck = (lpCode: string, sId: string) => {
-    // Start checking payment status after a short delay
     setTimeout(() => {
       checkPaymentStatus(lpCode, sId);
       
@@ -271,7 +261,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     setSessionId('');
     setLowProfileCode('');
     
-    // Reinitialize payment if needed
     setTimeout(() => {
       initializePayment();
     }, 500);
@@ -292,7 +281,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master frame for coordinating iframes */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
