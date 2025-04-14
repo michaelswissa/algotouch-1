@@ -23,6 +23,23 @@ export const usePaymentStatus = (
     const lowProfileId = params.get('lowProfileId') || localStorage.getItem('payment_pending_id') || profileId;
     const paymentPlanId = params.get('planId') || localStorage.getItem('payment_pending_plan') || planId;
     
+    // Check for stale payment sessions (older than 2 hours)
+    const sessionCreatedStr = localStorage.getItem('payment_session_created');
+    if (sessionCreatedStr) {
+      const sessionCreated = new Date(sessionCreatedStr);
+      const now = new Date();
+      const twoHoursInMs = 2 * 60 * 60 * 1000;
+      if (now.getTime() - sessionCreated.getTime() > twoHoursInMs) {
+        // Clear stale session data
+        console.log('Clearing stale payment session data');
+        localStorage.removeItem('payment_pending_id');
+        localStorage.removeItem('payment_pending_plan');
+        localStorage.removeItem('payment_processing');
+        localStorage.removeItem('payment_session_created');
+        return;
+      }
+    }
+    
     // Check if we're already processing this payment
     const storedProcessingId = localStorage.getItem('payment_processing');
     if (storedProcessingId && storedProcessingId === lowProfileId) {
@@ -70,6 +87,7 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_processing');
           localStorage.removeItem('payment_pending_id');
           localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
           setPaymentProcessingId(null);
           
           // Allow toasts to be shown before redirecting
@@ -82,7 +100,10 @@ export const usePaymentStatus = (
 
         // If not already processed by webhook, check status with the API
         const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
-          body: { lowProfileId }
+          body: { 
+            lowProfileId,
+            planId: paymentPlanId // Pass along the plan ID for better context
+          }
         });
         
         if (error) {
@@ -196,6 +217,7 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_processing');
           localStorage.removeItem('payment_pending_id');
           localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
           if (storedData) {
             sessionStorage.removeItem('registration_data');
           }
@@ -217,6 +239,7 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_processing');
           localStorage.removeItem('payment_pending_id');
           localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
           setPaymentProcessingId(null);
           
           setPaymentError(data.Description || 'אירעה שגיאה בתהליך התשלום');
@@ -234,6 +257,7 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_processing');
           localStorage.removeItem('payment_pending_id');
           localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
           setPaymentProcessingId(null);
           
           setPaymentError(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
@@ -245,6 +269,7 @@ export const usePaymentStatus = (
           localStorage.removeItem('payment_processing');
           localStorage.removeItem('payment_pending_id');
           localStorage.removeItem('payment_pending_plan');
+          localStorage.removeItem('payment_session_created');
           setPaymentProcessingId(null);
         }
       }

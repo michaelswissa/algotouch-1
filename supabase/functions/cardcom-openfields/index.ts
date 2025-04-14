@@ -30,31 +30,36 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
+    const requestBody = await req.json();
     const { 
       planId, 
       planName, 
       amount, 
       userId, 
       userName, 
-      userEmail, 
+      email, 
+      userEmail, // Accept both email and userEmail for backward compatibility
       isRecurring, 
       freeTrialDays,
       registrationData // Registration data for non-authenticated users
-    } = await req.json();
+    } = requestBody;
+    
+    // Use either email or userEmail (prefer userEmail if both exist)
+    const effectiveEmail = userEmail || email;
     
     // Validate essential parameters
     if (!planId) {
       throw new Error('Missing required parameter: planId');
     }
     
-    if (!userEmail) {
+    if (!effectiveEmail) {
       throw new Error('Missing required parameter: userEmail');
     }
 
     console.log('Creating payment session for:', { 
       planId, 
       userId, 
-      userEmail, 
+      userEmail: effectiveEmail, 
       userName, 
       hasRegistrationData: !!registrationData,
       amount
@@ -97,7 +102,7 @@ serve(async (req) => {
       planName,
       planId,
       userName,
-      userEmail,
+      userEmail: effectiveEmail,
       operation,
       status: 'created',
       freeTrialDays,
@@ -121,7 +126,7 @@ serve(async (req) => {
       .insert({
         id: sessionId,
         user_id: userId || null, // Allow null for registration flow
-        email: userEmail,
+        email: effectiveEmail,
         plan_id: planId,
         expires_at: expiresAt.toISOString(),
         payment_details: paymentDetails
