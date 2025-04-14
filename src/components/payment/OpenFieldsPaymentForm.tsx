@@ -1,9 +1,11 @@
 
 import React from 'react';
-import CardcomIframe from './CardcomIframe';
+import CardcomOpenFields from './CardcomOpenFields';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useAuth } from '@/contexts/auth';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 interface OpenFieldsPaymentFormProps {
   planId: string;
@@ -46,20 +48,24 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   }, [onPaymentStart]);
 
   if (!userEmail) {
-    onError('כתובת אימייל חסרה. לא ניתן להמשיך בתהליך התשלום.');
-    return null;
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          כתובת אימייל חסרה. לא ניתן להמשיך בתהליך התשלום.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   return (
     <div className="w-full">
-      <CardcomIframe
+      <CardcomOpenFields
         planId={planId}
-        amount={plan.price}
-        userName={fullName}
-        userEmail={userEmail}
-        onSuccess={onPaymentComplete}
+        onPaymentComplete={onPaymentComplete}
         onError={onError}
         onCancel={onCancel}
+        onPaymentStart={onPaymentStart}
       />
     </div>
   );

@@ -22,9 +22,20 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
   const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [checkCount, setCheckCount] = useState(0);
+  const maxChecks = 10; // Maximum number of status checks
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
+      // Avoid excessive checks
+      if (checkCount >= maxChecks) {
+        setStatus('error');
+        setErrorMessage('תהליך התשלום לא הושלם בזמן המוקצב');
+        return;
+      }
+
+      setCheckCount(prevCount => prevCount + 1);
+      
       // Get payment parameters from URL if not provided
       const params = new URLSearchParams(window.location.search);
       const success = params.get('success');
@@ -48,7 +59,11 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
       }
 
       try {
-        console.log('Checking payment status for:', { profileIdToCheck, planIdToCheck });
+        console.log('Checking payment status for:', { 
+          profileIdToCheck, 
+          planIdToCheck, 
+          attempt: checkCount 
+        });
         
         // Check payment status with the dedicated function
         const { data, error } = await supabase.functions.invoke('cardcom-check-status', {
@@ -66,7 +81,8 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
         console.log('Payment status response:', data);
         
         // Check if the transaction was successful
-        if (data.ResponseCode === 0 || 
+        if (data.success === true || 
+            data.ResponseCode === 0 || 
             data.OperationResponse === '0' || 
             (data.TranzactionInfo && data.TranzactionInfo.ResponseCode === 0) ||
             (data.paymentLog && data.paymentLog.status === 'completed')) {
@@ -89,7 +105,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
           localStorage.removeItem('payment_pending_plan');
           localStorage.removeItem('payment_session_created');
           
-          // Process registration data if this was part of registration
+          // Process registration data if this was part of registration flow
           const storedData = sessionStorage.getItem('registration_data');
           if (storedData) {
             try {
@@ -105,23 +121,32 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
           setTimeout(() => {
             navigate(redirectOnSuccess, { replace: true });
           }, 2000);
-        } else if (retryCount < 3) {
-          // Retry a few times if payment not yet processed
+        } else if (checkCount < maxChecks) {
+          // Not yet processed or failed, schedule another check
+          const delay = Math.min(2000 * (checkCount + 1), 10000); // Exponential backoff, max 10s
           setTimeout(() => {
-            setRetryCount(prevCount => prevCount + 1);
-          }, (retryCount + 1) * 1500);
+            // Increment retry count if we've checked a few times already
+            if (checkCount > 3 && checkCount % 2 === 0) {
+              setRetryCount(prevCount => prevCount + 1);
+            }
+          }, delay);
         } else {
+          // Max checks reached
           setStatus('error');
-          setErrorMessage(data.Description || 'אירעה שגיאה בתהליך התשלום');
+          setErrorMessage(data.message || data.Description || 'אירעה שגיאה בתהליך התשלום');
           toast.error('התשלום לא הושלם בהצלחה');
         }
       } catch (err) {
         console.error('Error checking payment status:', err);
         
-        if (retryCount < 3) {
+        if (checkCount < maxChecks) {
+          // Schedule another check with exponential backoff
+          const delay = Math.min(2000 * (checkCount + 1), 10000);
           setTimeout(() => {
-            setRetryCount(prevCount => prevCount + 1);
-          }, (retryCount + 1) * 1500);
+            if (checkCount > 3 && checkCount % 2 === 0) {
+              setRetryCount(prevCount => prevCount + 1);
+            }
+          }, delay);
         } else {
           setStatus('error');
           setErrorMessage(err instanceof Error ? err.message : 'אירעה שגיאה בבדיקת סטטוס התשלום');
@@ -130,7 +155,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
     };
 
     checkPaymentStatus();
-  }, [lowProfileId, planId, navigate, redirectOnSuccess, retryCount]);
+  }, [lowProfileId, planId, navigate, redirectOnSuccess, retryCount, checkCount, maxChecks]);
 
   if (status === 'checking') {
     return (
@@ -139,7 +164,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
         <p className="text-lg">בודק את סטטוס התשלום...</p>
         {retryCount > 0 && (
           <p className="text-sm text-muted-foreground">
-            ניסיון {retryCount + 1}/4. עיבוד התשלום יכול להימשך מספר שניות...
+            ניסיון {retryCount + 1}/5. עיבוד התשלום יכול להימשך מספר שניות...
           </p>
         )}
       </div>
