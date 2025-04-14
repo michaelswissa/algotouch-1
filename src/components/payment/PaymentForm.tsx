@@ -36,27 +36,53 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       ? planDetails.vip 
       : planDetails.monthly;
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const response = await fetch('/OpenFields-Backend-Node-main/config.json');
-        const config = await response.json();
-        setTerminalNumber(config.terminalNumber.toString());
-        setCardcomUrl(config.cardcomUrl);
-      } catch (error) {
-        console.error('Error loading CardCom config:', error);
-        toast.error('אירעה שגיאה בטעינת הגדרות התשלום');
-      }
-    };
+  // Add master frame reference
+  const masterFrameRef = useRef<HTMLIFrameElement>(null);
 
-    fetchConfig();
+  useEffect(() => {
+    // Load the 3DS script
+    const script = document.createElement('script');
+    script.src = `${cardcomUrl}/External/OpenFields/3DS.js?v=${Date.now()}`;
+    document.head.appendChild(script);
     
     return () => {
-      if (statusCheckTimerRef.current) {
-        window.clearInterval(statusCheckTimerRef.current);
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
       }
     };
-  }, []);
+  }, [cardcomUrl]);
+
+  // Enhanced message handler
+  const handleFrameMessages = (event: MessageEvent) => {
+    if (!event.origin.includes('cardcom.solutions')) {
+      return;
+    }
+
+    const msg = event.data;
+    console.log('Received message from CardCom iframe:', msg);
+
+    switch (msg.action) {
+      case 'HandleSubmit':
+        handlePaymentSuccess(msg.data);
+        break;
+      case '3DSProcessStarted':
+        setPaymentStatus(PaymentStatus.PROCESSING);
+        break;
+      case '3DSProcessCompleted':
+        checkPaymentStatus(lowProfileCode, sessionId);
+        break;
+      case 'HandleError':
+        console.error('Payment error:', msg);
+        setPaymentStatus(PaymentStatus.FAILED);
+        toast.error(msg.message || 'אירעה שגיאה בעיבוד התשלום');
+        break;
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('message', handleFrameMessages);
+    return () => window.removeEventListener('message', handleFrameMessages);
+  }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
     if (paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.INITIALIZING) {
@@ -73,13 +99,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         navigate('/auth');
         return;
       }
-      
+
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
           amount: plan.price,
           invoiceInfo: null,
-          currency: "ILS"
+          currency: "ILS",
+          redirectUrls: {
+            success: `${window.location.origin}/subscription/success`,
+            failed: `${window.location.origin}/subscription/failed`
+          }
         }
       });
       
@@ -94,6 +124,35 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       setTerminalNumber(data.data.terminalNumber);
       setCardcomUrl(data.data.cardcomUrl);
       setPaymentStatus(PaymentStatus.PROCESSING);
+      
+      // Initialize master frame
+      if (masterFrameRef.current?.contentWindow) {
+        const initMessage = {
+          action: 'init',
+          lowProfileCode: data.data.lowProfileCode,
+          sessionId: data.data.sessionId,
+          cardFieldCSS: `
+            input {
+              font-family: 'Assistant', sans-serif;
+              font-size: 16px;
+              text-align: right;
+              direction: rtl;
+            }
+            .invalid { border: 2px solid red; }
+          `,
+          cvvFieldCSS: `
+            input {
+              font-family: 'Assistant', sans-serif;
+              font-size: 16px;
+              text-align: center;
+            }
+            .invalid { border: 2px solid red; }
+          `,
+          language: "he"
+        };
+        
+        masterFrameRef.current.contentWindow.postMessage(initMessage, 'https://secure.cardcom.solutions');
+      }
       
       startStatusCheck(data.data.lowProfileCode, data.data.sessionId);
       
@@ -168,7 +227,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
+      
       <CardContent className="space-y-4">
+        {/* Master frame for coordinating iframes */}
+        <iframe
+          ref={masterFrameRef}
+          id="CardComMasterFrame"
+          name="CardComMasterFrame"
+          src={`${cardcomUrl}/openFields/master.html?terminalnumber=${terminalNumber}&rtl=true`}
+          style={{ display: 'none' }}
+          title="CardCom Master Frame"
+        />
+        
         <PlanSummary 
           planName={plan.name} 
           planId={plan.id}
@@ -183,6 +253,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           <PaymentDetails 
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
+            masterFrameRef={masterFrameRef}
           />
         )}
         
@@ -231,6 +302,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </div>
         )}
       </CardContent>
+
       <CardFooter className="flex flex-col space-y-2">
         {paymentStatus === PaymentStatus.IDLE && (
           <>
