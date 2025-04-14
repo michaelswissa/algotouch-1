@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -27,11 +27,13 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   onCancel 
 }) => {
   const { user } = useAuth();
+  const { email: contextEmail } = useSubscriptionContext();
   const [registrationData, setRegistrationData] = useState<any>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Check for registration data
   useEffect(() => {
@@ -43,6 +45,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
       }
     } catch (err) {
       console.error('Error parsing registration data:', err);
+      setErrorMessage('אירעה שגיאה בטעינת נתוני ההרשמה');
     }
   }, []);
 
@@ -70,6 +73,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           }
         } catch (err) {
           console.error('Error checking subscription:', err);
+          setErrorMessage('אירעה שגיאה בבדיקת פרטי המנוי');
         } finally {
           setIsCheckingSubscription(false);
         }
@@ -80,6 +84,21 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     
     checkExistingSubscription();
   }, [user?.id, planId]);
+
+  const handlePaymentStart = () => {
+    setProcessingPayment(true);
+    if (onPaymentStart) {
+      onPaymentStart();
+    }
+  };
+
+  const handlePaymentError = (error: string) => {
+    setProcessingPayment(false);
+    setErrorMessage(error);
+    if (onError) {
+      onError(error);
+    }
+  };
 
   if (isCheckingSubscription) {
     return (
@@ -132,8 +151,8 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
           <CardcomOpenFields
             planId={planId}
             onPaymentComplete={onPaymentComplete}
-            onPaymentStart={onPaymentStart}
-            onError={onError}
+            onPaymentStart={handlePaymentStart}
+            onError={handlePaymentError}
             onCancel={onCancel}
           />
         </CardContent>
@@ -152,13 +171,19 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
         <CardDescription>
           {isRegistering ? 'השלם את פרטי התשלום להשלמת ההרשמה' : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
+        {errorMessage && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
       </CardHeader>
       <CardContent>
         <CardcomOpenFields
           planId={planId}
           onPaymentComplete={onPaymentComplete}
-          onPaymentStart={onPaymentStart}
-          onError={onError}
+          onPaymentStart={handlePaymentStart}
+          onError={handlePaymentError}
           onCancel={onCancel}
         />
       </CardContent>

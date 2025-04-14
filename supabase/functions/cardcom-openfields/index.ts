@@ -27,7 +27,7 @@ function generateRandomId() {
 // Helper function to validate required fields
 function validateRequiredParams(data: any, requiredFields: string[]): string | null {
   for (const field of requiredFields) {
-    if (!data[field]) {
+    if (data[field] === undefined || data[field] === null || data[field] === '') {
       return `Missing required parameter: ${field}`;
     }
   }
@@ -100,10 +100,19 @@ serve(async (req) => {
     // Use either email or userEmail (prefer userEmail if both exist)
     const effectiveEmail = sanitizeString(userEmail || email);
     
-    // Email is required
+    // Email is required - validate strictly
     if (!effectiveEmail) {
       console.error('Missing email address in request');
-      throw new Error('Missing required parameter: email or userEmail');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Missing required parameter: email or userEmail' 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
     console.log('Creating payment session for:', { 
