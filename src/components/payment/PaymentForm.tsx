@@ -110,6 +110,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
+    // Fix the problematic comparison - use strict equality instead
     if (paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.INITIALIZING) {
       return;
     }
