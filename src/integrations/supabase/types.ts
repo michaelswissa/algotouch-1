@@ -324,6 +324,120 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_errors: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          request_data: Json | null
+          response_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_logs: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          payment_data: Json | null
+          payment_status: string
+          plan_id: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_data?: Json | null
+          payment_status: string
+          plan_id: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_data?: Json | null
+          payment_status?: string
+          plan_id?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_sessions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          expires_at: string
+          id: string
+          low_profile_code: string
+          plan_id: string
+          reference: string
+          status: string
+          transaction_data: Json | null
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          expires_at: string
+          id?: string
+          low_profile_code: string
+          plan_id: string
+          reference: string
+          status?: string
+          transaction_data?: Json | null
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          id?: string
+          low_profile_code?: string
+          plan_id?: string
+          reference?: string
+          status?: string
+          transaction_data?: Json | null
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_tags: {
         Row: {
           post_id: string

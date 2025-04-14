@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
@@ -14,9 +13,14 @@ import { getSubscriptionPlans, PaymentStatus } from './utils/paymentHelpers';
 interface PaymentFormProps {
   planId: string;
   onPaymentComplete: () => void;
+  onBack?: () => void;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({ 
+  planId, 
+  onPaymentComplete, 
+  onBack 
+}) => {
   const navigate = useNavigate();
   const [terminalNumber, setTerminalNumber] = useState<string>('');
   const [cardcomUrl, setCardcomUrl] = useState<string>('');
@@ -25,7 +29,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
   const [lowProfileCode, setLowProfileCode] = useState<string>('');
   const statusCheckTimerRef = useRef<number | null>(null);
 
-  // Get subscription plan details
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -34,7 +37,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       : planDetails.monthly;
 
   useEffect(() => {
-    // Fetch CardCom terminal information from backend config
     const fetchConfig = async () => {
       try {
         const response = await fetch('/OpenFields-Backend-Node-main/config.json');
@@ -49,7 +51,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
 
     fetchConfig();
     
-    // Cleanup function for status check timer
     return () => {
       if (statusCheckTimerRef.current) {
         window.clearInterval(statusCheckTimerRef.current);
@@ -57,16 +58,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     };
   }, []);
 
-  // Start the payment process
   const initializePayment = async () => {
     if (paymentStatus === PaymentStatus.PROCESSING || paymentStatus === PaymentStatus.INITIALIZING) {
-      return; // Prevent multiple calls
+      return;
     }
     
     try {
       setPaymentStatus(PaymentStatus.INITIALIZING);
       
-      // Get user data from auth
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -75,12 +74,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
         return;
       }
       
-      // Call the CardCom payment edge function
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
           amount: plan.price,
-          invoiceInfo: null, // Will be added after successful payment
+          invoiceInfo: null,
           currency: "ILS"
         }
       });
@@ -97,7 +95,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       setCardcomUrl(data.data.cardcomUrl);
       setPaymentStatus(PaymentStatus.PROCESSING);
       
-      // Start polling for payment status
       startStatusCheck(data.data.lowProfileCode, data.data.sessionId);
       
     } catch (error: any) {
@@ -107,20 +104,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     }
   };
   
-  // Start checking payment status
   const startStatusCheck = (lpCode: string, sId: string) => {
-    // First check after 5 seconds, then every 3 seconds
     setTimeout(() => {
       checkPaymentStatus(lpCode, sId);
       
-      // Set interval for subsequent checks
       statusCheckTimerRef.current = window.setInterval(() => {
         checkPaymentStatus(lpCode, sId);
       }, 3000);
     }, 5000);
   };
   
-  // Check payment status
   const checkPaymentStatus = async (lpCode: string, sId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
@@ -136,7 +129,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       
       console.log('Payment status check result:', data);
       
-      // If payment status is final (completed or failed), stop checking
       if (data.status === 'completed' || data.status === 'failed') {
         if (statusCheckTimerRef.current) {
           window.clearInterval(statusCheckTimerRef.current);
@@ -157,7 +149,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
     }
   };
   
-  // Retry payment after failure
   const handleRetry = () => {
     setPaymentStatus(PaymentStatus.IDLE);
     setSessionId('');
@@ -219,7 +210,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
             <p className="text-muted-foreground">
               {plan.id === 'vip'
                 ? 'המנוי שלך הופעל לכל החיים'
-                : `המנוי שלך הופעל ויחודש אוטומטית בכל ${plan.id === 'monthly' ? 'חודש' : 'שנה'}`}
+                : `המנוי שלך הופעל ויחודש אוטומatically בכל ${plan.id === 'monthly' ? 'חודש' : 'שנה'}`}
             </p>
           </div>
         )}
@@ -268,6 +259,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
             onClick={() => navigate('/dashboard')}
           >
             המשך למערכת
+          </Button>
+        )}
+        
+        {onBack && (
+          <Button 
+            variant="outline" 
+            onClick={onBack} 
+            className="absolute top-4 right-4"
+          >
+            חזור
           </Button>
         )}
       </CardFooter>

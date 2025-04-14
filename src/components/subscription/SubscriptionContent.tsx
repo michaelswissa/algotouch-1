@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useParams, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
@@ -179,7 +178,7 @@ const SubscriptionContent = () => {
       
       {currentStep === 3 && selectedPlan && (
         <PaymentSection
-          selectedPlan={selectedPlan}
+          planId={selectedPlan}
           onPaymentComplete={handlePaymentComplete}
           onBack={() => setCurrentStep(2)}
         />
