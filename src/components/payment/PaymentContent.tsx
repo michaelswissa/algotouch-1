@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { PaymentStatusType } from './types/payment';
+import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
 import InitializingPayment from './states/InitializingPayment';
 import ProcessingPayment from './states/ProcessingPayment';
@@ -28,13 +29,13 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onRetry
 }) => {
   switch (paymentStatus) {
-    case 'initializing':
+    case PaymentStatus.INITIALIZING:
       return <InitializingPayment />;
-    case 'processing':
+    case PaymentStatus.PROCESSING:
       return <ProcessingPayment />;
-    case 'success':
+    case PaymentStatus.SUCCESS:
       return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
-    case 'failed':
+    case PaymentStatus.FAILED:
       return <FailedPayment onRetry={onRetry} />;
     default:
       return (

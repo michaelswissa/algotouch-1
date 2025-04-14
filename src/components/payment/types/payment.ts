@@ -33,6 +33,7 @@ export interface CardComMessage {
   message?: string;
   field?: string;
   isValid?: boolean;
+  cardType?: string; // Added to handle card type info
 }
 
 export interface InitConfig {
