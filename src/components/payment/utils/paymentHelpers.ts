@@ -1,4 +1,3 @@
-
 // Subscription plan definitions
 export interface SubscriptionPlan {
   id: string;
@@ -80,7 +79,7 @@ export const formatPrice = (amount: number, currencyCode = 'ILS'): string => {
   return formatter.format(amount);
 };
 
-// Payment status types
+// Change enum to use string values for better comparisons
 export enum PaymentStatus {
   IDLE = 'idle',
   INITIALIZING = 'initializing',

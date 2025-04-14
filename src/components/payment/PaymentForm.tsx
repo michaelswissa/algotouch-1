@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,7 @@ import { getSubscriptionPlans, PaymentStatus } from './utils/paymentHelpers';
 interface PaymentFormProps {
   planId: string;
   onPaymentComplete: () => void;
-  onBack?: () => void; // Optional back handler
+  onBack?: () => void;
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ 
@@ -102,9 +101,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   }, [lowProfileCode, sessionId]);
 
   const initializePayment = async () => {
-    // Fix TypeScript error with proper type checking
-    if (paymentStatus === PaymentStatus.PROCESSING || 
-        paymentStatus === PaymentStatus.INITIALIZING) {
+    if ([PaymentStatus.PROCESSING, PaymentStatus.INITIALIZING].includes(paymentStatus)) {
       return;
     }
     
@@ -119,15 +116,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         return;
       }
 
-      // Set proper plan pricing according to the subscription requirements
-      let planPrice = 0;
-      if (planId === 'monthly') {
-        planPrice = 371;
-      } else if (planId === 'annual') {
-        planPrice = 3371;
-      } else if (planId === 'vip') {
-        planPrice = 13121;
-      }
+      const planPrice = planId === 'monthly' 
+        ? 371
+        : planId === 'annual' 
+          ? 3371 
+          : 13121;
 
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
@@ -138,7 +131,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             email: user.email || '',
           },
           currency: "ILS",
-          operation: "ChargeAndCreateToken", // For recurring payments
+          operation: "ChargeAndCreateToken",
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`
@@ -220,7 +213,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       setPaymentStatus(PaymentStatus.FAILED);
     }
   };
-  
+
   const startStatusCheck = (lpCode: string, sId: string) => {
     setTimeout(() => {
       checkPaymentStatus(lpCode, sId);
@@ -230,7 +223,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }, 3000);
     }, 5000);
   };
-  
+
   const checkPaymentStatus = async (lpCode: string, sId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
@@ -265,7 +258,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       console.error('Error checking payment status:', error);
     }
   };
-  
+
   const handleRetry = () => {
     setPaymentStatus(PaymentStatus.IDLE);
     setSessionId('');
