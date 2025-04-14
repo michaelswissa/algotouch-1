@@ -46,7 +46,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       
       // Consider the flow valid if we have contract data from a registered user
       // or if we have valid registration data (for new users)
-      const isValidFlow = contractData || (registrationData && hasRegistrationData);
+      const isValidFlow = Boolean(contractData) || (registrationData && hasRegistrationData);
       setHasValidFlow(isValidFlow);
       
     } catch (error) {

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth';
+import { toast } from 'sonner';
 
 interface ContractSectionProps {
   selectedPlan: string;
