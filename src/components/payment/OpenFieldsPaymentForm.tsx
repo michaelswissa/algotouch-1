@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import CardcomOpenFields from './CardcomOpenFields';
+import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -9,7 +10,6 @@ import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import usePaymentStatus from '@/hooks/usePaymentStatus';
 
 interface OpenFieldsPaymentFormProps {
   planId: string;
@@ -34,9 +34,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
   const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
-  // Use the payment status hook to check for completed payments
-  const { isChecking, paymentSuccess, paymentError } = usePaymentStatus();
 
   // Check for registration data
   useEffect(() => {
@@ -88,20 +85,6 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     checkExistingSubscription();
   }, [user?.id, planId]);
 
-  // Handle successful payment from URL parameters
-  useEffect(() => {
-    if (paymentSuccess) {
-      setProcessingPayment(false);
-      onPaymentComplete('redirect-success');
-    } else if (paymentError) {
-      setProcessingPayment(false);
-      setErrorMessage(paymentError);
-      if (onError) {
-        onError(paymentError);
-      }
-    }
-  }, [paymentSuccess, paymentError, onPaymentComplete, onError]);
-
   const handlePaymentStart = () => {
     setProcessingPayment(true);
     if (onPaymentStart) {
@@ -117,7 +100,7 @@ const OpenFieldsPaymentForm: React.FC<OpenFieldsPaymentFormProps> = ({
     }
   };
 
-  if (isCheckingSubscription || isChecking) {
+  if (isCheckingSubscription) {
     return (
       <div className="flex justify-center py-8">
         <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin"></div>
