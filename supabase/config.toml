@@ -1,44 +1,45 @@
 
-# This is the project configuration file for your Supabase project.
 project_id = "ndhakvhrrkczgylcmyoc"
 
 [api]
-# Port that the API dev server listens on. Access the API through localhost:54321
+enabled = true
 port = 54321
-schemes = ["http"]
-host = "localhost"
+schemas = ["public", "storage", "graphql_public"]
 
 [db]
-# Port that the PostgreSQL database server is listening on. Access the database through localhost:54322
 port = 54322
-shadow_port = 54320
-# The database major version to use when creating a new cluster or when upgrading the cluster.
-major_version = 15
 
 [studio]
-# Port that the Studio dev server listens on.
+enabled = true
 port = 54323
+api_url = "http://localhost"
 
 [inbucket]
-# Port that the Inbucket web interface is listening on.
+enabled = true
 port = 54324
 
-[storage]
-# The service that will handle file storage for the application.
-file_size_limit = "50MiB"
-
 [auth]
-# Enable or disable JWT verification by the API. If set to true, the service will throw
-# an error if the JWT verification fails. If set to false, the service will execute without
-# verifying the JWT.
-enable_jwt = true
+enabled = true
+port = 54325
+
+[storage]
+enabled = true
+
+[realtime]
+enabled = true
+
+[analytics]
+enabled = false
+port = 54327
+
+[vector]
+enabled = false
+port = 54328
 
 [functions]
-[functions.cardcom-webhook]
-verify_jwt = false
-
 [functions.cardcom-openfields]
 verify_jwt = false
-
 [functions.cardcom-check-status]
+verify_jwt = false
+[functions.cardcom-webhook]
 verify_jwt = false

@@ -49,12 +49,30 @@ function encodeParameter(value: string | number | boolean): string {
 }
 
 serve(async (req) => {
+  // Add detailed logging for debugging
+  console.log('Request received at cardcom-openfields endpoint');
+  
   // Handle CORS
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const requestBody = await req.json();
+    console.log('Processing payment initialization request');
+    
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed:', {
+        planId: requestBody.planId,
+        amount: requestBody.amount,
+        userEmail: requestBody.userEmail || requestBody.email,
+        hasRegistrationData: !!requestBody.registrationData
+      });
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      throw new Error('Invalid request body: Could not parse JSON');
+    }
+    
     const { 
       planId, 
       planName, 
@@ -75,6 +93,7 @@ serve(async (req) => {
     const requiredParams = ['planId', 'amount'];
     const validationError = validateRequiredParams(requestBody, requiredParams);
     if (validationError) {
+      console.error('Validation error:', validationError);
       throw new Error(validationError);
     }
     
@@ -83,7 +102,8 @@ serve(async (req) => {
     
     // Email is required
     if (!effectiveEmail) {
-      throw new Error('Missing required parameter: userEmail');
+      console.error('Missing email address in request');
+      throw new Error('Missing required parameter: email or userEmail');
     }
 
     console.log('Creating payment session for:', { 
@@ -101,8 +121,11 @@ serve(async (req) => {
     const apiName = sanitizeString(Deno.env.get("CARDCOM_API_NAME") || Deno.env.get("CARDCOM_USERNAME"));
     
     if (!terminalNumber || !apiName) {
+      console.error('Missing Cardcom API credentials');
       throw new Error('Missing Cardcom API credentials in environment variables');
     }
+
+    console.log('Using Cardcom credentials:', {terminalNumber, apiName});
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -189,6 +212,8 @@ serve(async (req) => {
     }
 
     // Save payment session to database
+    console.log('Saving payment session to database', {sessionId, userId, email: effectiveEmail, planId});
+    
     const { error: sessionError } = await supabaseClient
       .from('payment_sessions')
       .insert({
@@ -212,6 +237,7 @@ serve(async (req) => {
         const url = new URL(req.url);
         origin = `${url.protocol}//${url.hostname}`;
       } catch (e) {
+        console.error('Error extracting origin from URL:', e);
         origin = 'https://ndhakvhrrkczgylcmyoc.supabase.co';
       }
     }
@@ -245,6 +271,8 @@ serve(async (req) => {
       `SuccessRedirectUrl=${encodeParameter(success_url)}&` +
       `ErrorRedirectUrl=${encodeParameter(error_url)}&` +
       `IndicatorUrl=${encodeParameter(webhookUrl)}`;
+    
+    console.log('Payment URL generated successfully');
     
     return new Response(
       JSON.stringify({

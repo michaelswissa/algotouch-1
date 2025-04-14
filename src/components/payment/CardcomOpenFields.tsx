@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth';
@@ -30,7 +31,7 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   onCancel
 }) => {
   const { user } = useAuth();
-  const { fullName, email } = useSubscriptionContext();
+  const { fullName, email: contextEmail } = useSubscriptionContext();
 
   // Iframe references
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
@@ -47,18 +48,34 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [registrationData, setRegistrationData] = useState<any>(null);
+  const [email, setEmail] = useState<string | null>(null);
 
-  // Get registration data
+  // Get registration data and email
   useEffect(() => {
     try {
       const storedData = sessionStorage.getItem('registration_data');
       if (storedData) {
-        setRegistrationData(JSON.parse(storedData));
+        const parsedData = JSON.parse(storedData);
+        setRegistrationData(parsedData);
+        
+        // Get email from registration data if available
+        if (parsedData?.email) {
+          setEmail(parsedData.email);
+        } else if (parsedData?.userData?.email) {
+          setEmail(parsedData.userData.email);
+        }
       }
     } catch (err) {
       console.error('Error parsing registration data:', err);
     }
-  }, []);
+
+    // Get email from auth context if authenticated
+    if (user?.email) {
+      setEmail(user.email);
+    } else if (contextEmail) {
+      setEmail(contextEmail);
+    }
+  }, [user, contextEmail]);
 
   // Initialize cardOwnerName from fullName if available
   useEffect(() => {
@@ -132,6 +149,14 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
   // Initialize a payment session with our backend
   const initializePayment = async () => {
     try {
+      // Make sure we have email before proceeding
+      if (!email && !contextEmail && (!registrationData?.email && !user?.email)) {
+        throw new Error('Missing email address required for payment processing');
+      }
+      
+      // Ensure we have a valid email to use
+      const effectiveEmail = email || contextEmail || registrationData?.email || user?.email;
+      
       // Get plan amount
       const amount = plan.price; // This should be in ILS
       
@@ -142,12 +167,20 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
         amount,
         userId: user?.id,
         userName: cardOwnerName || fullName || '',
-        email: email || registrationData?.email || '',
-        userEmail: email || registrationData?.email || '',
+        email: effectiveEmail,
+        userEmail: effectiveEmail, // Ensure both email fields are set
         isRecurring: planId !== 'vip',
         freeTrialDays: plan.freeTrialDays || 0,
         registrationData
       };
+      
+      console.log('Initializing payment with data:', {
+        planId,
+        amount,
+        email: effectiveEmail,
+        userName: userData.userName,
+        hasRegistrationData: !!registrationData
+      });
       
       // Call our backend to initialize the payment
       const { data, error } = await supabase.functions.invoke('cardcom-openfields', {
@@ -155,10 +188,12 @@ const CardcomOpenFields: React.FC<CardcomOpenFieldsProps> = ({
       });
       
       if (error) {
+        console.error('Edge function error:', error);
         throw new Error(`Error initializing payment: ${error.message}`);
       }
       
       if (!data || !data.success) {
+        console.error('Payment initialization failed:', data);
         throw new Error(data?.error || 'Failed to initialize payment');
       }
       
