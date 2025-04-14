@@ -4,6 +4,7 @@ import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/auth';
 
 interface ContractSectionProps {
   selectedPlan: string;
@@ -19,22 +20,34 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onBack 
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const { isAuthenticated } = useAuth();
   
   // Function to handle contract signing
   const handleSignContract = async (contractData: any) => {
     try {
       setIsProcessing(true);
-      console.log('Contract signed, saving to session storage before payment');
+      console.log('Contract signed, saving before payment');
+      
+      // Get existing registration data if available
+      const registrationData = sessionStorage.getItem('registration_data');
+      const parsedRegistrationData = registrationData ? JSON.parse(registrationData) : null;
       
       // Save contract data to session storage for use during payment
-      // This way it can be retrieved by the payment process but doesn't 
-      // need to be passed in the URL or payment parameters
-      sessionStorage.setItem('contract_data', JSON.stringify(contractData));
+      // Include registration data reference if it exists
+      const contractStateData = {
+        ...contractData,
+        registrationData: parsedRegistrationData,
+        contractSignedAt: new Date().toISOString(),
+        isAuthenticated
+      };
+      
+      // Save contract state in session storage
+      sessionStorage.setItem('contract_data', JSON.stringify(contractStateData));
       
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      onSign(contractData);
+      onSign(contractStateData);
     } catch (error) {
       console.error('Error signing contract:', error);
     } finally {

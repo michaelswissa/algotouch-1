@@ -82,8 +82,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         registrationTime: new Date().toISOString()
       };
       
-      // Clear any existing registration data to start fresh
+      // Clear any existing registration data and contract data to start fresh
       sessionStorage.removeItem('registration_data');
+      sessionStorage.removeItem('contract_data');
       sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
       
       console.log('Registration data saved, proceeding to subscription');

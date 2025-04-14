@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
@@ -43,6 +44,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         console.error("Error parsing registration data:", error);
         setHasRegistrationData(false);
         setIsValidRegistration(false);
+        sessionStorage.removeItem('registration_data');
       }
     } else {
       setHasRegistrationData(false);
@@ -59,16 +61,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Special case for subscription page - allow access if:
-  // 1. User is authenticated OR
-  // 2. User is in registration process OR
-  // 3. Has valid registration data
+  // Special case for contract signing and subscription flow
   if (location.pathname.startsWith('/subscription')) {
-    if (isAuthenticated || (hasRegistrationData && isValidRegistration)) {
+    // Allow access if:
+    // 1. User is authenticated OR
+    // 2. Has valid registration data OR
+    // 3. Coming from contract signing (stored in session)
+    const hasContractData = sessionStorage.getItem('contract_data');
+    
+    if (isAuthenticated || (hasRegistrationData && isValidRegistration) || hasContractData) {
       console.log("ProtectedRoute: Allowing access to subscription path", {
         isAuthenticated,
         hasRegistrationData,
-        isValidRegistration
+        isValidRegistration,
+        hasContractData
       });
       return <>{children}</>;
     }
@@ -80,32 +86,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
-  // Special case for subscription page - allow access if:
-  // 1. User is authenticated OR
-  // 2. User is in registration process (has valid data in sessionStorage) OR
-  // 3. User is redirected directly from signup (isRegistering state)
-  if (isSubscriptionPath(location.pathname)) {
-    if (isAuthenticated) {
-      console.log("ProtectedRoute: Allowing access to subscription path", {
-        isAuthenticated,
-        hasRegistrationData,
-        isValidRegistration
-      });
-      return <>{children}</>;
-    }
-    console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
-    return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
-  }
-
   if (requireAuth && !isAuthenticated) {
     console.log("ProtectedRoute: User is not authenticated, redirecting to auth");
-    // Redirect to login page if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
     console.log("ProtectedRoute: User is already authenticated, redirecting to dashboard");
-    // Redirect to dashboard if already authenticated (for login/register pages)
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -117,10 +104,6 @@ function isPublicPath(path: string, publicPaths: string[]): boolean {
   return publicPaths.some(publicPath => 
     path === publicPath || path.startsWith(`${publicPath}/`)
   );
-}
-
-function isSubscriptionPath(path: string): boolean {
-  return path === '/subscription' || path.startsWith('/subscription/');
 }
 
 export default ProtectedRoute;
