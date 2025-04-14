@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -45,7 +45,7 @@ serve(async (req) => {
       .from('payment_logs')
       .select('*')
       .eq('lowprofile_id', lowProfileId)
-      .single();
+      .maybeSingle();
       
     if (paymentLogError) {
       console.log(`No payment log found for lowProfileId: ${lowProfileId}`);
@@ -56,7 +56,7 @@ serve(async (req) => {
       .from('payment_sessions')
       .select('payment_details')
       .filter('payment_details->lowProfileId', 'eq', lowProfileId)
-      .single();
+      .maybeSingle();
       
     if (paymentSessionError) {
       console.log(`No payment session found for lowProfileId: ${lowProfileId}`);

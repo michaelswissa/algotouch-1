@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
+import { createClient } from "@supabase/supabase-js";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -268,7 +268,7 @@ serve(async (req) => {
     });
     
     // Construct the payment URL for Cardcom - minimizing the amount of parameters
-    const paymentUrl = `https://secure.cardcom.solutions/External/LowProfile.aspx?` +
+    const paymentUrl = `https://secure.cardcom.solutions/Interface/LowProfile.aspx?` +
       `TerminalNumber=${encodeParameter(terminalNumber)}&` + 
       `UserName=${encodeParameter(apiName)}&` +
       `APILevel=10&` +

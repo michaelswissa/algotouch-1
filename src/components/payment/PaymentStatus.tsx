@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
 import { useNavigate } from 'react-router-dom';
 import usePaymentStatus from '@/hooks/usePaymentStatus';
 import { supabase } from '@/integrations/supabase/client';
@@ -168,7 +167,7 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
       <CardContent className="space-y-4">
         {(isChecking || manuallyChecking) && (
           <div className="flex flex-col items-center justify-center py-8">
-            <Spinner className="h-8 w-8 mb-4 text-primary" />
+            <div className="h-8 w-8 border-4 border-t-primary animate-spin rounded-full mb-4"></div>
             <p className="text-center">מאמת את פרטי התשלום...</p>
             {retryCount > 0 && (
               <p className="text-sm text-muted-foreground mt-2">
@@ -212,8 +211,8 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
                 )}
               </Button>
               
-              <Button variant="ghost" onClick={handleRetry}>
-                נסה תשלום שוב
+              <Button variant="outline" onClick={handleRetry}>
+                נסה שנית
               </Button>
             </div>
           </div>

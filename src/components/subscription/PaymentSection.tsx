@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import OpenFieldsPaymentForm from '@/components/payment/OpenFieldsPaymentForm';
 import { useNavigate } from 'react-router-dom';
 import usePaymentStatus from '@/hooks/usePaymentStatus';
+import PaymentStatus from '@/components/payment/PaymentStatus';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -31,6 +32,10 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
 
   // Use hook to check payment status from URL parameters
   const { isChecking, paymentSuccess: urlPaymentSuccess, paymentError: urlPaymentError } = usePaymentStatus();
+
+  // Check if we are returning from a payment redirect
+  const params = new URLSearchParams(window.location.search);
+  const hasPaymentParams = params.has('success') || params.has('error') || params.has('lowProfileId');
 
   // Check for registration data in session storage on component mount
   useEffect(() => {
@@ -90,6 +95,18 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const isRegistering = !!registrationData;
   const isValidUser = isAuthenticated || isRegistering;
 
+  // If we're returning from a payment redirect, show the payment status component
+  if (hasPaymentParams) {
+    return (
+      <PaymentStatus 
+        redirectOnSuccess="/my-subscription"
+        lowProfileId={params.get('lowProfileId') || undefined}
+        planId={params.get('planId') || selectedPlan}
+      />
+    );
+  }
+
+  // Show loading state while checking payment status
   if (isChecking) {
     return (
       <div className="flex justify-center items-center py-8">
