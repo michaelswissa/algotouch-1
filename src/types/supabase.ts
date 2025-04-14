@@ -1,7 +1,8 @@
+
 import { Database as OriginalDatabase, Json } from '@/integrations/supabase/types';
 
 // Extend the original Database type to include our community tables
-export interface ExtendedDatabase extends OriginalDatabase {
+export interface ExtendedDatabase extends Omit<OriginalDatabase, 'public'> {
   public: {
     Tables: {
       // Keep existing tables
@@ -124,6 +125,81 @@ export interface ExtendedDatabase extends OriginalDatabase {
           transaction_id?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      // Add new tables we created in the migration
+      recurring_payments: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          token_expiry: string;
+          last_4_digits: string | null;
+          status: string;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          token_expiry: string;
+          last_4_digits?: string | null;
+          status?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token?: string;
+          token_expiry?: string;
+          last_4_digits?: string | null;
+          status?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      user_payment_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          subscription_id: string | null;
+          token: string;
+          amount: number;
+          currency: string;
+          status: string;
+          created_at: string | null;
+          transaction_id: string | null;
+          payment_data: Json | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subscription_id?: string | null;
+          token: string;
+          amount: number;
+          currency?: string;
+          status: string;
+          created_at?: string | null;
+          transaction_id?: string | null;
+          payment_data?: Json | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subscription_id?: string | null;
+          token?: string;
+          amount?: number;
+          currency?: string;
+          status?: string;
+          created_at?: string | null;
+          transaction_id?: string | null;
+          payment_data?: Json | null;
         };
         Relationships: [];
       };
