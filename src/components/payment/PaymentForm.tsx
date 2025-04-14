@@ -70,19 +70,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {paymentStatus === PaymentStatus.IDLE && (
+        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.INITIALIZING) && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={initializePayment}
+              disabled={paymentStatus === PaymentStatus.INITIALIZING}
             >
-              {paymentStatus === PaymentStatus.INITIALIZING && (
+              {paymentStatus === PaymentStatus.INITIALIZING ? (
                 <span className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> טוען...
                 </span>
+              ) : (
+                'שלם עכשיו'
               )}
-              {paymentStatus === PaymentStatus.IDLE && 'שלם עכשיו'}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               {plan.hasTrial ? 'לא יבוצע חיוב במהלך תקופת הניסיון' : 'החיוב יבוצע מיידית'}
