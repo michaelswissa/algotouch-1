@@ -14,36 +14,36 @@ export interface ExtendedDatabase extends OriginalDatabase {
       payment_logs: {
         Row: {
           id: string;
-          user_id: string | null;
-          lowprofile_id: string;
-          plan_id: string | null;
-          transaction_id: string | null;
+          user_id: string;
+          amount: number;
+          currency: string;
+          payment_status: string;
+          plan_id: string;
+          transaction_id: string;
           payment_data: Json | null;
-          status: string;
-          created_at: string | null;
-          updated_at: string | null;
+          created_at: string;
         };
         Insert: {
           id?: string;
-          user_id?: string | null;
-          lowprofile_id: string;
-          plan_id?: string | null;
-          transaction_id?: string | null;
+          user_id: string;
+          amount: number;
+          currency?: string;
+          payment_status: string;
+          plan_id: string;
+          transaction_id: string;
           payment_data?: Json | null;
-          status: string;
-          created_at?: string | null;
-          updated_at?: string | null;
+          created_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string | null;
-          lowprofile_id?: string;
-          plan_id?: string | null;
-          transaction_id?: string | null;
+          user_id?: string;
+          amount?: number;
+          currency?: string;
+          payment_status?: string;
+          plan_id?: string;
+          transaction_id?: string;
           payment_data?: Json | null;
-          status?: string;
-          created_at?: string | null;
-          updated_at?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -129,461 +129,29 @@ export interface ExtendedDatabase extends OriginalDatabase {
       };
       
       // Add our new community tables
-      community_reputation: {
-        Row: {
-          id: string;
-          user_id: string;
-          points: number;
-          level: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          points?: number;
-          level?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          points?: number;
-          level?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      community_badges: {
-        Row: {
-          id: string;
-          name: string;
-          description: string;
-          icon: string;
-          points_required: number;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          description: string;
-          icon: string;
-          points_required?: number;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          name?: string;
-          description?: string;
-          icon?: string;
-          points_required?: number;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      user_badges: {
-        Row: {
-          id: string;
-          user_id: string;
-          badge_id: string;
-          earned_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          badge_id: string;
-          earned_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          badge_id?: string;
-          earned_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "user_badges_badge_id_fkey";
-            columns: ["badge_id"];
-            isOneToOne: false;
-            referencedRelation: "community_badges";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      community_posts: {
-        Row: {
-          id: string;
-          user_id: string;
-          title: string;
-          content: string;
-          likes: number;
-          comments: number;
-          created_at: string;
-          updated_at: string;
-          media_urls: string[] | null;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          title: string;
-          content: string;
-          likes?: number;
-          comments?: number;
-          created_at?: string;
-          updated_at?: string;
-          media_urls?: string[] | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          title?: string;
-          content?: string;
-          likes?: number;
-          comments?: number;
-          created_at?: string;
-          updated_at?: string;
-          media_urls?: string[] | null;
-        };
-        Relationships: [];
-      };
-      community_activities: {
-        Row: {
-          id: string;
-          user_id: string;
-          activity_type: string;
-          points_earned: number;
-          reference_id: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          activity_type: string;
-          points_earned?: number;
-          reference_id?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          activity_type?: string;
-          points_earned?: number;
-          reference_id?: string | null;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      course_progress: {
-        Row: {
-          id: string;
-          user_id: string;
-          course_id: string;
-          lessons_watched: string[] | null;
-          modules_completed: string[] | null;
-          is_completed: boolean | null;
-          last_watched: string | null;
-          created_at: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          course_id: string;
-          lessons_watched?: string[] | null;
-          modules_completed?: string[] | null;
-          is_completed?: boolean | null;
-          last_watched?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          course_id?: string;
-          lessons_watched?: string[] | null;
-          modules_completed?: string[] | null;
-          is_completed?: boolean | null;
-          last_watched?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Relationships: [];
-      };
-      user_streaks: {
-        Row: {
-          id: string;
-          user_id: string;
-          current_streak: number;
-          longest_streak: number;
-          last_activity: string;
-          streak_start_date: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          current_streak?: number;
-          longest_streak?: number;
-          last_activity?: string;
-          streak_start_date?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          current_streak?: number;
-          longest_streak?: number;
-          last_activity?: string;
-          streak_start_date?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      community_comments: {
-        Row: {
-          id: string;
-          content: string;
-          user_id: string;
-          post_id: string;
-          parent_comment_id: string | null;
-          likes: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          content: string;
-          user_id: string;
-          post_id: string;
-          parent_comment_id?: string | null;
-          likes?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          content?: string;
-          user_id?: string;
-          post_id?: string;
-          parent_comment_id?: string | null;
-          likes?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "community_comments_parent_comment_id_fkey";
-            columns: ["parent_comment_id"];
-            isOneToOne: false;
-            referencedRelation: "community_comments";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "community_comments_post_id_fkey";
-            columns: ["post_id"];
-            isOneToOne: false;
-            referencedRelation: "community_posts";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      community_tags: {
-        Row: {
-          id: string;
-          name: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          name?: string;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      payment_tokens: {
-        Row: {
-          id: string;
-          user_id: string;
-          token: string;
-          token_expiry: string;
-          card_brand: string | null;
-          card_last_four: string | null;
-          is_active: boolean | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          token: string;
-          token_expiry: string;
-          card_brand?: string | null;
-          card_last_four?: string | null;
-          is_active?: boolean | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          token?: string;
-          token_expiry?: string;
-          card_brand?: string | null;
-          card_last_four?: string | null;
-          is_active?: boolean | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      post_tags: {
-        Row: {
-          post_id: string;
-          tag_id: string;
-        };
-        Insert: {
-          post_id: string;
-          tag_id: string;
-        };
-        Update: {
-          post_id?: string;
-          tag_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "post_tags_post_id_fkey";
-            columns: ["post_id"];
-            isOneToOne: false;
-            referencedRelation: "community_posts";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "post_tags_tag_id_fkey";
-            columns: ["tag_id"];
-            isOneToOne: false;
-            referencedRelation: "community_tags";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      temp_registration_data: {
-        Row: {
-          id: string;
-          registration_data: Json;
-          expires_at: string;
-          created_at: string;
-          used: boolean;
-        };
-        Insert: {
-          id?: string;
-          registration_data: Json;
-          expires_at: string;
-          created_at?: string;
-          used?: boolean;
-        };
-        Update: {
-          id?: string;
-          registration_data?: Json;
-          expires_at?: string;
-          created_at?: string;
-          used?: boolean;
-        };
-        Relationships: [];
-      };
-      user_payment_logs: {
-        Row: {
-          id: string;
-          user_id: string | null;
-          token: string;
-          amount: number;
-          status: string;
-          approval_code: string | null;
-          transaction_details: Json | null;
-          created_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string | null;
-          token: string;
-          amount: number;
-          status: string;
-          approval_code?: string | null;
-          transaction_details?: Json | null;
-          created_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string | null;
-          token?: string;
-          amount?: number;
-          status?: string;
-          approval_code?: string | null;
-          transaction_details?: Json | null;
-          created_at?: string | null;
-        };
-        Relationships: [];
-      };
+      community_reputation: OriginalDatabase['public']['Tables']['community_reputation'];
+      community_badges: OriginalDatabase['public']['Tables']['community_badges'];
+      user_badges: OriginalDatabase['public']['Tables']['user_badges'];
+      community_posts: OriginalDatabase['public']['Tables']['community_posts'];
+      community_activities: OriginalDatabase['public']['Tables']['community_activities'];
+      course_progress: OriginalDatabase['public']['Tables']['course_progress'];
+      user_streaks: OriginalDatabase['public']['Tables']['user_streaks'];
+      community_comments: OriginalDatabase['public']['Tables']['community_comments'];
+      community_tags: OriginalDatabase['public']['Tables']['community_tags'];
+      payment_tokens: OriginalDatabase['public']['Tables']['payment_tokens'];
+      post_tags: OriginalDatabase['public']['Tables']['post_tags'];
+      temp_registration_data: OriginalDatabase['public']['Tables']['temp_registration_data'];
+      user_payment_logs: OriginalDatabase['public']['Tables']['user_payment_logs'];
     };
     Views: OriginalDatabase['public']['Views'];
     Functions: {
-      increment_user_points: {
-        Args: {
-          user_id_param: string;
-          points_to_add: number;
-        };
-        Returns: {
-          points: number;
-          level: number;
-        };
-      };
+      increment_user_points: OriginalDatabase['public']['Functions']['increment_user_points'];
       is_admin: OriginalDatabase['public']['Functions']['is_admin'];
-      check_row_exists: {
-        Args: {
-          p_table_name: string;
-          p_column_name: string;
-          p_value: string;
-        };
-        Returns: boolean;
-      };
-      increment: {
-        Args: {
-          row_id: string;
-          table_name: string;
-          column_name: string;
-        };
-        Returns: undefined;
-      };
-      increment_column_value: {
-        Args: {
-          p_row_id: string;
-          p_table_name: string;
-          p_column_name: string;
-          p_increment_by?: number;
-        };
-        Returns: boolean;
-      };
-      cleanup_user_payment_sessions: {
-        Args: {
-          user_id_param: string;
-        };
-        Returns: undefined;
-      };
-      check_duplicate_payment: {
-        Args: {
-          low_profile_id: string;
-        };
-        Returns: boolean;
-      };
+      check_row_exists: OriginalDatabase['public']['Functions']['check_row_exists'];
+      increment: OriginalDatabase['public']['Functions']['increment'];
+      increment_column_value: OriginalDatabase['public']['Functions']['increment_column_value'];
+      cleanup_user_payment_sessions: OriginalDatabase['public']['Functions']['cleanup_user_payment_sessions'];
+      check_duplicate_payment: OriginalDatabase['public']['Functions']['check_duplicate_payment'];
     };
     Enums: OriginalDatabase['public']['Enums'];
     CompositeTypes: OriginalDatabase['public']['CompositeTypes'];
