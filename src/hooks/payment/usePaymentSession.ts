@@ -1,0 +1,67 @@
+
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { PaymentStatus } from '@/components/payment/types/payment';
+
+interface UsePaymentSessionProps {
+  setState: (updater: any) => void;
+}
+
+export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
+  const initializePaymentSession = async (
+    planId: string,
+    userId: string | null,
+    paymentUser: { email: string; fullName: string }
+  ) => {
+    console.log("Initializing payment for:", {
+      planId,
+      email: paymentUser.email,
+      fullName: paymentUser.fullName
+    });
+
+    // Call CardCom payment initialization Edge Function
+    const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      body: {
+        planId,
+        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        invoiceInfo: {
+          fullName: paymentUser.fullName || paymentUser.email,
+          email: paymentUser.email,
+        },
+        currency: "ILS",
+        operation: "ChargeAndCreateToken",
+        redirectUrls: {
+          success: `${window.location.origin}/subscription/success`,
+          failed: `${window.location.origin}/subscription/failed`
+        },
+        userId: userId,
+        registrationData: sessionStorage.getItem('registration_data') 
+          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+          : null
+      }
+    });
+    
+    if (error || !data?.success) {
+      console.error("Payment initialization error:", error || data?.message);
+      throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
+    }
+    
+    console.log("Payment session created:", data.data);
+    
+    setState(prev => ({
+      ...prev,
+      sessionId: data.data.sessionId,
+      lowProfileCode: data.data.lowProfileCode,
+      terminalNumber: data.data.terminalNumber,
+      cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+      paymentStatus: PaymentStatus.IDLE
+    }));
+    
+    return { 
+      lowProfileCode: data.data.lowProfileCode, 
+      sessionId: data.data.sessionId 
+    };
+  };
+
+  return { initializePaymentSession };
+};

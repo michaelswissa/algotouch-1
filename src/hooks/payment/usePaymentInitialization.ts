@@ -1,10 +1,9 @@
 
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from './useCardcomInitializer';
+import { useContractValidation } from './useContractValidation';
+import { usePaymentSession } from './usePaymentSession';
 
 interface UsePaymentInitializationProps {
   planId: string;
@@ -17,9 +16,10 @@ export const usePaymentInitialization = ({
   setState,
   masterFrameRef
 }: UsePaymentInitializationProps) => {
-  const navigate = useNavigate();
   const { handleRegistrationData } = useRegistrationHandler();
   const { initializeCardcomFields } = useCardcomInitializer();
+  const { validateContract } = useContractValidation();
+  const { initializePaymentSession } = usePaymentSession({ setState });
 
   const initializePayment = async () => {
     setState(prev => ({ 
@@ -28,6 +28,7 @@ export const usePaymentInitialization = ({
     }));
     
     try {
+      // Get and validate registration data
       const { userId, userEmail, fullName } = await handleRegistrationData();
       
       if (!userEmail) {
@@ -35,74 +36,21 @@ export const usePaymentInitialization = ({
         throw new Error('חסרים פרטי משתמש לביצוע התשלום');
       }
 
-      // Get contract data - required before payment
-      const contractData = sessionStorage.getItem('contract_data');
-      const contractDetails = contractData ? JSON.parse(contractData) : null;
+      // Validate contract
+      const contractDetails = validateContract();
+      if (!contractDetails) return;
 
-      if (!contractDetails) {
-        console.error("Missing contract data");
-        toast.error('נדרשת חתימה על החוזה');
-        navigate('/subscription');
-        return;
-      }
-
-      // Prepare payment user info
-      const paymentUser = {
-        email: userEmail,
-        fullName: fullName || userEmail
-      };
-
-      console.log("Initializing payment for:", {
+      // Initialize payment session
+      const paymentData = await initializePaymentSession(
         planId,
-        email: paymentUser.email,
-        fullName: paymentUser.fullName
-      });
-
-      // Call CardCom payment initialization Edge Function
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-        body: {
-          planId,
-          amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
-          invoiceInfo: {
-            fullName: paymentUser.fullName || paymentUser.email,
-            email: paymentUser.email,
-          },
-          currency: "ILS",
-          operation: "ChargeAndCreateToken",
-          redirectUrls: {
-            success: `${window.location.origin}/subscription/success`,
-            failed: `${window.location.origin}/subscription/failed`
-          },
-          userId: userId,
-          registrationData: sessionStorage.getItem('registration_data') 
-            ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-            : null
-        }
-      });
-      
-      if (error || !data?.success) {
-        console.error("Payment initialization error:", error || data?.message);
-        throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
-      }
-      
-      console.log("Payment session created:", data.data);
-      
-      setState(prev => ({
-        ...prev,
-        sessionId: data.data.sessionId,
-        lowProfileCode: data.data.lowProfileCode,
-        terminalNumber: data.data.terminalNumber,
-        cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
-        paymentStatus: PaymentStatus.IDLE
-      }));
+        userId,
+        { email: userEmail, fullName: fullName || userEmail }
+      );
       
       // Initialize CardCom fields with improved iframe handling
-      initializeCardcomFields(masterFrameRef, data.data.lowProfileCode, data.data.sessionId);
+      initializeCardcomFields(masterFrameRef, paymentData.lowProfileCode, paymentData.sessionId);
       
-      return { 
-        lowProfileCode: data.data.lowProfileCode, 
-        sessionId: data.data.sessionId 
-      };
+      return paymentData;
     } catch (error) {
       console.error('Payment initialization error:', error);
       toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
