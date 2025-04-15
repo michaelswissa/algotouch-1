@@ -4,6 +4,7 @@ import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from './useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
+import { toast } from 'sonner';
 
 interface UsePaymentInitializationProps {
   planId: string;
