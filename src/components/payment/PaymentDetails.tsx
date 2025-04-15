@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -6,6 +5,7 @@ import CardNumberFrame from './iframes/CardNumberFrame';
 import CVVFrame from './iframes/CVVFrame';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
+import { usePaymentValidation } from '@/hooks/payment/usePaymentValidation';
 import { Loader2 } from 'lucide-react';
 
 interface PaymentDetailsProps {
@@ -26,7 +26,19 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryYear, setExpiryYear] = useState('');
   const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
 
-  // Reset frame load status when terminal number changes
+  const {
+    cardNumberError,
+    cardTypeInfo,
+    cvvError,
+    cardholderNameError,
+    expiryError,
+    isValid
+  } = usePaymentValidation({
+    cardholderName,
+    expiryMonth,
+    expiryYear
+  });
+
   React.useEffect(() => {
     if (terminalNumber) {
       setCardNumberFrameLoaded(false);
@@ -35,7 +47,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
   }, [terminalNumber]);
 
-  // Retry loading frames if they fail to load
   React.useEffect(() => {
     if (!cardNumberFrameLoaded || !cvvFrameLoaded) {
       const maxAttempts = 3;
@@ -58,8 +69,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           placeholder="ישראל ישראלי"
           value={cardholderName}
           onChange={(e) => setCardholderName(e.target.value)}
+          className={cardholderNameError ? 'border-red-500' : ''}
           required
         />
+        {cardholderNameError && (
+          <p className="text-sm text-red-500">{cardholderNameError}</p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -76,6 +91,14 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             onLoad={() => setCardNumberFrameLoaded(true)}
             frameLoadAttempts={frameLoadAttempts}
           />
+          {cardNumberError && (
+            <p className="text-sm text-red-500">{cardNumberError}</p>
+          )}
+          {cardTypeInfo && (
+            <p className="text-sm text-muted-foreground">
+              סוג כרטיס: {cardTypeInfo}
+            </p>
+          )}
         </div>
       </div>
 
@@ -84,6 +107,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         expiryYear={expiryYear}
         onMonthChange={setExpiryMonth}
         onYearChange={setExpiryYear}
+        error={expiryError}
       />
 
       <div className="space-y-2">
@@ -100,6 +124,9 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             onLoad={() => setCvvFrameLoaded(true)}
             frameLoadAttempts={frameLoadAttempts}
           />
+          {cvvError && (
+            <p className="text-sm text-red-500">{cvvError}</p>
+          )}
         </div>
       </div>
 
