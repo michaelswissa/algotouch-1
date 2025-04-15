@@ -8,11 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configuration from environment variables
-const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
-const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
-const cardcomUrl = "https://secure.cardcom.solutions";
-
 // Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -51,8 +46,7 @@ serve(async (req) => {
       amount, 
       currency,
       hasUserId: !!userId,
-      hasRegistrationData: !!registrationData,
-      hasInvoiceInfo: !!invoiceInfo
+      hasRegistrationData: !!registrationData
     });
 
     // Validate required parameters
@@ -70,23 +64,6 @@ serve(async (req) => {
       userEmail = registrationData.email;
       const userData = registrationData.userData || {};
       fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
-      
-      // Try to find existing user with this email
-      try {
-        const { data: existingUser } = await supabaseAdmin
-          .from('profiles')
-          .select('id')
-          .eq('email', userEmail)
-          .maybeSingle();
-          
-        if (existingUser) {
-          finalUserId = existingUser.id;
-          logStep("Found existing user by email", { userId: finalUserId });
-        }
-      } catch (err) {
-        logStep("Error looking up user by email", { error: err.message });
-        // Continue even if lookup fails
-      }
     }
 
     // For invoice and reference, use either provided info or defaults    
@@ -106,15 +83,15 @@ serve(async (req) => {
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
-      terminalNumber,
+      terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
       operation,
       transactionRef
     });
-    
+
     // Create CardCom API request body
     const cardcomPayload = new URLSearchParams({
-      TerminalNumber: terminalNumber,
-      ApiName: apiName,
+      TerminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "",
+      ApiName: Deno.env.get("CARDCOM_API_NAME") || "",
       Operation: operation,
       ReturnValue: transactionRef,
       Amount: amount.toString(),
@@ -145,7 +122,7 @@ serve(async (req) => {
     logStep("Sending request to CardCom");
     
     // Initialize payment session with CardCom
-    const response = await fetch(`${cardcomUrl}/Interface/LowProfile.aspx`, {
+    const response = await fetch(`https://secure.cardcom.solutions/Interface/LowProfile.aspx`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -154,7 +131,10 @@ serve(async (req) => {
     });
     
     if (!response.ok) {
-      logStep("CardCom API error response", { status: response.status, statusText: response.statusText });
+      logStep("CardCom API error response", { 
+        status: response.status, 
+        statusText: response.statusText 
+      });
       throw new Error(`CardCom API error: ${response.status} ${response.statusText}`);
     }
     
@@ -226,9 +206,9 @@ serve(async (req) => {
         message: "Payment session created",
         data: {
           lowProfileCode: lowProfileCode,
-          terminalNumber: terminalNumber,
+          terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
           sessionId: dbSessionId,
-          cardcomUrl: cardcomUrl,
+          cardcomUrl: "https://secure.cardcom.solutions",
           url: url
         }
       }),

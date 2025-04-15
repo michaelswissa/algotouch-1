@@ -1,9 +1,8 @@
 
-# This file controls the configuration for your Supabase project.
-# For a full list of available options, check out the docs at
-# https://supabase.com/docs/guides/functions/config
-
 project_id = "ndhakvhrrkczgylcmyoc"
+
+[functions.cardcom-payment]
+verify_jwt = false
 
 [functions.cardcom-status]
 verify_jwt = false
