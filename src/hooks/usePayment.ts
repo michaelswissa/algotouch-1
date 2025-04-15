@@ -21,7 +21,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     handleError
   } = usePaymentStatus({ onPaymentComplete });
 
-  // Fix: Update to match the type signature of each dependency
   const { initializePayment } = usePaymentInitialization({ 
     planId, 
     setState,
@@ -34,9 +33,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     cleanupStatusCheck
   } = usePaymentStatusCheck({ setState });
 
-  // Fix: Ensure we're passing the correct handlePaymentSuccess that matches expected signature
   useFrameMessages({
-    handlePaymentSuccess: () => handlePaymentSuccess(), // Changed to match the expected signature
+    handlePaymentSuccess: handlePaymentSuccess,
     setState,
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
@@ -63,12 +61,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const submitPayment = () => {
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
-      // Using the format from the example files
+      // Format follows the example from the CardCom example files
       masterFrameRef.current.contentWindow.postMessage(
         { action: 'doTransaction' },
         '*'
       );
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+    } else {
+      console.error("Master frame not available for transaction");
     }
   };
 

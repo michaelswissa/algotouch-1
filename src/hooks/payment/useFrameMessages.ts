@@ -24,8 +24,11 @@ export const useFrameMessages = ({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        const message = event.data as CardComMessage;
-        console.log('Message from CardCom:', message);
+        // Validate the source of the message for security
+        // Note: In production, you should validate the origin
+        
+        const message = event.data;
+        console.log('Received message from iframe:', message);
 
         if (!message || typeof message !== 'object' || !message.action) {
           return;
@@ -35,32 +38,35 @@ export const useFrameMessages = ({
           case 'HandleSubmit':
             console.log('HandleSubmit message:', message);
             if (message.data?.IsSuccess) {
+              // Payment was successful
               handlePaymentSuccess();
             } else {
+              // Payment failed
               setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
               toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
             }
             break;
 
-          case 'HandleError':
+          case 'HandleEror': // Note: This is the correct spelling from the example
             console.error('Payment error:', message);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
             toast.error(message.message || 'שגיאה בביצוע התשלום');
             break;
 
           case 'handleValidations':
-            // Handle field validations without showing errors to user
-            if (message.field === 'cardNumber' || message.field === 'cvv') {
-              console.log('Field validation:', message.field, message.isValid);
+            // Handle field validations as shown in the example
+            if (message.field === 'cardNumber') {
+              console.log('Card number validation:', message.isValid);
+            } else if (message.field === 'cvv') {
+              console.log('CVV validation:', message.isValid);
+            } else if (message.field === 'reCaptcha') {
+              console.log('reCaptcha validation:', message.isValid);
             }
             break;
 
           case '3DSProcessStarted':
             console.log('3DS Process Started');
-            setState(prev => ({ 
-              ...prev, 
-              paymentStatus: PaymentStatus.PROCESSING 
-            }));
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
             break;
             
           case '3DSProcessCompleted':
@@ -69,11 +75,10 @@ export const useFrameMessages = ({
             break;
 
           default:
-            console.log('Unknown message type:', message.action);
-            break;
+            console.log('Unknown message action:', message.action);
         }
       } catch (error) {
-        console.error('Error processing CardCom message:', error);
+        console.error('Error processing iframe message:', error);
       }
     };
 

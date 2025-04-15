@@ -70,9 +70,10 @@ export const usePaymentValidation = ({
     }
   }, [expiryMonth, expiryYear]);
 
-  // Handle CardCom validation messages
+  // Handle CardCom validation messages using the correct message format
   const handleCardValidation = (event: MessageEvent) => {
     const message = event.data;
+    
     if (!message || typeof message !== 'object' || message.action !== 'handleValidations') {
       return;
     }
@@ -85,6 +86,25 @@ export const usePaymentValidation = ({
           cardNumberError: message.isValid ? '' : (message.message || ''),
           cardTypeInfo: message.isValid && message.cardType ? message.cardType : ''
         }));
+        
+        // Apply CSS classes as shown in the example
+        if (message.isValid) {
+          const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ 
+              action: 'removeCardNumberFieldClass', 
+              className: "invalid" 
+            }, '*');
+          }
+        } else {
+          const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ 
+              action: 'addCardNumberFieldClass', 
+              className: "invalid" 
+            }, '*');
+          }
+        }
         break;
 
       case 'cvv':
@@ -93,6 +113,30 @@ export const usePaymentValidation = ({
           isCvvValid: message.isValid,
           cvvError: message.isValid ? '' : (message.message || '')
         }));
+        
+        // Apply CSS classes as shown in the example
+        if (message.isValid) {
+          const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ 
+              action: 'removeCvvFieldClass', 
+              className: "invalid" 
+            }, '*');
+          }
+        } else {
+          const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ 
+              action: 'addCvvFieldClass', 
+              className: "invalid" 
+            }, '*');
+          }
+        }
+        break;
+        
+      case 'reCaptcha':
+        // Handle reCaptcha validation if needed
+        console.log('reCaptcha validation:', message.isValid);
         break;
     }
   };
@@ -101,6 +145,21 @@ export const usePaymentValidation = ({
     window.addEventListener('message', handleCardValidation);
     return () => window.removeEventListener('message', handleCardValidation);
   }, []);
+
+  // Manually trigger validation to check fields
+  const validateCardNumber = () => {
+    const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({ action: "validateCardNumber" }, '*');
+    }
+  };
+
+  const validateCvv = () => {
+    const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({ action: "validateCvv" }, '*');
+    }
+  };
 
   const isValid = () => {
     return !validationState.cardNumberError &&
@@ -116,6 +175,8 @@ export const usePaymentValidation = ({
 
   return {
     ...validationState,
-    isValid
+    isValid,
+    validateCardNumber,
+    validateCvv
   };
 };

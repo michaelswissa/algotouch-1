@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import CardNumberFrame from './iframes/CardNumberFrame';
@@ -26,6 +26,8 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   const {
     cardNumberError,
@@ -33,14 +35,17 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     cvvError,
     cardholderNameError,
     expiryError,
-    isValid
+    isValid,
+    validateCardNumber,
+    validateCvv
   } = usePaymentValidation({
     cardholderName,
     expiryMonth,
     expiryYear
   });
 
-  React.useEffect(() => {
+  // Reset frames when terminal number changes
+  useEffect(() => {
     if (terminalNumber) {
       setCardNumberFrameLoaded(false);
       setCvvFrameLoaded(false);
@@ -48,7 +53,8 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
   }, [terminalNumber]);
 
-  React.useEffect(() => {
+  // Retry loading frames if they fail
+  useEffect(() => {
     if (!cardNumberFrameLoaded || !cvvFrameLoaded) {
       const maxAttempts = 3;
       if (frameLoadAttempts < maxAttempts && terminalNumber) {
@@ -61,13 +67,15 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
   }, [cardNumberFrameLoaded, cvvFrameLoaded, frameLoadAttempts, terminalNumber]);
 
-  // Set card owner details for Google Pay transactions
-  React.useEffect(() => {
-    if (cardholderName && masterFrameRef.current?.contentWindow) {
+  // Update card owner details in the master frame when they change
+  useEffect(() => {
+    if (masterFrameRef.current?.contentWindow) {
       const data = {
         cardOwnerName: cardholderName,
-        cardOwnerEmail: '', // Could be added as another field if needed
-        cardOwnerPhone: ''  // Could be added as another field if needed
+        cardOwnerEmail: email,
+        cardOwnerPhone: phone,
+        expirationMonth: expiryMonth,
+        expirationYear: expiryYear
       };
       
       masterFrameRef.current.contentWindow.postMessage({ 
@@ -75,7 +83,13 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         data 
       }, '*');
     }
-  }, [cardholderName, masterFrameRef]);
+  }, [cardholderName, email, phone, expiryMonth, expiryYear, masterFrameRef]);
+
+  // Validate all fields before submission
+  const validateFields = () => {
+    validateCardNumber();
+    validateCvv();
+  };
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -92,6 +106,27 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         {cardholderNameError && (
           <p className="text-sm text-red-500">{cardholderNameError}</p>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">דוא"ל</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="example@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="phone">טלפון</Label>
+        <Input
+          id="phone"
+          placeholder="05xxxxxxxx"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
       </div>
 
       <div className="space-y-2">

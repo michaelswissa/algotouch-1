@@ -55,6 +55,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Master frame for CardCom - hidden but essential */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
