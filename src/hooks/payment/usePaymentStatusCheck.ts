@@ -14,8 +14,12 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     lpCode?: string;
     sessionId?: string;
     attempts: number;
+    maxAttempts: number;
+    checkInterval: number;
   }>({
-    attempts: 0
+    attempts: 0,
+    maxAttempts: 30, // 5 minutes total with 10-second intervals
+    checkInterval: 10000 // 10 seconds
   });
 
   // Clean up interval on unmount
@@ -35,6 +39,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
 
     console.log('Starting payment status check for:', { lowProfileCode, sessionId });
     
+    // Initial check immediately
+    setTimeout(() => {
+      checkPaymentStatus(lowProfileCode, sessionId);
+    }, 1000);
+    
     // Set up a new interval to check payment status
     const intervalId = setInterval(() => {
       checkPaymentStatus(lowProfileCode, sessionId);
@@ -43,8 +52,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       setStatusCheckData(prev => {
         const newAttempts = prev.attempts + 1;
         
-        // After 30 attempts (5 minutes), stop checking
-        if (newAttempts >= 30) {
+        // After max attempts, stop checking
+        if (newAttempts >= prev.maxAttempts) {
           clearInterval(intervalId);
           console.log('Stopped payment status check after maximum attempts');
           setState(prev => ({ 
@@ -57,20 +66,23 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         
         return { ...prev, attempts: newAttempts };
       });
-    }, 10000); // Check every 10 seconds
+    }, statusCheckData.checkInterval);
 
     setStatusCheckData({
       intervalId,
       lpCode: lowProfileCode,
       sessionId,
-      attempts: 0
+      attempts: 0,
+      maxAttempts: 30,
+      checkInterval: 10000
     });
   };
 
   const checkPaymentStatus = async (lowProfileCode: string, sessionId: string) => {
-    console.log('Checking payment status:', { lowProfileCode, sessionId });
+    console.log('Checking payment status:', { lowProfileCode, sessionId, attempt: statusCheckData.attempts + 1 });
     
     try {
+      // Call the cardcom-status Edge Function
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: { lowProfileCode, sessionId }
       });
@@ -80,18 +92,13 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       if (error) {
         console.error('Error checking payment status:', error);
         
-        // Handle authentication errors specially
-        if (error.message && error.message.includes('401')) {
-          console.log('Authentication error, retrying without authentication');
-          // Let it continue, don't set failed state here
-          // The Edge Function will be changed to not require authentication
-        }
-        
+        // For now, we continue checking even if there's an error
+        // The server returns 200 status even for errors now
         return;
       }
 
       if (data?.success) {
-        console.log('Payment successful!');
+        console.log('Payment successful!', data);
         
         // Clean up the interval
         if (statusCheckData.intervalId) {
@@ -106,6 +113,19 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         }));
         
         toast.success('התשלום בוצע בהצלחה!');
+        
+        // Also update the database if needed as a fallback
+        try {
+          await supabase.from('payment_sessions')
+            .update({
+              status: 'completed',
+              transaction_id: data.data?.transactionId
+            })
+            .eq('id', sessionId);
+        } catch (dbError) {
+          console.warn('Failed to update payment session in DB:', dbError);
+          // Not critical, the webhook should handle this
+        }
       } else if (data?.failed) {
         console.log('Payment failed:', data.message);
         
@@ -122,15 +142,21 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         
         toast.error(data.message || 'התשלום נכשל');
       }
+      // If neither success nor failure, continue checking
     } catch (error) {
-      console.error('Error in payment status check:', error);
+      console.error('Exception in payment status check:', error);
+      // Continue checking despite errors - the interval will stop after max attempts
     }
   };
 
   const cleanupStatusCheck = () => {
     if (statusCheckData.intervalId) {
       clearInterval(statusCheckData.intervalId);
-      setStatusCheckData(prev => ({ ...prev, intervalId: undefined }));
+      setStatusCheckData(prev => ({ 
+        ...prev, 
+        intervalId: undefined,
+        attempts: 0
+      }));
     }
   };
 

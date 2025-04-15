@@ -1,12 +1,13 @@
 
 import { useEffect } from 'react';
-import { PaymentStatus, CardComMessage } from '@/components/payment/types/payment';
+import { CardComMessage } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {
-  handlePaymentSuccess: (data: any) => void;
+  handlePaymentSuccess: () => void;
   setState: (updater: any) => void;
-  checkPaymentStatus: (lpCode: string, sId: string) => void;
+  checkPaymentStatus: (lowProfileCode: string, sessionId: string) => void;
   lowProfileCode: string;
   sessionId: string;
 }
@@ -18,86 +19,77 @@ export const useFrameMessages = ({
   lowProfileCode,
   sessionId
 }: UseFrameMessagesProps) => {
-  
-  const handleFrameMessages = (event: MessageEvent) => {
-    // Validate the origin for security
-    if (!event.origin.includes('cardcom.solutions')) {
-      console.log('Ignoring message from untrusted origin:', event.origin);
-      return;
-    }
+  useEffect(() => {
+    // Skip if no lowProfileCode or sessionId is available yet
+    if (!lowProfileCode || !sessionId) return;
 
-    const msg = event.data as CardComMessage;
-    console.log('Received message from CardCom iframe:', msg);
+    const handleMessage = (event: MessageEvent) => {
+      // Only handle messages from CardCom domains
+      if (!event.origin.includes('cardcom.solutions')) {
+        return;
+      }
 
-    try {
-      switch (msg.action) {
-        case 'HandleSubmit':
-          console.log('Payment successful:', msg.data);
-          handlePaymentSuccess(msg.data);
-          break;
-          
-        case '3DSProcessStarted':
-          console.log('3DS process started');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-          break;
-          
-        case '3DSProcessCompleted':
-          console.log('3DS process completed, checking payment status');
-          // After 3DS is completed, check the payment status
-          if (lowProfileCode && sessionId) {
-            // Add slight delay to allow CardCom to process the payment
+      try {
+        const message = event.data as CardComMessage;
+        console.log('Message from CardCom:', message);
+
+        // Handle different CardCom messages
+        switch (message.action) {
+          case 'HandleSubmit':
+            console.log('Payment submitted from iframe');
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            
+            // Active check for payment status after a short delay
             setTimeout(() => {
               checkPaymentStatus(lowProfileCode, sessionId);
-            }, 1500);
-          } else {
-            console.error('Missing lowProfileCode or sessionId for payment status check');
-            toast.error('חסרים פרטים לבדיקת סטטוס התשלום');
-          }
-          break;
-          
-        case 'HandleError':
-          console.error('Payment error from CardCom:', msg);
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(msg.message || 'אירעה שגיאה בעיבוד התשלום');
-          break;
-          
-        case 'handleValidations':
-          console.log('Field validation from CardCom:', msg);
-          if (msg.field === 'cardNumber') {
-            if (!msg.isValid && msg.message) {
-              // Don't show toast for every validation error, but you could log it
-              console.warn('Card validation error:', msg.message);
-            } else if (msg.isValid && msg.cardType) {
-              // Card type information can be used to show card brand logo
-              console.log('Card type detected:', msg.cardType);
+            }, 3000);
+            break;
+            
+          case '3DSProcessStarted':
+            console.log('3DS verification started');
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            break;
+            
+          case '3DSProcessCompleted':
+            console.log('3DS verification completed');
+            
+            // Check if 3DS was successful
+            if (message.data?.success) {
+              // Don't set success state yet, wait for webhook confirmation
+              setTimeout(() => {
+                checkPaymentStatus(lowProfileCode, sessionId);
+              }, 2000);
+            } else {
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+              toast.error('אימות 3DS נכשל');
             }
-          } else if (msg.field === 'cvv') {
-            // CVV validation
-            console.log('CVV validation:', msg.isValid);
-          }
-          break;
-          
-        default:
-          console.log('Unhandled message from CardCom iframe:', msg);
-          break;
+            break;
+            
+          case 'HandleError':
+            console.error('Payment error from iframe:', message);
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+            toast.error(message.message || 'אירעה שגיאה בעיבוד התשלום');
+            break;
+            
+          case 'handleValidations':
+            // These are form validation messages, not critical errors
+            console.log('Validation message:', message);
+            break;
+            
+          default:
+            console.log('Unknown message from CardCom:', message);
+        }
+      } catch (error) {
+        console.error('Error processing CardCom message:', error, event.data);
       }
-    } catch (error) {
-      console.error('Error handling message from CardCom iframe:', error);
-    }
-  };
-
-  useEffect(() => {
-    console.log('Setting up message listener with:', { lowProfileCode, sessionId });
-    
-    // Set up the event listener
-    window.addEventListener('message', handleFrameMessages);
-    
-    // Clean up on unmount
-    return () => {
-      console.log('Cleaning up message listener');
-      window.removeEventListener('message', handleFrameMessages);
     };
-  }, [lowProfileCode, sessionId]);
 
-  return { handleFrameMessages };
+    // Add message listener
+    window.addEventListener('message', handleMessage);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus]);
 };

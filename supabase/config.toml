@@ -1,45 +1,12 @@
 
+# This file controls the configuration for your Supabase project.
+# For a full list of available options, check out the docs at
+# https://supabase.com/docs/guides/functions/config
+
 project_id = "ndhakvhrrkczgylcmyoc"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-
-[db]
-port = 54322
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://localhost"
-
-[inbucket]
-enabled = true
-port = 54324
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-
-[storage]
-enabled = true
-
-[realtime]
-enabled = true
-
-[analytics]
-enabled = true
-
-[vector]
-enabled = true
-
-[edge-functions]
-[edge-functions.cardcom-payment]
+[functions.cardcom-status]
 verify_jwt = false
-[edge-functions.cardcom-webhook]
+
+[functions.cardcom-webhook]
 verify_jwt = false
-[edge-functions.cardcom-status]
-verify_jwt = true
-[edge-functions.cardcom-recurring]
-verify_jwt = true

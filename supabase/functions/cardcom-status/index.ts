@@ -36,6 +36,8 @@ serve(async (req) => {
       const payload = await req.json();
       lowProfileCode = payload.lowProfileCode;
       sessionId = payload.sessionId;
+      
+      logStep("Request payload parsed", { lowProfileCode, sessionId });
     } catch (parseError) {
       logStep("Error parsing request body", { error: parseError.message });
       throw new Error("Invalid request format");
@@ -48,11 +50,18 @@ serve(async (req) => {
     logStep("Checking payment status", { lowProfileCode, sessionId });
     
     // Call CardCom API to get payment status
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
+    
+    logStep("Using CardCom credentials", { terminalNumber, apiNameLength: apiName?.length || 0 });
+    
     const cardcomPayload = new URLSearchParams({
-      terminalnumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138",
-      username: Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b",
+      terminalnumber: terminalNumber,
+      username: apiName,
       lowprofilecode: lowProfileCode
     }).toString();
+    
+    logStep("Sending request to CardCom API", { url: "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx" });
     
     const cardcomResponse = await fetch(
       "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx", 
@@ -66,11 +75,17 @@ serve(async (req) => {
     );
     
     if (!cardcomResponse.ok) {
+      logStep("CardCom API error response", { 
+        status: cardcomResponse.status, 
+        statusText: cardcomResponse.statusText 
+      });
       throw new Error(`CardCom API error: ${cardcomResponse.status} ${cardcomResponse.statusText}`);
     }
     
     // Parse CardCom response
     const responseText = await cardcomResponse.text();
+    logStep("Raw CardCom response", { responseTextLength: responseText.length });
+    
     const responseParams = new URLSearchParams(responseText);
     
     // Extract key information
@@ -94,7 +109,7 @@ serve(async (req) => {
       try {
         // Only update real DB sessions (not temp ones)
         if (!sessionId.startsWith('temp-')) {
-          await supabaseAdmin
+          const updateResult = await supabaseAdmin
             .from('payment_sessions')
             .update({
               status: 'completed',
@@ -103,11 +118,14 @@ serve(async (req) => {
             })
             .eq('id', sessionId);
           
-          logStep("Updated payment session status", { sessionId, status: 'completed' });
+          logStep("Database update result", { 
+            status: updateResult.status, 
+            error: updateResult.error?.message || null 
+          });
         } else {
           logStep("Skipping DB update for temporary session", { sessionId });
         }
-      } catch (dbError) {
+      } catch (dbError: any) {
         logStep("Database error (non-fatal)", { error: dbError.message });
         // Continue even if DB update fails
       }
@@ -123,7 +141,11 @@ serve(async (req) => {
           operationResponse,
           dealResponse,
           transactionId,
-          returnValue
+          returnValue,
+          cardcomResponse: {
+            status: cardcomResponse.status,
+            ok: cardcomResponse.ok
+          }
         }
       }),
       {
@@ -138,9 +160,10 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         message: errorMessage || "Payment status check failed",
+        error: true
       }),
       {
-        status: 400,
+        status: 200, // Return 200 even for errors to prevent retry loops
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
