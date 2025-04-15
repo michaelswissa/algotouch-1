@@ -1,8 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import CardNumberFrame from './iframes/CardNumberFrame';
+import CVVFrame from './iframes/CVVFrame';
+import CardExpiryInputs from './CardExpiryInputs';
+import SecurityNote from './SecurityNote';
 import { Loader2 } from 'lucide-react';
 
 interface PaymentDetailsProps {
@@ -21,45 +24,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [cardholderName, setCardholderName] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
-  const [cardDataValid, setCardDataValid] = useState(false);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
-  const [cardTypeInfo, setCardTypeInfo] = useState('');
   const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
 
-  const handleFieldValidation = (field: string, isValid: boolean, message?: string) => {
-    if (!isValid && message) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: message
-      }));
-    } else {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleCardNumberValidation = (event: MessageEvent) => {
-    if (!event.origin.includes('cardcom.solutions')) return;
-    
-    if (event.data?.action === 'handleValidations' && event.data?.field === 'cardNumber') {
-      handleFieldValidation('cardNumber', event.data.isValid, event.data.message);
-      
-      if (event.data.cardType) {
-        setCardTypeInfo(event.data.cardType);
-      }
-    }
-  };
-
-  useEffect(() => {
-    window.addEventListener('message', handleCardNumberValidation);
-    return () => window.removeEventListener('message', handleCardNumberValidation);
-  }, []);
-
-  useEffect(() => {
-    // Reset frame load status when terminal number changes
+  // Reset frame load status when terminal number changes
+  React.useEffect(() => {
     if (terminalNumber) {
       setCardNumberFrameLoaded(false);
       setCvvFrameLoaded(false);
@@ -68,57 +36,18 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   }, [terminalNumber]);
 
   // Retry loading frames if they fail to load
-  useEffect(() => {
+  React.useEffect(() => {
     if (!cardNumberFrameLoaded || !cvvFrameLoaded) {
       const maxAttempts = 3;
       if (frameLoadAttempts < maxAttempts && terminalNumber) {
         const timer = setTimeout(() => {
           console.log(`Retrying frame load, attempt ${frameLoadAttempts + 1}`);
           setFrameLoadAttempts(prev => prev + 1);
-          // Force iframe reload by updating a key or similar approach
-          // This will be triggered by the key change in the component render
         }, 1000);
         return () => clearTimeout(timer);
       }
     }
   }, [cardNumberFrameLoaded, cvvFrameLoaded, frameLoadAttempts, terminalNumber]);
-
-  const handlePaymentSubmit = () => {
-    if (masterFrameRef.current?.contentWindow) {
-      const submitMessage = {
-        action: 'submitPayment',
-        cardOwnerName: cardholderName,
-        cardExpMonth: expiryMonth,
-        cardExpYear: expiryYear
-      };
-      
-      try {
-        console.log('Submitting payment with data:', { 
-          cardOwnerName: cardholderName,
-          hasExpMonth: !!expiryMonth,
-          hasExpYear: !!expiryYear
-        });
-        
-        masterFrameRef.current.contentWindow.postMessage(
-          submitMessage, 
-          'https://secure.cardcom.solutions'
-        );
-      } catch (error) {
-        console.error('Error sending payment submit message:', error);
-      }
-    } else {
-      console.error('Master frame not ready for submission');
-    }
-  };
-
-  useEffect(() => {
-    const isValid = cardholderName.trim() !== '' && 
-                   expiryMonth !== '' && 
-                   expiryYear !== '' && 
-                   Object.keys(errors).length === 0;
-    
-    setCardDataValid(isValid);
-  }, [cardholderName, expiryMonth, expiryYear, errors]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -141,95 +70,40 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           )}
-          <iframe
-            id="CardComCardNumber"
-            name="CardComCardNumber"
-            src={`${cardcomUrl}/External/openFields/card-number.html?terminalnumber=${terminalNumber}&rtl=true`}
-            className="w-full h-[40px] border border-input rounded-md"
+          <CardNumberFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
             onLoad={() => setCardNumberFrameLoaded(true)}
-            title="מספר כרטיס"
-            key={`cardnumber-${frameLoadAttempts}`}
+            frameLoadAttempts={frameLoadAttempts}
           />
-          {errors.cardNumber && (
-            <p className="mt-1 text-sm text-red-500">{errors.cardNumber}</p>
-          )}
-          {cardTypeInfo && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              סוג כרטיס: {cardTypeInfo}
-            </p>
-          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="expiry-month">חודש תפוגה</Label>
-          <select
-            id="expiry-month"
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2"
-            value={expiryMonth}
-            onChange={(e) => setExpiryMonth(e.target.value)}
-            required
-          >
-            <option value="" disabled>חודש</option>
-            {Array.from({ length: 12 }, (_, i) => {
-              const month = (i + 1).toString().padStart(2, '0');
-              return (
-                <option key={month} value={month}>
-                  {month}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="expiry-year">שנת תפוגה</Label>
-          <select
-            id="expiry-year"
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2"
-            value={expiryYear}
-            onChange={(e) => setExpiryYear(e.target.value)}
-            required
-          >
-            <option value="" disabled>שנה</option>
-            {Array.from({ length: 10 }, (_, i) => {
-              const year = (new Date().getFullYear() + i).toString().slice(2);
-              return (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-      </div>
+      <CardExpiryInputs
+        expiryMonth={expiryMonth}
+        expiryYear={expiryYear}
+        onMonthChange={setExpiryMonth}
+        onYearChange={setExpiryYear}
+      />
 
       <div className="space-y-2">
         <Label htmlFor="cvv-frame">קוד אבטחה (CVV)</Label>
-        <div className="relative" style={{ maxWidth: '100px' }}>
+        <div className="relative">
           {!cvvFrameLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded border border-input">
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           )}
-          <iframe
-            id="CardComCvv"
-            name="CardComCvv"
-            src={`${cardcomUrl}/External/openFields/cvv-field.html?terminalnumber=${terminalNumber}&rtl=true`}
-            className="w-full h-[40px] border border-input rounded-md"
+          <CVVFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
             onLoad={() => setCvvFrameLoaded(true)}
-            title="קוד אבטחה"
-            key={`cvv-${frameLoadAttempts}`}
-          ></iframe>
+            frameLoadAttempts={frameLoadAttempts}
+          />
         </div>
       </div>
 
-      <Card className="bg-gray-50 dark:bg-gray-900 p-3">
-        <p className="text-xs text-muted-foreground flex items-center">
-          <span className="mr-1">🔒</span>
-          פרטי התשלום מאובטחים ומוצפנים בתקן PCI DSS. הכרטיס יחויב רק לאחר אישור.
-        </p>
-      </Card>
+      <SecurityNote />
     </div>
   );
 };
