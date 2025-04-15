@@ -61,22 +61,23 @@ export const usePaymentValidation = ({
     }
   }, [expiryMonth, expiryYear]);
 
-  // Handle card validation messages from CardCom iframe
+  // Handle card validation messages from CardCom iframe using their format
   const handleCardValidation = (event: MessageEvent) => {
-    if (!event.origin.includes('cardcom.solutions')) return;
-    
-    if (event.data?.action === 'handleValidations') {
-      if (event.data.field === 'cardNumber') {
-        setValidationState(prev => ({
-          ...prev,
-          cardNumberError: event.data.isValid ? '' : (event.data.message || ''),
-          cardTypeInfo: event.data.isValid && event.data.cardType ? event.data.cardType : ''
-        }));
-      } else if (event.data.field === 'cvv') {
-        setValidationState(prev => ({
-          ...prev,
-          cvvError: event.data.isValid ? '' : (event.data.message || '')
-        }));
+    // Accept messages from any origin as shown in the examples
+    if (event.data && typeof event.data === 'object' && 'action' in event.data) {
+      if (event.data.action === 'handleValidations') {
+        if (event.data.field === 'cardNumber') {
+          setValidationState(prev => ({
+            ...prev,
+            cardNumberError: event.data.isValid ? '' : (event.data.message || ''),
+            cardTypeInfo: event.data.isValid && event.data.cardType ? event.data.cardType : ''
+          }));
+        } else if (event.data.field === 'cvv') {
+          setValidationState(prev => ({
+            ...prev,
+            cvvError: event.data.isValid ? '' : (event.data.message || '')
+          }));
+        }
       }
     }
   };

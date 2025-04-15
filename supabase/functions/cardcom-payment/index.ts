@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -143,7 +142,7 @@ serve(async (req) => {
     
     logStep("Sending request to CardCom");
     
-    // Initialize payment session with CardCom
+    // Initialize payment session with CardCom - using the correct URL from your config file
     const response = await fetch("https://secure.cardcom.solutions/Interface/LowProfile.aspx", {
       method: "POST",
       headers: {

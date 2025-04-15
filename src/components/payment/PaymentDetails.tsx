@@ -61,6 +61,22 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
   }, [cardNumberFrameLoaded, cvvFrameLoaded, frameLoadAttempts, terminalNumber]);
 
+  // Set card owner details for Google Pay transactions
+  React.useEffect(() => {
+    if (cardholderName && masterFrameRef.current?.contentWindow) {
+      const data = {
+        cardOwnerName: cardholderName,
+        cardOwnerEmail: '', // Could be added as another field if needed
+        cardOwnerPhone: ''  // Could be added as another field if needed
+      };
+      
+      masterFrameRef.current.contentWindow.postMessage({ 
+        action: 'setCardOwnerDetails', 
+        data 
+      }, '*');
+    }
+  }, [cardholderName, masterFrameRef]);
+
   return (
     <div className="space-y-4" dir="rtl">
       <div className="space-y-2">

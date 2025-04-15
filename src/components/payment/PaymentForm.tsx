@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,7 +59,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
-          src={`${cardcomUrl}/External/openFields/master.html?terminalnumber=${terminalNumber}&rtl=true`}
+          src={`${cardcomUrl}/api/openfields/master`}
           style={{ display: 'none' }}
           title="CardCom Master Frame"
         />

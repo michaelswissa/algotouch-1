@@ -25,18 +25,18 @@ export const useCardcomInitializer = () => {
       }
 
       try {
-        // Initialize CardCom master frame
-        const config: InitConfig = {
+        // Initialize CardCom master frame - using the format from the example files
+        const config = {
           action: 'init',
           lowProfileCode,
           sessionId,
-          cardFieldCSS: "border:1px solid #ccc;height:40px;width:100%;border-radius:4px;padding:0 8px;",
-          cvvFieldCSS: "border:1px solid #ccc;height:40px;width:100%;border-radius:4px;padding:0 8px;",
+          cardFieldCSS: `body { margin: 0; padding: 0; box-sizing: border-box; } .cardNumberField { border: 1px solid #ccc; border-radius: 4px; height: 40px; width: 100%; padding: 0 10px; font-size: 16px; box-sizing: border-box; } .cardNumberField:focus { border-color: #3498db; outline: none; box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2); } .cardNumberField.invalid { border-color: #e74c3c; box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2); }`,
+          cvvFieldCSS: `body { margin: 0; padding: 0; box-sizing: border-box; } .cvvField { border: 1px solid #ccc; border-radius: 3px; height: 39px; margin: 0; padding: 0 10px; width: 100%; } .cvvField.invalid { border: 1px solid #c01111; }`,
           language: 'he'
         };
 
         console.log('Sending initialization config to CardCom iframe');
-        masterFrameRef.current.contentWindow.postMessage(config, 'https://secure.cardcom.solutions');
+        masterFrameRef.current.contentWindow.postMessage(config, '*');
         return true;
       } catch (error) {
         console.error('Error initializing CardCom fields:', error);
@@ -49,8 +49,7 @@ export const useCardcomInitializer = () => {
     
     // Double-check with a longer delay as backup
     setTimeout(() => {
-      // Use proper type check to access contentWindow
-      const frameElement = document.getElementById('CardComCardNumber');
+      const frameElement = document.getElementById('CardComMasterFrame');
       if (frameElement && 'contentWindow' in frameElement && !frameElement.contentWindow) {
         console.log('Attempting secondary CardCom initialization');
         checkFrameAndInitialize();

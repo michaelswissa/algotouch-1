@@ -19,7 +19,7 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
       <iframe
         id="CardComCardNumber"
         name="CardComCardNumber"
-        src={`${cardcomUrl}/External/openFields/card-number.html?terminalnumber=${terminalNumber}&rtl=true`}
+        src={`${cardcomUrl}/api/openfields/cardNumber`}
         className="w-full h-[40px] border border-input rounded-md"
         onLoad={onLoad}
         title="מספר כרטיס"

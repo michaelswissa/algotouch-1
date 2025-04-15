@@ -63,9 +63,10 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const submitPayment = () => {
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
+      // Using the format from the example files
       masterFrameRef.current.contentWindow.postMessage(
-        { action: 'submitPayment' },
-        'https://secure.cardcom.solutions'
+        { action: 'doTransaction' },
+        '*'
       );
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
     }
