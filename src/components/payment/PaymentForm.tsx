@@ -34,7 +34,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     onPaymentComplete
   });
 
-  // Initialize payment only once on mount
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
     initializePayment();
@@ -59,7 +58,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
-          src={`https://secure.cardcom.solutions/External/openFields/master.html?terminalnumber=${terminalNumber}&rtl=true`}
+          src={`${cardcomUrl}/External/openFields/master.html?terminalnumber=${terminalNumber}&rtl=true`}
           style={{ display: 'none' }}
           title="CardCom Master Frame"
         />
