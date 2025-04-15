@@ -17,6 +17,7 @@ export const useCardcomInitializer = () => {
 
     // We need to ensure iframe is loaded before sending messages
     const checkFrameAndInitialize = () => {
+      // Check if the iframe and contentWindow exist
       if (!masterFrameRef.current?.contentWindow) {
         console.warn('Master frame contentWindow not ready, retrying in 100ms');
         setTimeout(checkFrameAndInitialize, 100);
@@ -48,7 +49,9 @@ export const useCardcomInitializer = () => {
     
     // Double-check with a longer delay as backup
     setTimeout(() => {
-      if (!document.getElementById('CardComCardNumber')?.contentWindow) {
+      // Use proper type check to access contentWindow
+      const frameElement = document.getElementById('CardComCardNumber');
+      if (frameElement && 'contentWindow' in frameElement && !frameElement.contentWindow) {
         console.log('Attempting secondary CardCom initialization');
         checkFrameAndInitialize();
       }

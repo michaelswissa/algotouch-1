@@ -16,8 +16,9 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
     lowProfileCode: '',
   });
 
-  const handlePaymentSuccess = (data: any) => {
-    console.log('Payment successful:', data);
+  // Changed to match the expected signature (no parameters)
+  const handlePaymentSuccess = () => {
+    console.log('Payment successful');
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
     toast.success('התשלום בוצע בהצלחה!');
     

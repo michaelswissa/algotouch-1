@@ -5,7 +5,7 @@ import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {
-  handlePaymentSuccess: () => void;
+  handlePaymentSuccess: () => void; // Changed to match the expected signature
   setState: (updater: any) => void;
   checkPaymentStatus: (lowProfileCode: string, sessionId: string) => void;
   lowProfileCode: string;
