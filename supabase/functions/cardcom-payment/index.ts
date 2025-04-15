@@ -22,14 +22,18 @@ serve(async (req) => {
 
   try {
     logStep("Function started");
-
-    // Create Supabase admin client for database operations that bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
     
-    // Parse request payload first to get all required data
+    // Create Supabase admin client for database operations that bypass RLS
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Missing Supabase configuration");
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Parse request payload and validate required fields
     const { 
       planId, 
       amount, 
@@ -51,7 +55,15 @@ serve(async (req) => {
 
     // Validate required parameters
     if (!planId || !amount) {
-      throw new Error("Missing required parameters: planId or amount");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Missing required parameters: planId or amount",
+        }), {
+          status: 200, // Return 200 even for validation errors
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
     
     // Get user information - either from auth token, userId passed, or registration data
@@ -73,7 +85,7 @@ serve(async (req) => {
                 `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                 "Anonymous User");
     
-    // Generate unique transaction reference
+    // Generate unique transaction reference with validation
     const transactionRef = finalUserId 
       ? `${finalUserId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
@@ -83,15 +95,30 @@ serve(async (req) => {
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
-      terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
       operation,
       transactionRef
     });
 
-    // Create CardCom API request body
+    // Validate CardCom credentials
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
+    const apiName = Deno.env.get("CARDCOM_API_NAME");
+    
+    if (!terminalNumber || !apiName) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "CardCom configuration is missing",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Create CardCom API request body with validation
     const cardcomPayload = new URLSearchParams({
-      TerminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "",
-      ApiName: Deno.env.get("CARDCOM_API_NAME") || "",
+      TerminalNumber: terminalNumber,
+      ApiName: apiName,
       Operation: operation,
       ReturnValue: transactionRef,
       Amount: amount.toString(),
@@ -110,11 +137,6 @@ serve(async (req) => {
       "InvoiceLines1.Description": `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       "InvoiceLines1.Price": amount.toString(),
       "InvoiceLines1.Quantity": "1",
-      // CardCom-specific UI customization options
-      "UIDefinition.IsHideCardOwnerPhone": "false",
-      "UIDefinition.IsCardOwnerPhoneRequired": "true", 
-      "UIDefinition.IsHideCardOwnerEmail": "false",
-      "UIDefinition.IsCardOwnerEmailRequired": "true",
       // Enable 3DS for better security
       "AdvancedDefinition.ThreeDSecureState": "Enabled"
     }).toString();
@@ -122,7 +144,7 @@ serve(async (req) => {
     logStep("Sending request to CardCom");
     
     // Initialize payment session with CardCom
-    const response = await fetch(`https://secure.cardcom.solutions/Interface/LowProfile.aspx`, {
+    const response = await fetch("https://secure.cardcom.solutions/Interface/LowProfile.aspx", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -130,30 +152,32 @@ serve(async (req) => {
       body: cardcomPayload,
     });
     
-    if (!response.ok) {
-      logStep("CardCom API error response", { 
-        status: response.status, 
-        statusText: response.statusText 
-      });
-      throw new Error(`CardCom API error: ${response.status} ${response.statusText}`);
-    }
-    
-    // Parse response
+    // Handle CardCom API errors gracefully
     const responseText = await response.text();
     const responseParams = new URLSearchParams(responseText);
     
     const lowProfileCode = responseParams.get("LowProfileCode");
     const responseCode = responseParams.get("ResponseCode");
+    const errorDescription = responseParams.get("Description");
     const url = responseParams.get("url");
     
     logStep("CardCom response", { 
       responseCode,
       lowProfileCode: lowProfileCode || '',
-      hasUrl: !!url
+      hasUrl: !!url,
+      description: errorDescription || ''
     });
     
     if (responseCode !== "0" || !lowProfileCode) {
-      throw new Error(`CardCom initialization failed: ${responseParams.get("Description") || "Unknown error"}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: errorDescription || "CardCom initialization failed",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
     
     // Store payment session in database 
@@ -166,7 +190,6 @@ serve(async (req) => {
       currency: currency,
       status: 'initiated',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
-      // Store anonymous user info if not authenticated
       anonymous_data: !finalUserId ? { email: userEmail, fullName } : null
     };
     
@@ -197,22 +220,21 @@ serve(async (req) => {
       // Continue even if storage fails
     }
     
-    logStep("Payment session prepared", { sessionId: dbSessionId });
-    
-    // Return data for frontend iframe creation
+    // Return success response with CardCom data
     return new Response(
       JSON.stringify({
         success: true,
         message: "Payment session created",
         data: {
           lowProfileCode: lowProfileCode,
-          terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
+          terminalNumber: terminalNumber,
           sessionId: dbSessionId,
           cardcomUrl: "https://secure.cardcom.solutions",
           url: url
         }
       }),
       {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
@@ -220,13 +242,14 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
     
+    // Return error response with 200 status code
     return new Response(
       JSON.stringify({
         success: false,
         message: errorMessage || "Payment initialization failed",
       }),
       {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
