@@ -7,6 +7,8 @@ interface ValidationState {
   cvvError: string;
   cardholderNameError: string;
   expiryError: string;
+  isCardNumberValid: boolean;
+  isCvvValid: boolean;
 }
 
 interface PaymentValidationProps {
@@ -25,12 +27,19 @@ export const usePaymentValidation = ({
     cardTypeInfo: '',
     cvvError: '',
     cardholderNameError: '',
-    expiryError: ''
+    expiryError: '',
+    isCardNumberValid: false,
+    isCvvValid: false
   });
 
   // Validate cardholder name
   useEffect(() => {
-    if (cardholderName && cardholderName.length < 2) {
+    if (!cardholderName) {
+      setValidationState(prev => ({
+        ...prev,
+        cardholderNameError: 'שם בעל הכרטיס הוא שדה חובה'
+      }));
+    } else if (cardholderName.length < 2) {
       setValidationState(prev => ({
         ...prev,
         cardholderNameError: 'שם בעל הכרטיס חייב להכיל לפחות 2 תווים'
@@ -44,13 +53,13 @@ export const usePaymentValidation = ({
   useEffect(() => {
     if (expiryMonth && expiryYear) {
       const currentDate = new Date();
-      const currentYear = currentDate.getFullYear() % 100; // Get last 2 digits
+      const currentYear = currentDate.getFullYear() % 100;
       const currentMonth = currentDate.getMonth() + 1;
       const selectedYear = parseInt(expiryYear);
       const selectedMonth = parseInt(expiryMonth);
 
       if (selectedYear < currentYear || 
-          (selectedYear === currentYear && selectedMonth < currentMonth)) {
+         (selectedYear === currentYear && selectedMonth < currentMonth)) {
         setValidationState(prev => ({
           ...prev,
           expiryError: 'תאריך תפוגה לא תקין'
@@ -61,24 +70,30 @@ export const usePaymentValidation = ({
     }
   }, [expiryMonth, expiryYear]);
 
-  // Handle card validation messages from CardCom iframe using their format
+  // Handle CardCom validation messages
   const handleCardValidation = (event: MessageEvent) => {
-    // Accept messages from any origin as shown in the examples
-    if (event.data && typeof event.data === 'object' && 'action' in event.data) {
-      if (event.data.action === 'handleValidations') {
-        if (event.data.field === 'cardNumber') {
-          setValidationState(prev => ({
-            ...prev,
-            cardNumberError: event.data.isValid ? '' : (event.data.message || ''),
-            cardTypeInfo: event.data.isValid && event.data.cardType ? event.data.cardType : ''
-          }));
-        } else if (event.data.field === 'cvv') {
-          setValidationState(prev => ({
-            ...prev,
-            cvvError: event.data.isValid ? '' : (event.data.message || '')
-          }));
-        }
-      }
+    const message = event.data;
+    if (!message || typeof message !== 'object' || message.action !== 'handleValidations') {
+      return;
+    }
+
+    switch (message.field) {
+      case 'cardNumber':
+        setValidationState(prev => ({
+          ...prev,
+          isCardNumberValid: message.isValid,
+          cardNumberError: message.isValid ? '' : (message.message || ''),
+          cardTypeInfo: message.isValid && message.cardType ? message.cardType : ''
+        }));
+        break;
+
+      case 'cvv':
+        setValidationState(prev => ({
+          ...prev,
+          isCvvValid: message.isValid,
+          cvvError: message.isValid ? '' : (message.message || '')
+        }));
+        break;
     }
   };
 
@@ -92,6 +107,8 @@ export const usePaymentValidation = ({
            !validationState.cvvError &&
            !validationState.cardholderNameError &&
            !validationState.expiryError &&
+           validationState.isCardNumberValid &&
+           validationState.isCvvValid &&
            cardholderName.length >= 2 &&
            expiryMonth &&
            expiryYear;
