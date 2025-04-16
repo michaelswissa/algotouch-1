@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -18,11 +17,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkInterval: number;
   }>({
     attempts: 0,
-    maxAttempts: 60, // 10 minutes total with 10-second intervals
-    checkInterval: 10000 // 10 seconds
+    maxAttempts: 60, // 10 minutes total
+    checkInterval: 10000 // 10 seconds between checks
   });
 
-  // Clean up interval on unmount
   useEffect(() => {
     return () => {
       if (statusCheckData.intervalId) {
@@ -39,20 +37,18 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
 
     console.log('Starting payment status check for:', { lowProfileCode, sessionId });
     
-    // Initial check immediately
+    // Initial check after a 5 second delay to allow fields initialization
     setTimeout(() => {
       checkPaymentStatus(lowProfileCode, sessionId);
-    }, 1000);
+    }, 5000);
     
     // Set up a new interval to check payment status
     const intervalId = setInterval(() => {
       checkPaymentStatus(lowProfileCode, sessionId);
       
-      // Update attempts count
       setStatusCheckData(prev => {
         const newAttempts = prev.attempts + 1;
         
-        // After max attempts, stop checking
         if (newAttempts >= prev.maxAttempts) {
           clearInterval(intervalId);
           console.log('Stopped payment status check after maximum attempts');

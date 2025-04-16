@@ -49,6 +49,9 @@ serve(async (req) => {
     
     logStep("Checking payment status", { lowProfileCode, sessionId });
     
+    // Add a short delay to allow CardCom to process the payment
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // Call CardCom API to get payment status
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
     const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
@@ -84,7 +87,7 @@ serve(async (req) => {
     
     // Parse CardCom response
     const responseText = await cardcomResponse.text();
-    logStep("Raw CardCom response", { responseTextLength: responseText.length });
+    logStep("Raw CardCom response", { responseText });
     
     const responseParams = new URLSearchParams(responseText);
     
@@ -93,18 +96,42 @@ serve(async (req) => {
     const dealResponse = responseParams.get('DealResponse');
     const transactionId = responseParams.get('InternalDealNumber');
     const returnValue = responseParams.get('ReturnValue');
+    const description = responseParams.get('Description');
     
     logStep("CardCom status response", { 
       operationResponse, 
       dealResponse,
       transactionId,
-      returnValue
+      returnValue,
+      description
     });
     
+    // Return early if transaction is not complete
+    if (!operationResponse) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'העסקה עדיין בעיבוד...',
+          data: {
+            operationResponse,
+            dealResponse,
+            description,
+            cardcomResponse: {
+              status: cardcomResponse.status,
+              ok: cardcomResponse.ok
+            }
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Determine payment success based on CardCom response
     const isSuccessful = operationResponse === '0';
     
-    // Update session status in database if available (even for temp sessions)
+    // Update session status in database if available
     if (isSuccessful && sessionId) {
       try {
         // Only update real DB sessions (not temp ones)
@@ -127,7 +154,7 @@ serve(async (req) => {
         }
       } catch (dbError: any) {
         logStep("Database error (non-fatal)", { error: dbError.message });
-        // Continue even if DB update fails
+        // Continue even if DB update fails - webhook will handle this
       }
     }
     
@@ -136,7 +163,7 @@ serve(async (req) => {
       JSON.stringify({
         success: isSuccessful,
         failed: !isSuccessful,
-        message: responseParams.get('Description') || '',
+        message: description || '',
         data: {
           operationResponse,
           dealResponse,
@@ -159,7 +186,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: errorMessage || "Payment status check failed",
+        message: errorMessage || "בדיקת סטטוס התשלום נכשלה",
         error: true
       }),
       {
