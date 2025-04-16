@@ -1,7 +1,7 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,12 +12,11 @@ const CARDCOM_CONFIG = {
   terminalNumber: "160138",
   apiName: "bLaocQRMSnwphQRUVG3b",
   apiPassword: "i9nr6caGbgheTdYfQbo6",
-  companyId: "517043808",
   endpoints: {
     master: "https://secure.cardcom.solutions/api/openfields/master",
     cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
     cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
-    threeDSecure: "https://secure.cardcom.solutions/External/OpenFields/3DS.js"
+    createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
   }
 };
 
@@ -52,7 +51,8 @@ serve(async (req) => {
       currency = "ILS", 
       invoiceInfo, 
       userId,
-      registrationData
+      registrationData,
+      redirectUrls
     } = await req.json();
     
     logStep("Received request data", { 
@@ -63,11 +63,11 @@ serve(async (req) => {
       hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !amount) {
+    if (!planId || !amount || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Missing required parameters: planId or amount",
+          message: "Missing required parameters",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -76,11 +76,11 @@ serve(async (req) => {
     }
 
     // Get user information and prepare transaction reference
-    let userEmail = invoiceInfo?.email || registrationData?.email || "anonymous@example.com";
+    let userEmail = invoiceInfo?.email || registrationData?.email;
     let fullName = invoiceInfo?.fullName || 
                   (registrationData?.userData ? 
                     `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
-                    "Anonymous User");
+                    undefined);
     
     const transactionRef = userId 
       ? `${userId}-${Date.now()}`
@@ -91,29 +91,51 @@ serve(async (req) => {
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
-      transactionRef
+      transactionRef,
+      userEmail,
+      fullName
     });
 
-    // Create CardCom API request body for OpenFields integration
+    // Create CardCom API request body for payment initialization
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Amount: amount.toString(),
-      Currency: currency === "ILS" ? "1" : "2",
-      TransactionId: transactionRef,
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
+      ReturnValue: transactionRef,
+      Amount: amount,
       WebHookUrl: webhookUrl,
+      SuccessRedirectUrl: redirectUrls.success,
+      FailedRedirectUrl: redirectUrls.failed,
+      ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
-      Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-      CustomerName: fullName,
-      CustomerEmail: userEmail,
-      EnableOpenFields: true,
-      ThreeDSecureState: "Enabled"
+      ISOCoinId: currency === "ILS" ? 1 : 2,
+      MaxNumOfPayments: 1, // No installments allowed
+      UIDefinition: {
+        IsHideCardOwnerName: false,
+        IsHideCardOwnerEmail: false,
+        IsHideCardOwnerPhone: false,
+        CardOwnerEmailValue: userEmail,
+        CardOwnerNameValue: fullName,
+        IsCardOwnerEmailRequired: true,
+        reCaptchaFieldCSS: "body { margin: 0; padding:0; display: flex; }",
+        placeholder: "1111-2222-3333-4444",
+        cvvPlaceholder: "123"
+      },
+      Document: invoiceInfo ? {
+        Name: fullName || userEmail,
+        Email: userEmail,
+        Products: [{
+          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+          UnitCost: amount,
+          Quantity: 1
+        }]
+      } : undefined
     };
     
     logStep("Sending request to CardCom");
     
-    // Initialize payment session with CardCom OpenFields API
-    const response = await fetch("https://secure.cardcom.solutions/api/v11/Transactions/Transaction", {
+    // Initialize payment session with CardCom
+    const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -151,7 +173,7 @@ serve(async (req) => {
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
     
-    let dbSessionId = "temp-" + Date.now();
+    let dbSessionId = null;
     
     try {
       if (userId) {
@@ -168,6 +190,7 @@ serve(async (req) => {
       }
     } catch (dbError) {
       logStep("Error storing payment session", { error: dbError.message });
+      // Don't fail the request if DB storage fails
     }
     
     return new Response(
@@ -175,7 +198,7 @@ serve(async (req) => {
         success: true,
         message: "Payment session created",
         data: {
-          sessionId: dbSessionId,
+          sessionId: dbSessionId || `temp-${Date.now()}`,
           lowProfileCode: responseData.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
