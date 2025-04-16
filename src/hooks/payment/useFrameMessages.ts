@@ -1,6 +1,5 @@
 
 import { useEffect } from 'react';
-import { CardComMessage } from '@/components/payment/types/payment';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
@@ -28,7 +27,6 @@ export const useFrameMessages = ({
         console.log('Received message from iframe:', message);
 
         if (!message || typeof message !== 'object') {
-          console.log('Invalid message format:', message);
           return;
         }
 
@@ -58,7 +56,7 @@ export const useFrameMessages = ({
             }
             break;
 
-          case 'HandleEror': // This is the correct spelling from the CardCom example
+          case 'HandleEror': // This is the correct spelling from CardCom
             console.error('Payment error:', message);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
             toast.error(message.message || 'שגיאה בביצוע התשלום');

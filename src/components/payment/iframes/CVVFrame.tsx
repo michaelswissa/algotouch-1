@@ -24,7 +24,6 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
         onLoad={onLoad}
         title="קוד אבטחה"
         key={`cvv-${frameLoadAttempts}-${terminalNumber}`}
-        style={{ border: '1px solid #ccc', borderRadius: '4px' }}
       />
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -47,14 +46,11 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Parse request payload and validate required fields
     const { 
       planId, 
       amount, 
       currency = "ILS", 
       invoiceInfo, 
-      operation = "ChargeAndCreateToken",
-      redirectUrls,
       userId,
       registrationData
     } = await req.json();
@@ -67,41 +63,27 @@ serve(async (req) => {
       hasRegistrationData: !!registrationData
     });
 
-    // Validate required parameters
     if (!planId || !amount) {
       return new Response(
         JSON.stringify({
           success: false,
           message: "Missing required parameters: planId or amount",
         }), {
-          status: 200, // Return 200 even for validation errors
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
-    
-    // Get user information - either from auth token, userId passed, or registration data
-    let finalUserId = userId;
-    let userEmail = null;
-    let fullName = '';
 
-    // If no userId was passed but we have registration data, try to match with existing user
-    if (!finalUserId && registrationData?.email) {
-      userEmail = registrationData.email;
-      const userData = registrationData.userData || {};
-      fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
-    }
-
-    // For invoice and reference, use either provided info or defaults    
-    userEmail = invoiceInfo?.email || registrationData?.email || "anonymous@example.com";
-    fullName = invoiceInfo?.fullName || 
-              (registrationData?.userData ? 
-                `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
-                "Anonymous User");
+    // Get user information and prepare transaction reference
+    let userEmail = invoiceInfo?.email || registrationData?.email || "anonymous@example.com";
+    let fullName = invoiceInfo?.fullName || 
+                  (registrationData?.userData ? 
+                    `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
+                    "Anonymous User");
     
-    // Generate unique transaction reference with validation
-    const transactionRef = finalUserId 
-      ? `${finalUserId}-${Date.now()}`
+    const transactionRef = userId 
+      ? `${userId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
     // Prepare webhook URL with full domain
@@ -109,68 +91,45 @@ serve(async (req) => {
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
-      operation,
       transactionRef
     });
-    
-    // Create CardCom API request body with validation
-    const cardcomPayload = new URLSearchParams({
+
+    // Create CardCom API request body for OpenFields integration
+    const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: operation,
-      ReturnValue: transactionRef,
       Amount: amount.toString(),
-      CoinID: currency === "ILS" ? "1" : "2",
-      Language: "he",
+      Currency: currency === "ILS" ? "1" : "2",
+      TransactionId: transactionRef,
       WebHookUrl: webhookUrl,
-      SuccessRedirectUrl: redirectUrls?.success || `${req.headers.get('origin')}/subscription/success`,
-      FailedRedirectUrl: redirectUrls?.failed || `${req.headers.get('origin')}/subscription/failed`,
-      ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-      APILevel: "10",
-      "InvoiceHead.CustName": fullName || userEmail || '',
-      "InvoiceHead.Email": invoiceInfo?.email || userEmail || '',
-      "InvoiceHead.Language": "he",
-      "InvoiceHead.SendByEmail": "true",
-      "InvoiceHead.CoinID": currency === "ILS" ? "1" : "2",
-      "InvoiceLines1.Description": `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-      "InvoiceLines1.Price": amount.toString(),
-      "InvoiceLines1.Quantity": "1",
-      // Enable 3DS for better security
-      "AdvancedDefinition.ThreeDSecureState": "Enabled"
-    }).toString();
+      Language: "he",
+      Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+      CustomerName: fullName,
+      CustomerEmail: userEmail,
+      EnableOpenFields: true,
+      ThreeDSecureState: "Enabled"
+    };
     
     logStep("Sending request to CardCom");
     
-    // Initialize payment session with CardCom
-    const response = await fetch("https://secure.cardcom.solutions/Interface/LowProfile.aspx", {
+    // Initialize payment session with CardCom OpenFields API
+    const response = await fetch("https://secure.cardcom.solutions/api/v11/Transactions/Transaction", {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       },
-      body: cardcomPayload,
+      body: JSON.stringify(cardcomPayload),
     });
     
-    // Handle CardCom API errors gracefully
-    const responseText = await response.text();
-    const responseParams = new URLSearchParams(responseText);
+    const responseData = await response.json();
     
-    const lowProfileCode = responseParams.get("LowProfileCode");
-    const responseCode = responseParams.get("ResponseCode");
-    const errorDescription = responseParams.get("Description");
-    const url = responseParams.get("url");
+    logStep("CardCom response", responseData);
     
-    logStep("CardCom response", { 
-      responseCode,
-      lowProfileCode: lowProfileCode || '',
-      hasUrl: !!url,
-      description: errorDescription || ''
-    });
-    
-    if (responseCode !== "0" || !lowProfileCode) {
+    if (responseData.ResponseCode !== 0) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: errorDescription || "CardCom initialization failed",
+          message: responseData.Description || "CardCom initialization failed",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -180,56 +139,46 @@ serve(async (req) => {
     
     // Store payment session in database 
     const sessionData = {
-      user_id: finalUserId,
-      low_profile_code: lowProfileCode,
+      user_id: userId,
+      low_profile_code: responseData.LowProfileId,
       reference: transactionRef,
       plan_id: planId,
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
-      anonymous_data: !finalUserId ? { email: userEmail, fullName } : null,
-      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber // Store terminal number for reference
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      anonymous_data: !userId ? { email: userEmail, fullName } : null,
+      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
     
-    let dbSessionId = "temp-" + Date.now(); // Default temporary ID
+    let dbSessionId = "temp-" + Date.now();
     
-    // Store the session in database if possible
     try {
-      if (finalUserId) {
-        // For authenticated users, store in payment_sessions
+      if (userId) {
         const { data: dbSession, error: sessionError } = await supabaseAdmin
           .from('payment_sessions')
           .insert(sessionData)
           .select('id')
           .single();
             
-        if (sessionError) {
-          logStep("Database error (non-fatal)", { error: sessionError.message });
-          // Don't fail - we can still proceed with payment even if DB write fails
-        } else if (dbSession) {
+        if (!sessionError && dbSession) {
           dbSessionId = dbSession.id;
           logStep("Payment session stored in DB", { sessionId: dbSessionId });
         }
-      } else {
-        logStep("Created anonymous payment session", { lowProfileCode });
       }
     } catch (dbError) {
       logStep("Error storing payment session", { error: dbError.message });
-      // Continue even if storage fails
     }
     
-    // Return success response with CardCom data
     return new Response(
       JSON.stringify({
         success: true,
         message: "Payment session created",
         data: {
-          lowProfileCode: lowProfileCode,
-          terminalNumber: CARDCOM_CONFIG.terminalNumber,
           sessionId: dbSessionId,
-          cardcomUrl: "https://secure.cardcom.solutions",
-          url: url
+          lowProfileCode: responseData.LowProfileId,
+          terminalNumber: CARDCOM_CONFIG.terminalNumber,
+          cardcomUrl: "https://secure.cardcom.solutions"
         }
       }),
       {
@@ -241,7 +190,6 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
     
-    // Return error response with 200 status code
     return new Response(
       JSON.stringify({
         success: false,

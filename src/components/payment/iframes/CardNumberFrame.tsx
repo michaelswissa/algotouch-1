@@ -24,7 +24,6 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
         onLoad={onLoad}
         title="מספר כרטיס"
         key={`cardnumber-${frameLoadAttempts}-${terminalNumber}`}
-        style={{ border: '1px solid #ccc', borderRadius: '4px' }}
       />
     </div>
   );
