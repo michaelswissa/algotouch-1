@@ -2,11 +2,7 @@
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
-  const initializeCardcomFields = (
-    masterFrameRef: React.RefObject<HTMLIFrameElement>, 
-    lowProfileCode: string, 
-    sessionId: string
-  ) => {
+  const initializeCardcomFields = (masterFrameRef: React.RefObject<HTMLIFrameElement>, lowProfileCode: string, sessionId: string) => {
     if (!masterFrameRef.current) {
       console.error("Master frame reference is not available");
       return false;
@@ -18,13 +14,14 @@ export const useCardcomInitializer = () => {
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
-    // Load 3DS script dynamically with cache-busting
+    // Load 3DS script dynamically
     const script = document.createElement('script');
     const time = new Date().getTime();
     script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
     document.head.appendChild(script);
 
     const checkFrameAndInitialize = () => {
+      // Fix TypeScript error by properly checking for iframe and contentWindow
       const iframe = masterFrameRef.current;
       if (!iframe || !iframe.contentWindow) {
         console.warn('Master frame or contentWindow not ready, retrying in 100ms');
@@ -74,7 +71,7 @@ export const useCardcomInitializer = () => {
           placeholder: "1111-2222-3333-4444",
           cvvPlaceholder: "123",
           language: 'he',
-          terminalNumber: "160138"
+          terminalNumber: "160138" // Add terminal number for proper initialization
         };
 
         console.log('Sending initialization config to CardCom iframe');
@@ -86,17 +83,17 @@ export const useCardcomInitializer = () => {
       }
     };
 
-    // Initial check with a delay to ensure iframe is loaded
-    setTimeout(checkFrameAndInitialize, 1000);
+    // Initial check with a slight delay to ensure iframe is loaded
+    setTimeout(checkFrameAndInitialize, 300);
     
-    // Secondary check after 2 seconds as a fallback
+    // Secondary check in case the first one fails
     setTimeout(() => {
       const frame = document.getElementById('CardComMasterFrame');
       if (frame instanceof HTMLIFrameElement && !frame.contentWindow) {
         console.log('Attempting secondary CardCom initialization');
         checkFrameAndInitialize();
       }
-    }, 2000);
+    }, 1000);
     
     return true;
   };

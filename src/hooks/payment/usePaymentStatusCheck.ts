@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -83,7 +84,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         body: { 
           lowProfileCode, 
           sessionId,
-          terminalNumber: "160138" // Add terminal number for proper lookup
+          terminalNumber: "160138"
         }
       });
 

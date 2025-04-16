@@ -82,15 +82,6 @@ export const useFrameMessages = ({
             }
             break;
 
-          case '3DSProcessStarted':
-            console.log('3DS Process Started');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-            break;
-            
-          case '3DSProcessCompleted':
-            console.log('3DS Process Completed');
-            break;
-
           default:
             console.log('Unhandled message action:', message.action);
             break;
