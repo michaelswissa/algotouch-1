@@ -35,6 +35,7 @@ export const useFrameMessages = ({
         // Handle initialization success message
         if (message.action === 'initialized') {
           console.log('CardCom fields initialized successfully');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
           return;
         }
 

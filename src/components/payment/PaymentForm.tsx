@@ -61,7 +61,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           id="CardComMasterFrame"
           name="CardComMasterFrame"
           src={`${cardcomUrl}/api/openfields/master`}
-          style={{ display: 'block', width: '0px', height: '0px' }}
+          style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
           title="CardCom Master Frame"
         />
         

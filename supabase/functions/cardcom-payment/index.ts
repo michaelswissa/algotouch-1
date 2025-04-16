@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -5,6 +6,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// CardCom Configuration
+const CARDCOM_CONFIG = {
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  companyId: "517043808",
+  endpoints: {
+    master: "https://secure.cardcom.solutions/api/openfields/master",
+    cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
+    cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
+    threeDSecure: "https://secure.cardcom.solutions/External/OpenFields/3DS.js"
+  }
 };
 
 // Helper logging function for enhanced debugging
@@ -97,27 +112,11 @@ serve(async (req) => {
       operation,
       transactionRef
     });
-
-    // Validate CardCom credentials
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
-    const apiName = Deno.env.get("CARDCOM_API_NAME");
     
-    if (!terminalNumber || !apiName) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "CardCom configuration is missing",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     // Create CardCom API request body with validation
     const cardcomPayload = new URLSearchParams({
-      TerminalNumber: terminalNumber,
-      ApiName: apiName,
+      TerminalNumber: CARDCOM_CONFIG.terminalNumber,
+      ApiName: CARDCOM_CONFIG.apiName,
       Operation: operation,
       ReturnValue: transactionRef,
       Amount: amount.toString(),
@@ -142,7 +141,7 @@ serve(async (req) => {
     
     logStep("Sending request to CardCom");
     
-    // Initialize payment session with CardCom - using the correct URL from your config file
+    // Initialize payment session with CardCom
     const response = await fetch("https://secure.cardcom.solutions/Interface/LowProfile.aspx", {
       method: "POST",
       headers: {
@@ -189,7 +188,8 @@ serve(async (req) => {
       currency: currency,
       status: 'initiated',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
-      anonymous_data: !finalUserId ? { email: userEmail, fullName } : null
+      anonymous_data: !finalUserId ? { email: userEmail, fullName } : null,
+      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber // Store terminal number for reference
     };
     
     let dbSessionId = "temp-" + Date.now(); // Default temporary ID
@@ -226,7 +226,7 @@ serve(async (req) => {
         message: "Payment session created",
         data: {
           lowProfileCode: lowProfileCode,
-          terminalNumber: terminalNumber,
+          terminalNumber: CARDCOM_CONFIG.terminalNumber,
           sessionId: dbSessionId,
           cardcomUrl: "https://secure.cardcom.solutions",
           url: url

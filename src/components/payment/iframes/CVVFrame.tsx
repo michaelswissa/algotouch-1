@@ -23,7 +23,8 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
         className="w-full h-[40px] border border-input rounded-md"
         onLoad={onLoad}
         title="קוד אבטחה"
-        key={`cvv-${frameLoadAttempts}`}
+        key={`cvv-${frameLoadAttempts}-${terminalNumber}`}
+        style={{ border: '1px solid #ccc', borderRadius: '4px' }}
       />
     </div>
   );

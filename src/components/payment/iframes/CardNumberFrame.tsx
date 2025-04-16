@@ -23,7 +23,8 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
         className="w-full h-[40px] border border-input rounded-md"
         onLoad={onLoad}
         title="מספר כרטיס"
-        key={`cardnumber-${frameLoadAttempts}`}
+        key={`cardnumber-${frameLoadAttempts}-${terminalNumber}`}
+        style={{ border: '1px solid #ccc', borderRadius: '4px' }}
       />
     </div>
   );

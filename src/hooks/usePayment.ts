@@ -41,7 +41,16 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     sessionId: state.sessionId
   });
 
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      cleanupStatusCheck();
+    };
+  }, [cleanupStatusCheck]);
+
   const handleRetry = () => {
+    console.log('Retrying payment initialization');
+    
     setState(prev => ({
       ...prev,
       paymentStatus: PaymentStatus.IDLE,
@@ -52,6 +61,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     setTimeout(() => {
       initializePayment().then(data => {
         if (data) {
+          console.log('Payment reinitialized successfully, starting status check');
           startStatusCheck(data.lowProfileCode, data.sessionId);
         }
       });
@@ -59,6 +69,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   };
 
   const submitPayment = () => {
+    console.log('Submitting payment transaction');
+    
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
       // Format follows the example from the CardCom example files
@@ -69,6 +81,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
     } else {
       console.error("Master frame not available for transaction");
+      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
     }
   };
 
@@ -76,8 +89,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     ...state,
     masterFrameRef,
     initializePayment: () => {
+      console.log('Initializing payment with plan:', planId);
+      
       initializePayment().then(data => {
         if (data) {
+          console.log('Payment initialized successfully, starting status check');
           startStatusCheck(data.lowProfileCode, data.sessionId);
         }
       });

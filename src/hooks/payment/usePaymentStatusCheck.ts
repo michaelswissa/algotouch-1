@@ -18,7 +18,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkInterval: number;
   }>({
     attempts: 0,
-    maxAttempts: 30, // 5 minutes total with 10-second intervals
+    maxAttempts: 60, // 10 minutes total with 10-second intervals
     checkInterval: 10000 // 10 seconds
   });
 
@@ -73,7 +73,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       lpCode: lowProfileCode,
       sessionId,
       attempts: 0,
-      maxAttempts: 30,
+      maxAttempts: 60,
       checkInterval: 10000
     });
   };
@@ -84,16 +84,17 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     try {
       // Call the cardcom-status Edge Function
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
-        body: { lowProfileCode, sessionId }
+        body: { 
+          lowProfileCode, 
+          sessionId,
+          terminalNumber: "160138" // Add terminal number for proper lookup
+        }
       });
 
       console.log('Payment status check response:', data);
 
       if (error) {
         console.error('Error checking payment status:', error);
-        
-        // For now, we continue checking even if there's an error
-        // The server returns 200 status even for errors now
         return;
       }
 

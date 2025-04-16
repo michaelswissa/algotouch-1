@@ -49,14 +49,15 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     if (terminalNumber) {
       setCardNumberFrameLoaded(false);
       setCvvFrameLoaded(false);
-      setFrameLoadAttempts(0);
+      setFrameLoadAttempts(prev => prev + 1);
+      console.log(`Frames reset for terminal ${terminalNumber}`);
     }
   }, [terminalNumber]);
 
   // Retry loading frames if they fail
   useEffect(() => {
     if (!cardNumberFrameLoaded || !cvvFrameLoaded) {
-      const maxAttempts = 3;
+      const maxAttempts = 5; // Increase max attempts
       if (frameLoadAttempts < maxAttempts && terminalNumber) {
         const timer = setTimeout(() => {
           console.log(`Retrying frame load, attempt ${frameLoadAttempts + 1}`);
@@ -78,6 +79,8 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         expirationYear: expiryYear
       };
       
+      console.log('Updating card owner details:', data);
+      
       masterFrameRef.current.contentWindow.postMessage({ 
         action: 'setCardOwnerDetails', 
         data 
@@ -89,6 +92,16 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const validateFields = () => {
     validateCardNumber();
     validateCvv();
+  };
+
+  const handleCardNumberFrameLoaded = () => {
+    console.log('Card number frame loaded');
+    setCardNumberFrameLoaded(true);
+  };
+
+  const handleCvvFrameLoaded = () => {
+    console.log('CVV frame loaded');
+    setCvvFrameLoaded(true);
   };
 
   return (
@@ -140,7 +153,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <CardNumberFrame
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => setCardNumberFrameLoaded(true)}
+            onLoad={handleCardNumberFrameLoaded}
             frameLoadAttempts={frameLoadAttempts}
           />
           {cardNumberError && (
@@ -173,7 +186,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <CVVFrame
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => setCvvFrameLoaded(true)}
+            onLoad={handleCvvFrameLoaded}
             frameLoadAttempts={frameLoadAttempts}
           />
           {cvvError && (
