@@ -27,7 +27,22 @@ export const useFrameMessages = ({
         const message = event.data;
         console.log('Received message from iframe:', message);
 
-        if (!message || typeof message !== 'object' || !message.action) {
+        if (!message || typeof message !== 'object') {
+          console.log('Invalid message format:', message);
+          return;
+        }
+
+        // Handle initialization success message
+        if (message.action === 'initialized') {
+          console.log('CardCom fields initialized successfully');
+          return;
+        }
+
+        // Handle initialization error
+        if (message.action === 'initializationError') {
+          console.error('CardCom initialization error:', message);
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          toast.error('שגיאה באתחול טופס התשלום');
           return;
         }
 
@@ -75,7 +90,10 @@ export const useFrameMessages = ({
             
           case '3DSProcessCompleted':
             console.log('3DS Process Completed');
-            // Wait for final HandleSubmit message
+            break;
+
+          default:
+            console.log('Unhandled message action:', message.action);
             break;
         }
       } catch (error) {

@@ -21,8 +21,10 @@ export const useCardcomInitializer = () => {
     document.head.appendChild(script);
 
     const checkFrameAndInitialize = () => {
-      if (!masterFrameRef.current?.contentWindow) {
-        console.warn('Master frame contentWindow not ready, retrying in 100ms');
+      // Fix TypeScript error by properly checking for iframe and contentWindow
+      const iframe = masterFrameRef.current;
+      if (!iframe || !iframe.contentWindow) {
+        console.warn('Master frame or contentWindow not ready, retrying in 100ms');
         setTimeout(checkFrameAndInitialize, 100);
         return;
       }
@@ -64,14 +66,6 @@ export const useCardcomInitializer = () => {
             }
             .cvvField.invalid {
               border: 1px solid #c01111;
-            }
-            input::-webkit-outer-spin-button,
-            input::-webkit-inner-spin-button {
-              -webkit-appearance: none;
-              margin: 0;
-            }
-            input[type=number] {
-              -moz-appearance: textfield;
             }`,
           reCaptchaFieldCSS: `body { margin: 0; padding:0; display: flex; }`,
           placeholder: "1111-2222-3333-4444",
@@ -80,7 +74,7 @@ export const useCardcomInitializer = () => {
         };
 
         console.log('Sending initialization config to CardCom iframe');
-        masterFrameRef.current.contentWindow.postMessage(config, '*');
+        iframe.contentWindow.postMessage(config, '*');
         return true;
       } catch (error) {
         console.error('Error initializing CardCom fields:', error);
@@ -88,11 +82,13 @@ export const useCardcomInitializer = () => {
       }
     };
 
+    // Initial check with a slight delay to ensure iframe is loaded
     setTimeout(checkFrameAndInitialize, 300);
     
+    // Secondary check in case the first one fails
     setTimeout(() => {
-      if (document.getElementById('CardComMasterFrame') && 
-          !document.getElementById('CardComMasterFrame')?.contentWindow) {
+      const frame = document.getElementById('CardComMasterFrame');
+      if (frame instanceof HTMLIFrameElement && !frame.contentWindow) {
         console.log('Attempting secondary CardCom initialization');
         checkFrameAndInitialize();
       }
