@@ -1,10 +1,11 @@
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
+import { toast } from 'sonner';
 
 interface UsePaymentProps {
   planId: string;
@@ -48,7 +49,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     };
   }, [cleanupStatusCheck]);
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     console.log('Retrying payment initialization');
     
     setState(prev => ({
@@ -58,32 +59,62 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       lowProfileCode: ''
     }));
     
+    // Reset the payment process
+    cleanupStatusCheck();
+    
+    // Reinitialize with a slight delay
     setTimeout(() => {
       initializePayment().then(data => {
         if (data) {
           console.log('Payment reinitialized successfully, starting status check');
           startStatusCheck(data.lowProfileCode, data.sessionId);
+        } else {
+          // Handle initialization failure
+          handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
         }
+      }).catch(err => {
+        console.error('Failed to reinitialize payment:', err);
+        handleError('אירעה שגיאה באתחול התשלום');
       });
     }, 500);
-  };
+  }, [initializePayment, setState, startStatusCheck, cleanupStatusCheck, handleError]);
 
-  const submitPayment = () => {
+  const handleCancel = useCallback(() => {
+    console.log('User cancelled payment process');
+    
+    // Clean up any ongoing status checks
+    cleanupStatusCheck();
+    
+    // Set state back to idle
+    setState(prev => ({
+      ...prev,
+      paymentStatus: PaymentStatus.IDLE
+    }));
+    
+    toast.info('תהליך התשלום בוטל');
+  }, [setState, cleanupStatusCheck]);
+
+  const submitPayment = useCallback(() => {
     console.log('Submitting payment transaction');
     
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
-      // Format follows the example from the CardCom example files
-      masterFrameRef.current.contentWindow.postMessage(
-        { action: 'doTransaction' },
-        '*'
-      );
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+      try {
+        // Format follows the example from the CardCom example files
+        masterFrameRef.current.contentWindow.postMessage(
+          { action: 'doTransaction' },
+          '*'
+        );
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+      } catch (error) {
+        console.error("Error submitting payment:", error);
+        handleError("שגיאה בשליחת פרטי התשלום");
+      }
     } else {
       console.error("Master frame not available for transaction");
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
     }
-  };
+  }, [masterFrameRef, setState, handleError]);
 
   return {
     ...state,
@@ -95,10 +126,17 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         if (data) {
           console.log('Payment initialized successfully, starting status check');
           startStatusCheck(data.lowProfileCode, data.sessionId);
+        } else {
+          // Handle initialization failure
+          handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
         }
+      }).catch(err => {
+        console.error('Failed to initialize payment:', err);
+        handleError('אירעה שגיאה באתחול התשלום');
       });
     },
     handleRetry,
+    handleCancel,
     submitPayment
   };
 };

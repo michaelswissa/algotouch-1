@@ -17,6 +17,7 @@ interface PaymentContentProps {
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   onNavigateToDashboard: () => void;
   onRetry: () => void;
+  onCancel?: () => void;
 }
 
 const PaymentContent: React.FC<PaymentContentProps> = ({
@@ -26,13 +27,14 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   cardcomUrl,
   masterFrameRef,
   onNavigateToDashboard,
-  onRetry
+  onRetry,
+  onCancel
 }) => {
   switch (paymentStatus) {
     case PaymentStatus.INITIALIZING:
       return <InitializingPayment />;
     case PaymentStatus.PROCESSING:
-      return <ProcessingPayment />;
+      return <ProcessingPayment onCancel={onCancel} />;
     case PaymentStatus.SUCCESS:
       return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
     case PaymentStatus.FAILED:

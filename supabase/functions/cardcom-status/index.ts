@@ -30,14 +30,15 @@ serve(async (req) => {
     );
     
     // Parse request payload
-    let lowProfileCode, sessionId;
+    let lowProfileCode, sessionId, terminalNumber;
     
     try {
       const payload = await req.json();
       lowProfileCode = payload.lowProfileCode;
       sessionId = payload.sessionId;
+      terminalNumber = payload.terminalNumber || Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
       
-      logStep("Request payload parsed", { lowProfileCode, sessionId });
+      logStep("Request payload parsed", { lowProfileCode, sessionId, terminalNumber });
     } catch (parseError) {
       logStep("Error parsing request body", { error: parseError.message });
       throw new Error("Invalid request format");
@@ -49,22 +50,25 @@ serve(async (req) => {
     
     logStep("Checking payment status", { lowProfileCode, sessionId });
     
-    // Add a short delay to allow CardCom to process the payment
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
     // Call CardCom API to get payment status
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
     const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
     
     logStep("Using CardCom credentials", { terminalNumber, apiNameLength: apiName?.length || 0 });
     
+    // Add a unique timestamp parameter to avoid caching issues
+    const timestamp = Date.now();
+    
     const cardcomPayload = new URLSearchParams({
       terminalnumber: terminalNumber,
       username: apiName,
-      lowprofilecode: lowProfileCode
+      lowprofilecode: lowProfileCode,
+      timestamp: timestamp.toString() // Add timestamp to prevent caching
     }).toString();
     
-    logStep("Sending request to CardCom API", { url: "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx" });
+    logStep("Sending request to CardCom API", { 
+      url: "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx",
+      timestamp 
+    });
     
     const cardcomResponse = await fetch(
       "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx", 
@@ -72,6 +76,7 @@ serve(async (req) => {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
+          "Cache-Control": "no-cache, no-store, must-revalidate"
         },
         body: cardcomPayload,
       }
@@ -97,17 +102,22 @@ serve(async (req) => {
     const transactionId = responseParams.get('InternalDealNumber');
     const returnValue = responseParams.get('ReturnValue');
     const description = responseParams.get('Description');
+    const operation = responseParams.get('Operation');
     
     logStep("CardCom status response", { 
       operationResponse, 
       dealResponse,
       transactionId,
       returnValue,
-      description
+      description,
+      operation
     });
     
-    // Return early if transaction is not complete
-    if (!operationResponse) {
+    // Check if we need to wait for further processing (e.g., 3DS)
+    const is3DSProcess = operation === '5' || responseParams.get('ThreeDSResult') === 'Processing';
+    
+    // Return early if transaction is still processing
+    if (!operationResponse || is3DSProcess) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -116,6 +126,8 @@ serve(async (req) => {
             operationResponse,
             dealResponse,
             description,
+            is3DSProcess,
+            operation,
             cardcomResponse: {
               status: cardcomResponse.status,
               ok: cardcomResponse.ok
@@ -158,12 +170,16 @@ serve(async (req) => {
       }
     }
     
-    // Return payment status information
+    // Return payment status information with clear message for the user
+    const userFriendlyMessage = isSuccessful 
+      ? 'התשלום בוצע בהצלחה!'
+      : description || 'אירעה שגיאה בביצוע התשלום';
+    
     return new Response(
       JSON.stringify({
         success: isSuccessful,
         failed: !isSuccessful,
-        message: description || '',
+        message: userFriendlyMessage,
         data: {
           operationResponse,
           dealResponse,

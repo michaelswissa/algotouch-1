@@ -29,6 +29,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     masterFrameRef,
     initializePayment,
     handleRetry,
+    handleCancel,
     submitPayment
   } = usePayment({
     planId,
@@ -73,6 +74,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           masterFrameRef={masterFrameRef}
           onNavigateToDashboard={() => window.location.href = '/dashboard'}
           onRetry={handleRetry}
+          onCancel={handleCancel}
         />
       </CardContent>
 
