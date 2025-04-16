@@ -61,7 +61,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           id="CardComMasterFrame"
           name="CardComMasterFrame"
           src={`${cardcomUrl}/api/openfields/master`}
-          style={{ display: 'none' }}
+          style={{ display: 'block', width: '0px', height: '0px' }}
           title="CardCom Master Frame"
         />
         
@@ -69,7 +69,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           paymentStatus={paymentStatus}
           plan={plan}
           terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl || 'https://secure.cardcom.solutions'}
+          cardcomUrl={cardcomUrl}
           masterFrameRef={masterFrameRef}
           onNavigateToDashboard={() => window.location.href = '/dashboard'}
           onRetry={handleRetry}

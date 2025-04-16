@@ -24,9 +24,6 @@ export const useFrameMessages = ({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        // Validate the source of the message for security
-        // Note: In production, you should validate the origin
-        
         const message = event.data;
         console.log('Received message from iframe:', message);
 
@@ -38,29 +35,36 @@ export const useFrameMessages = ({
           case 'HandleSubmit':
             console.log('HandleSubmit message:', message);
             if (message.data?.IsSuccess) {
-              // Payment was successful
               handlePaymentSuccess();
             } else {
-              // Payment failed
               setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
               toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
             }
             break;
 
-          case 'HandleEror': // Note: This is the correct spelling from the example
+          case 'HandleEror': // This is the correct spelling from the CardCom example
             console.error('Payment error:', message);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
             toast.error(message.message || 'שגיאה בביצוע התשלום');
             break;
 
           case 'handleValidations':
-            // Handle field validations as shown in the example
             if (message.field === 'cardNumber') {
-              console.log('Card number validation:', message.isValid);
+              const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+              if (iframe?.contentWindow) {
+                iframe.contentWindow.postMessage({
+                  action: message.isValid ? 'removeCardNumberFieldClass' : 'addCardNumberFieldClass',
+                  className: 'invalid'
+                }, '*');
+              }
             } else if (message.field === 'cvv') {
-              console.log('CVV validation:', message.isValid);
-            } else if (message.field === 'reCaptcha') {
-              console.log('reCaptcha validation:', message.isValid);
+              const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
+              if (iframe?.contentWindow) {
+                iframe.contentWindow.postMessage({
+                  action: message.isValid ? 'removeCvvFieldClass' : 'addCvvFieldClass',
+                  className: 'invalid'
+                }, '*');
+              }
             }
             break;
 
@@ -71,11 +75,8 @@ export const useFrameMessages = ({
             
           case '3DSProcessCompleted':
             console.log('3DS Process Completed');
-            // Wait for final HandleSubmit message for success/failure
+            // Wait for final HandleSubmit message
             break;
-
-          default:
-            console.log('Unknown message action:', message.action);
         }
       } catch (error) {
         console.error('Error processing iframe message:', error);
