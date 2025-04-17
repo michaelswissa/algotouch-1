@@ -7,6 +7,7 @@ import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
+import AdminSetupButton from '@/components/auth/AdminSetupButton';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -15,7 +16,6 @@ const Auth = () => {
   const navigate = useNavigate();
   const state = location.state as { from?: Location, redirectToSubscription?: boolean };
 
-  // Get initial tab from URL if present
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
@@ -24,14 +24,12 @@ const Auth = () => {
     }
   }, [location]);
 
-  // Check if the state specifies to show the signup tab
   useEffect(() => {
     if (state?.redirectToSubscription) {
       setActiveTab('signup');
     }
   }, [state]);
 
-  // Check if there's valid registration data in session storage
   useEffect(() => {
     const checkSessionData = () => {
       const contractData = sessionStorage.getItem('contract_data');
@@ -39,7 +37,6 @@ const Auth = () => {
       
       if (contractData || registrationData) {
         try {
-          // If we have contract data, prioritize that
           if (contractData) {
             const data = JSON.parse(contractData);
             if (data.selectedPlan) {
@@ -49,7 +46,6 @@ const Auth = () => {
             }
           }
           
-          // Otherwise check registration data
           if (registrationData) {
             const data = JSON.parse(registrationData);
             const registrationTime = new Date(data.registrationTime);
@@ -77,7 +73,6 @@ const Auth = () => {
     checkSessionData();
   }, [navigate, location.state]);
 
-  // Show loading state while auth is initializing
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
@@ -86,7 +81,6 @@ const Auth = () => {
     );
   }
 
-  // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
     console.log("Auth page: User is authenticated, redirecting to appropriate page");
     if (state?.redirectToSubscription) {
@@ -114,6 +108,8 @@ const Auth = () => {
             <SignupForm />
           </TabsContent>
         </Tabs>
+        
+        {import.meta.env.DEV && <AdminSetupButton />}
       </div>
     </div>
   );

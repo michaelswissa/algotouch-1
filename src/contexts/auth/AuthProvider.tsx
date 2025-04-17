@@ -12,6 +12,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,6 +26,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Only synchronous state updates here to prevent loops
         setSession(newSession);
         setUser(newSession?.user ?? null);
+        
+        // Check if user is admin
+        if (newSession?.user) {
+          const isUserAdmin = newSession.user.user_metadata?.is_admin === true || 
+                            newSession.user.email === 'support@algotouch.co.il';
+          setIsAdmin(isUserAdmin);
+        } else {
+          setIsAdmin(false);
+        }
         
         // Handle sign in event - send welcome email if needed using setTimeout to prevent loop
         if (event === 'SIGNED_IN' && newSession?.user) {
@@ -72,6 +82,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setSession(existingSession);
         setUser(existingSession?.user ?? null);
+        
+        // Check admin status
+        if (existingSession?.user) {
+          const isUserAdmin = existingSession.user.user_metadata?.is_admin === true || 
+                            existingSession.user.email === 'support@algotouch.co.il';
+          setIsAdmin(isUserAdmin);
+        }
       } catch (error) {
         console.error('Error checking session:', error);
       } finally {
@@ -262,6 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     isAuthenticated: !!user,
     initialized,
+    isAdmin,
     signIn,
     signUp,
     signOut,

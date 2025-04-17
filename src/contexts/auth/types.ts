@@ -7,6 +7,7 @@ export interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   initialized: boolean;
+  isAdmin: boolean; // Added admin flag
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (userData: {
     email: string;
