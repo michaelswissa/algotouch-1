@@ -8,17 +8,15 @@ import { toast } from 'sonner';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAuth?: boolean;
-  requireAdmin?: boolean; // New prop for admin-only routes
   publicPaths?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
-  requireAdmin = false,
   publicPaths = ['/auth']
 }) => {
-  const { isAuthenticated, isAdmin, loading, initialized } = useAuth();
+  const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
   const [hasRegistrationData, setHasRegistrationData] = useState(false);
   const [hasValidFlow, setHasValidFlow] = useState(false);
@@ -72,12 +70,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <Spinner className="h-8 w-8" />
       </div>
     );
-  }
-
-  // Check for admin access if required
-  if (requireAdmin && !isAdmin) {
-    toast.error('אין לך הרשאה לצפות בדף זה');
-    return <Navigate to="/dashboard" state={{ from: location }} replace />;
   }
 
   // Special handling for subscription flow
