@@ -38,87 +38,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     }
   }, [statusCheckData.intervalId]);
 
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      clearStatusCheckInterval();
-    };
-  }, [clearStatusCheckInterval]);
-
-  const startStatusCheck = useCallback((lowProfileCode: string, sessionId: string) => {
-    // Clean up any existing interval
-    clearStatusCheckInterval();
-    
-    // Reset verification flag
-    paymentVerifiedRef.current = false;
-    
-    // Set start time for timeout tracking
-    startTimeRef.current = Date.now();
-
-    console.log('Starting payment status check for:', { lowProfileCode, sessionId });
-    
-    // Initial check immediately
-    checkPaymentStatus(lowProfileCode, sessionId);
-    
-    // Set up adaptive polling with increasingly longer intervals
-    let currentInterval = statusCheckData.checkInterval;
-    
-    const intervalId = setInterval(() => {
-      // Check if maximum processing time has been exceeded
-      if (startTimeRef.current && (Date.now() - startTimeRef.current > MAX_PROCESSING_TIME)) {
-        clearInterval(intervalId);
-        console.log('Payment processing timeout exceeded');
-        setState(prev => ({ 
-          ...prev, 
-          paymentStatus: PaymentStatus.FAILED 
-        }));
-        toast.error('חריגת זמן בתהליך התשלום, אנא נסה שנית');
-        return;
-      }
-      
-      // Don't check again if payment was already verified
-      if (paymentVerifiedRef.current) {
-        clearInterval(intervalId);
-        return;
-      }
-      
-      checkPaymentStatus(lowProfileCode, sessionId);
-      
-      setStatusCheckData(prev => {
-        const newAttempts = prev.attempts + 1;
-        
-        if (newAttempts >= prev.maxAttempts) {
-          clearInterval(intervalId);
-          console.log('Stopped payment status check after maximum attempts');
-          setState(prev => ({ 
-            ...prev, 
-            paymentStatus: PaymentStatus.FAILED 
-          }));
-          toast.error('זמן בדיקת התשלום הסתיים, אנא נסה שנית');
-          return { ...prev, intervalId: undefined };
-        }
-        
-        // Implement adaptive polling - increase interval after certain thresholds
-        if (newAttempts === 5) {
-          currentInterval = 15000; // After 5 attempts, check every 15 seconds
-        } else if (newAttempts === 10) {
-          currentInterval = 20000; // After 10 attempts, check every 20 seconds
-        }
-        
-        return { ...prev, attempts: newAttempts, lpCode: lowProfileCode, sessionId };
-      });
-    }, currentInterval);
-
-    setStatusCheckData({
-      intervalId,
-      lpCode: lowProfileCode,
-      sessionId,
-      attempts: 0,
-      maxAttempts: 30,
-      checkInterval: 10000
-    });
-  }, [clearStatusCheckInterval, checkPaymentStatus, setState, statusCheckData.checkInterval]);
-
+  // Define checkPaymentStatus function before it's used
   const checkPaymentStatus = useCallback(async (lowProfileCode: string, sessionId: string) => {
     // Don't check if payment was already verified
     if (paymentVerifiedRef.current) {
@@ -199,6 +119,87 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       // Continue checking despite errors - the interval will stop after max attempts
     }
   }, [clearStatusCheckInterval, setState]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      clearStatusCheckInterval();
+    };
+  }, [clearStatusCheckInterval]);
+
+  const startStatusCheck = useCallback((lowProfileCode: string, sessionId: string) => {
+    // Clean up any existing interval
+    clearStatusCheckInterval();
+    
+    // Reset verification flag
+    paymentVerifiedRef.current = false;
+    
+    // Set start time for timeout tracking
+    startTimeRef.current = Date.now();
+
+    console.log('Starting payment status check for:', { lowProfileCode, sessionId });
+    
+    // Initial check immediately
+    checkPaymentStatus(lowProfileCode, sessionId);
+    
+    // Set up adaptive polling with increasingly longer intervals
+    let currentInterval = statusCheckData.checkInterval;
+    
+    const intervalId = setInterval(() => {
+      // Check if maximum processing time has been exceeded
+      if (startTimeRef.current && (Date.now() - startTimeRef.current > MAX_PROCESSING_TIME)) {
+        clearInterval(intervalId);
+        console.log('Payment processing timeout exceeded');
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED 
+        }));
+        toast.error('חריגת זמן בתהליך התשלום, אנא נסה שנית');
+        return;
+      }
+      
+      // Don't check again if payment was already verified
+      if (paymentVerifiedRef.current) {
+        clearInterval(intervalId);
+        return;
+      }
+      
+      checkPaymentStatus(lowProfileCode, sessionId);
+      
+      setStatusCheckData(prev => {
+        const newAttempts = prev.attempts + 1;
+        
+        if (newAttempts >= prev.maxAttempts) {
+          clearInterval(intervalId);
+          console.log('Stopped payment status check after maximum attempts');
+          setState(prev => ({ 
+            ...prev, 
+            paymentStatus: PaymentStatus.FAILED 
+          }));
+          toast.error('זמן בדיקת התשלום הסתיים, אנא נסה שנית');
+          return { ...prev, intervalId: undefined };
+        }
+        
+        // Implement adaptive polling - increase interval after certain thresholds
+        if (newAttempts === 5) {
+          currentInterval = 15000; // After 5 attempts, check every 15 seconds
+        } else if (newAttempts === 10) {
+          currentInterval = 20000; // After 10 attempts, check every 20 seconds
+        }
+        
+        return { ...prev, attempts: newAttempts, lpCode: lowProfileCode, sessionId };
+      });
+    }, currentInterval);
+
+    setStatusCheckData({
+      intervalId,
+      lpCode: lowProfileCode,
+      sessionId,
+      attempts: 0,
+      maxAttempts: 30,
+      checkInterval: 10000
+    });
+  }, [clearStatusCheckInterval, checkPaymentStatus, setState, statusCheckData.checkInterval]);
 
   const cleanupStatusCheck = useCallback(() => {
     clearStatusCheckInterval();
