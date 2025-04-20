@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -28,22 +28,26 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   // Track time when status check started (for timeout calculation)
   const startTimeRef = useRef<number | null>(null);
   
-  // Maximum allowed time for processing in milliseconds (2 minutes)
-  const MAX_PROCESSING_TIME = 2 * 60 * 1000;
+  // Maximum allowed time for processing in milliseconds (3 minutes)
+  const MAX_PROCESSING_TIME = 3 * 60 * 1000;
 
-  useEffect(() => {
-    return () => {
-      if (statusCheckData.intervalId) {
-        clearInterval(statusCheckData.intervalId);
-      }
-    };
-  }, [statusCheckData.intervalId]);
-
-  const startStatusCheck = (lowProfileCode: string, sessionId: string) => {
-    // Clean up any existing interval
+  // Clear interval on unmount or when no longer needed
+  const clearStatusCheckInterval = useCallback(() => {
     if (statusCheckData.intervalId) {
       clearInterval(statusCheckData.intervalId);
     }
+  }, [statusCheckData.intervalId]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      clearStatusCheckInterval();
+    };
+  }, [clearStatusCheckInterval]);
+
+  const startStatusCheck = useCallback((lowProfileCode: string, sessionId: string) => {
+    // Clean up any existing interval
+    clearStatusCheckInterval();
     
     // Reset verification flag
     paymentVerifiedRef.current = false;
@@ -53,10 +57,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
 
     console.log('Starting payment status check for:', { lowProfileCode, sessionId });
     
-    // Initial check after a 5 second delay to allow fields initialization and initial transaction processing
-    setTimeout(() => {
-      checkPaymentStatus(lowProfileCode, sessionId);
-    }, 5000);
+    // Initial check immediately
+    checkPaymentStatus(lowProfileCode, sessionId);
     
     // Set up adaptive polling with increasingly longer intervals
     let currentInterval = statusCheckData.checkInterval;
@@ -103,7 +105,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           currentInterval = 20000; // After 10 attempts, check every 20 seconds
         }
         
-        return { ...prev, attempts: newAttempts };
+        return { ...prev, attempts: newAttempts, lpCode: lowProfileCode, sessionId };
       });
     }, currentInterval);
 
@@ -115,23 +117,25 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       maxAttempts: 30,
       checkInterval: 10000
     });
-  };
+  }, [clearStatusCheckInterval, checkPaymentStatus, setState, statusCheckData.checkInterval]);
 
-  const checkPaymentStatus = async (lowProfileCode: string, sessionId: string) => {
+  const checkPaymentStatus = useCallback(async (lowProfileCode: string, sessionId: string) => {
     // Don't check if payment was already verified
     if (paymentVerifiedRef.current) {
       return;
     }
     
-    console.log('Checking payment status:', { lowProfileCode, sessionId, attempt: statusCheckData.attempts + 1 });
+    console.log('Checking payment status:', { lowProfileCode, sessionId, timestamp: new Date().toISOString() });
     
     try {
-      // Call the cardcom-status Edge Function
+      // Call the cardcom-status Edge Function with cache-busting
+      const timestamp = Date.now();
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: { 
           lowProfileCode, 
           sessionId,
-          terminalNumber: "160138"
+          terminalNumber: "160138",
+          timestamp // Add timestamp to prevent caching issues
         }
       });
 
@@ -149,9 +153,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         paymentVerifiedRef.current = true;
         
         // Clean up the interval
-        if (statusCheckData.intervalId) {
-          clearInterval(statusCheckData.intervalId);
-        }
+        clearStatusCheckInterval();
         
         // Update state with success
         setState(prev => ({ 
@@ -181,9 +183,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         paymentVerifiedRef.current = true;
         
         // Clean up the interval
-        if (statusCheckData.intervalId) {
-          clearInterval(statusCheckData.intervalId);
-        }
+        clearStatusCheckInterval();
         
         // Update state with failure
         setState(prev => ({ 
@@ -198,24 +198,22 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       console.error('Exception in payment status check:', error);
       // Continue checking despite errors - the interval will stop after max attempts
     }
-  };
+  }, [clearStatusCheckInterval, setState]);
 
-  const cleanupStatusCheck = () => {
-    if (statusCheckData.intervalId) {
-      clearInterval(statusCheckData.intervalId);
-      setStatusCheckData(prev => ({ 
-        ...prev, 
-        intervalId: undefined,
-        attempts: 0
-      }));
-      
-      // Reset verification flag
-      paymentVerifiedRef.current = false;
-      
-      // Reset start time
-      startTimeRef.current = null;
-    }
-  };
+  const cleanupStatusCheck = useCallback(() => {
+    clearStatusCheckInterval();
+    setStatusCheckData(prev => ({ 
+      ...prev, 
+      intervalId: undefined,
+      attempts: 0
+    }));
+    
+    // Reset verification flag
+    paymentVerifiedRef.current = false;
+    
+    // Reset start time
+    startTimeRef.current = null;
+  }, [clearStatusCheckInterval]);
 
   return {
     startStatusCheck,

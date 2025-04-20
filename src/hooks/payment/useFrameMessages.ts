@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -56,6 +55,7 @@ export const useFrameMessages = ({
           case 'HandleSubmit':
             console.log('HandleSubmit message:', message);
             if (message.data?.IsSuccess) {
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
               handlePaymentSuccess();
             } else {
               setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
@@ -72,12 +72,14 @@ export const useFrameMessages = ({
           case '3DSProcessStarted':
             console.log('3DS Process Started');
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            // Start checking status immediately when 3DS starts
+            setTimeout(() => checkPaymentStatus(lowProfileCode, sessionId), 2000);
             break;
             
           case '3DSProcessCompleted':
             console.log('3DS Process Completed');
-            // Now we need to explicitly check the payment status as 3DS completion doesn't guarantee success
-            setTimeout(() => checkPaymentStatus(lowProfileCode, sessionId), 1000);
+            // Check status after 3DS completion
+            checkPaymentStatus(lowProfileCode, sessionId);
             break;
 
           case 'paymentStarted':
@@ -97,7 +99,14 @@ export const useFrameMessages = ({
             toast.error('פג תוקף העסקה, אנא נסה שנית');
             break;
 
+          case 'transactionProcessing':
+          case 'waitingForResponse':
+            console.log(`Transaction still processing: ${message.action}`);
+            // No state change, keep in processing state
+            break;
+
           case 'handleValidations':
+            // Handle field validations as before
             if (message.field === 'cardNumber') {
               const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
               if (iframe?.contentWindow) {

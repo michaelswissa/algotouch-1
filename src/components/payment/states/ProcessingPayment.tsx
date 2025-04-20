@@ -11,12 +11,12 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
   const [processingTime, setProcessingTime] = useState(0);
   const [showCancelOption, setShowCancelOption] = useState(false);
   
-  // Show cancel option after 10 seconds
+  // Show cancel option after 15 seconds (increased from 10)
   useEffect(() => {
     const timer = setInterval(() => {
       setProcessingTime(prev => prev + 1);
       
-      if (processingTime >= 10 && !showCancelOption) {
+      if (processingTime >= 15 && !showCancelOption) {
         setShowCancelOption(true);
       }
     }, 1000);
@@ -28,7 +28,8 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
     <div className="flex flex-col items-center justify-center py-8">
       <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
       <p>מעבד את התשלום, אנא המתן...</p>
-      <p className="text-sm text-muted-foreground mt-2">אל תסגור את החלון זה</p>
+      <p className="text-sm text-muted-foreground mt-2">העסקה מאומתת מול חברת האשראי, התהליך עשוי להימשך מספר רגעים</p>
+      <p className="text-xs text-muted-foreground mt-1">אל תסגור את החלון זה</p>
       
       {showCancelOption && onCancel && (
         <div className="mt-6">
@@ -40,8 +41,8 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
             <XCircle className="h-4 w-4" />
             ביטול העסקה
           </Button>
-          <p className="text-xs text-muted-foreground mt-1">
-            לתשומת לבך: ביטול כעת לא יבטיח שהעסקה לא תושלם
+          <p className="text-xs text-muted-foreground mt-1 max-w-[300px] text-center">
+            לתשומת לבך: הביטול לא מבטיח שהעסקה לא תושלם בצד חברת האשראי, אם העסקה נקלטה כבר
           </p>
         </div>
       )}

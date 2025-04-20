@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -100,12 +99,33 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
       try {
-        // Format follows the example from the CardCom example files
-        masterFrameRef.current.contentWindow.postMessage(
-          { action: 'doTransaction' },
-          '*'
-        );
+        // Get cardholder details from form fields or state
+        const formData = {
+          action: 'doTransaction',
+          // Add required transaction parameters based on CardCom documentation
+          TerminalNumber: state.terminalNumber,
+          // Keep expirationMonth and expirationYear as they're set via postMessage separately
+          numberOfPayments: "1",
+          // Create a unique transaction ID based on timestamp to avoid duplicates
+          ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          // Important fields for 3DS flow
+          ISOCoinId: 1, // ILS
+          cardOwnerPhone: document.querySelector<HTMLInputElement>('#phone')?.value || '',
+          cardOwnerEmail: document.querySelector<HTMLInputElement>('#email')?.value || '',
+          cardOwnerName: document.querySelector<HTMLInputElement>('#cardholder-name')?.value || '',
+        };
+
+        console.log('Sending transaction data:', formData);
+        masterFrameRef.current.contentWindow.postMessage(formData, '*');
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+        
+        // Start monitoring the transaction status immediately
+        if (state.lowProfileCode && state.sessionId) {
+          console.log('Starting transaction status check');
+          startStatusCheck(state.lowProfileCode, state.sessionId);
+        } else {
+          console.error('Missing lowProfileCode or sessionId for status check');
+        }
       } catch (error) {
         console.error("Error submitting payment:", error);
         handleError("שגיאה בשליחת פרטי התשלום");
@@ -114,7 +134,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.error("Master frame not available for transaction");
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
     }
-  }, [masterFrameRef, setState, handleError]);
+  }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, state.terminalNumber, startStatusCheck]);
 
   return {
     ...state,
