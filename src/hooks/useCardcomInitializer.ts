@@ -13,56 +13,107 @@ export const useCardcomInitializer = () => {
       return false;
     }
 
-    try {
-      // פשוט ככל האפשר - טעינת הסקריפט וקונפיגורציה בסיסית
-      const script = document.createElement('script');
-      script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + new Date().getTime();
-      document.head.appendChild(script);
+    console.log('Initializing CardCom fields with:', { 
+      lowProfileCode, 
+      sessionId,
+      operationType,
+      hasMasterFrame: Boolean(masterFrameRef.current)
+    });
 
-      // הגדרות CSS בסיסיות
-      const cardFieldCSS = `
-        body { margin: 0; padding: 0; box-sizing: border-box; }
-        .cardNumberField {
-          border: 1px solid #ccc; border-radius: 4px; height: 40px; width: 100%;
-          padding: 0 10px; font-size: 16px; box-sizing: border-box;
-        }
-        .cardNumberField:focus { border-color: #3498db; outline: none; }
-        .cardNumberField.invalid { border-color: #e74c3c; }`;
+    // Load 3DS script dynamically
+    const script = document.createElement('script');
+    const time = new Date().getTime();
+    script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
+    document.head.appendChild(script);
 
-      const cvvFieldCSS = `
-        body { margin: 0; padding: 0; box-sizing: border-box; }
-        .cvvField {
-          border: 1px solid #ccc; border-radius: 3px; height: 39px;
-          margin: 0; padding: 0 10px; width: 100%;
-        }
-        .cvvField.invalid { border: 1px solid #c01111; }`;
+    const checkFrameAndInitialize = () => {
+      // Fix TypeScript error by properly checking for iframe and contentWindow
+      const iframe = masterFrameRef.current;
+      if (!iframe || !iframe.contentWindow) {
+        console.warn('Master frame or contentWindow not ready, retrying in 100ms');
+        setTimeout(checkFrameAndInitialize, 100);
+        return;
+      }
 
-      // הגדר את סוג הפעולה באופן מפורש
-      const operation = operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly';
-      
-      // יצירת קונפיגורציה פשוטה
-      const config: InitConfig = {
-        action: 'init',
-        lowProfileCode,
-        sessionId,
-        cardFieldCSS,
-        cvvFieldCSS,
-        language: 'he',
-        operationType,
-        operation,
-        placeholder: "1111-2222-3333-4444",
-        cvvPlaceholder: "123",
-        terminalNumber: "160138"
-      };
+      try {
+        // Adjust CSS based on operation type
+        const cardFieldCSS = `
+          body { margin: 0; padding: 0; box-sizing: border-box; }
+          .cardNumberField {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            height: 40px;
+            width: 100%;
+            padding: 0 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+          }
+          .cardNumberField:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+          }
+          .cardNumberField.invalid {
+            border-color: #e74c3c;
+            box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2);
+          }`;
 
-      // שליחת ההגדרות לאייפריים
-      masterFrameRef.current.contentWindow?.postMessage(config, '*');
-      
-      return true;
-    } catch (error) {
-      console.error('Error initializing CardCom fields:', error);
-      return false;
-    }
+        const cvvFieldCSS = `
+          body { margin: 0; padding: 0; box-sizing: border-box; }
+          .cvvField {
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            height: 39px;
+            margin: 0;
+            padding: 0 10px;
+            width: 100%;
+          }
+          .cvvField.invalid {
+            border: 1px solid #c01111;
+          }`;
+
+        // Create initialization config with improved options for token operation
+        const config: InitConfig = {
+          action: 'init',
+          lowProfileCode,
+          sessionId,
+          cardFieldCSS,
+          cvvFieldCSS,
+          language: 'he',
+          operationType, // Explicitly pass operation type to the iframe
+          operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly',
+          placeholder: "1111-2222-3333-4444",
+          cvvPlaceholder: "123"
+        };
+
+        console.log('Sending initialization config to CardCom iframe with operation:', operationType);
+        iframe.contentWindow.postMessage(config, '*');
+        
+        // Add event to verify the iframe received and processed the initialization
+        const checkInitStatus = setTimeout(() => {
+          iframe.contentWindow.postMessage({ action: 'checkInitStatus' }, '*');
+        }, 1000);
+        
+        return true;
+      } catch (error) {
+        console.error('Error initializing CardCom fields:', error);
+        return false;
+      }
+    };
+
+    // Initial check with a slight delay to ensure iframe is loaded
+    setTimeout(checkFrameAndInitialize, 300);
+    
+    // Secondary check in case the first one fails
+    setTimeout(() => {
+      const frame = document.getElementById('CardComMasterFrame');
+      if (frame instanceof HTMLIFrameElement && !frame.contentWindow) {
+        console.log('Attempting secondary CardCom initialization');
+        checkFrameAndInitialize();
+      }
+    }, 1000);
+    
+    return true;
   };
 
   return { initializeCardcomFields };

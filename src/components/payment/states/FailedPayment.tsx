@@ -1,42 +1,26 @@
 
 import React from 'react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AlertCircle } from 'lucide-react';
 
 interface FailedPaymentProps {
-  errorMessage?: string;
   onRetry: () => void;
 }
 
-const FailedPayment: React.FC<FailedPaymentProps> = ({ 
-  errorMessage = 'אירעה שגיאה בתהליך התשלום. אנא נסה שוב או צור קשר עם התמיכה.',
-  onRetry 
-}) => {
+const FailedPayment: React.FC<FailedPaymentProps> = ({ onRetry }) => {
   return (
-    <div className="text-center py-6 space-y-6">
-      <div className="flex flex-col items-center gap-4">
-        <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full">
-          <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
-        </div>
-        
-        <div>
-          <h3 className="text-xl font-semibold">התשלום נכשל</h3>
-          <p className="text-muted-foreground mt-1 max-w-xs mx-auto">
-            {errorMessage}
-          </p>
-        </div>
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full mb-4">
+        <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
       </div>
-      
-      <Button 
-        onClick={onRetry} 
-        className="w-full"
-      >
-        נסה שוב
-      </Button>
-      
-      <p className="text-xs text-muted-foreground">
-        אם אתה ממשיך להיתקל בבעיות, אנא צור קשר עם התמיכה.
+      <h3 className="text-xl font-semibold mb-2">התשלום נכשל</h3>
+      <p className="text-muted-foreground mb-4">
+        אירעה שגיאה בעיבוד התשלום. אנא נסה שנית או פנה לתמיכה.
       </p>
+      <Button variant="outline" onClick={onRetry} className="flex items-center gap-2">
+        <RefreshCw className="h-4 w-4" />
+        נסה שנית
+      </Button>
     </div>
   );
 };

@@ -3,10 +3,10 @@ import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { PaymentStatus, PaymentStatusType } from './types/payment';
-import { getSubscriptionPlans } from './utils/paymentHelpers';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
+import { PaymentStatus } from './types/payment';
+import { getSubscriptionPlans } from './utils/paymentHelpers';
 
 interface PaymentFormProps {
   planId: string;
@@ -14,11 +14,7 @@ interface PaymentFormProps {
   onBack?: () => void;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ 
-  planId, 
-  onPaymentComplete, 
-  onBack 
-}) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -30,7 +26,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     terminalNumber,
     cardcomUrl,
     paymentStatus,
-    lowProfileCode,
     masterFrameRef,
     operationType,
     initializePayment,
@@ -43,8 +38,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   });
 
   useEffect(() => {
+    console.log("Initializing payment for plan:", planId);
     initializePayment();
-  }, [initializePayment]);
+  }, []); // Run only once on mount
+  
+  // Determine button text based on operation type and status
+  const getButtonText = () => {
+    if (paymentStatus === PaymentStatus.PROCESSING) {
+      return operationType === 'token_only' 
+        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
+        : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
+    }
+    
+    return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
+  };
   
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -56,19 +63,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         <CardDescription>
           {paymentStatus === PaymentStatus.SUCCESS 
             ? 'התשלום בוצע בהצלחה!'
-            : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
+            : operationType === 'token_only'
+              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
+              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master frame for CardCom */}
+        {/* Master frame for CardCom - hidden but essential */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
-          name="CardComMasterFrame" 
-          src={`${cardcomUrl}/api/v11/LowProfile/Create`}
-          style={{ display: 'block', width: '100%', height: '500px', border: 'none' }}
-          title="CardCom Payment Frame"
+          name="CardComMasterFrame"
+          src={`${cardcomUrl}/api/openfields/master`}
+          style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
+          title="CardCom Master Frame"
         />
         
         <PaymentContent
@@ -81,29 +90,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           onRetry={handleRetry}
           onCancel={handleCancel}
           operationType={operationType}
-          lowProfileCode={lowProfileCode}
         />
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || 
-          paymentStatus === PaymentStatus.INITIALIZING || 
-          paymentStatus === PaymentStatus.FAILED) && (
+        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={submitPayment}
-              disabled={paymentStatus === PaymentStatus.PROCESSING}
+              disabled={paymentStatus !== PaymentStatus.IDLE}
             >
-              {paymentStatus === PaymentStatus.PROCESSING ? (
-                <span className="flex items-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                  מעבד תשלום...
-                </span>
-              ) : (
-                operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום'
-              )}
+              {getButtonText()}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               {operationType === 'token_only' 

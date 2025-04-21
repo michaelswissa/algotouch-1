@@ -1,22 +1,31 @@
 
 export const PaymentStatus = {
-  IDLE: 'idle',
-  INITIALIZING: 'initializing',
-  PROCESSING: 'processing',
-  SUCCESS: 'success',
-  FAILED: 'failed'
+  IDLE: 'idle' as const,
+  INITIALIZING: 'initializing' as const,
+  PROCESSING: 'processing' as const,
+  SUCCESS: 'success' as const,
+  FAILED: 'failed' as const
 } as const;
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
+export interface PaymentResponse {
+  success: boolean;
+  data: {
+    sessionId: string;
+    lowProfileCode: string;
+    terminalNumber: string;
+  };
+  message?: string;
+}
+
 export interface CardComMessage {
-  action: string;
+  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted';
   data?: any;
   message?: string;
   field?: string;
   isValid?: boolean;
   cardType?: string;
-  success?: boolean;
 }
 
 export interface InitConfig {
@@ -27,11 +36,9 @@ export interface InitConfig {
   cvvFieldCSS: string;
   language: string;
   operationType?: 'payment' | 'token_only';
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
   placeholder?: string;
   cvvPlaceholder?: string;
-  terminalNumber?: string;
-  reCaptchaFieldCSS?: string;
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken'; // Added the missing operation property
 }
 
 export interface PaymentState {
@@ -42,5 +49,4 @@ export interface PaymentState {
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
-  errorMessage?: string;
 }
