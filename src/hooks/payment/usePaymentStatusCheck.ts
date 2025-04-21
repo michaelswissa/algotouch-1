@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -18,8 +17,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkInterval: number;
   }>({
     attempts: 0,
-    maxAttempts: 30, // Reduced from 60 to 30 (5 minutes at 10 second intervals)
-    checkInterval: 10000 // 10 seconds between checks
+    maxAttempts: 30,
+    checkInterval: 10000
   });
   
   // Track if payment has been verified as successful
