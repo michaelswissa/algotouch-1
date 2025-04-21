@@ -48,7 +48,7 @@ export const useCardcomInitializer = () => {
       }
 
       try {
-        const config = {
+        const config: InitConfig = {
           action: 'init',
           lowProfileCode,
           sessionId,
