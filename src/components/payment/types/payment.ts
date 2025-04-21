@@ -26,6 +26,7 @@ export interface CardComMessage {
   field?: string;
   isValid?: boolean;
   cardType?: string;
+  success?: boolean;
 }
 
 export interface InitConfig {

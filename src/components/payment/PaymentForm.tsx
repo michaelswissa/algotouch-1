@@ -38,20 +38,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   });
 
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId, "with operation type:", operationType);
+    // אתחול התשלום מיד כשהקומפוננטה נטענת
     initializePayment();
-  }, [initializePayment, planId, operationType]);
-  
-  // Determine button text based on operation type and status
-  const getButtonText = () => {
-    if (paymentStatus === PaymentStatus.PROCESSING) {
-      return operationType === 'token_only' 
-        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
-        : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
-    }
-    
-    return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
-  };
+  }, [initializePayment]);
   
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -63,9 +52,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         <CardDescription>
           {paymentStatus === PaymentStatus.SUCCESS 
             ? 'התשלום בוצע בהצלחה!'
-            : operationType === 'token_only'
-              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
-              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
+            : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
       
@@ -94,15 +81,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && (
+        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.INITIALIZING) && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={submitPayment}
-              disabled={paymentStatus !== PaymentStatus.IDLE}
+              disabled={paymentStatus === PaymentStatus.PROCESSING}
             >
-              {getButtonText()}
+              {paymentStatus === PaymentStatus.PROCESSING 
+                ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>
+                : operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום'}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               {operationType === 'token_only' 

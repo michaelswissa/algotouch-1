@@ -32,45 +32,57 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onCancel,
   operationType = 'payment'
 }) => {
-  console.log('Rendering PaymentContent with status:', paymentStatus, 'operation:', operationType);
-  
-  switch (paymentStatus) {
-    case PaymentStatus.INITIALIZING:
-      return <InitializingPayment />;
-      
-    case PaymentStatus.PROCESSING:
-      return <ProcessingPayment 
-        onCancel={onCancel} 
-        operationType={operationType}
-        planType={plan.id}
-      />;
-      
-    case PaymentStatus.SUCCESS:
-      return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
-      
-    case PaymentStatus.FAILED:
-      return <FailedPayment onRetry={onRetry} />;
-      
-    default:
-      return (
-        <>
-          <PlanSummary 
-            planName={plan.name} 
-            planId={plan.id}
-            price={plan.price}
-            displayPrice={plan.displayPrice}
-            description={plan.description} 
-            hasTrial={plan.hasTrial}
-            freeTrialDays={plan.freeTrialDays}
-          />
-          <PaymentDetails 
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            masterFrameRef={masterFrameRef}
-          />
-        </>
-      );
+  // הסרנו את מסך האתחול
+  if (paymentStatus === PaymentStatus.INITIALIZING) {
+    return <PlanSummary 
+      planName={plan.name} 
+      planId={plan.id}
+      price={plan.price}
+      displayPrice={plan.displayPrice}
+      description={plan.description} 
+      hasTrial={plan.hasTrial}
+      freeTrialDays={plan.freeTrialDays}
+    />;
   }
+  
+  // עיבוד תשלום
+  if (paymentStatus === PaymentStatus.PROCESSING) {
+    return <ProcessingPayment 
+      onCancel={onCancel} 
+      operationType={operationType}
+      planType={plan.id}
+    />;
+  }
+  
+  // תשלום הצליח
+  if (paymentStatus === PaymentStatus.SUCCESS) {
+    return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
+  }
+  
+  // תשלום נכשל
+  if (paymentStatus === PaymentStatus.FAILED) {
+    return <FailedPayment onRetry={onRetry} />;
+  }
+  
+  // מצב ברירת מחדל - מסך הזנת פרטי תשלום
+  return (
+    <>
+      <PlanSummary 
+        planName={plan.name} 
+        planId={plan.id}
+        price={plan.price}
+        displayPrice={plan.displayPrice}
+        description={plan.description} 
+        hasTrial={plan.hasTrial}
+        freeTrialDays={plan.freeTrialDays}
+      />
+      <PaymentDetails 
+        terminalNumber={terminalNumber}
+        cardcomUrl={cardcomUrl}
+        masterFrameRef={masterFrameRef}
+      />
+    </>
+  );
 };
 
 export default PaymentContent;
