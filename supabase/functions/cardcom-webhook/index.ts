@@ -21,7 +21,7 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
+    logStep("Function started", { method: req.method, url: req.url });
 
     // Create Supabase client with service role to bypass RLS
     const supabaseAdmin = createClient(
@@ -33,13 +33,43 @@ serve(async (req) => {
     let webhookData;
 
     const contentType = req.headers.get('content-type') || '';
+    logStep("Content-Type", { contentType });
+
     if (contentType.includes('application/json')) {
       webhookData = await req.json();
+      logStep("Parsed JSON webhook data");
     } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await req.formData();
-      webhookData = Object.fromEntries(formData.entries());
+      try {
+        const formData = await req.formData();
+        webhookData = Object.fromEntries(formData.entries());
+        logStep("Parsed form data webhook");
+      } catch (formError) {
+        // Handle raw form data if formData() fails
+        const text = await req.text();
+        logStep("FormData parsing failed, trying text parsing", { text });
+        
+        try {
+          // Try to parse URL-encoded form data manually
+          const params = new URLSearchParams(text);
+          webhookData = Object.fromEntries(params.entries());
+          logStep("Manually parsed form data");
+        } catch (textParseError) {
+          throw new Error(`Failed to parse form data: ${textParseError.message}, Raw content: ${text}`);
+        }
+      }
     } else {
-      throw new Error(`Unsupported content type: ${contentType}`);
+      // Try to handle any other format as text
+      const text = await req.text();
+      logStep("Unexpected content type, raw content", { text });
+      
+      try {
+        // Try to parse as URL-encoded
+        const params = new URLSearchParams(text);
+        webhookData = Object.fromEntries(params.entries());
+        logStep("Parsed as URL-encoded despite content type");
+      } catch (e) {
+        throw new Error(`Unsupported content type: ${contentType}, Raw content: ${text}`);
+      }
     }
 
     logStep("Received webhook data", webhookData);
@@ -51,11 +81,21 @@ serve(async (req) => {
       ReturnValue: returnValue,
       InternalDealNumber: transactionId,
       TranzactionInfo: transactionInfo,
-      TokenInfo: tokenInfo
+      TokenInfo: tokenInfo,
+      CardNumber5: cardNumber5
     } = webhookData;
 
+    // Basic data validation
     if (!lowProfileCode) {
-      throw new Error("Missing LowProfileId in webhook data");
+      logStep("Missing LowProfileId", webhookData);
+      // Don't fail - return 200 so CardCom doesn't retry
+      return new Response("OK - Missing LowProfileId, but accepting request", {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
     }
 
     // Find matching payment session
@@ -91,8 +131,24 @@ serve(async (req) => {
     logStep("Found payment session", {
       sessionId: sessionData.id,
       userId: sessionData.user_id,
-      planId: sessionData.plan_id
+      planId: sessionData.plan_id,
+      currentStatus: sessionData.status
     });
+
+    // Check if this session is already processed (idempotency)
+    if (sessionData.status === 'completed' && sessionData.transaction_id) {
+      logStep("Session already completed", { 
+        transactionId: sessionData.transaction_id,
+        sessionId: sessionData.id 
+      });
+      return new Response("OK - Session already processed", {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
 
     // Extract token information if available
     let paymentMethod = null;
@@ -100,19 +156,50 @@ serve(async (req) => {
       paymentMethod = {
         token: tokenInfo.Token,
         tokenExpiryDate: tokenInfo.TokenExDate,
-        lastFourDigits: webhookData.CardNumber5 || "0000",
+        lastFourDigits: cardNumber5 || webhookData.Last4CardDigits || "0000",
         expiryMonth: tokenInfo.CardMonth || tokenInfo.CardValidityMonth,
         expiryYear: tokenInfo.CardYear || tokenInfo.CardValidityYear
       };
+    } else if (transactionInfo) {
+      // Try to extract from transaction info if available
+      paymentMethod = {
+        token: transactionInfo.Token || null,
+        lastFourDigits: transactionInfo.Last4CardDigitsString || cardNumber5 || "0000",
+        expiryMonth: transactionInfo.CardMonth || null,
+        expiryYear: transactionInfo.CardYear || null
+      };
     }
 
-    // Update payment status
-    const isSuccessful = operationResponse === "0";
+    // Determine payment status
+    // Check multiple fields because CardCom can send different formats
+    const isSuccessful = 
+      operationResponse === "0" || 
+      operationResponse === 0 || 
+      webhookData.ResponseCode === "0" || 
+      webhookData.ResponseCode === 0 ||
+      (transactionInfo && (transactionInfo.ResponseCode === "0" || transactionInfo.ResponseCode === 0));
+    
     const status = isSuccessful ? 'completed' : 'failed';
+    
+    // Get actual transaction ID from various possible fields
+    const finalTransactionId = 
+      transactionId || 
+      (transactionInfo && transactionInfo.TranzactionId) || 
+      webhookData.TransactionId || 
+      webhookData.TranzactionId || 
+      null;
+
+    logStep("Determined payment status", { 
+      isSuccessful, 
+      status, 
+      operationResponse, 
+      finalTransactionId,
+      hasPaymentMethod: !!paymentMethod
+    });
 
     const updateData: any = {
       status,
-      transaction_id: transactionId,
+      transaction_id: finalTransactionId,
       transaction_data: webhookData,
       updated_at: new Date().toISOString()
     };
@@ -139,7 +226,7 @@ serve(async (req) => {
       });
     }
 
-    logStep("Updated payment session status", { status });
+    logStep("Updated payment session status", { status, sessionId: sessionData.id });
 
     // Log transaction in either 'payment_logs' or 'payment_errors'
     const logTable = isSuccessful ? 'payment_logs' : 'payment_errors';
@@ -147,7 +234,7 @@ serve(async (req) => {
     const logData = isSuccessful
       ? {
         user_id: sessionData.user_id,
-        transaction_id: transactionId,
+        transaction_id: finalTransactionId,
         amount: sessionData.amount,
         currency: sessionData.currency,
         plan_id: sessionData.plan_id,
@@ -156,7 +243,7 @@ serve(async (req) => {
       }
       : {
         user_id: sessionData.user_id,
-        error_code: operationResponse,
+        error_code: operationResponse || webhookData.ResponseCode,
         error_message: webhookData.Description || 'Payment failed',
         request_data: { low_profile_code: lowProfileCode, return_value: returnValue },
         response_data: webhookData
@@ -231,7 +318,7 @@ serve(async (req) => {
               payment_method: paymentMethod
             });
         }
-        logStep("Updated subscription record", { planId });
+        logStep("Updated subscription record", { planId, userId: sessionData.user_id });
       } catch (error: any) {
         logStep("Failed to update subscription", { error: error.message });
       }

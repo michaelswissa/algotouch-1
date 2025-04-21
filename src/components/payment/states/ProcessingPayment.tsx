@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface ProcessingPaymentProps {
   onCancel?: () => void;
@@ -9,43 +9,56 @@ interface ProcessingPaymentProps {
 
 const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
   const [processingTime, setProcessingTime] = useState(0);
-  const [showCancelOption, setShowCancelOption] = useState(false);
+  const [progressValue, setProgressValue] = useState(0);
+  const MAX_PROCESSING_TIME = 180; // 3 minutes in seconds
   
-  // Show cancel option after 15 seconds (increased from 10)
+  // Update processing time and progress
   useEffect(() => {
     const timer = setInterval(() => {
-      setProcessingTime(prev => prev + 1);
+      setProcessingTime(prev => {
+        const newTime = prev + 1;
+        // Cap at maximum processing time
+        return newTime <= MAX_PROCESSING_TIME ? newTime : MAX_PROCESSING_TIME;
+      });
       
-      if (processingTime >= 15 && !showCancelOption) {
-        setShowCancelOption(true);
-      }
+      setProgressValue(prev => {
+        // Calculate progress percentage (0-100)
+        const newProgress = (processingTime / MAX_PROCESSING_TIME) * 100;
+        return Math.min(newProgress, 99); // Never reach 100% until complete
+      });
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [processingTime, showCancelOption]);
+  }, [processingTime]);
+
+  // Get appropriate message based on processing time
+  const getStatusMessage = () => {
+    if (processingTime < 15) {
+      return "מעבד את התשלום, אנא המתן...";
+    } else if (processingTime < 30) {
+      return "מאמת פרטים מול חברת האשראי...";
+    } else if (processingTime < 60) {
+      return "ממתין לאישור העסקה...";
+    } else if (processingTime < 90) {
+      return "העסקה עדיין בבדיקה, אנא המתן...";
+    } else {
+      return "הבדיקה נמשכת זמן רב מהרגיל, אנא המתן...";
+    }
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center py-8">
-      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-      <p>מעבד את התשלום, אנא המתן...</p>
-      <p className="text-sm text-muted-foreground mt-2">העסקה מאומתת מול חברת האשראי, התהליך עשוי להימשך מספר רגעים</p>
-      <p className="text-xs text-muted-foreground mt-1">אל תסגור את החלון זה</p>
+    <div className="flex flex-col items-center justify-center py-8 space-y-4">
+      <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+      <p className="font-medium">{getStatusMessage()}</p>
       
-      {showCancelOption && onCancel && (
-        <div className="mt-6">
-          <Button 
-            variant="outline" 
-            className="flex items-center gap-2 text-destructive"
-            onClick={onCancel}
-          >
-            <XCircle className="h-4 w-4" />
-            ביטול העסקה
-          </Button>
-          <p className="text-xs text-muted-foreground mt-1 max-w-[300px] text-center">
-            לתשומת לבך: הביטול לא מבטיח שהעסקה לא תושלם בצד חברת האשראי, אם העסקה נקלטה כבר
-          </p>
-        </div>
-      )}
+      <div className="w-full max-w-md">
+        <Progress value={progressValue} className="h-2" />
+      </div>
+      
+      <p className="text-sm text-muted-foreground">
+        העסקה מאומתת מול חברת האשראי, התהליך עשוי להימשך מספר רגעים
+      </p>
+      <p className="text-xs text-muted-foreground">אל תסגור את החלון זה</p>
     </div>
   );
 };

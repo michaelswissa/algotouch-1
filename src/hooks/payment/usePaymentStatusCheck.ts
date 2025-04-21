@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -17,8 +18,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkInterval: number;
   }>({
     attempts: 0,
-    maxAttempts: 30,
-    checkInterval: 10000
+    maxAttempts: 36, // Increased to accommodate longer processing times
+    checkInterval: 5000 // Start with more frequent checks
   });
   
   // Track if payment has been verified as successful
@@ -29,6 +30,9 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   
   // Maximum allowed time for processing in milliseconds (3 minutes)
   const MAX_PROCESSING_TIME = 3 * 60 * 1000;
+  
+  // Track pending checks to prevent race conditions
+  const pendingCheckRef = useRef(false);
 
   // Clear interval on unmount or when no longer needed
   const clearStatusCheckInterval = useCallback(() => {
@@ -37,14 +41,22 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     }
   }, [statusCheckData.intervalId]);
 
-  // Define checkPaymentStatus function before it's used
+  // Define checkPaymentStatus function with improved error handling
   const checkPaymentStatus = useCallback(async (lowProfileCode: string, sessionId: string) => {
-    // Don't check if payment was already verified
-    if (paymentVerifiedRef.current) {
+    // Don't check if payment was already verified or if there's a check in progress
+    if (paymentVerifiedRef.current || pendingCheckRef.current) {
       return;
     }
     
-    console.log('Checking payment status:', { lowProfileCode, sessionId, timestamp: new Date().toISOString() });
+    // Set pending flag to prevent concurrent checks
+    pendingCheckRef.current = true;
+    
+    console.log('Checking payment status:', { 
+      lowProfileCode, 
+      sessionId, 
+      timestamp: new Date().toISOString(),
+      attempt: statusCheckData.attempts
+    });
     
     try {
       // Call the cardcom-status Edge Function with cache-busting
@@ -54,7 +66,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           lowProfileCode, 
           sessionId,
           terminalNumber: "160138",
-          timestamp // Add timestamp to prevent caching issues
+          timestamp, // Add timestamp to prevent caching issues
+          attempt: statusCheckData.attempts // Add attempt number for logging
         }
       });
 
@@ -62,6 +75,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
 
       if (error) {
         console.error('Error checking payment status:', error);
+        pendingCheckRef.current = false;
         return;
       }
 
@@ -111,13 +125,18 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         }));
         
         toast.error(data.message || 'התשלום נכשל');
+      } else if (data?.processing) {
+        console.log('Payment is still processing', { attempt: statusCheckData.attempts });
       }
       // If neither success nor failure, continue checking
     } catch (error) {
       console.error('Exception in payment status check:', error);
       // Continue checking despite errors - the interval will stop after max attempts
+    } finally {
+      // Clear pending flag
+      pendingCheckRef.current = false;
     }
-  }, [clearStatusCheckInterval, setState]);
+  }, [clearStatusCheckInterval, setState, statusCheckData.attempts]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -126,12 +145,16 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     };
   }, [clearStatusCheckInterval]);
 
+  // Start status checking with adaptive polling
   const startStatusCheck = useCallback((lowProfileCode: string, sessionId: string) => {
     // Clean up any existing interval
     clearStatusCheckInterval();
     
     // Reset verification flag
     paymentVerifiedRef.current = false;
+    
+    // Reset pending check flag
+    pendingCheckRef.current = false;
     
     // Set start time for timeout tracking
     startTimeRef.current = Date.now();
@@ -142,8 +165,6 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkPaymentStatus(lowProfileCode, sessionId);
     
     // Set up adaptive polling with increasingly longer intervals
-    let currentInterval = statusCheckData.checkInterval;
-    
     const intervalId = setInterval(() => {
       // Check if maximum processing time has been exceeded
       if (startTimeRef.current && (Date.now() - startTimeRef.current > MAX_PROCESSING_TIME)) {
@@ -163,11 +184,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         return;
       }
       
-      checkPaymentStatus(lowProfileCode, sessionId);
-      
       setStatusCheckData(prev => {
         const newAttempts = prev.attempts + 1;
         
+        // Stop if maximum attempts reached
         if (newAttempts >= prev.maxAttempts) {
           clearInterval(intervalId);
           console.log('Stopped payment status check after maximum attempts');
@@ -175,28 +195,48 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
             ...prev, 
             paymentStatus: PaymentStatus.FAILED 
           }));
-          toast.error('זמן בדיקת התשלום הסתיים, אנא נסה שנית');
-          return { ...prev, intervalId: undefined };
+          toast.error('זמן בדיקת התשלום הסתיים, אנא בדוק אם החיוב בוצע בפועל או נסה שנית');
+          return { ...prev, attempts: newAttempts, intervalId: undefined };
         }
         
-        // Implement adaptive polling - increase interval after certain thresholds
-        if (newAttempts === 5) {
-          currentInterval = 15000; // After 5 attempts, check every 15 seconds
-        } else if (newAttempts === 10) {
-          currentInterval = 20000; // After 10 attempts, check every 20 seconds
+        // Implement adaptive polling intervals
+        let newInterval = prev.checkInterval;
+        
+        if (newAttempts === 6) { // After ~30 seconds (6 attempts × 5s)
+          newInterval = 10000; // Check every 10 seconds
+        } else if (newAttempts === 12) { // After ~1.5 minutes
+          newInterval = 15000; // Check every 15 seconds
         }
         
-        return { ...prev, attempts: newAttempts, lpCode: lowProfileCode, sessionId };
+        // If the interval has changed, need to recreate it
+        if (newInterval !== prev.checkInterval) {
+          clearInterval(intervalId);
+          const newIntervalId = setInterval(() => {
+            checkPaymentStatus(lowProfileCode, sessionId);
+          }, newInterval);
+          
+          return { 
+            ...prev, 
+            attempts: newAttempts,
+            checkInterval: newInterval,
+            intervalId: newIntervalId
+          };
+        }
+        
+        return { ...prev, attempts: newAttempts };
       });
-    }, currentInterval);
+      
+      // Check payment status
+      checkPaymentStatus(lowProfileCode, sessionId);
+    }, statusCheckData.checkInterval);
 
     setStatusCheckData({
       intervalId,
       lpCode: lowProfileCode,
       sessionId,
       attempts: 0,
-      maxAttempts: 30,
-      checkInterval: 10000
+      maxAttempts: 36, // Increased for longer polling
+      checkInterval: 5000 // Start with 5 seconds
     });
   }, [clearStatusCheckInterval, checkPaymentStatus, setState, statusCheckData.checkInterval]);
 
@@ -210,6 +250,9 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     
     // Reset verification flag
     paymentVerifiedRef.current = false;
+    
+    // Reset pending check flag
+    pendingCheckRef.current = false;
     
     // Reset start time
     startTimeRef.current = null;

@@ -30,7 +30,7 @@ serve(async (req) => {
     );
     
     // Parse request payload
-    let lowProfileCode, sessionId, terminalNumber, timestamp;
+    let lowProfileCode, sessionId, terminalNumber, timestamp, attempt;
     
     try {
       const payload = await req.json();
@@ -38,8 +38,15 @@ serve(async (req) => {
       sessionId = payload.sessionId;
       terminalNumber = payload.terminalNumber || Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
       timestamp = payload.timestamp || Date.now(); // Use provided timestamp or generate new one
+      attempt = payload.attempt || 0; // Track attempt number for better logging
       
-      logStep("Request payload parsed", { lowProfileCode, sessionId, terminalNumber, timestamp });
+      logStep("Request payload parsed", { 
+        lowProfileCode, 
+        sessionId, 
+        terminalNumber, 
+        timestamp,
+        attempt 
+      });
     } catch (parseError) {
       logStep("Error parsing request body", { error: parseError.message });
       throw new Error("Invalid request format");
@@ -49,12 +56,67 @@ serve(async (req) => {
       throw new Error("Missing required parameter: lowProfileCode");
     }
     
-    logStep("Checking payment status", { lowProfileCode, sessionId, timestamp });
+    // First, check if session is already marked as completed in our database
+    if (sessionId && !sessionId.startsWith('temp-')) {
+      const { data: sessionData, error: sessionError } = await supabaseAdmin
+        .from('payment_sessions')
+        .select('status, transaction_id')
+        .eq('id', sessionId)
+        .eq('low_profile_code', lowProfileCode)
+        .maybeSingle();
+        
+      if (!sessionError && sessionData) {
+        logStep("Found session in database", { 
+          status: sessionData.status, 
+          hasTransactionId: !!sessionData.transaction_id 
+        });
+        
+        // If session is already completed, return success immediately
+        if (sessionData.status === 'completed' && sessionData.transaction_id) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'התשלום כבר בוצע בהצלחה',
+              data: {
+                transactionId: sessionData.transaction_id,
+                lowProfileCode
+              }
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        
+        // If session is already failed, return failure immediately
+        if (sessionData.status === 'failed') {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              failed: true,
+              message: 'התשלום נכשל',
+              data: {
+                lowProfileCode,
+                status: 'failed'
+              }
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      }
+    }
+    
+    logStep("Checking payment status", { lowProfileCode, sessionId, attempt });
     
     // Call CardCom API to get payment status
     const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
     
-    logStep("Using CardCom credentials", { terminalNumber, apiNameLength: apiName?.length || 0 });
+    logStep("Using CardCom credentials", { 
+      terminalNumber, 
+      apiNameLength: apiName?.length || 0 
+    });
     
     // Build request with cache-busting measures
     const cardcomPayload = new URLSearchParams({
@@ -68,7 +130,8 @@ serve(async (req) => {
     logStep("Sending request to CardCom API", { 
       url: "https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx",
       timestamp,
-      payloadLength: cardcomPayload.length
+      payloadLength: cardcomPayload.length,
+      attempt
     });
     
     const cardcomResponse = await fetch(
@@ -94,7 +157,7 @@ serve(async (req) => {
     
     // Parse CardCom response
     const responseText = await cardcomResponse.text();
-    logStep("Raw CardCom response", { responseText });
+    logStep("Raw CardCom response", { responseText, attempt });
     
     const responseParams = new URLSearchParams(responseText);
     
@@ -111,8 +174,10 @@ serve(async (req) => {
     const cardOwnerPhone = responseParams.get('CardOwnerPhone');
     const cardOwnerName = responseParams.get('CardOwnerName');
     const threeDSResult = responseParams.get('ThreeDSResult');
+    const cardMonth = responseParams.get('CardValidityMonth') || responseParams.get('CardMonth');
+    const cardYear = responseParams.get('CardValidityYear') || responseParams.get('CardYear');
     
-    logStep("CardCom status response", { 
+    logStep("CardCom status response details", { 
       operationResponse, 
       dealResponse,
       transactionId,
@@ -122,15 +187,19 @@ serve(async (req) => {
       threeDSResult,
       hasCardOwnerEmail: !!cardOwnerEmail,
       hasCardOwnerPhone: !!cardOwnerPhone,
-      hasCardOwnerName: !!cardOwnerName
+      hasCardOwnerName: !!cardOwnerName,
+      cardMonth,
+      cardYear,
+      attempt
     });
     
     // Check if we need to wait for further processing (e.g., 3DS)
     const is3DSProcess = operation === '5' || threeDSResult === 'Processing';
     const is3DSComplete = threeDSResult === 'Complete';
+    const isInitialProcessing = !operationResponse && attempt < 3;
     
     // Return early if transaction is still processing
-    if (!operationResponse || is3DSProcess) {
+    if (isInitialProcessing || is3DSProcess) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -143,6 +212,7 @@ serve(async (req) => {
             is3DSProcess,
             operation,
             threeDSResult,
+            attempt,
             cardcomResponse: {
               status: cardcomResponse.status,
               ok: cardcomResponse.ok
@@ -168,6 +238,7 @@ serve(async (req) => {
             .update({
               status: 'completed',
               transaction_id: transactionId,
+              transaction_data: Object.fromEntries(responseParams.entries()),
               updated_at: new Date().toISOString()
             })
             .eq('id', sessionId);
@@ -202,6 +273,7 @@ serve(async (req) => {
           returnValue,
           threeDSResult,
           is3DSComplete,
+          attempt,
           cardcomResponse: {
             status: cardcomResponse.status,
             ok: cardcomResponse.ok
