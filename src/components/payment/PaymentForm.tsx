@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -6,6 +7,7 @@ import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
 import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
+import { toast } from 'sonner';
 
 interface PaymentFormProps {
   planId: string;
@@ -14,6 +16,7 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -42,13 +45,38 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   }, []); // Run only once on mount
   
   const getButtonText = () => {
-    if (paymentStatus === PaymentStatus.PROCESSING) {
+    if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
     
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
+  };
+
+  const handleSubmitPayment = () => {
+    // Quick validation - similar to example
+    const cardholderName = document.querySelector<HTMLInputElement>('#cardholder-name')?.value;
+    
+    if (!cardholderName) {
+      toast.error('יש למלא את שם בעל הכרטיס');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      submitPayment();
+      
+      // Reset submitting state after a timeout
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      toast.error('אירעה שגיאה בשליחת התשלום');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -68,6 +96,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Hidden master iframe - similar to example */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -96,8 +125,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             <Button 
               type="button" 
               className="w-full" 
-              onClick={submitPayment}
-              disabled={paymentStatus === PaymentStatus.PROCESSING}
+              onClick={handleSubmitPayment}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
             >
               {getButtonText()}
             </Button>
@@ -116,7 +145,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             variant="outline" 
             onClick={onBack} 
             className="absolute top-4 right-4"
-            disabled={paymentStatus === PaymentStatus.PROCESSING}
+            disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
           >
             חזור
           </Button>

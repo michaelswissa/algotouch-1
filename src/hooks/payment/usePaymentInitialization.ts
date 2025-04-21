@@ -41,9 +41,13 @@ export const usePaymentInitialization = ({
 
       // Validate contract
       const contractDetails = validateContract();
-      if (!contractDetails) return;
+      if (!contractDetails) {
+        console.error("Contract validation failed");
+        throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
+      }
 
-      // Initialize payment session with operation type
+      // Initialize payment session with operation type - similar to example approach
+      console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
         userId,
@@ -51,8 +55,25 @@ export const usePaymentInitialization = ({
         operationType
       );
       
-      // Initialize CardCom fields with improved iframe handling
-      initializeCardcomFields(masterFrameRef, paymentData.lowProfileCode, paymentData.sessionId, operationType);
+      if (!paymentData) {
+        console.error("Failed to initialize payment session");
+        throw new Error('שגיאה באתחול התשלום');
+      }
+      
+      console.log('Payment session initialized:', paymentData);
+      
+      // Initialize CardCom fields with improved iframe handling - similar to example
+      const initialized = initializeCardcomFields(
+        masterFrameRef, 
+        paymentData.lowProfileCode, 
+        paymentData.sessionId, 
+        operationType
+      );
+      
+      if (!initialized) {
+        console.error("Failed to initialize CardCom fields");
+        throw new Error('שגיאה באתחול שדות התשלום');
+      }
       
       return paymentData;
     } catch (error) {
