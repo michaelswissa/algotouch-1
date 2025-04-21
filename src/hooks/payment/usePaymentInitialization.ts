@@ -69,7 +69,7 @@ export const usePaymentInitialization = ({
         masterFrameRef, 
         paymentData.lowProfileCode, 
         paymentData.sessionId,
-        paymentData.terminalNumber || '160138', // Fallback to default terminal if not provided
+        paymentData.terminalNumber, // Now included in the return type
         operationType
       );
       

@@ -32,13 +32,14 @@ export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
   sessionId: string;
+  terminalNumber: string; // Added terminalNumber to the InitConfig interface
   cardFieldCSS: string;
   cvvFieldCSS: string;
   language: string;
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken'; // Added the missing operation property
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
 }
 
 export interface PaymentState {

@@ -13,7 +13,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<{ lowProfileCode: string; sessionId: string }> => {
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string }> => {
     console.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -68,7 +68,8 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     
     return { 
       lowProfileCode: data.data.lowProfileCode, 
-      sessionId: data.data.sessionId 
+      sessionId: data.data.sessionId,
+      terminalNumber: data.data.terminalNumber || '160138', // Ensure terminalNumber is returned, with fallback
     };
   };
 
