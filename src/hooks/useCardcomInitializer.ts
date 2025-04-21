@@ -72,6 +72,7 @@ export const useCardcomInitializer = () => {
             border: 1px solid #c01111;
           }`;
 
+        // Create initialization config with token operation type
         const config: InitConfig = {
           action: 'init',
           lowProfileCode,
@@ -79,7 +80,9 @@ export const useCardcomInitializer = () => {
           cardFieldCSS,
           cvvFieldCSS,
           language: 'he',
-          operationType // Pass operation type to the iframe
+          operationType, // Pass operation type to the iframe
+          placeholder: "1111-2222-3333-4444",
+          cvvPlaceholder: "123"
         };
 
         console.log('Sending initialization config to CardCom iframe');

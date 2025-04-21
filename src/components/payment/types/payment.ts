@@ -36,6 +36,8 @@ export interface InitConfig {
   cvvFieldCSS: string;
   language: string;
   operationType?: 'payment' | 'token_only';
+  placeholder?: string;
+  cvvPlaceholder?: string;
 }
 
 export interface PaymentState {
@@ -45,4 +47,5 @@ export interface PaymentState {
   sessionId: string;
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
+  transactionId?: string;
 }

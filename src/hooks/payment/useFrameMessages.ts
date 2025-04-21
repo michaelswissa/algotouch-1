@@ -57,6 +57,7 @@ export const useFrameMessages = ({
         switch (message.action) {
           case 'HandleSubmit':
             console.log('HandleSubmit message:', message);
+            // Per CardCom docs, we should check message.data.IsSuccess
             if (message.data?.IsSuccess) {
               // For token operations, we need to check status via API
               if (operationType === 'token_only') {
@@ -75,6 +76,7 @@ export const useFrameMessages = ({
             }
             break;
 
+          case 'HandleError':
           case 'HandleEror': // This is the correct spelling from CardCom
             console.error('Payment error:', message);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
@@ -111,54 +113,27 @@ export const useFrameMessages = ({
             break;
             
           case 'tokenCreationCompleted':
-            console.log('Token creation completed');
+            console.log('Token creation completed', message);
             // Check status specifically for token
-            checkPaymentStatus(lowProfileCode, sessionId, 'token_only');
-            break;
-
-          case 'transactionTimeout':
-            console.log('Transaction timed out');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-            toast.error('פג תוקף העסקה, אנא נסה שנית');
-            break;
-
-          case 'transactionProcessing':
-          case 'waitingForResponse':
-            console.log(`Transaction still processing: ${message.action}`);
-            // No state change, keep in processing state
+            checkPaymentStatus(lowProfileCode, sessionId, operationType);
             break;
 
           case 'handleValidations':
-            // Handle field validations as before
-            if (message.field === 'cardNumber') {
-              const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
-              if (iframe?.contentWindow) {
-                iframe.contentWindow.postMessage({
-                  action: message.isValid ? 'removeCardNumberFieldClass' : 'addCardNumberFieldClass',
-                  className: 'invalid'
-                }, '*');
-              }
-            } else if (message.field === 'cvv') {
-              const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
-              if (iframe?.contentWindow) {
-                iframe.contentWindow.postMessage({
-                  action: message.isValid ? 'removeCvvFieldClass' : 'addCvvFieldClass',
-                  className: 'invalid'
-                }, '*');
-              }
-            }
+            // Handle field validations
+            console.log('Field validation:', message);
             break;
-
+            
           default:
-            console.log('Unhandled message action:', message.action);
-            break;
+            console.log('Unknown message action:', message.action);
         }
       } catch (error) {
-        console.error('Error processing iframe message:', error);
+        console.error('Error handling iframe message:', error);
       }
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
   }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType]);
 };

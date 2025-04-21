@@ -207,6 +207,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
     
     // Calculate appropriate initial check interval based on operation type
+    // For token operations, check more frequently initially
     const initialCheckInterval = operationType === 'token_only' ? 3000 : 5000;
     
     // Set up adaptive polling with increasingly longer intervals

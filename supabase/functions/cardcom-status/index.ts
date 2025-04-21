@@ -127,6 +127,7 @@ serve(async (req) => {
       operationType
     });
 
+    // According to CardCom docs, we should call BillGoldGetLowProfileIndicator with POST
     const cardcomPayload = new URLSearchParams({
       terminalnumber: terminalNumber,
       username: apiName,
@@ -169,6 +170,7 @@ serve(async (req) => {
 
     const responseParams = new URLSearchParams(responseText);
 
+    // Extract all relevant fields from the response
     const operationResponse = responseParams.get('OperationResponse');
     const dealResponse = responseParams.get('DealResponse');
     const transactionId = responseParams.get('InternalDealNumber');
@@ -203,7 +205,7 @@ serve(async (req) => {
       last4Digits
     });
 
-    // Improved token creation detection logic
+    // Improved token creation detection logic based on CardCom documentation
     const isMonthlySubscription = planType === 'monthly';
     const isTokenCreationOp = 
       operationType === 'token_only' || // Explicitly requested token operation
@@ -211,7 +213,7 @@ serve(async (req) => {
       operation === '2' ||             // Operation 2 = ChargeAndCreateToken
       operation === '3';               // Operation 3 = CreateTokenOnly
 
-    // Better token success detection with multiple criteria
+    // Better token success detection with multiple criteria from CardCom docs
     const tokenCreatedSuccessfully = isTokenCreationOp && (
       (!!token && token.length > 10) || // Valid token format
       tokenResponse === '0' ||          // Successful token response
@@ -223,7 +225,8 @@ serve(async (req) => {
       tokenCreatedSuccessfully,
       isMonthlySubscription,
       hasValidToken: !!token && token.length > 10,
-      tokenResponseIs0: tokenResponse === '0'
+      tokenResponseIs0: tokenResponse === '0',
+      operation
     });
 
     // Handle successful token creation
