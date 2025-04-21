@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { PaymentStatus } from './types/payment';
+import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
