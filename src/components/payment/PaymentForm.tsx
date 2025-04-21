@@ -86,7 +86,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {[PaymentStatus.IDLE, PaymentStatus.INITIALIZING, PaymentStatus.FAILED].includes(paymentStatus) && (
+        {(paymentStatus === PaymentStatus.IDLE || 
+          paymentStatus === PaymentStatus.INITIALIZING || 
+          paymentStatus === PaymentStatus.FAILED) && (
           <>
             <Button 
               type="button" 
