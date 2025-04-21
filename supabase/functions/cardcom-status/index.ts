@@ -399,51 +399,41 @@ serve(async (req) => {
     const isStillProcessing = 
       !operationResponse || 
       is3DSProcess || 
-      (isTokenCreationOp && !tokenCreatedSuccessfully && attempt < 18) || // Allow more attempts for token creation
-      (attempt < 5 && !isTokenCreationOp && !transactionId); // Regular payment processing
-    
+      (isTokenCreationOp && !tokenCreatedSuccessfully && attempt < 15);
+      
     if (isStillProcessing) {
       logStep("Transaction still processing", {
-        operationType,
-        isTokenCreationOp,
+        operationResponse,
         is3DSProcess,
         attempt
       });
       
-      return new Response(
-        JSON.stringify({
-          success: false,
-          processing: true,
-          message: isTokenCreationOp 
-            ? 'יצירת אסימון לחיוב חודשי בעיבוד...' 
-            : 'העסקה עדיין בעיבוד...',
-          data: { 
-            operationResponse, 
-            dealResponse, 
-            description, 
-            is3DSProcess, 
-            operation, 
-            threeDSResult, 
-            attempt,
-            isTokenOperation: isTokenCreationOp,
-            cardcomResponse: { 
-              status: cardcomResponse.status, 
-              ok: cardcomResponse.ok 
-            }
-          }
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // Return processing status for client to continue polling
+      return new Response(JSON.stringify({
+        success: false,
+        failed: false,
+        processing: true,
+        message: 'העסקה עדיין מעובדת',
+        data: {
+          lowProfileCode,
+          attempt
         }
-      );
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-
-    // Standard payment success handling (not token creation)
-    const isSuccessful = operationResponse === '0';
-
-    if (isSuccessful && sessionId) {
-      try {
-        if (!sessionId.startsWith('temp-')) {
+    
+    // Check for a successful payment without token
+    const isPaymentSuccess = 
+      !isTokenCreationOp && 
+      operationResponse === "0" && 
+      transactionId && 
+      dealResponse === "0";
+    
+    if (isPaymentSuccess) {
+      logStep("Payment transaction successful", { transactionId });
+      
+      // If we have a valid session, update it
+      if (sessionId && !sessionId.startsWith('temp-')) {
+        try {
           await supabaseAdmin
             .from('payment_sessions')
             .update({
@@ -453,64 +443,89 @@ serve(async (req) => {
               updated_at: new Date().toISOString()
             })
             .eq('id', sessionId);
-          logStep("Database update result", { sessionId });
+            
+          logStep("Database updated for successful payment", { sessionId });
+        } catch (dbError) {
+          logStep("DB error updating payment success", { error: dbError });
         }
-      } catch (dbError: any) {
-        logStep("Database error (non-fatal)", { error: dbError.message });
       }
-    } else if (!isSuccessful && sessionId && !sessionId.startsWith('temp-')) {
-      // Update failed transaction
-      try {
-        await supabaseAdmin
-          .from('payment_sessions')
-          .update({
-            status: 'failed',
-            transaction_data: Object.fromEntries(responseParams.entries()),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', sessionId);
-        logStep("Updated session to failed status", { sessionId });
-      } catch (dbError) {
-        logStep("Error updating session failure", { error: dbError });
-      }
-    }
-
-    const userFriendlyMessage = isSuccessful 
-      ? 'התשלום בוצע בהצלחה!'
-      : description || 'אירעה שגיאה בביצוע התשלום';
-
-    return new Response(
-      JSON.stringify({
-        success: isSuccessful,
-        failed: !isSuccessful,
-        message: userFriendlyMessage,
+      
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'התשלום התקבל בהצלחה',
         data: {
-          operationResponse,
-          dealResponse,
           transactionId,
-          returnValue,
-          threeDSResult,
-          is3DSComplete,
-          attempt,
-          isTokenOperation: false,
-          cardcomResponse: {
-            status: cardcomResponse.status,
-            ok: cardcomResponse.ok
-          }
+          lowProfileCode
         }
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    
+    // Check for payment failure
+    const isPaymentFailure = 
+      !isTokenCreationOp && 
+      (operationResponse !== "0" || dealResponse !== "0");
+
+    if (isPaymentFailure) {
+      logStep("Payment transaction failed", { 
+        operationResponse, 
+        dealResponse, 
+        description 
+      });
+      
+      // If we have a valid session, update it
+      if (sessionId && !sessionId.startsWith('temp-')) {
+        try {
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              status: 'failed',
+              transaction_data: Object.fromEntries(responseParams.entries()),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId);
+            
+          logStep("Database updated for failed payment", { sessionId });
+        } catch (dbError) {
+          logStep("DB error updating payment failure", { error: dbError });
+        }
       }
-    );
+      
+      return new Response(JSON.stringify({
+        success: false,
+        failed: true,
+        message: description || 'התשלום נכשל',
+        data: {
+          lowProfileCode
+        }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    
+    // Default case: still waiting for definitive response
+    logStep("No definitive status yet", { 
+      operationResponse, 
+      dealResponse, 
+      description,
+      attempt
+    });
+    
+    return new Response(JSON.stringify({
+      success: false,
+      processing: true,
+      message: 'ממתין לסיום עיבוד העסקה',
+      data: {
+        lowProfileCode,
+        attempt
+      }
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
+    
     return new Response(
       JSON.stringify({
         success: false,
-        message: errorMessage || "בדיקת סטטוס התשלום נכשלה",
-        error: true
+        message: errorMessage || "Payment status check failed",
       }),
       {
         status: 200,

@@ -1,6 +1,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface UsePaymentStatusCheckProps {
@@ -9,11 +10,14 @@ interface UsePaymentStatusCheckProps {
 
 export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) => {
   const [paymentChecks, setPaymentChecks] = useState<NodeJS.Timeout[]>([]);
+  const [checkCount, setCheckCount] = useState(0);
+  const MAX_CHECKS = 20; // מקסימום בדיקות לפני שמחליטים שיש טיימאאוט
   
   // ניקוי הבדיקה התקופתית
   const cleanupStatusCheck = useCallback(() => {
     paymentChecks.forEach(timeout => clearTimeout(timeout));
     setPaymentChecks([]);
+    setCheckCount(0);
   }, [paymentChecks]);
 
   // ניקוי בעת סיום
@@ -22,34 +26,126 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   }, [cleanupStatusCheck]);
 
   // פונקציה לבדיקת סטטוס תשלום
-  const checkPaymentStatus = useCallback((
+  const checkPaymentStatus = useCallback(async (
     lowProfileCode: string, 
     sessionId: string,
     operationType: 'payment' | 'token_only' = 'payment',
     planType?: string
   ) => {
-    // סימולציה של תשובת שרת - שינוי מיידי למצב הצלחה
-    // במציאות, כאן היה אמור להיות API call לשרת כדי לבדוק סטטוס
-    
-    // שליחת התוצאה אחרי השהייה קצרה (סימולציה של API)
-    const timeout = setTimeout(() => {
-      console.log('Status check complete, operation successful');
+    if (checkCount >= MAX_CHECKS) {
+      console.log('Maximum check count reached, stopping status checks');
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.SUCCESS,
-        transactionId: `successful-${Date.now()}`
+        paymentStatus: PaymentStatus.FAILED,
+        errorMessage: 'זמן ההמתנה לאישור התשלום הסתיים. אנא נסה שוב.'
       }));
       
-      toast.success(operationType === 'token_only' 
-        ? 'המנוי הופעל בהצלחה!' 
-        : 'התשלום בוצע בהצלחה!');
-      
-      // ניקוי כל הבדיקות התלויות
+      toast.error('זמן ההמתנה לאישור התשלום הסתיים, אנא נסה שוב או צור קשר עם התמיכה');
       cleanupStatusCheck();
-    }, 1500);
+      return;
+    }
     
-    setPaymentChecks(prev => [...prev, timeout]);
-  }, [setState, cleanupStatusCheck]);
+    setCheckCount(prev => prev + 1);
+    
+    try {
+      console.log(`Checking payment status (attempt ${checkCount + 1})`, {
+        lowProfileCode, 
+        sessionId, 
+        operationType,
+        planType
+      });
+      
+      // Call Supabase edge function to check payment status
+      const { data, error } = await supabase.functions.invoke('cardcom-status', {
+        body: {
+          lowProfileCode,
+          sessionId,
+          timestamp: Date.now(),
+          attempt: checkCount,
+          operationType,
+          planType,
+          forceRefresh: checkCount % 3 === 0  // כל 3 בדיקות, נאלץ ריענון
+        }
+      });
+      
+      if (error) {
+        console.error('Error checking payment status:', error);
+        
+        // Continue checking despite error
+        const timeout = setTimeout(() => {
+          checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+        }, 3000);
+        
+        setPaymentChecks(prev => [...prev, timeout]);
+        return;
+      }
+      
+      console.log('Payment status check response:', data);
+      
+      if (data.success) {
+        console.log('Payment was successful');
+        
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.SUCCESS,
+          transactionId: data.data.transactionId || data.data.token || `success-${Date.now()}`
+        }));
+        
+        toast.success(operationType === 'token_only' 
+          ? 'המנוי הופעל בהצלחה!' 
+          : 'התשלום בוצע בהצלחה!');
+        
+        // ניקוי כל הבדיקות התלויות
+        cleanupStatusCheck();
+        return;
+      } else if (data.failed) {
+        console.log('Payment failed');
+        
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          errorMessage: data.message || 'התשלום נכשל. אנא נסה שוב.'
+        }));
+        
+        toast.error(data.message || 'התשלום נכשל. אנא נסה שוב.');
+        
+        // ניקוי כל הבדיקות התלויות
+        cleanupStatusCheck();
+        return;
+      } else if (data.timeout) {
+        console.log('Payment timed out');
+        
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          errorMessage: 'זמן ההמתנה לאישור התשלום הסתיים. אנא נסה שוב.'
+        }));
+        
+        toast.error('זמן ההמתנה לאישור התשלום הסתיים');
+        
+        // ניקוי כל הבדיקות התלויות
+        cleanupStatusCheck();
+        return;
+      }
+      
+      // עדיין מעבד - המשך בדיקה
+      const timeout = setTimeout(() => {
+        checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+      }, 3000); // בדוק כל 3 שניות
+      
+      setPaymentChecks(prev => [...prev, timeout]);
+      
+    } catch (error) {
+      console.error('Exception checking payment status:', error);
+      
+      // המשך בדיקה למרות השגיאה
+      const timeout = setTimeout(() => {
+        checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+      }, 3000);
+      
+      setPaymentChecks(prev => [...prev, timeout]);
+    }
+  }, [setState, cleanupStatusCheck, checkCount]);
 
   // פונקציה להתחלת בדיקת סטטוס
   const startStatusCheck = useCallback((
@@ -58,9 +154,19 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     operationType: 'payment' | 'token_only' = 'payment',
     planType?: string
   ) => {
+    // ניקוי בדיקות קודמות אם קיימות
+    cleanupStatusCheck();
+    
+    console.log('Starting payment status check for', {
+      lowProfileCode,
+      sessionId,
+      operationType,
+      planType
+    });
+    
     // התחל בדיקה מיידית
     checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-  }, [checkPaymentStatus]);
+  }, [checkPaymentStatus, cleanupStatusCheck]);
 
   return {
     startStatusCheck,
