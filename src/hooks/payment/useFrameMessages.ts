@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -56,16 +55,22 @@ export const useFrameMessages = ({
 
         switch (message.action) {
           case 'HandleSubmit':
-            console.log('HandleSubmit message:', message);
+            console.log('HandleSubmit message received:', message);
+            
             // Per CardCom docs, we should check message.data.IsSuccess
             if (message.data?.IsSuccess) {
-              // For token operations, we need to check status via API
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+              
+              // If this is a token operation, we need to start checking immediately
+              // Otherwise the UI can get stuck in the loading state
               if (operationType === 'token_only') {
-                setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-                // Start checking status immediately
+                console.log('Token operation - initiating immediate status check');
+                checkPaymentStatus(lowProfileCode, sessionId, operationType);
+                
+                // Additional checks after a brief delay to catch fast responses
                 setTimeout(() => {
                   checkPaymentStatus(lowProfileCode, sessionId, operationType);
-                }, 1000);
+                }, 2000);
               } else {
                 setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
                 handlePaymentSuccess();
@@ -110,12 +115,21 @@ export const useFrameMessages = ({
           case 'tokenCreationStarted':
             console.log('Token creation started');
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            
+            // Immediately start checking for token creation status
+            checkPaymentStatus(lowProfileCode, sessionId, operationType);
             break;
             
           case 'tokenCreationCompleted':
             console.log('Token creation completed', message);
-            // Check status specifically for token
+            // Check status specifically for token and force a quick status check
             checkPaymentStatus(lowProfileCode, sessionId, operationType);
+            break;
+
+          case 'tokenCreationFailed':
+            console.error('Token creation failed:', message);
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+            toast.error(message.message || 'יצירת אסימון נכשלה');
             break;
 
           case 'handleValidations':

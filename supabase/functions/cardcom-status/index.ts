@@ -25,7 +25,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let lowProfileCode, sessionId, terminalNumber, timestamp, attempt, operationType, planType;
+    let lowProfileCode, sessionId, terminalNumber, timestamp, attempt, operationType, planType, forceRefresh;
 
     try {
       const payload = await req.json();
@@ -36,6 +36,7 @@ serve(async (req) => {
       attempt = payload.attempt || 0;
       operationType = payload.operationType || 'payment'; // Can be 'payment' or 'token_only'
       planType = payload.planType || null;
+      forceRefresh = payload.forceRefresh || false;
 
       logStep("Request payload parsed", { 
         lowProfileCode, 
@@ -44,7 +45,8 @@ serve(async (req) => {
         timestamp,
         attempt,
         operationType,
-        planType
+        planType,
+        forceRefresh
       });
     } catch (parseError) {
       logStep("Error parsing request body", { error: parseError.message });
@@ -77,7 +79,9 @@ serve(async (req) => {
               message: 'התשלום כבר בוצע בהצלחה',
               data: {
                 transactionId: sessionData.transaction_id,
-                lowProfileCode
+                lowProfileCode,
+                isTokenOperation: operationType === 'token_only' || planType === 'monthly',
+                token: sessionData.transaction_id
               }
             }),
             {
@@ -94,7 +98,8 @@ serve(async (req) => {
               message: 'התשלום נכשל',
               data: {
                 lowProfileCode,
-                status: 'failed'
+                status: 'failed',
+                isTokenOperation: operationType === 'token_only' || planType === 'monthly'
               }
             }),
             {
@@ -141,7 +146,8 @@ serve(async (req) => {
       timestamp,
       payloadLength: cardcomPayload.length,
       attempt,
-      operationType
+      operationType,
+      forceRefresh
     });
 
     const cardcomResponse = await fetch(
@@ -187,7 +193,8 @@ serve(async (req) => {
     const cardMonth = responseParams.get('CardValidityMonth') || responseParams.get('CardMonth');
     const cardYear = responseParams.get('CardValidityYear') || responseParams.get('CardYear');
     const accountId = responseParams.get('AccountId');
-    const last4Digits = responseParams.get('CardNumber5') || '****';
+    const last4Digits = responseParams.get('CardNumber5') || responseParams.get('ExtShvaParams.CardNumEnd') || '****';
+    const prossesEndOk = responseParams.get('ProssesEndOk'); // Important for TokenOnly operations
 
     logStep("CardCom status response details", { 
       operationResponse, 
@@ -200,6 +207,7 @@ serve(async (req) => {
       token, 
       tokenResponse, 
       tokenExDate, 
+      prossesEndOk,
       attempt,
       operationType,
       last4Digits
@@ -214,10 +222,14 @@ serve(async (req) => {
       operation === '3';               // Operation 3 = CreateTokenOnly
 
     // Better token success detection with multiple criteria from CardCom docs
+    // ProssesEndOk is important for token operations to confirm the entire process completed
     const tokenCreatedSuccessfully = isTokenCreationOp && (
-      (!!token && token.length > 10) || // Valid token format
-      tokenResponse === '0' ||          // Successful token response
-      (!!operationResponse && (operationResponse === '0' || operationResponse === 0)) // General success
+      // Token exists and ProssesEndOk (entire process completed)
+      ((!!token && token.length > 10) && (prossesEndOk === "True" || prossesEndOk === "true")) ||
+      // Specific token success response code
+      (tokenResponse === '0' && (!!token && token.length > 10)) ||
+      // General success with valid token
+      ((operationResponse === '0' || operationResponse === 0) && (!!token && token.length > 10))
     );
 
     logStep("Token detection analysis", {
@@ -226,8 +238,51 @@ serve(async (req) => {
       isMonthlySubscription,
       hasValidToken: !!token && token.length > 10,
       tokenResponseIs0: tokenResponse === '0',
+      prossesEndOk,
       operation
     });
+
+    // Check for timeout specifically for token operations
+    // If we've tried many times and still no token, likely a timeout
+    const isTokenTimeout = isTokenCreationOp && attempt >= 15 && !token;
+    
+    if (isTokenTimeout) {
+      logStep("Token creation timeout detected", { attempt });
+      
+      // Update the database if we have a session
+      if (sessionId && !sessionId.startsWith('temp-')) {
+        try {
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              status: 'failed',
+              transaction_data: Object.fromEntries(responseParams.entries()),
+              updated_at: new Date().toISOString(),
+              error_message: 'Token creation timeout'
+            })
+            .eq('id', sessionId);
+        } catch (dbError) {
+          logStep("DB error on token timeout", { error: dbError });
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          failed: true,
+          timeout: true,
+          message: 'חריגת זמן ביצירת אסימון',
+          data: {
+            lowProfileCode,
+            isTokenOperation: true,
+            attempt
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Handle successful token creation
     if (tokenCreatedSuccessfully) {
@@ -336,16 +391,16 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Processing state detection with improved handling
+    // Processing state detection with improved handling for token creation
     const is3DSProcess = operation === '5' || threeDSResult === 'Processing';
     const is3DSComplete = threeDSResult === 'Complete';
     
-    // More flexible processing detection based on operation type
+    // More flexible processing detection based on operation type and attempt count
     const isStillProcessing = 
       !operationResponse || 
       is3DSProcess || 
-      (attempt < 3 && isTokenCreationOp && !token) || // Early in token creation
-      (attempt < 5 && !isTokenCreationOp); // Regular payment processing
+      (isTokenCreationOp && !tokenCreatedSuccessfully && attempt < 18) || // Allow more attempts for token creation
+      (attempt < 5 && !isTokenCreationOp && !transactionId); // Regular payment processing
     
     if (isStillProcessing) {
       logStep("Transaction still processing", {

@@ -72,7 +72,7 @@ export const useCardcomInitializer = () => {
             border: 1px solid #c01111;
           }`;
 
-        // Create initialization config with token operation type
+        // Create initialization config with improved options for token operation
         const config: InitConfig = {
           action: 'init',
           lowProfileCode,
@@ -80,13 +80,20 @@ export const useCardcomInitializer = () => {
           cardFieldCSS,
           cvvFieldCSS,
           language: 'he',
-          operationType, // Pass operation type to the iframe
+          operationType, // Explicitly pass operation type to the iframe
+          operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly',
           placeholder: "1111-2222-3333-4444",
           cvvPlaceholder: "123"
         };
 
-        console.log('Sending initialization config to CardCom iframe');
+        console.log('Sending initialization config to CardCom iframe with operation:', operationType);
         iframe.contentWindow.postMessage(config, '*');
+        
+        // Add event to verify the iframe received and processed the initialization
+        const checkInitStatus = setTimeout(() => {
+          iframe.contentWindow.postMessage({ action: 'checkInitStatus' }, '*');
+        }, 1000);
+        
         return true;
       } catch (error) {
         console.error('Error initializing CardCom fields:', error);

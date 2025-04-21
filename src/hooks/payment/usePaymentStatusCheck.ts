@@ -18,11 +18,13 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkInterval: number;
     operationType?: 'payment' | 'token_only';
     planType?: string;
+    retries: number; // Track retries for network errors
   }>({
     attempts: 0,
     maxAttempts: 36, // Increased to accommodate longer processing times
     checkInterval: 5000, // Start with more frequent checks
-    operationType: 'payment'
+    operationType: 'payment',
+    retries: 0
   });
   
   // Track if payment has been verified as successful
@@ -35,7 +37,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   // Different timeouts for different operation types
   const MAX_PROCESSING_TIME = {
     payment: 3 * 60 * 1000, // 3 minutes for regular payments
-    token_only: 45 * 1000    // 45 seconds for token creation
+    token_only: 60 * 1000    // 60 seconds for token creation (increased from 45s)
   };
   
   // Track pending checks to prevent race conditions
@@ -83,7 +85,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           timestamp, // Add timestamp to prevent caching issues
           attempt: statusCheckData.attempts, // Add attempt number for logging
           operationType, // Add operation type for better status detection
-          planType      // Add plan type for operation-specific handling
+          planType,     // Add plan type for operation-specific handling
+          forceRefresh: true // Force server to refresh data from CardCom
         }
       });
 
@@ -91,9 +94,27 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
 
       if (error) {
         console.error('Error checking payment status:', error);
+        
+        // Only increment retries for network errors, not business logic errors
+        setStatusCheckData(prev => ({
+          ...prev,
+          retries: prev.retries + 1
+        }));
+        
+        // If we've retried too many times, show an error
+        if (statusCheckData.retries > 3) {
+          toast.error('שגיאת תקשורת בבדיקת סטטוס העסקה');
+        }
+        
         pendingCheckRef.current = false;
         return;
       }
+
+      // Reset retries on successful API call
+      setStatusCheckData(prev => ({
+        ...prev,
+        retries: 0
+      }));
 
       // Improved token creation success detection
       if (data?.success && data.data?.isTokenOperation) {
@@ -126,6 +147,19 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           paymentStatus: PaymentStatus.FAILED 
         }));
         toast.error(data.message || 'יצירת אסימון נכשלה');
+        return;
+      }
+      
+      // Handle specific token creation timeout
+      if (data?.timeout && data.data?.isTokenOperation) {
+        console.error('Token creation timed out:', data);
+        paymentVerifiedRef.current = true;
+        clearStatusCheckInterval();
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED 
+        }));
+        toast.error('חריגת זמן ביצירת אסימון, אנא נסה שנית');
         return;
       }
       
@@ -165,10 +199,17 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       }
     } catch (error) {
       console.error('Exception in payment status check:', error);
+      
+      // Increment retries for any unexpected errors
+      setStatusCheckData(prev => ({
+        ...prev,
+        retries: prev.retries + 1
+      }));
+      
     } finally {
       pendingCheckRef.current = false;
     }
-  }, [clearStatusCheckInterval, setState, statusCheckData.attempts]);
+  }, [clearStatusCheckInterval, setState, statusCheckData.attempts, statusCheckData.retries]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -208,7 +249,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     
     // Calculate appropriate initial check interval based on operation type
     // For token operations, check more frequently initially
-    const initialCheckInterval = operationType === 'token_only' ? 3000 : 5000;
+    const initialCheckInterval = operationType === 'token_only' ? 2500 : 5000;
     
     // Set up adaptive polling with increasingly longer intervals
     const intervalId = setInterval(() => {
@@ -241,7 +282,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         const newAttempts = prev.attempts + 1;
         
         // Calculate max attempts based on operation type
-        const operationMaxAttempts = prev.operationType === 'token_only' ? 15 : 36;
+        const operationMaxAttempts = prev.operationType === 'token_only' ? 20 : 36; // Increased for token operations
         
         // Stop if maximum attempts reached
         if (newAttempts >= operationMaxAttempts) {
@@ -263,9 +304,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         if (prev.operationType === 'token_only') {
           // Faster interval adjustments for token operations
           if (newAttempts === 3) {
-            newInterval = 5000;  // 5 seconds
+            newInterval = 3000;  // 3 seconds
           } else if (newAttempts === 6) {
-            newInterval = 7000;  // 7 seconds
+            newInterval = 4000;  // 4 seconds
+          } else if (newAttempts === 10) {
+            newInterval = 5000;  // 5 seconds
           }
         } else {
           // Regular payment operation intervals
@@ -303,10 +346,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       lpCode: lowProfileCode,
       sessionId,
       attempts: 0,
-      maxAttempts: operationType === 'token_only' ? 15 : 36, // Fewer attempts for token operations
+      maxAttempts: operationType === 'token_only' ? 20 : 36, // More attempts for token operations
       checkInterval: initialCheckInterval,
       operationType,
-      planType
+      planType,
+      retries: 0
     });
   }, [clearStatusCheckInterval, checkPaymentStatus, setState]);
 
@@ -315,7 +359,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     setStatusCheckData(prev => ({ 
       ...prev, 
       intervalId: undefined,
-      attempts: 0
+      attempts: 0,
+      retries: 0
     }));
     
     // Reset verification flag
