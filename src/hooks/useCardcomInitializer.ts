@@ -72,17 +72,13 @@ export const useCardcomInitializer = () => {
             border: 1px solid #c01111;
           }`;
 
-        const config = {
+        const config: InitConfig = {
           action: 'init',
           lowProfileCode,
           sessionId,
           cardFieldCSS,
           cvvFieldCSS,
-          reCaptchaFieldCSS: `body { margin: 0; padding:0; display: flex; }`,
-          placeholder: "1111-2222-3333-4444",
-          cvvPlaceholder: "123",
           language: 'he',
-          terminalNumber: "160138", // Add terminal number for proper initialization
           operationType // Pass operation type to the iframe
         };
 
