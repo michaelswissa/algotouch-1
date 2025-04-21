@@ -65,10 +65,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
-          name="CardComMasterFrame"
-          src={`${cardcomUrl}/api/openfields/master`}
-          style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
-          title="CardCom Master Frame"
+          name="CardComMasterFrame" 
+          src={`${cardcomUrl}/api/v11/LowProfile/Create`}
+          style={{ display: 'block', width: '100%', height: '500px', border: 'none' }}
+          title="CardCom Payment Frame"
         />
         
         <PaymentContent

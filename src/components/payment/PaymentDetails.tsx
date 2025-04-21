@@ -1,7 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface PaymentDetailsProps {
@@ -13,23 +11,17 @@ interface PaymentDetailsProps {
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   terminalNumber, 
-  cardcomUrl,
-  masterFrameRef,
   lowProfileCode
 }) => {
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
-  useEffect(() => {
-    // Load the CardCom script
-    const script = document.createElement('script');
-    const time = new Date().getTime();
-    script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
-    document.head.appendChild(script);
-    
-    return () => {
-      document.head.removeChild(script);
-    };
-  }, []);
+  if (!lowProfileCode) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4" dir="rtl">
