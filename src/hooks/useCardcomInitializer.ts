@@ -71,7 +71,7 @@ export const useCardcomInitializer = () => {
             border: 1px solid #c01111;
           }`;
 
-        // Follow example's simpler config pattern
+        // Follow example's config pattern
         const config: InitConfig = {
           action: 'init',
           lowProfileCode,
@@ -79,7 +79,11 @@ export const useCardcomInitializer = () => {
           terminalNumber,
           cardFieldCSS,
           cvvFieldCSS,
-          language: 'he'
+          language: 'he',
+          placeholder: "1111-2222-3333-4444",
+          cvvPlaceholder: "123",
+          operationType,
+          operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
         };
 
         console.log('Sending initialization message to CardCom iframe');

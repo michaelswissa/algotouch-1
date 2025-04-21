@@ -37,13 +37,13 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
           email: paymentUser.email,
         },
         currency: "ILS",
-        operation: operation, // Explicitly set the operation type
+        operation: operation,
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
         },
         userId: userId,
-        operationType, // Pass the operation type to the backend
+        operationType,
         registrationData: sessionStorage.getItem('registration_data') 
           ? JSON.parse(sessionStorage.getItem('registration_data')!) 
           : null
@@ -61,7 +61,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       ...prev,
       sessionId: data.data.sessionId,
       lowProfileCode: data.data.lowProfileCode,
-      terminalNumber: data.data.terminalNumber,
+      terminalNumber: data.data.terminalNumber || '160138',
       cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
       paymentStatus: PaymentStatus.IDLE
     }));
@@ -69,7 +69,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     return { 
       lowProfileCode: data.data.lowProfileCode, 
       sessionId: data.data.sessionId,
-      terminalNumber: data.data.terminalNumber || '160138', // Ensure terminalNumber is returned, with fallback
+      terminalNumber: data.data.terminalNumber || '160138' // Ensure terminalNumber is returned
     };
   };
 
