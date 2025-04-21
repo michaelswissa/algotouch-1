@@ -34,39 +34,46 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
 }) => {
   console.log('Current payment status:', paymentStatus);
   
-  switch (paymentStatus) {
-    case PaymentStatus.INITIALIZING:
-      return <InitializingPayment />;
-    case PaymentStatus.PROCESSING:
-      return <ProcessingPayment 
-        onCancel={onCancel} 
-        operationType={operationType}
-        planType={plan.id}
-      />;
-    case PaymentStatus.SUCCESS:
-      return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
-    case PaymentStatus.FAILED:
-      return <FailedPayment onRetry={onRetry} />;
-    default:
-      return (
-        <>
-          <PlanSummary 
-            planName={plan.name} 
-            planId={plan.id}
-            price={plan.price}
-            displayPrice={plan.displayPrice}
-            description={plan.description} 
-            hasTrial={plan.hasTrial}
-            freeTrialDays={plan.freeTrialDays}
-          />
-          <PaymentDetails 
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            masterFrameRef={masterFrameRef}
-          />
-        </>
-      );
+  // Render different content based on payment status
+  if (paymentStatus === PaymentStatus.INITIALIZING) {
+    return <InitializingPayment />;
   }
+  
+  if (paymentStatus === PaymentStatus.PROCESSING) {
+    return <ProcessingPayment 
+      onCancel={onCancel} 
+      operationType={operationType}
+      planType={plan.id}
+    />;
+  }
+  
+  if (paymentStatus === PaymentStatus.SUCCESS) {
+    return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
+  }
+  
+  if (paymentStatus === PaymentStatus.FAILED) {
+    return <FailedPayment onRetry={onRetry} />;
+  }
+  
+  // Default state (IDLE)
+  return (
+    <>
+      <PlanSummary 
+        planName={plan.name} 
+        planId={plan.id}
+        price={plan.price}
+        displayPrice={plan.displayPrice}
+        description={plan.description} 
+        hasTrial={plan.hasTrial}
+        freeTrialDays={plan.freeTrialDays}
+      />
+      <PaymentDetails 
+        terminalNumber={terminalNumber}
+        cardcomUrl={cardcomUrl}
+        masterFrameRef={masterFrameRef}
+      />
+    </>
+  );
 };
 
 export default PaymentContent;

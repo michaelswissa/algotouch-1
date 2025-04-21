@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Loader2, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -10,6 +10,16 @@ interface ProcessingPaymentProps {
 }
 
 const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel, operationType, planType }) => {
+  // Set document title for better UX during processing
+  useEffect(() => {
+    const originalTitle = document.title;
+    document.title = operationType === 'token_only' ? 'יוצר אסימון...' : 'מעבד תשלום...';
+    
+    return () => {
+      document.title = originalTitle;
+    };
+  }, [operationType]);
+  
   const loadingMessage = operationType === 'token_only' 
     ? 'מיצר אסימון למנוי שלך...' 
     : 'מעבד את התשלום...';
