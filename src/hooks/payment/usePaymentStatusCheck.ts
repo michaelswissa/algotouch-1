@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -79,25 +78,45 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         return;
       }
 
-      if (data?.success) {
-        console.log('Payment successful!', data);
-        
-        // Mark payment as verified to prevent further checks
+      if (data?.success && (data.data?.token || data.data?.tokenResponse === "0")) {
+        // if token created - success for token only ops (monthly)
         paymentVerifiedRef.current = true;
-        
-        // Clean up the interval
         clearStatusCheckInterval();
-        
-        // Update state with success
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.SUCCESS,
+          transactionId: data.data?.token || 'unknown'
+        }));
+        toast.success('אסימון נוצר בהצלחה, תשלום מאושר!');
+        try {
+          await supabase.from('payment_sessions').update({
+            status: 'completed',
+            transaction_id: data.data?.token
+          })
+          .eq('id', sessionId);
+        } catch (dbError) { /* ignore */ }
+        return;
+      }
+      if (data?.failed && (data.data?.tokenResponse || data.data?.token)) {
+        // token creation failed? fail fast
+        paymentVerifiedRef.current = true;
+        clearStatusCheckInterval();
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED 
+        }));
+        toast.error(data.message || 'יצירת אסימון נכשלה');
+        return;
+      }
+      if (data?.success) {
+        paymentVerifiedRef.current = true;
+        clearStatusCheckInterval();
         setState(prev => ({ 
           ...prev, 
           paymentStatus: PaymentStatus.SUCCESS,
           transactionId: data.data?.transactionId || 'unknown'
         }));
-        
         toast.success('התשלום בוצע בהצלחה!');
-        
-        // Also update the database if needed as a fallback
         try {
           await supabase.from('payment_sessions')
             .update({
@@ -105,35 +124,21 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
               transaction_id: data.data?.transactionId
             })
             .eq('id', sessionId);
-        } catch (dbError) {
-          console.warn('Failed to update payment session in DB:', dbError);
-          // Not critical, the webhook should handle this
-        }
+        } catch (dbError) {}
       } else if (data?.failed) {
-        console.log('Payment failed:', data.message);
-        
-        // Mark payment as verified to prevent further checks
         paymentVerifiedRef.current = true;
-        
-        // Clean up the interval
         clearStatusCheckInterval();
-        
-        // Update state with failure
         setState(prev => ({ 
           ...prev, 
-          paymentStatus: PaymentStatus.FAILED 
+          paymentStatus: PaymentStatus.FAILED
         }));
-        
         toast.error(data.message || 'התשלום נכשל');
       } else if (data?.processing) {
         console.log('Payment is still processing', { attempt: statusCheckData.attempts });
       }
-      // If neither success nor failure, continue checking
     } catch (error) {
       console.error('Exception in payment status check:', error);
-      // Continue checking despite errors - the interval will stop after max attempts
     } finally {
-      // Clear pending flag
       pendingCheckRef.current = false;
     }
   }, [clearStatusCheckInterval, setState, statusCheckData.attempts]);
