@@ -68,7 +68,13 @@ serve(async (req) => {
         webhookData = Object.fromEntries(params.entries());
         logStep("Parsed as URL-encoded despite content type");
       } catch (e) {
-        throw new Error(`Unsupported content type: ${contentType}, Raw content: ${text}`);
+        try {
+          // Try to parse as JSON
+          webhookData = JSON.parse(text);
+          logStep("Parsed as JSON despite content type");
+        } catch (jsonError) {
+          throw new Error(`Unsupported content type: ${contentType}, Raw content: ${text}`);
+        }
       }
     }
 
@@ -82,8 +88,24 @@ serve(async (req) => {
       InternalDealNumber: transactionId,
       TranzactionInfo: transactionInfo,
       TokenInfo: tokenInfo,
-      CardNumber5: cardNumber5
+      CardNumber5: cardNumber5,
+      ResponseCode: responseCode
     } = webhookData;
+
+    // Check all possible response code fields
+    const isSuccessful = 
+      operationResponse === "0" || operationResponse === 0 || 
+      responseCode === "0" || responseCode === 0 ||
+      (webhookData.ResponseCode === "0" || webhookData.ResponseCode === 0) ||
+      (transactionInfo && (transactionInfo.ResponseCode === "0" || transactionInfo.ResponseCode === 0));
+
+    logStep("Payment success check", { 
+      isSuccessful,
+      operationResponse,
+      responseCode,
+      webhookResponseCode: webhookData.ResponseCode,
+      transactionInfoResponseCode: transactionInfo?.ResponseCode
+    });
 
     // Basic data validation
     if (!lowProfileCode) {
@@ -118,14 +140,43 @@ serve(async (req) => {
     }
     if (!sessionData) {
       logStep("Payment session missing for LowProfileId", { lowProfileCode });
-      // Don't fail
-      return new Response("OK - Session not found", {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/plain'
+      
+      // Try to check by ReturnValue as fallback
+      if (returnValue) {
+        const { data: sessionByReturnValue } = await supabaseAdmin
+          .from('payment_sessions')
+          .select('*')
+          .eq('reference', returnValue)
+          .maybeSingle();
+          
+        if (sessionByReturnValue) {
+          logStep("Found payment session by ReturnValue", { 
+            sessionId: sessionByReturnValue.id,
+            reference: returnValue
+          });
+          
+          // Continue with this session
+          sessionData = sessionByReturnValue;
+        } else {
+          // Don't fail
+          return new Response("OK - Session not found", {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'text/plain'
+            }
+          });
         }
-      });
+      } else {
+        // Don't fail
+        return new Response("OK - Session not found and no ReturnValue", {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'text/plain'
+          }
+        });
+      }
     }
 
     logStep("Found payment session", {
@@ -171,14 +222,6 @@ serve(async (req) => {
     }
 
     // Determine payment status
-    // Check multiple fields because CardCom can send different formats
-    const isSuccessful = 
-      operationResponse === "0" || 
-      operationResponse === 0 || 
-      webhookData.ResponseCode === "0" || 
-      webhookData.ResponseCode === 0 ||
-      (transactionInfo && (transactionInfo.ResponseCode === "0" || transactionInfo.ResponseCode === 0));
-    
     const status = isSuccessful ? 'completed' : 'failed';
     
     // Get actual transaction ID from various possible fields
@@ -267,20 +310,40 @@ serve(async (req) => {
         let trialEndsAt = null;
         let nextChargeDate = null;
         let currentPeriodEndsAt = null;
+        let status = 'active';
 
         if (planId === 'monthly') {
-          trialEndsAt = new Date(now);
-          trialEndsAt.setDate(trialEndsAt.getDate() + 7);
-          nextChargeDate = new Date(trialEndsAt);
-          currentPeriodEndsAt = new Date(nextChargeDate);
-          currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
+          if (sessionData.amount === 0) {
+            // This is a trial
+            status = 'trial';
+            trialEndsAt = new Date(now);
+            trialEndsAt.setDate(trialEndsAt.getDate() + 7); // 7-day trial
+            nextChargeDate = new Date(trialEndsAt);
+            currentPeriodEndsAt = new Date(nextChargeDate);
+            currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
+          } else {
+            // Regular monthly payment
+            currentPeriodEndsAt = new Date(now);
+            currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
+            nextChargeDate = new Date(currentPeriodEndsAt);
+          }
         } else if (planId === 'annual') {
-          trialEndsAt = new Date(now);
-          trialEndsAt.setDate(trialEndsAt.getDate() + 14);
-          nextChargeDate = new Date(trialEndsAt);
-          currentPeriodEndsAt = new Date(nextChargeDate);
-          currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+          if (sessionData.amount === 0) {
+            // This is a trial
+            status = 'trial';
+            trialEndsAt = new Date(now);
+            trialEndsAt.setDate(trialEndsAt.getDate() + 14); // 14-day trial
+            nextChargeDate = new Date(trialEndsAt);
+            currentPeriodEndsAt = new Date(nextChargeDate);
+            currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+          } else {
+            // Regular annual payment
+            currentPeriodEndsAt = new Date(now);
+            currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+            nextChargeDate = new Date(currentPeriodEndsAt);
+          }
         } else if (planId === 'vip') {
+          // VIP plan has no expiry
           currentPeriodEndsAt = null;
           nextChargeDate = null;
         }
@@ -297,7 +360,7 @@ serve(async (req) => {
             .from('subscriptions')
             .update({
               plan_type: planId,
-              status: planId === 'vip' ? 'active' : 'trial',
+              status: planId === 'vip' ? 'active' : status,
               next_charge_date: nextChargeDate,
               trial_ends_at: trialEndsAt,
               current_period_ends_at: currentPeriodEndsAt,
@@ -311,7 +374,7 @@ serve(async (req) => {
             .insert({
               user_id: sessionData.user_id,
               plan_type: planId,
-              status: planId === 'vip' ? 'active' : 'trial',
+              status: planId === 'vip' ? 'active' : status,
               next_charge_date: nextChargeDate,
               trial_ends_at: trialEndsAt,
               current_period_ends_at: currentPeriodEndsAt,

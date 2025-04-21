@@ -313,135 +313,32 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         }));
         toast.error(operationType === 'token_only' 
           ? 'חריגת זמן ביצירת אסימון, אנא נסה שנית' 
-          : 'חריגת זמן בתהליך התשלום, אנא נסה שנית');
+          : 'חריגת זמן בביצוע התשלום, אנא נסה שנית');
         return;
       }
       
-      // Don't check again if payment was already verified
-      if (paymentVerifiedRef.current) {
-        clearInterval(intervalId);
-        return;
-      }
+      // Perform status check with adaptive interval
+      checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
       
-      setStatusCheckData(prev => {
-        const newAttempts = prev.attempts + 1;
-        
-        // Calculate max attempts based on operation type
-        const operationMaxAttempts = prev.operationType === 'token_only' ? 30 : 40; // Increased for token operations
-        
-        // Stop if maximum attempts reached
-        if (newAttempts >= operationMaxAttempts) {
-          clearInterval(intervalId);
-          console.log(`Stopped ${prev.operationType} status check after maximum attempts (${operationMaxAttempts})`);
-          
-          // Only set failed if not already verified (could have been set during the interval)
-          if (!paymentVerifiedRef.current) {
-            setState(prev => ({ 
-              ...prev, 
-              paymentStatus: PaymentStatus.FAILED 
-            }));
-            toast.error(prev.operationType === 'token_only'
-              ? 'זמן יצירת האסימון הסתיים, אנא נסה שנית'
-              : 'זמן בדיקת התשלום הסתיים, אנא בדוק אם החיוב בוצע בפועל או נסה שנית');
-          }
-          
-          return { ...prev, attempts: newAttempts, intervalId: undefined };
-        }
-        
-        // Implement adaptive polling intervals based on operation type and attempt count
-        let newInterval = prev.checkInterval;
-        
-        if (prev.operationType === 'token_only') {
-          // More aggressive interval adjustments for token operations
-          if (newAttempts === 5) {
-            newInterval = 3000;  // 3 seconds
-          } else if (newAttempts === 10) {
-            newInterval = 4000;  // 4 seconds
-          } else if (newAttempts === 15) {
-            newInterval = 5000;  // 5 seconds
-            toast.info('ממשיך לעקוב אחר תהליך יצירת האסימון, אנא המתן...');
-          } else if (newAttempts === 20) {
-            newInterval = 6000;  // 6 seconds
-          }
-        } else {
-          // Regular payment operation intervals
-          if (newAttempts === 5) { // After ~15 seconds
-            newInterval = 5000; // Check every 5 seconds
-          } else if (newAttempts === 12) { // After ~1 minute
-            newInterval = 8000; // Check every 8 seconds
-            toast.info('ממשיך לעקוב אחר תהליך התשלום, אנא המתן...');
-          } else if (newAttempts === 20) { // After ~2.5 minutes
-            newInterval = 10000; // Check every 10 seconds
-          }
-        }
-        
-        // If the interval has changed, need to recreate it
-        if (newInterval !== prev.checkInterval) {
-          clearInterval(intervalId);
-          const newIntervalId = setInterval(() => {
-            if (!paymentVerifiedRef.current && !pendingCheckRef.current) {
-              checkPaymentStatus(lowProfileCode, sessionId, prev.operationType, prev.planType);
-            }
-          }, newInterval);
-          
-          return { 
-            ...prev, 
-            attempts: newAttempts,
-            checkInterval: newInterval,
-            intervalId: newIntervalId
-          };
-        }
-        
-        return { ...prev, attempts: newAttempts };
-      });
-      
-      // Check payment status if not already in progress and not verified
-      if (!paymentVerifiedRef.current && !pendingCheckRef.current) {
-        checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-      }
     }, initialCheckInterval);
-
-    setStatusCheckData({
+    
+    // Save interval ID for cleanup
+    setStatusCheckData(prev => ({
+      ...prev,
       intervalId,
       lpCode: lowProfileCode,
       sessionId,
-      attempts: 0,
-      maxAttempts: operationType === 'token_only' ? 30 : 40, 
-      checkInterval: initialCheckInterval,
       operationType,
-      planType,
-      retries: 0,
-      consecutiveErrors: 0
-    });
-    
-    // Also set a one-time check after a short delay to catch quick responses
-    setTimeout(() => {
-      if (!paymentVerifiedRef.current && !pendingCheckRef.current) {
-        checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-      }
-    }, 1000);
-  }, [clearStatusCheckInterval, checkPaymentStatus, setState]);
-
-  const cleanupStatusCheck = useCallback(() => {
-    clearStatusCheckInterval();
-    setStatusCheckData(prev => ({ 
-      ...prev, 
-      intervalId: undefined,
       attempts: 0,
       retries: 0,
       consecutiveErrors: 0
     }));
     
-    // Reset all state
-    paymentVerifiedRef.current = false;
-    pendingCheckRef.current = false;
-    startTimeRef.current = null;
-    lastCheckTimeRef.current = 0;
-  }, [clearStatusCheckInterval]);
+  }, [clearStatusCheckInterval, checkPaymentStatus, setState]);
 
   return {
     startStatusCheck,
     checkPaymentStatus,
-    cleanupStatusCheck
+    cleanupStatusCheck: clearStatusCheckInterval
   };
 };

@@ -3,7 +3,7 @@ import React from 'react';
 import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
 import InitializingPayment from './states/InitializingPayment';
-import ProcessingPayment from './states/ProcessingPayment';
+import ProcessingPayment from './ProcessingPayment';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import PaymentDetails from './PaymentDetails';
@@ -32,6 +32,8 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onCancel,
   operationType = 'payment'
 }) => {
+  console.log('Current payment status:', paymentStatus);
+  
   switch (paymentStatus) {
     case PaymentStatus.INITIALIZING:
       return <InitializingPayment />;
