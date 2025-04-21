@@ -52,7 +52,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
-    operationType
+    operationType,
+    planType: planId // Pass planId as planType
   });
 
   // Clean up on unmount

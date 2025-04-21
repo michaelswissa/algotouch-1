@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
 interface ProcessingPaymentProps {
@@ -10,96 +11,111 @@ interface ProcessingPaymentProps {
 }
 
 const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ 
-  onCancel, 
+  onCancel,
   operationType = 'payment',
   planType
 }) => {
-  const [processingTime, setProcessingTime] = useState(0);
-  const [progressValue, setProgressValue] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState<string>('');
+  const [elapsedTime, setElapsedTime] = useState(0);
   
-  // Set different max times based on operation type
-  const MAX_PROCESSING_TIME = operationType === 'token_only' ? 45 : 180; // seconds
-  
-  // Update processing time and progress
+  // Update progress and messages
   useEffect(() => {
-    const timer = setInterval(() => {
-      setProcessingTime(prev => {
-        const newTime = prev + 1;
-        // Cap at maximum processing time
-        return newTime <= MAX_PROCESSING_TIME ? newTime : MAX_PROCESSING_TIME;
-      });
+    const startTime = Date.now();
+    let progressInterval: NodeJS.Timeout;
+    let messageInterval: NodeJS.Timeout;
+    
+    // Different timing based on operation type
+    const maxProcessingTime = operationType === 'token_only' ? 60000 : 90000; // 1-1.5 mins
+    
+    // Set up progress bar animation
+    progressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const newProgress = Math.min(Math.floor((elapsed / maxProcessingTime) * 100), 95);
+      setProgress(newProgress);
+      setElapsedTime(Math.floor(elapsed / 1000));
+    }, 300);
+    
+    // Update messages based on elapsed time
+    messageInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
       
-      setProgressValue(prev => {
-        // Calculate progress percentage (0-100)
-        const newProgress = (processingTime / MAX_PROCESSING_TIME) * 100;
-        return Math.min(newProgress, 99); // Never reach 100% until complete
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [processingTime, MAX_PROCESSING_TIME]);
-
-  // Get appropriate message based on processing time and operation type
-  const getStatusMessage = () => {
-    // Token creation specific messages
-    if (operationType === 'token_only') {
-      if (planType === 'monthly') {
-        if (processingTime < 10) {
-          return "יוצר אסימון למנוי חודשי...";
-        } else if (processingTime < 20) {
-          return "מאמת פרטי כרטיס אשראי...";
+      if (operationType === 'token_only') {
+        if (elapsed < 5000) {
+          setMessage('מעבד את פרטי הכרטיס...');
+        } else if (elapsed < 15000) {
+          setMessage('יוצר אסימון לחיוב עתידי...');
+        } else if (elapsed < 30000) {
+          setMessage('ממתין לאישור מחברת האשראי...');
         } else {
-          return "ממתין לאישור יצירת האסימון...";
+          setMessage('הפעולה נמשכת זמן רב מהרגיל, אנא המתן...');
         }
       } else {
-        if (processingTime < 10) {
-          return "יוצר אסימון לשימוש עתידי...";
+        if (elapsed < 5000) {
+          setMessage('מעבד את פרטי התשלום...');
+        } else if (elapsed < 15000) {
+          setMessage('שולח את העסקה לחברת האשראי...');
+        } else if (elapsed < 30000) {
+          setMessage('ממתין לאישור מחברת האשראי...');
         } else {
-          return "ממתין לאישור יצירת האסימון...";
+          setMessage('הפעולה נמשכת זמן רב מהרגיל, אנא המתן...');
         }
       }
-    }
+    }, 5000);
     
-    // Regular payment messages
-    if (processingTime < 15) {
-      return "מעבד את התשלום, אנא המתן...";
-    } else if (processingTime < 30) {
-      return "מאמת פרטים מול חברת האשראי...";
-    } else if (processingTime < 60) {
-      return "ממתין לאישור העסקה...";
-    } else if (processingTime < 90) {
-      return "העסקה עדיין בבדיקה, אנא המתן...";
-    } else {
-      return "הבדיקה נמשכת זמן רב מהרגיל, אנא המתן...";
-    }
-  };
-
-  // Get secondary message based on operation type
-  const getSecondaryMessage = () => {
-    if (operationType === 'token_only') {
-      if (planType === 'monthly') {
-        return "אנו יוצרים אסימון מאובטח לצורך חיובים חודשיים עתידיים";
-      } else {
-        return "יצירת אסימון מאובטח לשימוש עתידי";
-      }
-    } else {
-      return "העסקה מאומתת מול חברת האשראי, התהליך עשוי להימשך מספר רגעים";
-    }
-  };
-
+    // Initial message
+    setMessage(operationType === 'token_only' ? 'מעבד את פרטי הכרטיס...' : 'מעבד את פרטי התשלום...');
+    
+    return () => {
+      clearInterval(progressInterval);
+      clearInterval(messageInterval);
+    };
+  }, [operationType]);
+  
   return (
-    <div className="flex flex-col items-center justify-center py-8 space-y-4">
-      <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-      <p className="font-medium">{getStatusMessage()}</p>
-      
-      <div className="w-full max-w-md">
-        <Progress value={progressValue} className="h-2" />
+    <div className="text-center py-10 space-y-6">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div>
+          <h3 className="text-lg font-medium mb-1">
+            {operationType === 'token_only' 
+              ? 'מפעיל את המנוי...' 
+              : 'מעבד את התשלום...'}
+          </h3>
+          <p className="text-muted-foreground">{message}</p>
+          {elapsedTime > 20 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {`זמן עיבוד: ${elapsedTime} שניות`}
+            </p>
+          )}
+        </div>
       </div>
       
-      <p className="text-sm text-muted-foreground">
-        {getSecondaryMessage()}
-      </p>
-      <p className="text-xs text-muted-foreground">אל תסגור את החלון זה</p>
+      <div className="w-full">
+        <Progress 
+          value={progress} 
+          className="w-full h-2" 
+          indicatorClassName={progress > 80 ? "bg-amber-500" : undefined}
+        />
+      </div>
+      
+      {onCancel && elapsedTime > 30 && (
+        <Button 
+          variant="outline" 
+          onClick={onCancel} 
+          className="mt-4"
+        >
+          ביטול
+        </Button>
+      )}
+      
+      {elapsedTime > 45 && (
+        <p className="text-xs text-muted-foreground">
+          {operationType === 'token_only'
+            ? 'יצירת האסימון נמשכת זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'
+            : 'עיבוד התשלום נמשך זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'}
+        </p>
+      )}
     </div>
   );
 };
