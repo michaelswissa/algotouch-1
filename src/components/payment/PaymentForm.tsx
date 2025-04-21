@@ -27,12 +27,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       : planDetails.monthly;
 
   const {
-    state: {
-      terminalNumber,
-      cardcomUrl,
-      paymentStatus,
-      lowProfileCode
-    },
+    terminalNumber,
+    cardcomUrl,
+    paymentStatus,
+    lowProfileCode,
     masterFrameRef,
     operationType,
     initializePayment,

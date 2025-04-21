@@ -32,7 +32,7 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
   // Handle payment error with message
   const handleError = (message: string) => {
     console.error('Payment error:', message);
-    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED, errorMessage: message }));
     toast.error(message || 'אירעה שגיאה בעיבוד התשלום');
   };
 

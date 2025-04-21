@@ -1,6 +1,6 @@
 
-import { useRef, useEffect, useCallback, useState } from 'react';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { useRef, useCallback, useState } from 'react';
+import { PaymentStatus, PaymentState } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
@@ -17,7 +17,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   
   // Determine operation type based on plan ID
-  useEffect(() => {
+  useState(() => {
     // Monthly plans use token creation for free trial
     if (planId === 'monthly') {
       console.log('Setting operation type to token_only for monthly plan');
@@ -26,7 +26,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.log('Setting operation type to payment for plan:', planId);
       setOperationType('payment');
     }
-  }, [planId]);
+  });
   
   const {
     state,
@@ -35,7 +35,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     handleError
   } = usePaymentStatus({ onPaymentComplete });
 
-  const { initializePayment } = usePaymentInitialization({ 
+  const { initializePayment: initPayment } = usePaymentInitialization({ 
     planId, 
     setState,
     masterFrameRef,
@@ -50,22 +50,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
   // Set up message handlers for iframe communication
   useFrameMessages({
-    handlePaymentSuccess: handlePaymentSuccess,
+    handlePaymentSuccess,
     setState,
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     operationType,
-    planType: planId // Explicitly pass planId as planType
+    planType: planId
   });
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      console.log('Payment component unmounting, cleaning up');
-      cleanupStatusCheck();
-    };
-  }, [cleanupStatusCheck]);
 
   // Handle retry of payment
   const handleRetry = useCallback(() => {
@@ -84,7 +76,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     // Reinitialize with a slight delay
     setTimeout(() => {
-      initializePayment().then(data => {
+      initPayment().then(data => {
         if (data) {
           console.log('Payment reinitialized successfully');
           startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
@@ -97,7 +89,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         handleError('אירעה שגיאה באתחול התשלום');
       });
     }, 500);
-  }, [initializePayment, setState, startStatusCheck, cleanupStatusCheck, handleError, operationType, planId]);
+  }, [initPayment, setState, startStatusCheck, cleanupStatusCheck, handleError, operationType, planId]);
 
   // Handle cancellation of payment
   const handleCancel = useCallback(() => {
@@ -182,26 +174,30 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, 
       state.terminalNumber, startStatusCheck, operationType, planId]);
 
+  // Initialize payment function
+  const initializePayment = useCallback(() => {
+    console.log('Initializing payment with plan:', planId, 'operation type:', operationType);
+    
+    initPayment().then(data => {
+      if (data) {
+        console.log('Payment initialized successfully');
+        startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
+      } else {
+        // Handle initialization failure
+        handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
+      }
+    }).catch(err => {
+      console.error('Failed to initialize payment:', err);
+      handleError('אירעה שגיאה באתחול התשלום');
+    });
+  }, [initPayment, startStatusCheck, operationType, planId, handleError]);
+
+  // Return the payment interface with flattened state properties
   return {
     ...state,
-    operationType,
     masterFrameRef,
-    initializePayment: () => {
-      console.log('Initializing payment with plan:', planId, 'operation type:', operationType);
-      
-      initializePayment().then(data => {
-        if (data) {
-          console.log('Payment initialized successfully');
-          startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
-        } else {
-          // Handle initialization failure
-          handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
-        }
-      }).catch(err => {
-        console.error('Failed to initialize payment:', err);
-        handleError('אירעה שגיאה באתחול התשלום');
-      });
-    },
+    operationType,
+    initializePayment,
     handleRetry,
     handleCancel,
     submitPayment

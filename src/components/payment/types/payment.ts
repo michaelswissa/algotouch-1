@@ -1,5 +1,7 @@
+
 export const PaymentStatus = {
   IDLE: 'idle',
+  INITIALIZING: 'initializing',
   PROCESSING: 'processing',
   SUCCESS: 'success',
   FAILED: 'failed'
