@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,7 +41,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     initializePayment();
   }, []); // Run only once on mount
   
-  // Determine button text based on operation type and status
   const getButtonText = () => {
     if (paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
@@ -52,7 +50,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
-  
+
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
       <CardHeader>
@@ -70,7 +68,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master frame for CardCom - hidden but essential */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -100,7 +97,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               type="button" 
               className="w-full" 
               onClick={submitPayment}
-              disabled={paymentStatus !== PaymentStatus.IDLE}
+              disabled={paymentStatus === PaymentStatus.PROCESSING}
             >
               {getButtonText()}
             </Button>
