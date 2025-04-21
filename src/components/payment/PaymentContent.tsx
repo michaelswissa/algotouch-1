@@ -32,19 +32,25 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onCancel,
   operationType = 'payment'
 }) => {
+  console.log('Rendering PaymentContent with status:', paymentStatus, 'operation:', operationType);
+  
   switch (paymentStatus) {
     case PaymentStatus.INITIALIZING:
       return <InitializingPayment />;
+      
     case PaymentStatus.PROCESSING:
       return <ProcessingPayment 
         onCancel={onCancel} 
         operationType={operationType}
         planType={plan.id}
       />;
+      
     case PaymentStatus.SUCCESS:
       return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
+      
     case PaymentStatus.FAILED:
       return <FailedPayment onRetry={onRetry} />;
+      
     default:
       return (
         <>

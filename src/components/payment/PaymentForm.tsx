@@ -38,9 +38,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   });
 
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId);
+    console.log("Initializing payment for plan:", planId, "with operation type:", operationType);
     initializePayment();
-  }, []); // Run only once on mount
+  }, [initializePayment, planId, operationType]);
   
   // Determine button text based on operation type and status
   const getButtonText = () => {
@@ -70,7 +70,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master frame for CardCom - hidden but essential */}
+        {/* Master frame for CardCom - essential but hidden from view */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"

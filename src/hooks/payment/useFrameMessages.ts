@@ -25,6 +25,14 @@ export const useFrameMessages = ({
   useEffect(() => {
     if (!lowProfileCode || !sessionId) return;
 
+    // For debugging
+    console.log('Setting up useFrameMessages listener', { 
+      lowProfileCode, 
+      sessionId, 
+      operationType, 
+      planType 
+    });
+
     const handleMessage = (event: MessageEvent) => {
       try {
         // Validate message origin for security
@@ -60,20 +68,25 @@ export const useFrameMessages = ({
           case 'HandleSubmit':
             console.log('HandleSubmit message received:', message);
             
-            // Always check if the payment processing should start
+            // Handle submit action
             if (message.data?.IsSuccess) {
+              console.log('Setting payment status to PROCESSING');
               setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
               
-              // Always check payment status regardless of operation type
-              console.log(`Starting payment status check for ${operationType} operation`);
+              // Start checking payment status
+              console.log(`Starting payment status check for ${operationType} operation - initial check`);
               checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
               
-              // Set up additional checks for both operation types to ensure we catch the result
-              const checkDelay = operationType === 'token_only' ? 2000 : 3000;
+              // Do additional checks at different intervals to catch completion
               setTimeout(() => {
-                console.log(`Performing follow-up status check for ${operationType}`);
+                console.log(`Follow-up status check for ${operationType} - 3s`);
                 checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-              }, checkDelay);
+              }, 3000);
+              
+              setTimeout(() => {
+                console.log(`Follow-up status check for ${operationType} - 7s`);
+                checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+              }, 7000);
             } else {
               setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
               toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
@@ -90,20 +103,27 @@ export const useFrameMessages = ({
           case '3DSProcessStarted':
             console.log('3DS Process Started');
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-            // Immediately start checking status when 3DS starts
+            // Check status when 3DS starts
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             break;
             
           case '3DSProcessCompleted':
-            console.log('3DS Process Completed');
-            // Aggressively check status after 3DS completion with short intervals
+            console.log('3DS Process Completed - triggering status checks');
+            // Aggressive checking after 3DS completion
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            
+            // Staggered checks to catch completion
             setTimeout(() => {
               checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             }, 1000);
+            
             setTimeout(() => {
               checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             }, 3000);
+            
+            setTimeout(() => {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }, 6000);
             break;
 
           case 'paymentStarted':
@@ -113,32 +133,46 @@ export const useFrameMessages = ({
             break;
 
           case 'paymentCompleted':
-            console.log('Payment process completed');
-            // Check status immediately and again after a short delay
+            console.log('Payment process completed - checking status');
+            // Payment completed - check status immediately
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            
+            // Additional check after short delay
             setTimeout(() => {
               checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             }, 1500);
+            
+            setTimeout(() => {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }, 4000);
             break;
 
           case 'tokenCreationStarted':
             console.log('Token creation started');
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
             
-            // Start checking status immediately for token creation
+            // Start status checks for token creation
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             break;
             
           case 'tokenCreationCompleted':
-            console.log('Token creation completed', message);
-            // Aggressive checking for token creation completion
+            console.log('Token creation completed. Checking status:', message);
+            
+            // Aggressive checking for token completion
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            
+            // Multiple checks with delays
             setTimeout(() => {
               checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             }, 1000);
+            
             setTimeout(() => {
               checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             }, 3000);
+            
+            setTimeout(() => {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }, 7000);
             break;
 
           case 'tokenCreationFailed':

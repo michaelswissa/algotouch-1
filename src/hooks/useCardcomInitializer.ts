@@ -20,19 +20,31 @@ export const useCardcomInitializer = () => {
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
-    // Load 3DS script dynamically
+    // Load 3DS script dynamically with cache busting
     const script = document.createElement('script');
     const time = new Date().getTime();
     script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
     document.head.appendChild(script);
 
+    // Track initialization attempts
+    let attempts = 0;
+    const maxAttempts = 5;
+
     const checkFrameAndInitialize = () => {
-      // Fix TypeScript error by properly checking for iframe and contentWindow
+      attempts++;
+      
+      // Give up after max attempts
+      if (attempts > maxAttempts) {
+        console.error(`Failed to initialize CardCom after ${maxAttempts} attempts`);
+        return false;
+      }
+      
+      // Check if the frame and its content window are ready
       const iframe = masterFrameRef.current;
       if (!iframe || !iframe.contentWindow) {
-        console.warn('Master frame or contentWindow not ready, retrying in 100ms');
-        setTimeout(checkFrameAndInitialize, 100);
-        return;
+        console.warn(`Master frame or contentWindow not ready (attempt ${attempts}/${maxAttempts}), retrying in 300ms`);
+        setTimeout(checkFrameAndInitialize, 300);
+        return false;
       }
 
       try {
@@ -72,7 +84,7 @@ export const useCardcomInitializer = () => {
             border: 1px solid #c01111;
           }`;
 
-        // Create initialization config with improved options for token operation
+        // Create initialization config with explicit operation type
         const config: InitConfig = {
           action: 'init',
           lowProfileCode,
@@ -80,34 +92,41 @@ export const useCardcomInitializer = () => {
           cardFieldCSS,
           cvvFieldCSS,
           language: 'he',
-          operationType, // Explicitly pass operation type to the iframe
+          operationType, // Pass the operation type explicitly
           operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly',
           placeholder: "1111-2222-3333-4444",
-          cvvPlaceholder: "123"
+          cvvPlaceholder: "123",
+          terminalNumber: "160138" // Add terminal number for proper initialization
         };
 
         console.log('Sending initialization config to CardCom iframe with operation:', operationType);
         iframe.contentWindow.postMessage(config, '*');
         
-        // Add event to verify the iframe received and processed the initialization
-        const checkInitStatus = setTimeout(() => {
-          iframe.contentWindow.postMessage({ action: 'checkInitStatus' }, '*');
+        // Verify initialization after a short delay
+        setTimeout(() => {
+          iframe.contentWindow?.postMessage({ action: 'checkInitStatus' }, '*');
         }, 1000);
         
         return true;
       } catch (error) {
         console.error('Error initializing CardCom fields:', error);
+        
+        // Retry if we haven't reached max attempts
+        if (attempts < maxAttempts) {
+          console.log(`Retrying initialization (attempt ${attempts}/${maxAttempts})`);
+          setTimeout(checkFrameAndInitialize, 500);
+        }
         return false;
       }
     };
 
-    // Initial check with a slight delay to ensure iframe is loaded
+    // Initial check with a short delay to ensure iframe is loaded
     setTimeout(checkFrameAndInitialize, 300);
     
     // Secondary check in case the first one fails
     setTimeout(() => {
       const frame = document.getElementById('CardComMasterFrame');
-      if (frame instanceof HTMLIFrameElement && !frame.contentWindow) {
+      if (frame instanceof HTMLIFrameElement && (!frame.contentWindow || attempts < maxAttempts)) {
         console.log('Attempting secondary CardCom initialization');
         checkFrameAndInitialize();
       }

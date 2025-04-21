@@ -20,8 +20,10 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   useEffect(() => {
     // Monthly plans need token creation
     if (planId === 'monthly') {
+      console.log('Setting operation type to token_only for monthly plan');
       setOperationType('token_only');
     } else {
+      console.log('Setting operation type to payment for plan:', planId);
       setOperationType('payment');
     }
   }, [planId]);
@@ -46,6 +48,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     cleanupStatusCheck
   } = usePaymentStatusCheck({ setState });
 
+  // Set up message handlers for iframe communication
   useFrameMessages({
     handlePaymentSuccess: handlePaymentSuccess,
     setState,
@@ -53,16 +56,18 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     operationType,
-    planType: planId // Pass planId as planType
+    planType: planId // Explicitly pass planId as planType
   });
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      console.log('Payment component unmounting, cleaning up');
       cleanupStatusCheck();
     };
   }, [cleanupStatusCheck]);
 
+  // Handle retry of payment
   const handleRetry = useCallback(() => {
     console.log('Retrying payment initialization');
     
@@ -93,6 +98,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }, 500);
   }, [initializePayment, setState, startStatusCheck, cleanupStatusCheck, handleError, operationType, planId]);
 
+  // Handle cancellation of payment
   const handleCancel = useCallback(() => {
     console.log('User cancelled payment process');
     
@@ -108,18 +114,18 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     toast.info('תהליך התשלום בוטל');
   }, [setState, cleanupStatusCheck]);
 
+  // Handle payment submission
   const submitPayment = useCallback(() => {
-    console.log('Submitting payment transaction');
+    console.log('Submitting payment transaction for plan:', planId);
     
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
       try {
-        // Get cardholder details from form fields or state
+        // Get cardholder details from form fields
         const formData = {
           action: 'doTransaction',
           // Add required transaction parameters based on CardCom documentation
           TerminalNumber: state.terminalNumber,
-          // Keep expirationMonth and expirationYear as they're set via postMessage separately
           numberOfPayments: "1",
           // Create a unique transaction ID based on timestamp to avoid duplicates
           ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -131,19 +137,27 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
           // Add operation type indicator
           Operation: operationType === 'token_only' || planId === 'monthly' 
             ? "ChargeAndCreateToken" 
-            : "ChargeOnly"
+            : "ChargeOnly",
+          // Add plan type for backend reference
+          planType: planId
         };
 
-        console.log('Sending transaction data:', formData);
+        console.log('Sending transaction data:', {
+          ...formData,
+          sessionId: state.sessionId,
+          lowProfileCode: state.lowProfileCode
+        });
+        
         masterFrameRef.current.contentWindow.postMessage(formData, '*');
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
         
-        // Start monitoring the transaction status immediately
+        // Start monitoring transaction status
         if (state.lowProfileCode && state.sessionId) {
           console.log('Starting transaction status check');
           startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
         } else {
           console.error('Missing lowProfileCode or sessionId for status check');
+          handleError('פרטי העסקה חסרים, אנא טען מחדש את הדף ונסה שנית');
         }
       } catch (error) {
         console.error("Error submitting payment:", error);
@@ -153,7 +167,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.error("Master frame not available for transaction");
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
     }
-  }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, state.terminalNumber, startStatusCheck, operationType, planId]);
+  }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, 
+      state.terminalNumber, startStatusCheck, operationType, planId]);
 
   return {
     ...state,

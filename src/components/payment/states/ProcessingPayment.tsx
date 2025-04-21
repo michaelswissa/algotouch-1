@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
@@ -18,6 +18,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string>('');
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [showWarning, setShowWarning] = useState(false);
   
   // Update progress and messages
   useEffect(() => {
@@ -26,7 +27,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
     let messageInterval: NodeJS.Timeout;
     
     // Different timing based on operation type
-    const maxProcessingTime = operationType === 'token_only' ? 60000 : 90000; // 1-1.5 mins
+    const maxProcessingTime = operationType === 'token_only' ? 40000 : 60000; // Lower timeouts for better UX
     
     // Set up progress bar animation
     progressInterval = setInterval(() => {
@@ -34,6 +35,12 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
       const newProgress = Math.min(Math.floor((elapsed / maxProcessingTime) * 100), 95);
       setProgress(newProgress);
       setElapsedTime(Math.floor(elapsed / 1000));
+      
+      // Show warning if taking too long
+      if (elapsed > 25000 && !showWarning) {
+        setShowWarning(true);
+        console.log("Processing taking longer than expected - encouraging user to check console");
+      }
     }, 300);
     
     // Update messages based on elapsed time
@@ -41,36 +48,52 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
       const elapsed = Date.now() - startTime;
       
       if (operationType === 'token_only') {
-        if (elapsed < 5000) {
-          setMessage('מעבד את פרטי הכרטיס...');
-        } else if (elapsed < 15000) {
+        if (elapsed < 3000) {
+          setMessage('שולח פרטי כרטיס לבדיקה...');
+        } else if (elapsed < 8000) {
           setMessage('יוצר אסימון לחיוב עתידי...');
-        } else if (elapsed < 30000) {
+        } else if (elapsed < 15000) {
           setMessage('ממתין לאישור מחברת האשראי...');
+        } else if (elapsed < 25000) {
+          setMessage('מעבד את פרטי ההרשאה...');
         } else {
-          setMessage('הפעולה נמשכת זמן רב מהרגיל, אנא המתן...');
+          setMessage('התהליך לוקח יותר זמן מהרגיל, אנא המתן...');
         }
       } else {
-        if (elapsed < 5000) {
-          setMessage('מעבד את פרטי התשלום...');
+        if (elapsed < 3000) {
+          setMessage('שולח פרטי תשלום...');
+        } else if (elapsed < 8000) {
+          setMessage('מעבד את העסקה מול חברת האשראי...');
         } else if (elapsed < 15000) {
-          setMessage('שולח את העסקה לחברת האשראי...');
-        } else if (elapsed < 30000) {
-          setMessage('ממתין לאישור מחברת האשראי...');
+          setMessage('ממתין לאישור העסקה...');
+        } else if (elapsed < 25000) {
+          setMessage('העסקה בתהליך אימות...');
         } else {
-          setMessage('הפעולה נמשכת זמן רב מהרגיל, אנא המתן...');
+          setMessage('העסקה עדיין בעיבוד, אנא המתן...');
         }
       }
-    }, 5000);
+    }, 3000);
     
     // Initial message
-    setMessage(operationType === 'token_only' ? 'מעבד את פרטי הכרטיס...' : 'מעבד את פרטי התשלום...');
+    setMessage(operationType === 'token_only' ? 'שולח פרטי כרטיס לבדיקה...' : 'מעבד את פרטי התשלום...');
     
     return () => {
       clearInterval(progressInterval);
       clearInterval(messageInterval);
     };
-  }, [operationType]);
+  }, [operationType, showWarning]);
+  
+  const handleCancel = () => {
+    if (onCancel) {
+      // Log cancellation for debugging
+      console.log("User manually cancelled payment process", { 
+        elapsedTime, 
+        operationType, 
+        planType 
+      });
+      onCancel();
+    }
+  };
   
   return (
     <div className="text-center py-10 space-y-6">
@@ -83,7 +106,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
               : 'מעבד את התשלום...'}
           </h3>
           <p className="text-muted-foreground">{message}</p>
-          {elapsedTime > 20 && (
+          {elapsedTime > 10 && (
             <p className="text-sm text-muted-foreground mt-1">
               {`זמן עיבוד: ${elapsedTime} שניות`}
             </p>
@@ -99,22 +122,36 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
         />
       </div>
       
-      {onCancel && elapsedTime > 30 && (
-        <Button 
-          variant="outline" 
-          onClick={onCancel} 
-          className="mt-4"
-        >
-          ביטול
-        </Button>
+      {showWarning && (
+        <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4 mt-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                {operationType === 'token_only'
+                  ? 'יצירת האסימון לוקחת זמן רב מהצפוי'
+                  : 'עיבוד התשלום לוקח זמן רב מהצפוי'}
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-200">
+                <p>
+                  אנחנו עדיין מעבדים את הבקשה. באפשרותך להמתין או לבטל ולנסות שנית.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       
-      {elapsedTime > 45 && (
-        <p className="text-xs text-muted-foreground">
-          {operationType === 'token_only'
-            ? 'יצירת האסימון נמשכת זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'
-            : 'עיבוד התשלום נמשך זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'}
-        </p>
+      {elapsedTime > 20 && (
+        <Button 
+          variant="outline" 
+          onClick={handleCancel} 
+          className="mt-4"
+        >
+          ביטול וניסיון מחדש
+        </Button>
       )}
     </div>
   );

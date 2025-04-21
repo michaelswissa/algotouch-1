@@ -20,7 +20,7 @@ export interface PaymentResponse {
 }
 
 export interface CardComMessage {
-  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted';
+  action: string; // More flexible type to accommodate all CardCom message types
   data?: any;
   message?: string;
   field?: string;
@@ -36,9 +36,11 @@ export interface InitConfig {
   cvvFieldCSS: string;
   language: string;
   operationType?: 'payment' | 'token_only';
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken'; // Added the missing operation property
+  terminalNumber?: string; // Add terminal number for proper initialization
+  reCaptchaFieldCSS?: string;
 }
 
 export interface PaymentState {

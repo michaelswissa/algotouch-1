@@ -16,17 +16,20 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
     lowProfileCode: '',
   });
 
-  // Changed to match the expected signature (no parameters)
+  // Handle successful payment completion
   const handlePaymentSuccess = () => {
-    console.log('Payment successful');
+    console.log('Payment successful - transitioning to SUCCESS state');
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
     toast.success('התשלום בוצע בהצלחה!');
     
+    // Delay callback to allow the UI to update
     setTimeout(() => {
+      console.log('Executing payment complete callback');
       onPaymentComplete();
-    }, 1000);
+    }, 1500);
   };
 
+  // Handle payment error with message
   const handleError = (message: string) => {
     console.error('Payment error:', message);
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
