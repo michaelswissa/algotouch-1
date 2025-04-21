@@ -6,16 +6,18 @@ export const useCardcomInitializer = () => {
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
+    terminalNumber: string,
     operationType: 'payment' | 'token_only' = 'payment'
   ) => {
-    if (!masterFrameRef.current) {
-      console.error("Master frame reference is not available");
+    if (!masterFrameRef.current || !terminalNumber) {
+      console.error("Master frame reference or terminal number is not available");
       return false;
     }
 
     console.log('Initializing CardCom fields with:', { 
       lowProfileCode, 
       sessionId,
+      terminalNumber,
       operationType,
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
@@ -37,7 +39,7 @@ export const useCardcomInitializer = () => {
           return;
         }
 
-        // Simpler CSS similar to example
+        // Simple CSS like in the example
         const cardFieldCSS = `
           body { margin: 0; padding: 0; }
           .cardNumberField {
@@ -74,11 +76,10 @@ export const useCardcomInitializer = () => {
           action: 'init',
           lowProfileCode,
           sessionId,
+          terminalNumber,
           cardFieldCSS,
           cvvFieldCSS,
-          language: 'he',
-          placeholder: "1111-2222-3333-4444",
-          cvvPlaceholder: "123"
+          language: 'he'
         };
 
         console.log('Sending initialization message to CardCom iframe');

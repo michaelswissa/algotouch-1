@@ -14,12 +14,14 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   frameLoadAttempts
 }) => {
+  const iframeSrc = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
+  
   return (
     <div className="relative" style={{ maxWidth: '100px' }}>
       <iframe
         id="CardComCvv"
         name="CardComCvv"
-        src={`${cardcomUrl}/api/openfields/CVV`}
+        src={iframeSrc}
         className="w-full h-[40px] border border-input rounded-md"
         onLoad={onLoad}
         title="קוד אבטחה"

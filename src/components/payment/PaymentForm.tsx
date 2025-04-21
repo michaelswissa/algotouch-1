@@ -96,12 +96,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Hidden master iframe - similar to example */}
+        {/* Hidden master iframe with terminal number */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
-          src={`${cardcomUrl}/api/openfields/master`}
+          src={`${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`}
           style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
           title="CardCom Master Frame"
         />

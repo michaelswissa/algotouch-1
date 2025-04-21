@@ -14,12 +14,14 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
   onLoad,
   frameLoadAttempts
 }) => {
+  const iframeSrc = `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`;
+  
   return (
     <div className="relative">
       <iframe
         id="CardComCardNumber"
         name="CardComCardNumber"
-        src={`${cardcomUrl}/api/openfields/cardNumber`}
+        src={iframeSrc}
         className="w-full h-[40px] border border-input rounded-md"
         onLoad={onLoad}
         title="מספר כרטיס"

@@ -33,6 +33,7 @@ export const usePaymentInitialization = ({
     try {
       // Get and validate registration data
       const { userId, userEmail, fullName } = await handleRegistrationData();
+      console.log('Registration data loaded:', { userId, userEmail });
       
       if (!userEmail) {
         console.error("No user email found for payment");
@@ -41,12 +42,13 @@ export const usePaymentInitialization = ({
 
       // Validate contract
       const contractDetails = validateContract();
+      console.log('Contract validation:', Boolean(contractDetails));
       if (!contractDetails) {
         console.error("Contract validation failed");
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
 
-      // Initialize payment session with operation type - similar to example approach
+      // Initialize payment session
       console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
@@ -62,11 +64,12 @@ export const usePaymentInitialization = ({
       
       console.log('Payment session initialized:', paymentData);
       
-      // Initialize CardCom fields with improved iframe handling - similar to example
-      const initialized = initializeCardcomFields(
+      // Initialize CardCom fields with terminal number
+      const initialized = await initializeCardcomFields(
         masterFrameRef, 
         paymentData.lowProfileCode, 
-        paymentData.sessionId, 
+        paymentData.sessionId,
+        paymentData.terminalNumber || '160138', // Fallback to default terminal if not provided
         operationType
       );
       
