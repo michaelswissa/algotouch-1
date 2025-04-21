@@ -3,10 +3,10 @@ import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
-import PaymentContent from './PaymentContent';
-import { usePayment } from '@/hooks/usePayment';
 import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
+import PaymentContent from './PaymentContent';
+import { usePayment } from '@/hooks/usePayment';
 
 interface PaymentFormProps {
   planId: string;
@@ -14,7 +14,11 @@ interface PaymentFormProps {
   onBack?: () => void;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({ 
+  planId, 
+  onPaymentComplete, 
+  onBack 
+}) => {
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -23,9 +27,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       : planDetails.monthly;
 
   const {
-    terminalNumber,
-    cardcomUrl,
-    paymentStatus,
+    state: {
+      terminalNumber,
+      cardcomUrl,
+      paymentStatus,
+      lowProfileCode
+    },
     masterFrameRef,
     operationType,
     initializePayment,
@@ -38,7 +45,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   });
 
   useEffect(() => {
-    // אתחול התשלום מיד כשהקומפוננטה נטענת
     initializePayment();
   }, [initializePayment]);
   
@@ -57,7 +63,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master frame for CardCom - essential but hidden from view */}
+        {/* Master frame for CardCom */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -77,12 +83,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           onRetry={handleRetry}
           onCancel={handleCancel}
           operationType={operationType}
+          lowProfileCode={lowProfileCode}
         />
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {/* תיקון בדיקת תנאים - בודק האם המצב אינו מעבד ואינו הצלחה */}
-        {paymentStatus !== PaymentStatus.PROCESSING && paymentStatus !== PaymentStatus.SUCCESS && (
+        {paymentStatus !== PaymentStatus.PROCESSING && 
+         paymentStatus !== PaymentStatus.SUCCESS && (
           <>
             <Button 
               type="button" 
@@ -90,9 +97,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               onClick={submitPayment}
               disabled={paymentStatus === PaymentStatus.PROCESSING}
             >
-              {paymentStatus === PaymentStatus.PROCESSING 
-                ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>
-                : operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום'}
+              {paymentStatus === PaymentStatus.PROCESSING ? (
+                <span className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                  מעבד תשלום...
+                </span>
+              ) : (
+                operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום'
+              )}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               {operationType === 'token_only' 

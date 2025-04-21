@@ -1,10 +1,8 @@
-
 export const PaymentStatus = {
-  IDLE: 'idle' as const,
-  INITIALIZING: 'initializing' as const,
-  PROCESSING: 'processing' as const,
-  SUCCESS: 'success' as const,
-  FAILED: 'failed' as const
+  IDLE: 'idle',
+  PROCESSING: 'processing',
+  SUCCESS: 'success',
+  FAILED: 'failed'
 } as const;
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
