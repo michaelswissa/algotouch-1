@@ -2,7 +2,12 @@
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
-  const initializeCardcomFields = (masterFrameRef: React.RefObject<HTMLIFrameElement>, lowProfileCode: string, sessionId: string) => {
+  const initializeCardcomFields = (
+    masterFrameRef: React.RefObject<HTMLIFrameElement>, 
+    lowProfileCode: string, 
+    sessionId: string,
+    operationType: 'payment' | 'token_only' = 'payment'
+  ) => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization");
       return false;
@@ -16,7 +21,8 @@ export const useCardcomInitializer = () => {
     console.log('Initializing CardCom fields with:', { 
       lowProfileCode, 
       sessionId,
-      hasMasterFrame: Boolean(masterFrameRef.current)
+      hasMasterFrame: Boolean(masterFrameRef.current),
+      operationType
     });
 
     // Load 3DS script dynamically with cache busting
@@ -35,7 +41,6 @@ export const useCardcomInitializer = () => {
       // Give up after max attempts
       if (attempts > maxAttempts) {
         console.error(`Failed to initialize CardCom after ${maxAttempts} attempts`);
-        // We could trigger a callback here to notify the parent component
         return false;
       }
       
@@ -48,6 +53,9 @@ export const useCardcomInitializer = () => {
       }
 
       try {
+        // Set operation based on operationType
+        const operation = operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly';
+        
         const config: InitConfig = {
           action: 'init',
           lowProfileCode,
@@ -89,7 +97,9 @@ export const useCardcomInitializer = () => {
           placeholder: "1111-2222-3333-4444",
           cvvPlaceholder: "123",
           language: 'he',
-          terminalNumber: "160138" // Terminal number for proper initialization
+          terminalNumber: "160138", // Terminal number for proper initialization
+          operationType, // Add operation type
+          operation // Add explicit operation based on operation type
         };
 
         console.log('Sending initialization config to CardCom iframe');
