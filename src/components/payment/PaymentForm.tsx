@@ -81,7 +81,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.INITIALIZING) && (
+        {/* Fixed type check to include all non-processing, non-success states */}
+        {paymentStatus !== PaymentStatus.PROCESSING && paymentStatus !== PaymentStatus.SUCCESS && (
           <>
             <Button 
               type="button" 
