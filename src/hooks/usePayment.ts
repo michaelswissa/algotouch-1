@@ -1,4 +1,5 @@
-import { useRef, useEffect, useCallback } from 'react';
+
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
@@ -13,6 +14,17 @@ interface UsePaymentProps {
 
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
+  const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
+  
+  // Determine operation type based on plan ID
+  useEffect(() => {
+    // Monthly plans need token creation
+    if (planId === 'monthly') {
+      setOperationType('token_only');
+    } else {
+      setOperationType('payment');
+    }
+  }, [planId]);
   
   const {
     state,
@@ -24,7 +36,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const { initializePayment } = usePaymentInitialization({ 
     planId, 
     setState,
-    masterFrameRef
+    masterFrameRef,
+    operationType
   });
 
   const {
@@ -38,7 +51,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     setState,
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
-    sessionId: state.sessionId
+    sessionId: state.sessionId,
+    operationType
   });
 
   // Clean up on unmount
@@ -66,7 +80,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       initializePayment().then(data => {
         if (data) {
           console.log('Payment reinitialized successfully, starting status check');
-          startStatusCheck(data.lowProfileCode, data.sessionId);
+          startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
         } else {
           // Handle initialization failure
           handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
@@ -76,7 +90,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         handleError('אירעה שגיאה באתחול התשלום');
       });
     }, 500);
-  }, [initializePayment, setState, startStatusCheck, cleanupStatusCheck, handleError]);
+  }, [initializePayment, setState, startStatusCheck, cleanupStatusCheck, handleError, operationType, planId]);
 
   const handleCancel = useCallback(() => {
     console.log('User cancelled payment process');
@@ -113,6 +127,10 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
           cardOwnerPhone: document.querySelector<HTMLInputElement>('#phone')?.value || '',
           cardOwnerEmail: document.querySelector<HTMLInputElement>('#email')?.value || '',
           cardOwnerName: document.querySelector<HTMLInputElement>('#cardholder-name')?.value || '',
+          // Add operation type indicator
+          Operation: operationType === 'token_only' || planId === 'monthly' 
+            ? "ChargeAndCreateToken" 
+            : "ChargeOnly"
         };
 
         console.log('Sending transaction data:', formData);
@@ -122,7 +140,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         // Start monitoring the transaction status immediately
         if (state.lowProfileCode && state.sessionId) {
           console.log('Starting transaction status check');
-          startStatusCheck(state.lowProfileCode, state.sessionId);
+          startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
         } else {
           console.error('Missing lowProfileCode or sessionId for status check');
         }
@@ -134,10 +152,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.error("Master frame not available for transaction");
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
     }
-  }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, state.terminalNumber, startStatusCheck]);
+  }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, state.terminalNumber, startStatusCheck, operationType, planId]);
 
   return {
     ...state,
+    operationType,
     masterFrameRef,
     initializePayment: () => {
       console.log('Initializing payment with plan:', planId);
@@ -145,7 +164,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       initializePayment().then(data => {
         if (data) {
           console.log('Payment initialized successfully, starting status check');
-          startStatusCheck(data.lowProfileCode, data.sessionId);
+          startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
         } else {
           // Handle initialization failure
           handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');

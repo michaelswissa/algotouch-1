@@ -5,12 +5,20 @@ import { Progress } from '@/components/ui/progress';
 
 interface ProcessingPaymentProps {
   onCancel?: () => void;
+  operationType?: 'payment' | 'token_only';
+  planType?: string;
 }
 
-const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
+const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ 
+  onCancel, 
+  operationType = 'payment',
+  planType
+}) => {
   const [processingTime, setProcessingTime] = useState(0);
   const [progressValue, setProgressValue] = useState(0);
-  const MAX_PROCESSING_TIME = 180; // 3 minutes in seconds
+  
+  // Set different max times based on operation type
+  const MAX_PROCESSING_TIME = operationType === 'token_only' ? 45 : 180; // seconds
   
   // Update processing time and progress
   useEffect(() => {
@@ -29,10 +37,30 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [processingTime]);
+  }, [processingTime, MAX_PROCESSING_TIME]);
 
-  // Get appropriate message based on processing time
+  // Get appropriate message based on processing time and operation type
   const getStatusMessage = () => {
+    // Token creation specific messages
+    if (operationType === 'token_only') {
+      if (planType === 'monthly') {
+        if (processingTime < 10) {
+          return "יוצר אסימון למנוי חודשי...";
+        } else if (processingTime < 20) {
+          return "מאמת פרטי כרטיס אשראי...";
+        } else {
+          return "ממתין לאישור יצירת האסימון...";
+        }
+      } else {
+        if (processingTime < 10) {
+          return "יוצר אסימון לשימוש עתידי...";
+        } else {
+          return "ממתין לאישור יצירת האסימון...";
+        }
+      }
+    }
+    
+    // Regular payment messages
     if (processingTime < 15) {
       return "מעבד את התשלום, אנא המתן...";
     } else if (processingTime < 30) {
@@ -46,6 +74,19 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
     }
   };
 
+  // Get secondary message based on operation type
+  const getSecondaryMessage = () => {
+    if (operationType === 'token_only') {
+      if (planType === 'monthly') {
+        return "אנו יוצרים אסימון מאובטח לצורך חיובים חודשיים עתידיים";
+      } else {
+        return "יצירת אסימון מאובטח לשימוש עתידי";
+      }
+    } else {
+      return "העסקה מאומתת מול חברת האשראי, התהליך עשוי להימשך מספר רגעים";
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-8 space-y-4">
       <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
@@ -56,7 +97,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({ onCancel }) => {
       </div>
       
       <p className="text-sm text-muted-foreground">
-        העסקה מאומתת מול חברת האשראי, התהליך עשוי להימשך מספר רגעים
+        {getSecondaryMessage()}
       </p>
       <p className="text-xs text-muted-foreground">אל תסגור את החלון זה</p>
     </div>

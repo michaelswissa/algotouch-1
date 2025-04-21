@@ -27,6 +27,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     cardcomUrl,
     paymentStatus,
     masterFrameRef,
+    operationType,
     initializePayment,
     handleRetry,
     handleCancel,
@@ -41,6 +42,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     initializePayment();
   }, []); // Run only once on mount
   
+  // Determine button text based on operation type and status
+  const getButtonText = () => {
+    if (paymentStatus === PaymentStatus.PROCESSING) {
+      return operationType === 'token_only' 
+        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
+        : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
+    }
+    
+    return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
+  };
+  
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
       <CardHeader>
@@ -51,7 +63,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         <CardDescription>
           {paymentStatus === PaymentStatus.SUCCESS 
             ? 'התשלום בוצע בהצלחה!'
-            : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
+            : operationType === 'token_only'
+              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
+              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
       
@@ -75,6 +89,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           onNavigateToDashboard={() => window.location.href = '/dashboard'}
           onRetry={handleRetry}
           onCancel={handleCancel}
+          operationType={operationType}
         />
       </CardContent>
 
@@ -87,16 +102,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               onClick={submitPayment}
               disabled={paymentStatus !== PaymentStatus.IDLE}
             >
-              {paymentStatus === PaymentStatus.PROCESSING ? (
-                <span className="flex items-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...
-                </span>
-              ) : (
-                'אשר תשלום'
-              )}
+              {getButtonText()}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              {plan.hasTrial ? 'לא יבוצע חיוב במהלך תקופת הניסיון' : 'החיוב יבוצע מיידית'}
+              {operationType === 'token_only' 
+                ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
+                : plan.hasTrial 
+                  ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
+                  : 'החיוב יבוצע מיידית'}
             </p>
           </>
         )}

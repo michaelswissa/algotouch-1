@@ -11,13 +11,21 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
   const initializePaymentSession = async (
     planId: string,
     userId: string | null,
-    paymentUser: { email: string; fullName: string }
+    paymentUser: { email: string; fullName: string },
+    operationType: 'payment' | 'token_only' = 'payment'
   ) => {
     console.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
-      fullName: paymentUser.fullName
+      fullName: paymentUser.fullName,
+      operationType
     });
+
+    // Determine operation based on plan and operationType
+    let operation = "ChargeOnly";
+    if (operationType === 'token_only' || planId === 'monthly') {
+      operation = "ChargeAndCreateToken";
+    }
 
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
@@ -29,12 +37,13 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
           email: paymentUser.email,
         },
         currency: "ILS",
-        operation: "ChargeAndCreateToken",
+        operation: operation, // Explicitly set the operation type
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
         },
         userId: userId,
+        operationType, // Pass the operation type to the backend
         registrationData: sessionStorage.getItem('registration_data') 
           ? JSON.parse(sessionStorage.getItem('registration_data')!) 
           : null

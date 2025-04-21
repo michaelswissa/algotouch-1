@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -5,9 +6,10 @@ import { toast } from 'sonner';
 interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
   setState: (updater: any) => void;
-  checkPaymentStatus: (lowProfileCode: string, sessionId: string) => void;
+  checkPaymentStatus: (lowProfileCode: string, sessionId: string, operationType?: 'payment' | 'token_only', planType?: string) => void;
   lowProfileCode: string;
   sessionId: string;
+  operationType?: 'payment' | 'token_only';
 }
 
 export const useFrameMessages = ({
@@ -15,7 +17,8 @@ export const useFrameMessages = ({
   setState,
   checkPaymentStatus,
   lowProfileCode,
-  sessionId
+  sessionId,
+  operationType = 'payment'
 }: UseFrameMessagesProps) => {
   useEffect(() => {
     if (!lowProfileCode || !sessionId) return;
@@ -55,8 +58,17 @@ export const useFrameMessages = ({
           case 'HandleSubmit':
             console.log('HandleSubmit message:', message);
             if (message.data?.IsSuccess) {
-              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-              handlePaymentSuccess();
+              // For token operations, we need to check status via API
+              if (operationType === 'token_only') {
+                setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+                // Start checking status immediately
+                setTimeout(() => {
+                  checkPaymentStatus(lowProfileCode, sessionId, operationType);
+                }, 1000);
+              } else {
+                setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+                handlePaymentSuccess();
+              }
             } else {
               setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
               toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
@@ -73,13 +85,13 @@ export const useFrameMessages = ({
             console.log('3DS Process Started');
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
             // Start checking status immediately when 3DS starts
-            setTimeout(() => checkPaymentStatus(lowProfileCode, sessionId), 2000);
+            setTimeout(() => checkPaymentStatus(lowProfileCode, sessionId, operationType), 2000);
             break;
             
           case '3DSProcessCompleted':
             console.log('3DS Process Completed');
             // Check status after 3DS completion
-            checkPaymentStatus(lowProfileCode, sessionId);
+            checkPaymentStatus(lowProfileCode, sessionId, operationType);
             break;
 
           case 'paymentStarted':
@@ -90,7 +102,18 @@ export const useFrameMessages = ({
           case 'paymentCompleted':
             console.log('Payment process completed');
             // Check status after completion
-            checkPaymentStatus(lowProfileCode, sessionId);
+            checkPaymentStatus(lowProfileCode, sessionId, operationType);
+            break;
+
+          case 'tokenCreationStarted':
+            console.log('Token creation started');
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            break;
+            
+          case 'tokenCreationCompleted':
+            console.log('Token creation completed');
+            // Check status specifically for token
+            checkPaymentStatus(lowProfileCode, sessionId, 'token_only');
             break;
 
           case 'transactionTimeout':
@@ -137,5 +160,5 @@ export const useFrameMessages = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus]);
+  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType]);
 };

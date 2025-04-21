@@ -20,7 +20,7 @@ export interface PaymentResponse {
 }
 
 export interface CardComMessage {
-  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations';
+  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted';
   data?: any;
   message?: string;
   field?: string;
@@ -35,6 +35,7 @@ export interface InitConfig {
   cardFieldCSS: string;
   cvvFieldCSS: string;
   language: string;
+  operationType?: 'payment' | 'token_only';
 }
 
 export interface PaymentState {
@@ -43,4 +44,5 @@ export interface PaymentState {
   paymentStatus: PaymentStatusType;
   sessionId: string;
   lowProfileCode: string;
+  operationType?: 'payment' | 'token_only';
 }

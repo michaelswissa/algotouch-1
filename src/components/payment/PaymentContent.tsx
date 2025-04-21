@@ -18,6 +18,7 @@ interface PaymentContentProps {
   onNavigateToDashboard: () => void;
   onRetry: () => void;
   onCancel?: () => void;
+  operationType?: 'payment' | 'token_only';
 }
 
 const PaymentContent: React.FC<PaymentContentProps> = ({
@@ -28,13 +29,18 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   masterFrameRef,
   onNavigateToDashboard,
   onRetry,
-  onCancel
+  onCancel,
+  operationType = 'payment'
 }) => {
   switch (paymentStatus) {
     case PaymentStatus.INITIALIZING:
       return <InitializingPayment />;
     case PaymentStatus.PROCESSING:
-      return <ProcessingPayment onCancel={onCancel} />;
+      return <ProcessingPayment 
+        onCancel={onCancel} 
+        operationType={operationType}
+        planType={plan.id}
+      />;
     case PaymentStatus.SUCCESS:
       return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
     case PaymentStatus.FAILED:

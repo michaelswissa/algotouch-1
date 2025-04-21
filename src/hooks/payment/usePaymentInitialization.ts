@@ -10,12 +10,14 @@ interface UsePaymentInitializationProps {
   planId: string;
   setState: (updater: any) => void;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
+  operationType?: 'payment' | 'token_only';
 }
 
 export const usePaymentInitialization = ({
   planId,
   setState,
-  masterFrameRef
+  masterFrameRef,
+  operationType = 'payment'
 }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
   const { initializeCardcomFields } = useCardcomInitializer();
@@ -41,15 +43,16 @@ export const usePaymentInitialization = ({
       const contractDetails = validateContract();
       if (!contractDetails) return;
 
-      // Initialize payment session
+      // Initialize payment session with operation type
       const paymentData = await initializePaymentSession(
         planId,
         userId,
-        { email: userEmail, fullName: fullName || userEmail }
+        { email: userEmail, fullName: fullName || userEmail },
+        operationType
       );
       
       // Initialize CardCom fields with improved iframe handling
-      initializeCardcomFields(masterFrameRef, paymentData.lowProfileCode, paymentData.sessionId);
+      initializeCardcomFields(masterFrameRef, paymentData.lowProfileCode, paymentData.sessionId, operationType);
       
       return paymentData;
     } catch (error) {
