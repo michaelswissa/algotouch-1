@@ -12,7 +12,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     planId: string,
     userId: string | null,
     paymentUser: { email: string; fullName: string },
-    operationType: 'payment' | 'token_only' = 'payment' // added operationType parameter
+    operationType: 'payment' | 'token_only' = 'payment'
   ): Promise<{ lowProfileCode: string; sessionId: string }> => {
     console.log("Initializing payment for:", {
       planId,
