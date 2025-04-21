@@ -86,8 +86,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {paymentStatus !== PaymentStatus.PROCESSING && 
-         paymentStatus !== PaymentStatus.SUCCESS && (
+        {paymentStatus !== PaymentStatus.SUCCESS && 
+         paymentStatus !== PaymentStatus.PROCESSING && (
           <>
             <Button 
               type="button" 
