@@ -18,7 +18,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   
   // Determine operation type based on plan ID
   useEffect(() => {
-    // Monthly plans need token creation
+    // Monthly plans use token creation for free trial
     if (planId === 'monthly') {
       console.log('Setting operation type to token_only for monthly plan');
       setOperationType('token_only');
@@ -75,7 +75,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       ...prev,
       paymentStatus: PaymentStatus.IDLE,
       sessionId: '',
-      lowProfileCode: ''
+      lowProfileCode: '',
+      errorMessage: undefined
     }));
     
     // Reset the payment process
@@ -85,7 +86,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     setTimeout(() => {
       initializePayment().then(data => {
         if (data) {
-          console.log('Payment reinitialized successfully, starting status check');
+          console.log('Payment reinitialized successfully');
           startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
         } else {
           // Handle initialization failure
@@ -108,7 +109,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     // Set state back to idle
     setState(prev => ({
       ...prev,
-      paymentStatus: PaymentStatus.IDLE
+      paymentStatus: PaymentStatus.IDLE,
+      errorMessage: undefined
     }));
     
     toast.info('תהליך התשלום בוטל');
@@ -116,24 +118,34 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
   // Handle payment submission
   const submitPayment = useCallback(() => {
-    console.log('Submitting payment transaction for plan:', planId);
+    console.log('Submitting payment transaction for plan:', planId, 'with operation type:', operationType);
     
     // Only send message if frame is ready
     if (masterFrameRef.current?.contentWindow) {
       try {
         // Get cardholder details from form fields
+        const cardholderName = document.querySelector<HTMLInputElement>('#cardholder-name')?.value || '';
+        const email = document.querySelector<HTMLInputElement>('#email')?.value || '';
+        const phone = document.querySelector<HTMLInputElement>('#phone')?.value || '';
+        
+        // Validate required fields
+        if (!cardholderName) {
+          toast.error('נא להזין שם בעל הכרטיס');
+          return;
+        }
+        
+        // Create unique transaction ID
+        const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        
         const formData = {
           action: 'doTransaction',
-          // Add required transaction parameters based on CardCom documentation
           TerminalNumber: state.terminalNumber,
           numberOfPayments: "1",
-          // Create a unique transaction ID based on timestamp to avoid duplicates
-          ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          // Important fields for 3DS flow
+          ExternalUniqTranId: uniqueId,
           ISOCoinId: 1, // ILS
-          cardOwnerPhone: document.querySelector<HTMLInputElement>('#phone')?.value || '',
-          cardOwnerEmail: document.querySelector<HTMLInputElement>('#email')?.value || '',
-          cardOwnerName: document.querySelector<HTMLInputElement>('#cardholder-name')?.value || '',
+          cardOwnerPhone: phone,
+          cardOwnerEmail: email,
+          cardOwnerName: cardholderName,
           // Add operation type indicator
           Operation: operationType === 'token_only' || planId === 'monthly' 
             ? "ChargeAndCreateToken" 
@@ -142,7 +154,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
           planType: planId
         };
 
-        console.log('Sending transaction data:', {
+        console.log('Sending transaction data to CardCom iframe:', {
           ...formData,
           sessionId: state.sessionId,
           lowProfileCode: state.lowProfileCode
@@ -165,7 +177,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }
     } else {
       console.error("Master frame not available for transaction");
-      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
+      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף");
     }
   }, [masterFrameRef, setState, handleError, state.lowProfileCode, state.sessionId, 
       state.terminalNumber, startStatusCheck, operationType, planId]);
@@ -175,11 +187,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     operationType,
     masterFrameRef,
     initializePayment: () => {
-      console.log('Initializing payment with plan:', planId);
+      console.log('Initializing payment with plan:', planId, 'operation type:', operationType);
       
       initializePayment().then(data => {
         if (data) {
-          console.log('Payment initialized successfully, starting status check');
+          console.log('Payment initialized successfully');
           startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
         } else {
           // Handle initialization failure

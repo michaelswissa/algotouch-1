@@ -20,7 +20,7 @@ export interface PaymentResponse {
 }
 
 export interface CardComMessage {
-  action: string; // More flexible type to accommodate all CardCom message types
+  action: string;
   data?: any;
   message?: string;
   field?: string;
@@ -39,7 +39,7 @@ export interface InitConfig {
   operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
   placeholder?: string;
   cvvPlaceholder?: string;
-  terminalNumber?: string; // Add terminal number for proper initialization
+  terminalNumber?: string;
   reCaptchaFieldCSS?: string;
 }
 
@@ -51,4 +51,5 @@ export interface PaymentState {
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
+  errorMessage?: string;
 }

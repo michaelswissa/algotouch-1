@@ -20,13 +20,15 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     planType?: string;
     retries: number;
     consecutiveErrors: number;
+    totalTime: number;
   }>({
     attempts: 0,
-    maxAttempts: 30, // Maximum attempts before giving up
-    checkInterval: 2500, // Initial interval (ms)
+    maxAttempts: 40, // Increase max attempts to avoid timeouts
+    checkInterval: 2000, // Initial interval (ms)
     operationType: 'payment',
     retries: 0,
-    consecutiveErrors: 0
+    consecutiveErrors: 0,
+    totalTime: 0
   });
   
   // Track if payment has been verified
@@ -35,10 +37,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   // Track time when status check started
   const startTimeRef = useRef<number | null>(null);
   
-  // Maximum processing time in milliseconds before considering it failed
+  // Maximum processing time in milliseconds
   const MAX_PROCESSING_TIME = {
-    payment: 3 * 60 * 1000, // 3 minutes for regular payments
-    token_only: 2 * 60 * 1000 // 2 minutes for token creation
+    payment: 4 * 60 * 1000, // 4 minutes for regular payments
+    token_only: 3 * 60 * 1000 // 3 minutes for token creation
   };
   
   // Track pending checks to prevent race conditions
@@ -87,13 +89,12 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     pendingCheckRef.current = true;
     lastCheckTimeRef.current = now;
     
-    console.log('Checking payment status:', { 
+    console.log(`[Payment Status Check #${statusCheckData.attempts + 1}] Checking:`, { 
       lowProfileCode, 
       sessionId, 
-      timestamp: new Date().toISOString(),
-      attempt: statusCheckData.attempts + 1,
       operationType,
-      planType
+      planType,
+      timestamp: new Date().toISOString()
     });
     
     try {
@@ -113,7 +114,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         }
       });
 
-      console.log('Payment status check response:', data);
+      console.log(`[Status Check Result #${statusCheckData.attempts + 1}]`, data);
 
       if (error) {
         console.error('Error checking payment status:', error);
@@ -126,8 +127,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         }));
         
         // Show error after multiple failures
-        if (statusCheckData.retries > 2) {
-          toast.error('שגיאת תקשורת בבדיקת סטטוס העסקה');
+        if (statusCheckData.retries > 3) {
+          toast.error('שגיאת תקשורת בבדיקת סטטוס העסקה, מנסה שוב...');
         }
         
         pendingCheckRef.current = false;
@@ -144,24 +145,30 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       // Token operation success handling with improved detection
       const isTokenOperation = operationType === 'token_only' || planType === 'monthly';
       
+      // SUCCESS CASE 1: Token creation successful
       if (data?.success && (data.data?.isTokenOperation || isTokenOperation)) {
-        console.log('Token creation successful:', data);
+        console.log('TOKEN CREATION SUCCESSFUL!', data);
         paymentVerifiedRef.current = true; // Prevent further checks
         clearStatusCheckInterval();
         
         setState(prev => ({ 
           ...prev, 
           paymentStatus: PaymentStatus.SUCCESS,
-          transactionId: data.data?.token || data.data?.transactionId || 'unknown'
+          transactionId: data.data?.token || data.data?.transactionId || 'token-created'
         }));
         
-        toast.success('אסימון נוצר בהצלחה, המנוי הופעל!');
+        toast.success('ההרשמה הושלמה בהצלחה!');
         
         try {
           if (sessionId && !sessionId.startsWith('temp-')) {
             await supabase.from('payment_sessions').update({
               status: 'completed',
-              transaction_id: data.data?.token || data.data?.transactionId
+              transaction_id: data.data?.token || data.data?.transactionId || 'token-created',
+              transaction_data: {
+                completedAt: new Date().toISOString(),
+                operation: 'token_creation',
+                success: true
+              }
             })
             .eq('id', sessionId);
             
@@ -173,47 +180,16 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         return;
       }
       
-      // Handle token creation failure
-      if (data?.failed && (data.data?.isTokenOperation || isTokenOperation)) {
-        console.error('Token creation failed:', data);
-        paymentVerifiedRef.current = true;
-        clearStatusCheckInterval();
-        
-        setState(prev => ({ 
-          ...prev, 
-          paymentStatus: PaymentStatus.FAILED 
-        }));
-        
-        toast.error(data.message || 'יצירת אסימון נכשלה');
-        return;
-      }
-      
-      // Handle token creation timeout
-      if ((data?.timeout && (data.data?.isTokenOperation || isTokenOperation)) ||
-          (isTokenOperation && statusCheckData.attempts >= 20)) {
-        console.error('Token creation timed out:', data);
-        paymentVerifiedRef.current = true;
-        clearStatusCheckInterval();
-        
-        setState(prev => ({ 
-          ...prev, 
-          paymentStatus: PaymentStatus.FAILED 
-        }));
-        
-        toast.error('חריגת זמן ביצירת אסימון, אנא נסה שנית');
-        return;
-      }
-      
-      // Regular payment success
-      if (data?.success) {
-        console.log('Payment successful:', data);
+      // SUCCESS CASE 2: Regular payment successful
+      if (data?.success && !isTokenOperation) {
+        console.log('PAYMENT SUCCESSFUL!', data);
         paymentVerifiedRef.current = true;
         clearStatusCheckInterval();
         
         setState(prev => ({ 
           ...prev, 
           paymentStatus: PaymentStatus.SUCCESS,
-          transactionId: data.data?.transactionId || 'unknown'
+          transactionId: data.data?.transactionId || 'transaction-completed'
         }));
         
         toast.success('התשלום בוצע בהצלחה!');
@@ -223,7 +199,12 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
             await supabase.from('payment_sessions')
               .update({
                 status: 'completed',
-                transaction_id: data.data?.transactionId
+                transaction_id: data.data?.transactionId || 'transaction-completed',
+                transaction_data: {
+                  completedAt: new Date().toISOString(),
+                  operation: 'payment',
+                  success: true
+                }
               })
               .eq('id', sessionId);
             
@@ -233,28 +214,50 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           console.error('Error updating session after payment:', dbError);
         }
         return;
-      } else if (data?.failed) {
-        console.error('Payment failed:', data);
+      }
+      
+      // FAILURE CASE 1: Token creation failed
+      if (data?.failed && (data.data?.isTokenOperation || isTokenOperation)) {
+        console.error('TOKEN CREATION FAILED:', data);
         paymentVerifiedRef.current = true;
         clearStatusCheckInterval();
         
         setState(prev => ({ 
           ...prev, 
-          paymentStatus: PaymentStatus.FAILED
+          paymentStatus: PaymentStatus.FAILED,
+          errorMessage: data.message || 'יצירת אסימון נכשלה'
+        }));
+        
+        toast.error(data.message || 'יצירת אסימון נכשלה');
+        return;
+      }
+      
+      // FAILURE CASE 2: Regular payment failed
+      if (data?.failed && !isTokenOperation) {
+        console.error('PAYMENT FAILED:', data);
+        paymentVerifiedRef.current = true;
+        clearStatusCheckInterval();
+        
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          errorMessage: data.message || 'התשלום נכשל'
         }));
         
         toast.error(data.message || 'התשלום נכשל');
         return;
-      } else if (data?.processing) {
-        console.log('Payment is still processing', { 
-          attempt: statusCheckData.attempts,
+      }
+      
+      // PROCESSING CASE: Still waiting for completion
+      if (data?.processing) {
+        console.log(`Transaction still processing [attempt ${statusCheckData.attempts}]`, { 
           operationType
         });
         
         // Show progress toast periodically
-        if (statusCheckData.attempts === 4) {
+        if (statusCheckData.attempts === 5) {
           toast.info(isTokenOperation ? 
-            'מעבד את יצירת האסימון, אנא המתן...' : 
+            'מעבד את הרשמתך, אנא המתן...' : 
             'מעבד את התשלום, אנא המתן...');
         }
       }
@@ -273,7 +276,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       // Update attempt count
       setStatusCheckData(prev => ({
         ...prev,
-        attempts: prev.attempts + 1
+        attempts: prev.attempts + 1,
+        totalTime: startTimeRef.current ? Date.now() - startTimeRef.current : prev.totalTime
       }));
     }
   }, [clearStatusCheckInterval, setState, statusCheckData.attempts, statusCheckData.retries, statusCheckData.consecutiveErrors]);
@@ -301,18 +305,19 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     lastCheckTimeRef.current = 0;
     startTimeRef.current = Date.now();
 
-    console.log('Starting payment status check:', { 
+    console.log('STARTING PAYMENT STATUS CHECK:', { 
       lowProfileCode, 
       sessionId,
       operationType,
-      planType
+      planType,
+      startTime: new Date().toISOString()
     });
     
     // Initial check immediately
     checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
     
     // Determine initial check interval based on operation type
-    const initialCheckInterval = operationType === 'token_only' ? 3000 : 2500;
+    const initialCheckInterval = operationType === 'token_only' ? 3000 : 2000;
     
     // Set up adaptive polling
     const intervalId = setInterval(() => {
@@ -326,14 +331,20 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         clearInterval(intervalId);
         console.log(`Payment processing timeout after ${Math.round((Date.now() - startTimeRef.current)/1000)} seconds`);
         
-        setState(prev => ({ 
-          ...prev, 
-          paymentStatus: PaymentStatus.FAILED 
-        }));
+        if (!paymentVerifiedRef.current) {
+          setState(prev => ({ 
+            ...prev, 
+            paymentStatus: PaymentStatus.FAILED,
+            errorMessage: operationType === 'token_only' 
+              ? 'חריגת זמן ביצירת אסימון, אנא נסה שנית' 
+              : 'חריגת זמן בתהליך התשלום, אנא נסה שנית'
+          }));
+          
+          toast.error(operationType === 'token_only' 
+            ? 'חריגת זמן ביצירת אסימון, אנא נסה שנית' 
+            : 'חריגת זמן בתהליך התשלום, אנא נסה שנית');
+        }
         
-        toast.error(operationType === 'token_only' 
-          ? 'חריגת זמן ביצירת אסימון, אנא נסה שנית' 
-          : 'חריגת זמן בתהליך התשלום, אנא נסה שנית');
         return;
       }
       
@@ -347,7 +358,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         const newAttempts = prev.attempts + 1;
         
         // Calculate max attempts based on operation
-        const operationMaxAttempts = prev.operationType === 'token_only' ? 25 : 20;
+        const operationMaxAttempts = prev.operationType === 'token_only' ? 40 : 30;
         
         // Stop if maximum attempts reached
         if (newAttempts >= operationMaxAttempts) {
@@ -358,12 +369,15 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           if (!paymentVerifiedRef.current) {
             setState(prev => ({ 
               ...prev, 
-              paymentStatus: PaymentStatus.FAILED 
+              paymentStatus: PaymentStatus.FAILED,
+              errorMessage: prev.operationType === 'token_only'
+                ? 'לא התקבל אישור ליצירת האסימון, אנא נסה שנית'
+                : 'לא התקבל אישור לביצוע התשלום, אנא נסה שנית'
             }));
             
             toast.error(prev.operationType === 'token_only'
               ? 'לא התקבל אישור ליצירת האסימון, אנא נסה שנית'
-              : 'לא התקבל אישור לביצוע התשלום, אנא בדוק אם החיוב בוצע');
+              : 'לא התקבל אישור לביצוע התשלום, אנא נסה שנית');
           }
           
           return { ...prev, attempts: newAttempts, intervalId: undefined };
@@ -373,22 +387,25 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         let newInterval = prev.checkInterval;
         
         if (prev.operationType === 'token_only') {
-          // Intervals for token operations
-          if (newAttempts === 4) newInterval = 3000;
-          else if (newAttempts === 8) newInterval = 4000;
-          else if (newAttempts === 12) {
+          // Intervals for token operations (slower intervals to avoid overloading)
+          if (newAttempts === 5) newInterval = 3000;
+          else if (newAttempts === 10) newInterval = 4000;
+          else if (newAttempts === 15) {
             newInterval = 5000;
-            toast.info('ממשיך לעקוב אחר תהליך יצירת האסימון...');
+            toast.info('ממשיך לעקוב אחר תהליך הרישום...');
           } 
-          else if (newAttempts === 16) newInterval = 6000;
+          else if (newAttempts === 20) newInterval = 6000;
+          else if (newAttempts === 25) newInterval = 8000;
+          else if (newAttempts === 30) newInterval = 10000;
         } else {
           // Intervals for payment operations
-          if (newAttempts === 4) newInterval = 3000;
-          else if (newAttempts === 8) {
+          if (newAttempts === 5) newInterval = 3000;
+          else if (newAttempts === 10) {
             newInterval = 4000;
             toast.info('ממשיך לעקוב אחר תהליך התשלום...');
           }
-          else if (newAttempts === 12) newInterval = 5000;
+          else if (newAttempts === 15) newInterval = 5000;
+          else if (newAttempts === 20) newInterval = 8000;
         }
         
         // If interval changed, recreate it
@@ -423,12 +440,13 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       lpCode: lowProfileCode,
       sessionId,
       attempts: 0,
-      maxAttempts: operationType === 'token_only' ? 25 : 20,
+      maxAttempts: operationType === 'token_only' ? 40 : 30,
       checkInterval: initialCheckInterval,
       operationType,
       planType,
       retries: 0,
-      consecutiveErrors: 0
+      consecutiveErrors: 0,
+      totalTime: 0
     });
     
     // Extra checks with delays to catch quick responses
@@ -442,7 +460,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       if (!paymentVerifiedRef.current && !pendingCheckRef.current) {
         checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
       }
-    }, 5000);
+    }, 4000);
   }, [clearStatusCheckInterval, checkPaymentStatus, setState]);
 
   // Clean up all state
@@ -453,7 +471,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       intervalId: undefined,
       attempts: 0,
       retries: 0,
-      consecutiveErrors: 0
+      consecutiveErrors: 0,
+      totalTime: 0
     }));
     
     paymentVerifiedRef.current = false;
