@@ -1,5 +1,6 @@
 
 import React from 'react';
+import '../styles/cardFields.css';
 
 interface CVVFrameProps {
   terminalNumber: string;
@@ -14,16 +15,15 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   frameLoadAttempts
 }) => {
-  // Make sure to include terminalNumber parameter in the URL exactly as in the example
   const iframeSrc = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
   
   return (
-    <div className="relative" style={{ maxWidth: '100px' }}>
+    <div className="relative credit-cvv-container">
       <iframe
         id="CardComCvv"
         name="CardComCvv"
         src={iframeSrc}
-        className="w-full h-[40px] border border-input rounded-md"
+        className="w-full"
         onLoad={onLoad}
         title="קוד אבטחה"
         key={`cvv-${frameLoadAttempts}-${terminalNumber}`}

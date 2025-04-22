@@ -1,0 +1,32 @@
+
+/* Base styles for card fields */
+.credit-card-field {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  height: 57px !important; /* Fixed height as per example */
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.credit-cvv-container {
+  max-width: 188px !important;
+}
+
+/* Match iframe heights */
+#CardComCardNumber,
+#CardComCvv {
+  height: 57px !important;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  transition: border-color 0.2s ease;
+}
+
+#CardComCvv {
+  width: 100%;
+}
+
+/* Focus and error states */
+.invalid {
+  border: 1px solid #c01111;
+}

@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import CardNumberFrame from './iframes/CardNumberFrame';
@@ -42,14 +41,23 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     expiryYear
   });
 
-  // Handle iframe load attempts
   const handleIframeLoad = useCallback(() => {
     setFrameLoadAttempts(prev => prev + 1);
-  }, []);
+    console.log('Frame loaded, attempt:', frameLoadAttempts + 1);
+  }, [frameLoadAttempts]);
 
-  // Update card owner details in the master frame when they change
-  React.useEffect(() => {
-    if (masterFrameRef.current?.contentWindow) {
+  useEffect(() => {
+    const masterFrame = masterFrameRef.current;
+    if (masterFrame) {
+      masterFrame.onload = () => {
+        console.log('Master frame loaded');
+        setFrameLoadAttempts(prev => prev + 1);
+      };
+    }
+  }, [masterFrameRef]);
+
+  useEffect(() => {
+    if (masterFrameRef.current?.contentWindow && frameLoadAttempts > 0) {
       const data = {
         action: 'setCardOwnerDetails',
         data: {
@@ -63,7 +71,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       
       masterFrameRef.current.contentWindow.postMessage(data, '*');
     }
-  }, [cardholderName, email, phone, expiryMonth, expiryYear, masterFrameRef]);
+  }, [cardholderName, email, phone, expiryMonth, expiryYear, frameLoadAttempts, masterFrameRef]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -111,12 +119,14 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       <div className="space-y-2">
         <Label htmlFor="CardComCardNumber">מספר כרטיס</Label>
         <div className="relative">
-          <CardNumberFrame
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            onLoad={handleIframeLoad}
-            frameLoadAttempts={frameLoadAttempts}
-          />
+          {frameLoadAttempts > 0 && (
+            <CardNumberFrame
+              terminalNumber={terminalNumber}
+              cardcomUrl={cardcomUrl}
+              onLoad={handleIframeLoad}
+              frameLoadAttempts={frameLoadAttempts}
+            />
+          )}
           {cardNumberError && (
             <p className="text-sm text-red-500">{cardNumberError}</p>
           )}
@@ -139,12 +149,14 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       <div className="space-y-2">
         <Label htmlFor="CardComCvv">קוד אבטחה (CVV)</Label>
         <div className="relative">
-          <CVVFrame
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            onLoad={handleIframeLoad}
-            frameLoadAttempts={frameLoadAttempts}
-          />
+          {frameLoadAttempts > 0 && (
+            <CVVFrame
+              terminalNumber={terminalNumber}
+              cardcomUrl={cardcomUrl}
+              onLoad={handleIframeLoad}
+              frameLoadAttempts={frameLoadAttempts}
+            />
+          )}
           {cvvError && (
             <p className="text-sm text-red-500">{cvvError}</p>
           )}

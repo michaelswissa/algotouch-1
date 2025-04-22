@@ -1,5 +1,6 @@
 
 import React from 'react';
+import '../styles/cardFields.css';
 
 interface CardNumberFrameProps {
   terminalNumber: string;
@@ -14,16 +15,15 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
   onLoad,
   frameLoadAttempts
 }) => {
-  // Make sure to include terminalNumber parameter in the URL exactly as in the example
   const iframeSrc = `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`;
   
   return (
-    <div className="relative">
+    <div className="relative credit-card-field">
       <iframe
         id="CardComCardNumber"
         name="CardComCardNumber"
         src={iframeSrc}
-        className="w-full h-[40px] border border-input rounded-md"
+        className="w-full"
         onLoad={onLoad}
         title="מספר כרטיס"
         key={`cardnumber-${frameLoadAttempts}-${terminalNumber}`}
