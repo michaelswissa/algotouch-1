@@ -1,4 +1,3 @@
-
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
@@ -30,7 +29,6 @@ export const useCardcomInitializer = () => {
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
-    // Track initialization attempts
     let attempts = 0;
     const maxAttempts = 5;
     
@@ -44,7 +42,6 @@ export const useCardcomInitializer = () => {
           return;
         }
 
-        // Check if the master frame exists and is loaded
         const masterFrame = masterFrameRef.current;
         
         if (!masterFrame?.contentWindow) {
@@ -54,10 +51,10 @@ export const useCardcomInitializer = () => {
         }
 
         try {
-          // Match configuration structure with OpenFields example
-          const config: InitConfig = {
+          const config: any = {
             action: 'init',
             lowProfileCode,
+            LowProfileCode: lowProfileCode,
             sessionId,
             terminalNumber,
             cardFieldCSS: `
@@ -103,10 +100,9 @@ export const useCardcomInitializer = () => {
             operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
           };
 
-          console.log('Sending initialization config to CardCom iframe');
+          console.log('Sending initialization config to CardCom iframe:', config);
           masterFrame.contentWindow.postMessage(config, '*');
           
-          // Load 3DS script after initialization is complete
           setTimeout(() => {
             loadScript();
             resolve(true);
@@ -122,7 +118,6 @@ export const useCardcomInitializer = () => {
         }
       };
 
-      // Load 3DS script dynamically with cache busting
       const loadScript = () => {
         console.log('Loading 3DS script...');
         const script = document.createElement('script');
@@ -132,7 +127,6 @@ export const useCardcomInitializer = () => {
         console.log('3DS script loaded');
       };
 
-      // Initial check with a short delay to ensure iframe is loaded
       setTimeout(checkFramesAndInitialize, 300);
     });
   };

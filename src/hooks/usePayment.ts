@@ -85,7 +85,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     setPaymentInProgress(true);
     console.log('Submitting payment transaction');
-    
+
     if (!masterFrameRef.current?.contentWindow) {
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
       setPaymentInProgress(false);
@@ -100,7 +100,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      const formData = {
+      // CardCom requires "lowProfileCode" param for each doTransaction
+      const formData: any = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
         cardOwnerId,
@@ -111,10 +112,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
-        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly"
+        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        lowProfileCode: state.lowProfileCode, // Ensure always present
+        LowProfileCode: state.lowProfileCode  // For extra compatibility
       };
 
-      console.log('Sending transaction data:', formData);
+      console.log('Sending transaction data to CardCom:', formData);
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
       setState(prev => ({
