@@ -1,13 +1,12 @@
+export enum PaymentStatus {
+  IDLE = 'IDLE',
+  INITIALIZING = 'INITIALIZING', 
+  PROCESSING = 'PROCESSING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED'
+}
 
-export const PaymentStatus = {
-  IDLE: 'idle' as const,
-  INITIALIZING: 'initializing' as const,
-  PROCESSING: 'processing' as const,
-  SUCCESS: 'success' as const,
-  FAILED: 'failed' as const
-} as const;
-
-export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
+export type PaymentStatusType = PaymentStatus;
 
 export interface PaymentResponse {
   success: boolean;
@@ -35,7 +34,7 @@ export interface InitConfig {
   terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
-  reCaptchaFieldCSS?: string; // Add this missing property
+  reCaptchaFieldCSS?: string;
   language: string;
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
@@ -46,7 +45,7 @@ export interface InitConfig {
 export interface PaymentState {
   terminalNumber: string;
   cardcomUrl: string;
-  paymentStatus: PaymentStatusType;
+  paymentStatus: PaymentStatus;
   sessionId: string;
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';

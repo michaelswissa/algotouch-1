@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { PaymentStatus, PaymentStatusType } from './types/payment';
+import { PaymentStatus } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
@@ -8,15 +7,14 @@ import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 
 interface PaymentContentProps {
-  paymentStatus: PaymentStatusType;
+  paymentStatus: PaymentStatus;
   plan: SubscriptionPlan;
   terminalNumber: string;
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
-  frameKey?: number; // Add frameKey prop
+  frameKey?: number;
   onNavigateToDashboard: () => void;
   onRetry: () => void;
-  onCancel?: () => void;
   operationType?: 'payment' | 'token_only';
 }
 
@@ -57,7 +55,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}
-        frameKey={frameKey} // Pass frameKey to PaymentDetails
+        frameKey={frameKey}
         paymentStatus={paymentStatus}
       />
     </>

@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -16,9 +15,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
-  const [frameKey, setFrameKey] = useState(Date.now()); // Add key for frame reinitialization
+  const [frameKey, setFrameKey] = useState(Date.now());
 
-  // Determine operation type based on plan ID
   useEffect(() => {
     if (planId === 'monthly') {
       setOperationType('token_only');
@@ -57,14 +55,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     planType: planId
   });
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       cleanupStatusCheck();
     };
   }, [cleanupStatusCheck]);
 
-  // Reset frames when needed
   const resetFrames = useCallback(() => {
     setFrameKey(Date.now());
     setTimeout(() => {
@@ -87,9 +83,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       ...prev,
       paymentStatus: PaymentStatus.IDLE
     }));
-    resetFrames(); // Reset frames before reinitializing
+    resetFrames();
     
-    // Slight delay to ensure frame reset completes
     setTimeout(() => {
       initializePayment();
     }, 300);
@@ -131,7 +126,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         return;
       }
 
-      // Verify lowProfileCode is available again just before sending
       if (!state.lowProfileCode) {
         console.error("lowProfileCode missing before send");
         handleError("חסר קוד פרופיל נמוך (lowProfileCode)");
@@ -148,8 +142,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
-        lowProfileCode: state.lowProfileCode, // Ensure this is passed correctly
-        sessionId: state.sessionId, // Include sessionId for better tracking
+        lowProfileCode: state.lowProfileCode,
+        sessionId: state.sessionId,
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly"
