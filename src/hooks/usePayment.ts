@@ -16,7 +16,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
-  
+
   // Determine operation type based on plan ID
   useEffect(() => {
     if (planId === 'monthly') {
@@ -25,7 +25,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       setOperationType('payment');
     }
   }, [planId]);
-  
+
   const {
     state,
     setState,
@@ -33,8 +33,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     handleError
   } = usePaymentStatus({ onPaymentComplete });
 
-  const { initializePayment } = usePaymentInitialization({ 
-    planId, 
+  const { initializePayment } = usePaymentInitialization({
+    planId,
     setState,
     masterFrameRef,
     operationType
@@ -77,16 +77,21 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.log('Payment submission already in progress');
       return;
     }
-    
-    setPaymentInProgress(true);
-    console.log('Submitting payment transaction');
-    
+
+    if (!state.lowProfileCode) {
+      handleError("שגיאת אתחול תשלום, אנא רענן את הדף ונסה שנית");
+      return;
+    }
+
     if (!masterFrameRef.current?.contentWindow) {
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
       setPaymentInProgress(false);
       return;
     }
-    
+
+    setPaymentInProgress(true);
+    console.log('Submitting payment transaction with lowProfileCode:', state.lowProfileCode);
+
     try {
       const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
       const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
@@ -94,16 +99,17 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
-      
+
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
-        cardOwnerId, // Added ID field
+        cardOwnerId,
         cardOwnerEmail: email,
         cardOwnerPhone: phone,
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
+        lowProfileCode: state.lowProfileCode,
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly"
@@ -111,7 +117,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
       console.log('Sending transaction data:', formData);
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
-      
+
+      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+
       setTimeout(() => {
         setPaymentInProgress(false);
       }, 5000);
@@ -120,7 +128,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, handleError, operationType, paymentInProgress]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, planId, startStatusCheck]);
 
   return {
     ...state,

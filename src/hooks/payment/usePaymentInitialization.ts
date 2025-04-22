@@ -27,7 +27,8 @@ export const usePaymentInitialization = ({
   const initializePayment = async () => {
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatus.INITIALIZING 
+      paymentStatus: PaymentStatus.INITIALIZING,
+      lowProfileCode: '', // Clear any existing lowProfileCode
     }));
     
     try {
@@ -57,9 +58,9 @@ export const usePaymentInitialization = ({
         operationType
       );
       
-      if (!paymentData) {
-        console.error("Failed to initialize payment session");
-        throw new Error('שגיאה באתחול התשלום');
+      if (!paymentData?.lowProfileCode) {
+        console.error("Missing lowProfileCode in payment initialization");
+        throw new Error('שגיאה באתחול התשלום - חסר קוד זיהוי');
       }
       
       console.log('Payment session initialized:', paymentData);
@@ -67,9 +68,9 @@ export const usePaymentInitialization = ({
       // Initialize CardCom fields with terminal number
       const initialized = await initializeCardcomFields(
         masterFrameRef, 
-        paymentData.lowProfileCode, 
+        paymentData.lowProfileCode,
         paymentData.sessionId,
-        paymentData.terminalNumber, // Now included in the return type
+        paymentData.terminalNumber,
         operationType
       );
       
