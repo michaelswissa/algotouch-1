@@ -1,12 +1,13 @@
-export enum PaymentStatus {
-  IDLE = 'IDLE',
-  INITIALIZING = 'INITIALIZING', 
-  PROCESSING = 'PROCESSING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED'
-}
 
-export type PaymentStatusType = PaymentStatus;
+export type PaymentStatusType = 'IDLE' | 'INITIALIZING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
+
+export const PaymentStatus = {
+  IDLE: 'IDLE' as PaymentStatusType,
+  INITIALIZING: 'INITIALIZING' as PaymentStatusType,
+  PROCESSING: 'PROCESSING' as PaymentStatusType,
+  SUCCESS: 'SUCCESS' as PaymentStatusType,
+  FAILED: 'FAILED' as PaymentStatusType,
+} as const;
 
 export interface PaymentResponse {
   success: boolean;
@@ -45,7 +46,7 @@ export interface InitConfig {
 export interface PaymentState {
   terminalNumber: string;
   cardcomUrl: string;
-  paymentStatus: PaymentStatus;
+  paymentStatus: PaymentStatusType;
   sessionId: string;
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';

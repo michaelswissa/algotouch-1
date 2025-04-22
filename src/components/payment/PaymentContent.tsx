@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PaymentStatus } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
@@ -7,7 +8,7 @@ import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 
 interface PaymentContentProps {
-  paymentStatus: PaymentStatus;
+  paymentStatus: string;  // Changed from PaymentStatus to string
   plan: SubscriptionPlan;
   terminalNumber: string;
   cardcomUrl: string;
