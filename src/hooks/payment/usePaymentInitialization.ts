@@ -58,7 +58,7 @@ export const usePaymentInitialization = ({
         operationType
       );
       
-      if (!paymentData?.lowProfileCode) {
+      if (!paymentData?.data?.lowProfileCode) {
         console.error("Missing lowProfileCode in payment initialization");
         throw new Error('שגיאה באתחול התשלום - חסר קוד זיהוי');
       }
@@ -68,9 +68,9 @@ export const usePaymentInitialization = ({
       // Initialize CardCom fields with terminal number
       const initialized = await initializeCardcomFields(
         masterFrameRef, 
-        paymentData.lowProfileCode,
-        paymentData.sessionId,
-        paymentData.terminalNumber,
+        paymentData.data.lowProfileCode,
+        paymentData.data.sessionId,
+        paymentData.data.terminalNumber,
         operationType
       );
       
