@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   masterFrameRef 
 }) => {
   const [cardholderName, setCardholderName] = useState('');
+  const [cardOwnerId, setCardOwnerId] = useState(''); // Added ID field
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
@@ -34,11 +36,14 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     cvvError,
     cardholderNameError,
     expiryError,
+    idNumberError, // Added validation for ID
     isValid,
     validateCardNumber,
-    validateCvv
+    validateCvv,
+    validateIdNumber // Added ID validation
   } = usePaymentValidation({
     cardholderName,
+    cardOwnerId,
     expiryMonth,
     expiryYear
   });
@@ -78,6 +83,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       action: 'setCardOwnerDetails',
       data: {
         cardOwnerName: cardholderName,
+        cardOwnerId: cardOwnerId, // Added ID field
         cardOwnerEmail: email,
         cardOwnerPhone: phone,
         expirationMonth: expiryMonth,
@@ -86,7 +92,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     };
     
     masterFrameRef.current.contentWindow.postMessage(data, '*');
-  }, [cardholderName, email, phone, expiryMonth, expiryYear, isMasterFrameReady, masterFrameRef]);
+  }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isMasterFrameReady, masterFrameRef]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -103,6 +109,27 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         />
         {cardholderNameError && (
           <p className="text-sm text-red-500">{cardholderNameError}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cardOwnerId">תעודת זהות</Label>
+        <Input
+          id="cardOwnerId"
+          name="cardOwnerId"
+          placeholder="123456789"
+          value={cardOwnerId}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '');
+            setCardOwnerId(value);
+            validateIdNumber(value);
+          }}
+          maxLength={9}
+          className={idNumberError ? 'border-red-500' : ''}
+          required
+        />
+        {idNumberError && (
+          <p className="text-sm text-red-500">{idNumberError}</p>
         )}
       </div>
 
