@@ -44,28 +44,12 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({
     }
   }, [planId]);
 
-  const handlePaymentSuccess = () => {
-    console.log('Payment successful');
-    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-    toast.success('התשלום בוצע בהצלחה!');
-    
-    setTimeout(() => {
-      onPaymentComplete();
-    }, 1000);
-  };
-
-  const handleError = (message: string) => {
-    console.error('Payment error:', message);
-    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-    toast.error(message || 'אירעה שגיאה בעיבוד התשלום');
-  };
-
   const { initializePayment } = usePaymentInitialization({
     planId,
     setState,
     masterFrameRef,
     operationType
-  });
+  }) as { initializePayment: () => Promise<PaymentResponse> };
 
   const { startStatusCheck, checkPaymentStatus, cleanupStatusCheck } = usePaymentStatusCheck({ 
     setState 
@@ -124,7 +108,7 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({
 
     if (!state.lowProfileCode) {
       console.error("Missing lowProfileCode for payment", state);
-      handleError("שגיאת אתחול תשלום - חסר קוד פרופיל, נא לרענן ולנסות שנית");
+      handleError("שגיאת אתחול תשלום - חסר קוד פרופיל, נא ��רענן ולנסות שנית");
       return;
     }
 

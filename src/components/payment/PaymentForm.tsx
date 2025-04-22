@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { CreditCard, Loader2 } from 'lucide-react';
-import PaymentContent from './PaymentContent';
+import { Card } from '@/components/ui/card';
 import { PaymentProvider, usePayment } from '@/contexts/payment/PaymentContext';
 import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
+import PaymentFormHeader from './sections/PaymentFormHeader';
+import PaymentFormContent from './sections/PaymentFormContent';
+import PaymentFormActions from './sections/PaymentFormActions';
 
 interface PaymentFormProps {
   planId: string;
@@ -47,15 +47,6 @@ const PaymentFormContent: React.FC<PaymentFormProps> = ({ planId, onPaymentCompl
   }, [initializePayment, planId]);
   
   const operationType = planId === 'monthly' ? 'token_only' : 'payment';
-  
-  const getButtonText = () => {
-    if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
-      return operationType === 'token_only' 
-        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
-        : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
-    }
-    return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
-  };
 
   const handleSubmitPayment = () => {
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
@@ -112,87 +103,33 @@ const PaymentFormContent: React.FC<PaymentFormProps> = ({ planId, onPaymentCompl
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5 text-primary" />
-          <CardTitle>פרטי תשלום</CardTitle>
-        </div>
-        <CardDescription>
-          {paymentStatus === PaymentStatus.SUCCESS 
-            ? 'התשלום בוצע בהצלחה!'
-            : operationType === 'token_only'
-              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
-              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
-        </CardDescription>
-      </CardHeader>
+      <PaymentFormHeader 
+        paymentStatus={paymentStatus} 
+        operationType={operationType} 
+      />
       
-      <CardContent className="space-y-4">
-        <iframe
-          key={frameKey}
-          ref={masterFrameRef}
-          id="CardComMasterFrame"
-          name="CardComMasterFrame"
-          src={`${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`}
-          style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
-          title="CardCom Master Frame"
-        />
-        
-        {isInitializing ? (
-          <div className="space-y-4 py-8">
-            <div className="flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-            <p className="text-center text-sm text-muted-foreground">
-              מאתחל טופס תשלום...
-            </p>
-          </div>
-        ) : (
-          <PaymentContent
-            paymentStatus={paymentStatus}
-            plan={plan}
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            masterFrameRef={masterFrameRef}
-            frameKey={frameKey}
-            onNavigateToDashboard={() => window.location.href = '/dashboard'}
-            onRetry={handleRetry}
-            operationType={operationType}
-          />
-        )}
-      </CardContent>
+      <PaymentFormContent
+        isInitializing={isInitializing}
+        paymentStatus={paymentStatus}
+        plan={plan}
+        terminalNumber={terminalNumber}
+        cardcomUrl={cardcomUrl}
+        masterFrameRef={masterFrameRef}
+        frameKey={frameKey}
+        onNavigateToDashboard={() => window.location.href = '/dashboard'}
+        onRetry={handleRetry}
+        operationType={operationType}
+      />
 
-      <CardFooter className="flex flex-col space-y-2">
-        {showPaymentButton && (
-          <>
-            <Button 
-              type="button" 
-              className="w-full" 
-              onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
-            >
-              {getButtonText()}
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              {operationType === 'token_only' 
-                ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
-                : plan.hasTrial 
-                  ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
-                  : 'החיוב יבוצע מיידית'}
-            </p>
-          </>
-        )}
-        
-        {onBack && paymentStatus !== PaymentStatus.SUCCESS && (
-          <Button 
-            variant="outline" 
-            onClick={onBack} 
-            className="absolute top-4 right-4"
-            disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
-          >
-            חזור
-          </Button>
-        )}
-      </CardFooter>
+      <PaymentFormActions
+        isSubmitting={isSubmitting}
+        paymentStatus={paymentStatus}
+        operationType={operationType}
+        onSubmit={handleSubmitPayment}
+        onBack={onBack}
+        showPaymentButton={showPaymentButton}
+        plan={plan}
+      />
     </Card>
   );
 };
