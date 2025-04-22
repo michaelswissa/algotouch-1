@@ -13,9 +13,9 @@ interface PaymentContentProps {
   terminalNumber: string;
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
-  frameKey?: number;
   onNavigateToDashboard: () => void;
   onRetry: () => void;
+  onCancel?: () => void;
   operationType?: 'payment' | 'token_only';
 }
 
@@ -25,7 +25,6 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   terminalNumber,
   cardcomUrl,
   masterFrameRef,
-  frameKey,
   onNavigateToDashboard,
   onRetry,
   operationType = 'payment'
@@ -40,7 +39,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
     return <FailedPayment onRetry={onRetry} />;
   }
   
-  // Default state (IDLE or INITIALIZING or PROCESSING)
+  // Default state (IDLE)
   return (
     <>
       <PlanSummary 
@@ -56,8 +55,6 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}
-        frameKey={frameKey}
-        paymentStatus={paymentStatus}
       />
     </>
   );

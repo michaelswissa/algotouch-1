@@ -1,11 +1,11 @@
 
 import { useEffect } from 'react';
-import { PaymentState, PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
-  setState: (updater: React.SetStateAction<PaymentState>) => void;
+  setState: (updater: any) => void;
   checkPaymentStatus: (lowProfileCode: string, sessionId: string, operationType?: 'payment' | 'token_only', planType?: string) => void;
   lowProfileCode: string;
   sessionId: string;
@@ -75,7 +75,7 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle 3DS processing
+        // Handle processing start/complete
         if (message.action === '3DSProcessStarted') {
           console.log('3DS process started');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
@@ -84,21 +84,7 @@ export const useFrameMessages = ({
 
         if (message.action === '3DSProcessCompleted') {
           console.log('3DS process completed');
-          if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-          }
-          return;
-        }
-
-        // Handle token creation
-        if (message.action === 'tokenCreationStarted') {
-          console.log('Token creation started');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-          return;
-        }
-
-        if (message.action === 'tokenCreationCompleted') {
-          console.log('Token creation completed');
+          // Start status check to verify final result
           if (lowProfileCode && sessionId) {
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
           }

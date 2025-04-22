@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import CardNumberFrame from './iframes/CardNumberFrame';
@@ -8,119 +8,62 @@ import ReCaptchaFrame from './iframes/ReCaptchaFrame';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
 import { usePaymentValidation } from '@/hooks/payment/usePaymentValidation';
-import { PaymentStatus, PaymentStatusType } from './types/payment';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface PaymentDetailsProps {
   terminalNumber: string;
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
-  frameKey?: number;
-  paymentStatus: PaymentStatusType;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   terminalNumber, 
   cardcomUrl,
-  masterFrameRef,
-  frameKey,
-  paymentStatus
+  masterFrameRef 
 }) => {
   const [cardholderName, setCardholderName] = useState('');
-  const [cardOwnerId, setCardOwnerId] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
 
-  const [isMasterFrameReady, setIsMasterFrameReady] = useState(false);
-  const [areFieldsReady, setAreFieldsReady] = useState(false);
-  const [loadingFields, setLoadingFields] = useState(new Set<string>());
-  
   const {
     cardNumberError,
     cardTypeInfo,
     cvvError,
     cardholderNameError,
     expiryError,
-    idNumberError,
-    validateIdNumber,
-    resetValidation
+    isValid,
+    validateCardNumber,
+    validateCvv
   } = usePaymentValidation({
     cardholderName,
-    cardOwnerId,
     expiryMonth,
     expiryYear
   });
 
-  useEffect(() => {
-    setLoadingFields(new Set());
-    setAreFieldsReady(false);
-    resetValidation();
-  }, [frameKey, paymentStatus, resetValidation]);
-
-  useEffect(() => {
-    const masterFrame = masterFrameRef.current;
-    if (!masterFrame) return;
-
-    const handleMasterLoad = () => {
-      console.log('Master frame loaded');
-      setIsMasterFrameReady(true);
-    };
-
-    masterFrame.addEventListener('load', handleMasterLoad);
-    return () => masterFrame.removeEventListener('load', handleMasterLoad);
-  }, [masterFrameRef]);
-
-  const handleFieldLoad = useCallback((fieldName: string) => {
-    setLoadingFields(prev => {
-      const newFields = new Set(prev);
-      newFields.add(fieldName);
-      
-      if (newFields.has('cardNumber') && newFields.has('cvv')) {
-        console.log('All payment fields loaded');
-        setAreFieldsReady(true);
-      }
-      
-      return newFields;
-    });
+  // Handle iframe load attempts
+  const handleIframeLoad = useCallback(() => {
+    setFrameLoadAttempts(prev => prev + 1);
   }, []);
 
-  useEffect(() => {
-    if (frameKey || paymentStatus === PaymentStatus.IDLE) {
-      resetValidation();
+  // Update card owner details in the master frame when they change
+  React.useEffect(() => {
+    if (masterFrameRef.current?.contentWindow) {
+      const data = {
+        action: 'setCardOwnerDetails',
+        data: {
+          cardOwnerName: cardholderName,
+          cardOwnerEmail: email,
+          cardOwnerPhone: phone,
+          expirationMonth: expiryMonth,
+          expirationYear: expiryYear
+        }
+      };
+      
+      masterFrameRef.current.contentWindow.postMessage(data, '*');
     }
-  }, [frameKey, paymentStatus, resetValidation]);
-
-  const showFields = isMasterFrameReady && paymentStatus !== PaymentStatus.PROCESSING;
-
-  if (!showFields) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    if (!isMasterFrameReady || !masterFrameRef.current?.contentWindow) return;
-
-    const data = {
-      action: 'setCardOwnerDetails',
-      data: {
-        cardOwnerName: cardholderName,
-        cardOwnerId: cardOwnerId,
-        cardOwnerEmail: email,
-        cardOwnerPhone: phone,
-        expirationMonth: expiryMonth,
-        expirationYear: expiryYear
-      }
-    };
-    
-    masterFrameRef.current.contentWindow.postMessage(data, '*');
-  }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isMasterFrameReady, masterFrameRef]);
+  }, [cardholderName, email, phone, expiryMonth, expiryYear, masterFrameRef]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -137,27 +80,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         />
         {cardholderNameError && (
           <p className="text-sm text-red-500">{cardholderNameError}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="cardOwnerId">תעודת זהות</Label>
-        <Input
-          id="cardOwnerId"
-          name="cardOwnerId"
-          placeholder="123456789"
-          value={cardOwnerId}
-          onChange={(e) => {
-            const value = e.target.value.replace(/\D/g, '');
-            setCardOwnerId(value);
-            validateIdNumber(value);
-          }}
-          maxLength={9}
-          className={idNumberError ? 'border-red-500' : ''}
-          required
-        />
-        {idNumberError && (
-          <p className="text-sm text-red-500">{idNumberError}</p>
         )}
       </div>
 
@@ -190,11 +112,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <Label htmlFor="CardComCardNumber">מספר כרטיס</Label>
         <div className="relative">
           <CardNumberFrame
-            key={`cardnumber-${frameKey}`}
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => handleFieldLoad('cardNumber')}
-            isReady={showFields}
+            onLoad={handleIframeLoad}
+            frameLoadAttempts={frameLoadAttempts}
           />
           {cardNumberError && (
             <p className="text-sm text-red-500">{cardNumberError}</p>
@@ -219,11 +140,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <Label htmlFor="CardComCvv">קוד אבטחה (CVV)</Label>
         <div className="relative">
           <CVVFrame
-            key={`cvv-${frameKey}`}
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => handleFieldLoad('cvv')}
-            isReady={showFields}
+            onLoad={handleIframeLoad}
+            frameLoadAttempts={frameLoadAttempts}
           />
           {cvvError && (
             <p className="text-sm text-red-500">{cvvError}</p>
@@ -233,7 +153,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
       <div className="space-y-2">
         <ReCaptchaFrame
-          key={`recaptcha-${frameKey}`}
           terminalNumber={terminalNumber}
           cardcomUrl={cardcomUrl}
           onLoad={() => {}}

@@ -1,14 +1,13 @@
-// Define the payment status as a proper union type
-export type PaymentStatusType = 'IDLE' | 'INITIALIZING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
 
-// Use const assertion to ensure type safety
 export const PaymentStatus = {
-  IDLE: 'IDLE' as const,
-  INITIALIZING: 'INITIALIZING' as const,
-  PROCESSING: 'PROCESSING' as const,
-  SUCCESS: 'SUCCESS' as const,
-  FAILED: 'FAILED' as const,
-};
+  IDLE: 'idle' as const,
+  INITIALIZING: 'initializing' as const,
+  PROCESSING: 'processing' as const,
+  SUCCESS: 'success' as const,
+  FAILED: 'failed' as const
+} as const;
+
+export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
 export interface PaymentResponse {
   success: boolean;
@@ -16,7 +15,6 @@ export interface PaymentResponse {
     sessionId: string;
     lowProfileCode: string;
     terminalNumber: string;
-    cardcomUrl?: string;
   };
   message?: string;
 }
@@ -37,7 +35,7 @@ export interface InitConfig {
   terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
-  reCaptchaFieldCSS?: string;
+  reCaptchaFieldCSS?: string; // Add this missing property
   language: string;
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
@@ -51,31 +49,6 @@ export interface PaymentState {
   paymentStatus: PaymentStatusType;
   sessionId: string;
   lowProfileCode: string;
-}
-
-export interface PaymentContextType {
-  state: PaymentState;
-  initializePayment: () => Promise<PaymentResponse | null>;
-  submitPayment: () => void;
-  handleRetry: () => void;
-  resetPaymentState: () => void;
-  masterFrameRef: React.RefObject<HTMLIFrameElement>;
-  frameKey: number;
-}
-
-export interface CardFieldProps {
-  terminalNumber: string;
-  cardcomUrl: string;
-  onLoad: () => void;
-  isReady: boolean;
-}
-
-export interface PaymentValidationState {
-  cardNumberError?: string;
-  cardTypeInfo?: string;
-  cvvError?: string;
-  cardholderNameError?: string;
-  expiryError?: string;
-  idNumberError?: string;
-  isValid: boolean;
+  operationType?: 'payment' | 'token_only';
+  transactionId?: string;
 }

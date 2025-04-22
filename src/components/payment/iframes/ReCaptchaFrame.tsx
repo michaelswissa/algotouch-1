@@ -1,6 +1,5 @@
 
 import React from 'react';
-import PaymentIframe from './PaymentIframe';
 
 interface ReCaptchaFrameProps {
   terminalNumber: string;
@@ -17,14 +16,13 @@ const ReCaptchaFrame: React.FC<ReCaptchaFrameProps> = ({
   
   return (
     <div className="relative">
-      <PaymentIframe
+      <iframe
         id="CardComReCaptcha"
         name="CardComReCaptcha"
         src={iframeSrc}
-        title="אימות reCaptcha"
         className="w-full h-[78px] border-none"
         onLoad={onLoad}
-        isReady={true}
+        title="אימות reCaptcha"
       />
     </div>
   );

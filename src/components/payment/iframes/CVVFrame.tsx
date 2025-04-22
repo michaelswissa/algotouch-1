@@ -1,25 +1,32 @@
 
 import React from 'react';
-import { CardFieldProps } from '../types/payment';
-import PaymentIframe from './PaymentIframe';
 
-const CVVFrame: React.FC<CardFieldProps> = ({
+interface CVVFrameProps {
+  terminalNumber: string;
+  cardcomUrl: string;
+  onLoad: () => void;
+  frameLoadAttempts: number;
+}
+
+const CVVFrame: React.FC<CVVFrameProps> = ({
   terminalNumber,
   cardcomUrl,
   onLoad,
-  isReady
+  frameLoadAttempts
 }) => {
+  // Make sure to include terminalNumber parameter in the URL exactly as in the example
   const iframeSrc = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
   
   return (
-    <div className="credit-cvv-container">
-      <PaymentIframe
+    <div className="relative" style={{ maxWidth: '100px' }}>
+      <iframe
         id="CardComCvv"
         name="CardComCvv"
         src={iframeSrc}
-        title="קוד אבטחה"
+        className="w-full h-[40px] border border-input rounded-md"
         onLoad={onLoad}
-        isReady={isReady}
+        title="קוד אבטחה"
+        key={`cvv-${frameLoadAttempts}-${terminalNumber}`}
       />
     </div>
   );
