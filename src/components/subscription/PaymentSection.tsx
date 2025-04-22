@@ -5,7 +5,7 @@ import PaymentForm from '../payment/PaymentForm';
 interface PaymentSectionProps {
   planId: string;
   onPaymentComplete: () => void;
-  onBack?: () => void; // Optional back handler
+  onBack?: () => void; 
 }
 
 const PaymentSection: React.FC<PaymentSectionProps> = ({ 

@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
 import PaymentContent from './PaymentContent';
-import { usePayment } from '@/hooks/usePayment';
+import { PaymentProvider, usePayment } from '@/contexts/payment/PaymentContext';
 import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
@@ -14,7 +15,8 @@ interface PaymentFormProps {
   onBack?: () => void;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
+// Internal component that uses the payment context
+const PaymentFormContent: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const planDetails = getSubscriptionPlans();
@@ -25,20 +27,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       : planDetails.monthly;
 
   const {
-    terminalNumber,
-    cardcomUrl,
-    paymentStatus,
+    state: { 
+      terminalNumber, 
+      cardcomUrl, 
+      paymentStatus, 
+      lowProfileCode 
+    },
     masterFrameRef,
-    operationType,
     frameKey,
-    lowProfileCode,
     initializePayment,
     handleRetry,
     submitPayment
-  } = usePayment({
-    planId,
-    onPaymentComplete
-  });
+  } = usePayment();
 
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
@@ -47,6 +47,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       setIsInitializing(false);
     });
   }, [initializePayment, planId]);
+  
+  const operationType = planId === 'monthly' ? 'token_only' : 'payment';
   
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
@@ -194,6 +196,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         )}
       </CardFooter>
     </Card>
+  );
+};
+
+// Main component that provides the payment context
+const PaymentForm: React.FC<PaymentFormProps> = (props) => {
+  return (
+    <PaymentProvider planId={props.planId} onPaymentComplete={props.onPaymentComplete}>
+      <PaymentFormContent {...props} />
+    </PaymentProvider>
   );
 };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -43,9 +44,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     cardholderNameError,
     expiryError,
     idNumberError,
-    isValid,
-    validateCardNumber,
-    validateCvv,
     validateIdNumber,
     resetValidation
   } = usePaymentValidation({
@@ -58,7 +56,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   useEffect(() => {
     setLoadingFields(new Set());
     setAreFieldsReady(false);
-    
     resetValidation();
   }, [frameKey, paymentStatus, resetValidation]);
 

@@ -8,7 +8,7 @@ import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 
 interface PaymentContentProps {
-  paymentStatus: PaymentStatusType;  // Fixed type to use PaymentStatusType
+  paymentStatus: PaymentStatusType;
   plan: SubscriptionPlan;
   terminalNumber: string;
   cardcomUrl: string;
@@ -40,7 +40,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
     return <FailedPayment onRetry={onRetry} />;
   }
   
-  // Default state (IDLE)
+  // Default state (IDLE or INITIALIZING or PROCESSING)
   return (
     <>
       <PlanSummary 

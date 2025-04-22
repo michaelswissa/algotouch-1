@@ -1,13 +1,15 @@
 
+// Define the payment status as a proper union type
 export type PaymentStatusType = 'IDLE' | 'INITIALIZING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
 
+// Use const assertion to ensure type safety
 export const PaymentStatus = {
-  IDLE: 'IDLE' as PaymentStatusType,
-  INITIALIZING: 'INITIALIZING' as PaymentStatusType,
-  PROCESSING: 'PROCESSING' as PaymentStatusType,
-  SUCCESS: 'SUCCESS' as PaymentStatusType,
-  FAILED: 'FAILED' as PaymentStatusType,
-} as const;
+  IDLE: 'IDLE' as const,
+  INITIALIZING: 'INITIALIZING' as const,
+  PROCESSING: 'PROCESSING' as const,
+  SUCCESS: 'SUCCESS' as const,
+  FAILED: 'FAILED' as const,
+};
 
 export interface PaymentResponse {
   success: boolean;
@@ -15,6 +17,7 @@ export interface PaymentResponse {
     sessionId: string;
     lowProfileCode: string;
     terminalNumber: string;
+    cardcomUrl?: string;
   };
   message?: string;
 }
@@ -51,4 +54,31 @@ export interface PaymentState {
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
+}
+
+export interface PaymentContextType {
+  state: PaymentState;
+  initializePayment: () => Promise<PaymentResponse | null>;
+  submitPayment: () => void;
+  handleRetry: () => void;
+  resetPaymentState: () => void;
+  masterFrameRef: React.RefObject<HTMLIFrameElement>;
+  frameKey: number;
+}
+
+export interface CardFieldProps {
+  terminalNumber: string;
+  cardcomUrl: string;
+  onLoad: () => void;
+  isReady: boolean;
+}
+
+export interface PaymentValidationState {
+  cardNumberError?: string;
+  cardTypeInfo?: string;
+  cvvError?: string;
+  cardholderNameError?: string;
+  expiryError?: string;
+  idNumberError?: string;
+  isValid: boolean;
 }
