@@ -52,7 +52,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
-    operationType,
+    operationType: state.operationType || operationType,
     planType: planId
   });
 
@@ -112,7 +112,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
-        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        Operation: state.operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
         lowProfileCode: state.lowProfileCode, // Ensure always present
         LowProfileCode: state.lowProfileCode  // For extra compatibility
       };
@@ -126,7 +126,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }));
       
       // Start status check with required params
-      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+      startStatusCheck(state.lowProfileCode, state.sessionId, state.operationType, planId);
       
       setTimeout(() => {
         setPaymentInProgress(false);
@@ -136,11 +136,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, state.operationType, handleError, paymentInProgress, setState, startStatusCheck, planId]);
 
   return {
     ...state,
-    operationType,
+    operationType: state.operationType || operationType,
     masterFrameRef,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,

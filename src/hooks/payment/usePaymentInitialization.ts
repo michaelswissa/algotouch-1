@@ -49,13 +49,17 @@ export const usePaymentInitialization = ({
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
 
-      // Step 3: Initialize payment session to get lowProfileCode
-      console.log('Initializing payment session with plan:', planId);
+      // Step 3: Determine operation type based on plan
+      // Monthly plans only need token creation, with first charge after trial
+      const effectiveOperationType = planId === 'monthly' ? 'token_only' : 'payment';
+      
+      // Step 4: Initialize payment session to get lowProfileCode
+      console.log('Initializing payment session with plan:', planId, 'operationType:', effectiveOperationType);
       const paymentData = await initializePaymentSession(
         planId,
         userId,
         { email: userEmail, fullName: fullName || userEmail },
-        operationType
+        effectiveOperationType
       );
       
       if (!paymentData || !paymentData.lowProfileCode) {
@@ -65,16 +69,17 @@ export const usePaymentInitialization = ({
       
       console.log('Payment session initialized with lowProfileCode:', paymentData.lowProfileCode);
 
-      // Step 4: Master frame should be loaded by the parent component
+      // Step 5: Master frame should be loaded by the parent component
       // We must ensure the iframes are ready before initialization
       
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE
+        paymentStatus: PaymentStatus.IDLE,
+        operationType: effectiveOperationType
       }));
       
-      // Step 5: Initialize CardCom fields with the lowProfileCode
+      // Step 6: Initialize CardCom fields with the lowProfileCode
       console.log('Setting up to initialize CardCom fields');
       setTimeout(async () => {
         console.log('Starting CardCom fields initialization');
@@ -84,7 +89,7 @@ export const usePaymentInitialization = ({
             paymentData.lowProfileCode, 
             paymentData.sessionId,
             paymentData.terminalNumber,
-            operationType
+            effectiveOperationType
           );
           
           if (!initialized) {

@@ -14,14 +14,21 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
     paymentStatus: PaymentStatus.IDLE,
     sessionId: '',
     lowProfileCode: '',
-    isFramesReady: false, // Added the missing property
+    isFramesReady: false,
+    operationType: undefined
   });
 
   // Changed to match the expected signature (no parameters)
   const handlePaymentSuccess = () => {
     console.log('Payment successful');
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-    toast.success('התשלום בוצע בהצלחה!');
+    
+    // Display different success message based on operation type
+    if (state.operationType === 'token_only') {
+      toast.success('המנוי הופעל בהצלחה! החיוב הראשון יתבצע בתום תקופת הניסיון.');
+    } else {
+      toast.success('התשלום בוצע בהצלחה!');
+    }
     
     setTimeout(() => {
       onPaymentComplete();

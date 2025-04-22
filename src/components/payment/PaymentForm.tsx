@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -138,7 +137,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         </div>
         <CardDescription>
           {paymentStatus === PaymentStatus.SUCCESS 
-            ? 'התשלום בוצע בהצלחה!'
+            ? operationType === 'token_only'
+              ? 'המנוי הופעל בהצלחה!'
+              : 'התשלום בוצע בהצלחה!'
             : operationType === 'token_only'
               ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
               : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}

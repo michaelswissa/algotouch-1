@@ -1,11 +1,70 @@
 
 project_id = "ndhakvhrrkczgylcmyoc"
 
-[functions.cardcom-payment]
-verify_jwt = false
+[api]
+# Port to run the API on
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
-[functions.cardcom-status]
+[db]
+# Port to run the DB on
+port = 54322
+
+[studio]
+# Port to run Studio on
+port = 54323
+
+# Email testing
+[inbucket]
+# Port to run the email testing server on
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+# The maximum file size allowed (e.g. "5MB", "500KB")
+file_size_limit = "50MiB"
+
+[auth]
+# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used in emails.
+site_url = "http://localhost:3000"
+# List of JWT algorithms that you want to use for signing
+jwt_algo = "HS256"
+# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 seconds (one week).
+jwt_exp = 3600
+# Allow/disallow new user signups to your project.
+enable_signup = true
+
+[auth.email]
+# Allow/disallow new user signups via email to your project.
+enable_signup = true
+# If enabled, a user will be required to confirm any email change on both the old, and new email addresses.
+# If disabled, only the new email is required to confirm
+double_confirm_changes = true
+# If enabled, users need to confirm their email address before signing in.
+enable_confirmations = false
+
+[auth.sms]
+# Allow/disallow new user signups via SMS to your project.
+enable_signup = true
+# If enabled, users need to confirm their phone number before signing in.
+enable_confirmations = false
+
+[auth.external.github]
+enabled = false
+client_id = ""
+secret = ""
+# Use exactly the same case for the callback URL
+redirect_uri = ""
+
+[functions]
+[functions.cardcom-payment]
 verify_jwt = false
 
 [functions.cardcom-webhook]
 verify_jwt = false
+
+[functions.cardcom-recurring]
+verify_jwt = true

@@ -66,7 +66,14 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         // Payment was successful, update state
         console.log('Payment successful:', data);
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-        toast.success('התשלום בוצע בהצלחה!');
+        
+        // Show appropriate success message based on operation type
+        if (operationType === 'token_only' || planType === 'monthly') {
+          toast.success('המנוי הופעל בהצלחה! החיוב הראשון יתבצע בתום תקופת הניסיון.');
+        } else {
+          toast.success('התשלום בוצע בהצלחה!');
+        }
+        
         clearStatusCheckTimer();
         return;
       }

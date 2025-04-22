@@ -47,8 +47,10 @@ export const useFrameMessages = ({
           
           if (message.data?.IsSuccess) {
             console.log('Payment submission successful');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-            handlePaymentSuccess();
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            
+            // Start checking payment status
+            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
           } else {
             console.error('Payment submission failed:', message.data?.Description);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
@@ -75,7 +77,21 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle processing start/complete
+        // Handle tokenization messages
+        if (message.action === 'tokenCreationStarted') {
+          console.log('Token creation started');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+          return;
+        }
+
+        if (message.action === 'tokenCreationCompleted') {
+          console.log('Token creation completed');
+          // Continue checking status to confirm token was saved properly
+          checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+          return;
+        }
+
+        // Handle 3DS processing status
         if (message.action === '3DSProcessStarted') {
           console.log('3DS process started');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
@@ -83,31 +99,28 @@ export const useFrameMessages = ({
         }
 
         if (message.action === '3DSProcessCompleted') {
-          console.log('3DS process completed');
-          // Start status check to verify final result
-          if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-          }
+          console.log('3DS process completed, checking payment status');
+          checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
           return;
         }
 
-        // Handle validations
+        // Handle validation feedback
         if (message.action === 'handleValidations') {
-          console.log('Validation message for field:', message.field);
-          // Field validation is handled separately in usePaymentValidation
+          console.log('Validation message:', message);
+          // Don't change the payment state for validation messages
           return;
         }
       } catch (error) {
-        console.error('Error handling iframe message:', error);
+        console.error('Error handling message from iframe:', error);
       }
     };
 
-    console.log('Setting up message event listener for CardCom iframe');
+    // Add event listener for messages from iframe
     window.addEventListener('message', handleMessage);
-    
+
+    // Cleanup
     return () => {
-      console.log('Removing message event listener for CardCom iframe');
       window.removeEventListener('message', handleMessage);
     };
-  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
+  }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType]);
 };

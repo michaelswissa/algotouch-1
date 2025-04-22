@@ -1,23 +1,9 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// CardCom Configuration
-const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6",
-  endpoints: {
-    master: "https://secure.cardcom.solutions/api/openfields/master",
-    cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
-    cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
-    createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
-  }
 };
 
 // Helper logging function for enhanced debugging
@@ -45,6 +31,13 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
+    const body = await req.json();
+    
+    // Handle different action types
+    if (body.action === 'check-status') {
+      return await handleStatusCheck(supabaseAdmin, body, corsHeaders);
+    }
+    
     const { 
       planId, 
       amount, 
@@ -52,15 +45,17 @@ serve(async (req) => {
       invoiceInfo, 
       userId,
       registrationData,
-      redirectUrls
-    } = await req.json();
+      redirectUrls,
+      operationType
+    } = body;
     
     logStep("Received request data", { 
       planId, 
       amount, 
       currency,
       hasUserId: !!userId,
-      hasRegistrationData: !!registrationData
+      hasRegistrationData: !!registrationData,
+      operationType
     });
 
     if (!planId || !amount || !redirectUrls) {
@@ -96,11 +91,20 @@ serve(async (req) => {
       fullName
     });
 
+    // Determine operation type based on plan
+    // For monthly plans, we only want to create a token without charging
+    let operation = "ChargeOnly";
+    if (planId === 'monthly') {
+      operation = "ChargeAndCreateToken";
+    } else {
+      operation = planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken';
+    }
+
     // Create CardCom API request body for payment initialization
     const cardcomPayload = {
-      TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-      ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
+      TerminalNumber: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
+      ApiName: Deno.env.get('CARDCOM_API_NAME'),
+      Operation: operation,
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
@@ -129,13 +133,19 @@ serve(async (req) => {
           UnitCost: amount,
           Quantity: 1
         }]
-      } : undefined
+      } : undefined,
+      AdvancedDefinition: {
+        // For monthly plan, we only create the token and will charge later
+        // For other plans, we charge immediately
+        IsCreateToken: planId === 'monthly',
+        IsAutoRecurringPayment: false // We'll handle recurring payments through our own system
+      }
     };
     
     logStep("Sending request to CardCom");
     
     // Initialize payment session with CardCom
-    const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
+    const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -159,7 +169,17 @@ serve(async (req) => {
       );
     }
     
-    // Store payment session in database 
+    // Store payment session in database
+    const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000);
+    
+    // For monthly plans, set next charge date to 30 days from now
+    let initialNextChargeDate = null;
+    if (planId === 'monthly') {
+      const nextChargeDate = new Date();
+      nextChargeDate.setDate(nextChargeDate.getDate() + 30);
+      initialNextChargeDate = nextChargeDate.toISOString();
+    }
+    
     const sessionData = {
       user_id: userId,
       low_profile_code: responseData.LowProfileId,
@@ -168,9 +188,11 @@ serve(async (req) => {
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      expires_at: sessionExpiry.toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
-      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
+      cardcom_terminal_number: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
+      operation_type: planId === 'monthly' ? 'token_only' : 'payment',
+      initial_next_charge_date: initialNextChargeDate
     };
     
     let dbSessionId = null;
@@ -200,7 +222,7 @@ serve(async (req) => {
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
           lowProfileCode: responseData.LowProfileId,
-          terminalNumber: CARDCOM_CONFIG.terminalNumber,
+          terminalNumber: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
           cardcomUrl: "https://secure.cardcom.solutions"
         }
       }),
@@ -225,3 +247,119 @@ serve(async (req) => {
     );
   }
 });
+
+async function handleStatusCheck(supabaseAdmin, body, corsHeaders) {
+  const { lowProfileCode, sessionId } = body;
+  
+  if (!lowProfileCode || !sessionId) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        processing: false,
+        failed: true,
+        message: "Missing required parameters",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  logStep("Checking payment status", { lowProfileCode, sessionId });
+
+  try {
+    // Query the payment sessions table
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .select('*')
+      .eq('low_profile_code', lowProfileCode)
+      .single();
+
+    if (sessionError || !session) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          processing: false, 
+          failed: true,
+          message: "Payment session not found",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    logStep("Found session", { status: session.status });
+
+    // Check if the session has expired
+    if (new Date(session.expires_at) < new Date()) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          processing: false,
+          failed: true,
+          message: "Payment session expired",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Check payment status
+    if (session.status === 'success') {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          processing: false,
+          failed: false,
+          message: "Payment successful",
+          data: session.transaction_data
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    } else if (session.status === 'failed') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          processing: false,
+          failed: true,
+          message: "Payment failed",
+          data: session.transaction_data
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    } else {
+      // Payment still processing
+      return new Response(
+        JSON.stringify({
+          success: false,
+          processing: true,
+          failed: false,
+          message: "Payment is still processing",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+  } catch (error) {
+    logStep("Error checking payment status", { error });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        processing: false,
+        failed: true,
+        message: "Error checking payment status",
+        error: error.message
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
