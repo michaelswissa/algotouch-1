@@ -1,6 +1,5 @@
-
 import { useEffect } from 'react';
-import { PaymentState } from '@/components/payment/types/payment';
+import { PaymentState, PaymentStatus } from '@/components/payment/types/payment';
 
 interface UseFrameMessagesProps {
   setState: (updater: (prev: PaymentState) => PaymentState) => void;
@@ -81,7 +80,7 @@ export const useFrameMessages = ({
           console.error('Transaction failed:', data.error || 'Unknown error');
           setState(prev => ({
             ...prev,
-            paymentStatus: 'failed',
+            paymentStatus: PaymentStatus.FAILED,
             error: data.error || 'Unknown error'
           }));
         }

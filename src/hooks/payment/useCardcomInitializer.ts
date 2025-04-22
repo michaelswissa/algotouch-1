@@ -1,4 +1,3 @@
-
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
@@ -28,8 +27,7 @@ export const useCardcomInitializer = () => {
     });
 
     try {
-      const config: InitConfig = {
-        action: 'init',
+      const config: any = {
         lowProfileCode,
         sessionId,
         terminalNumber,
