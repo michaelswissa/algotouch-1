@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,25 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [areFieldsReady, setAreFieldsReady] = useState(false);
   const [loadingFields, setLoadingFields] = useState(new Set<string>());
   
+  const {
+    cardNumberError,
+    cardTypeInfo,
+    cvvError,
+    cardholderNameError,
+    expiryError,
+    idNumberError, // Added validation for ID
+    isValid,
+    validateCardNumber,
+    validateCvv,
+    validateIdNumber, // Added ID validation
+    resetValidation // Move this up before it's used
+  } = usePaymentValidation({
+    cardholderName,
+    cardOwnerId,
+    expiryMonth,
+    expiryYear
+  });
+
   // Reset loaded fields when frameKey changes or retry is initiated
   useEffect(() => {
     setLoadingFields(new Set());
@@ -72,25 +92,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       return newFields;
     });
   }, []);
-
-  const {
-    cardNumberError,
-    cardTypeInfo,
-    cvvError,
-    cardholderNameError,
-    expiryError,
-    idNumberError, // Added validation for ID
-    isValid,
-    validateCardNumber,
-    validateCvv,
-    validateIdNumber, // Added ID validation
-    resetValidation // Add reset functionality
-  } = usePaymentValidation({
-    cardholderName,
-    cardOwnerId,
-    expiryMonth,
-    expiryYear
-  });
   
   // Reset validation when needed
   useEffect(() => {
