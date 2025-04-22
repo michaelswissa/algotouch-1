@@ -89,6 +89,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     try {
       const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
+      const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
       const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
       const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
@@ -97,6 +98,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
+        cardOwnerId, // Added ID field
         cardOwnerEmail: email,
         cardOwnerPhone: phone,
         expirationMonth,
@@ -110,7 +112,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.log('Sending transaction data:', formData);
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
-      // Reset in-progress flag after a timeout
       setTimeout(() => {
         setPaymentInProgress(false);
       }, 5000);

@@ -55,9 +55,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   const handleSubmitPayment = () => {
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
+    const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value;
     
     if (!cardholderName) {
       toast.error('יש למלא את שם בעל הכרטיס');
+      return;
+    }
+
+    if (!cardOwnerId || !/^\d{9}$/.test(cardOwnerId)) {
+      toast.error('יש למלא תעודת זהות תקינה');
       return;
     }
 
@@ -78,7 +84,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     try {
       submitPayment();
       
-      // Reset submitting state after a timeout
       setTimeout(() => {
         setIsSubmitting(false);
       }, 3000);

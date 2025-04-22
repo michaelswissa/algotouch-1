@@ -1,33 +1,36 @@
 
 import React from 'react';
+import '../styles/cardFields.css';
 
 interface CardNumberFrameProps {
   terminalNumber: string;
   cardcomUrl: string;
   onLoad: () => void;
-  frameLoadAttempts: number;
+  isReady: boolean;
 }
 
 const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
   terminalNumber,
   cardcomUrl,
   onLoad,
-  frameLoadAttempts
+  isReady
 }) => {
-  // Make sure to include terminalNumber parameter in the URL exactly as in the example
   const iframeSrc = `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`;
   
   return (
-    <div className="relative">
-      <iframe
-        id="CardComCardNumber"
-        name="CardComCardNumber"
-        src={iframeSrc}
-        className="w-full h-[40px] border border-input rounded-md"
-        onLoad={onLoad}
-        title="מספר כרטיס"
-        key={`cardnumber-${frameLoadAttempts}-${terminalNumber}`}
-      />
+    <div className="credit-card-field-container">
+      <div className={`credit-card-field ${!isReady ? 'field-loading' : ''}`}>
+        {isReady && (
+          <iframe
+            id="CardComCardNumber"
+            name="CardComCardNumber"
+            src={iframeSrc}
+            className="w-full"
+            onLoad={onLoad}
+            title="מספר כרטיס"
+          />
+        )}
+      </div>
     </div>
   );
 };

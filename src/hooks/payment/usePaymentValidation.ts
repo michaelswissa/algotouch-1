@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 interface ValidationState {
@@ -6,6 +5,7 @@ interface ValidationState {
   cardTypeInfo: string;
   cvvError: string;
   cardholderNameError: string;
+  idNumberError: string;
   expiryError: string;
   isCardNumberValid: boolean;
   isCvvValid: boolean;
@@ -13,12 +13,14 @@ interface ValidationState {
 
 interface PaymentValidationProps {
   cardholderName: string;
+  cardOwnerId: string;
   expiryMonth: string;
   expiryYear: string;
 }
 
 export const usePaymentValidation = ({ 
   cardholderName, 
+  cardOwnerId,
   expiryMonth, 
   expiryYear 
 }: PaymentValidationProps) => {
@@ -27,6 +29,7 @@ export const usePaymentValidation = ({
     cardTypeInfo: '',
     cvvError: '',
     cardholderNameError: '',
+    idNumberError: '',
     expiryError: '',
     isCardNumberValid: false,
     isCvvValid: false
@@ -48,6 +51,33 @@ export const usePaymentValidation = ({
       setValidationState(prev => ({ ...prev, cardholderNameError: '' }));
     }
   }, [cardholderName]);
+
+  // Validate Israeli ID number
+  const validateIdNumber = (id: string) => {
+    if (!id) {
+      setValidationState(prev => ({
+        ...prev,
+        idNumberError: 'תעודת זהות הינה שדה חובה'
+      }));
+      return false;
+    }
+
+    if (!/^\d{9}$/.test(id)) {
+      setValidationState(prev => ({
+        ...prev,
+        idNumberError: 'תעודת זהות חייבת להכיל 9 ספרות'
+      }));
+      return false;
+    }
+
+    // Clear error if valid
+    setValidationState(prev => ({ ...prev, idNumberError: '' }));
+    return true;
+  };
+
+  useEffect(() => {
+    validateIdNumber(cardOwnerId);
+  }, [cardOwnerId]);
 
   // Validate expiry date - check format and valid date
   useEffect(() => {
@@ -193,10 +223,12 @@ export const usePaymentValidation = ({
     return !validationState.cardNumberError &&
            !validationState.cvvError &&
            !validationState.cardholderNameError &&
+           !validationState.idNumberError &&
            !validationState.expiryError &&
            validationState.isCardNumberValid &&
            validationState.isCvvValid &&
            cardholderName.length >= 2 &&
+           cardOwnerId.length === 9 &&
            expiryMonth &&
            expiryYear;
   };
@@ -205,6 +237,7 @@ export const usePaymentValidation = ({
     ...validationState,
     isValid,
     validateCardNumber,
-    validateCvv
+    validateCvv,
+    validateIdNumber
   };
 };
