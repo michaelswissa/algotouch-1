@@ -32,9 +32,10 @@ export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
   sessionId: string;
-  terminalNumber: string; // Added terminalNumber to the InitConfig interface
+  terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
+  reCaptchaFieldCSS?: string; // Add this missing property
   language: string;
   operationType?: 'payment' | 'token_only';
   placeholder?: string;

@@ -99,6 +99,7 @@ export const useCardcomInitializer = () => {
             .cvvField.invalid {
               border: 1px solid #c01111;
             }`,
+          // Using the field with proper type definition now
           reCaptchaFieldCSS: 'body { margin: 0; padding:0; display: flex; }',
           placeholder: "1111-2222-3333-4444",
           cvvPlaceholder: "123",
