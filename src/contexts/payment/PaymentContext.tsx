@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useRef, useState } from 'react';
 import { PaymentState, PaymentStatus, PaymentContextType, PaymentResponse } from '@/components/payment/types/payment';
 import { usePaymentInitialization } from '@/hooks/payment/usePaymentInitialization';
@@ -44,6 +45,24 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({
     }
   }, [planId]);
 
+  // Define handlePaymentSuccess and handleError functions
+  const handlePaymentSuccess = () => {
+    console.log('Payment successful');
+    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+    toast.success('התשלום בוצע בהצלחה!');
+    
+    setTimeout(() => {
+      onPaymentComplete();
+    }, 1000);
+  };
+
+  const handleError = (message: string) => {
+    console.error('Payment error:', message);
+    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+    toast.error(message || 'אירעה שגיאה בעיבוד התשלום');
+  };
+
+  // Fix the type issue by proper casting
   const { initializePayment } = usePaymentInitialization({
     planId,
     setState,
@@ -108,7 +127,7 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({
 
     if (!state.lowProfileCode) {
       console.error("Missing lowProfileCode for payment", state);
-      handleError("שגיאת אתחול תשלום - חסר קוד פרופיל, נא ��רענן ולנסות שנית");
+      handleError("שגיאת אתחול תשלום - חסר קוד פרופיל, נא לרענן ולנסות שנית");
       return;
     }
 
