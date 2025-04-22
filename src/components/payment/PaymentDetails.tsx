@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef, useCallback } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import CardNumberFrame from './iframes/CardNumberFrame';
@@ -24,6 +25,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
 
   const {
     cardNumberError,
@@ -39,6 +41,11 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     expiryMonth,
     expiryYear
   });
+
+  // Handle iframe load attempts
+  const handleIframeLoad = useCallback(() => {
+    setFrameLoadAttempts(prev => prev + 1);
+  }, []);
 
   // Update card owner details in the master frame when they change
   React.useEffect(() => {
@@ -107,7 +114,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <CardNumberFrame
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => {}}
+            onLoad={handleIframeLoad}
             frameLoadAttempts={frameLoadAttempts}
           />
           {cardNumberError && (
@@ -135,7 +142,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <CVVFrame
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => {}}
+            onLoad={handleIframeLoad}
             frameLoadAttempts={frameLoadAttempts}
           />
           {cvvError && (
