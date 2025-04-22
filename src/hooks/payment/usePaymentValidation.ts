@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 
 interface ValidationState {
   cardNumberError: string;
@@ -24,7 +25,7 @@ export const usePaymentValidation = ({
   expiryMonth, 
   expiryYear 
 }: PaymentValidationProps) => {
-  const [validationState, setValidationState] = useState<ValidationState>({
+  const initialState: ValidationState = {
     cardNumberError: '',
     cardTypeInfo: '',
     cvvError: '',
@@ -33,7 +34,25 @@ export const usePaymentValidation = ({
     expiryError: '',
     isCardNumberValid: false,
     isCvvValid: false
-  });
+  };
+  
+  const [validationState, setValidationState] = useState<ValidationState>(initialState);
+
+  // Reset validation state
+  const resetValidation = useCallback(() => {
+    setValidationState(initialState);
+    
+    // Also reset validation in the iframes
+    const cardNumberFrame = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+    if (cardNumberFrame?.contentWindow) {
+      cardNumberFrame.contentWindow.postMessage({ action: 'resetValidation' }, '*');
+    }
+    
+    const cvvFrame = document.getElementById('CardComCvv') as HTMLIFrameElement;
+    if (cvvFrame?.contentWindow) {
+      cvvFrame.contentWindow.postMessage({ action: 'resetValidation' }, '*');
+    }
+  }, [initialState]);
 
   // Validate cardholder name
   useEffect(() => {
@@ -238,6 +257,7 @@ export const usePaymentValidation = ({
     isValid,
     validateCardNumber,
     validateCvv,
-    validateIdNumber
+    validateIdNumber,
+    resetValidation
   };
 };

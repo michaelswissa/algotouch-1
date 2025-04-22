@@ -30,6 +30,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     paymentStatus,
     masterFrameRef,
     operationType,
+    frameKey,
+    lowProfileCode,
     initializePayment,
     handleRetry,
     submitPayment
@@ -41,7 +43,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
     initializePayment();
-  }, []); // Run only once on mount
+  }, [initializePayment, planId]);
   
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
@@ -79,6 +81,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       return;
     }
     
+    if (!lowProfileCode) {
+      toast.error('שגיאה באתחול התשלום, אנא רענן ונסה שנית');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
@@ -112,6 +119,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       
       <CardContent className="space-y-4">
         <iframe
+          key={frameKey} // Add key for proper re-rendering
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
@@ -126,6 +134,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           terminalNumber={terminalNumber}
           cardcomUrl={cardcomUrl}
           masterFrameRef={masterFrameRef}
+          frameKey={frameKey}
           onNavigateToDashboard={() => window.location.href = '/dashboard'}
           onRetry={handleRetry}
           operationType={operationType}
@@ -139,7 +148,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               type="button" 
               className="w-full" 
               onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !lowProfileCode}
             >
               {getButtonText()}
             </Button>

@@ -1,3 +1,4 @@
+
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
@@ -80,8 +81,14 @@ export const useCardcomInitializer = () => {
         operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
       };
 
-      console.log('Sending initialization config to CardCom iframe');
-      masterFrameRef.current.contentWindow.postMessage(config, '*');
+      console.log('Sending initialization config to CardCom iframe with lowProfileCode:', lowProfileCode);
+      
+      // Allow small delay for iframe to be ready
+      setTimeout(() => {
+        if (masterFrameRef.current?.contentWindow) {
+          masterFrameRef.current.contentWindow.postMessage(config, '*');
+        }
+      }, 300);
 
       return true;
     } catch (error) {

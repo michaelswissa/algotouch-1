@@ -16,6 +16,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [frameKey, setFrameKey] = useState(Date.now()); // Add key for frame reinitialization
 
   // Determine operation type based on plan ID
   useEffect(() => {
@@ -63,14 +64,36 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     };
   }, [cleanupStatusCheck]);
 
+  // Reset frames when needed
+  const resetFrames = useCallback(() => {
+    setFrameKey(Date.now());
+    setTimeout(() => {
+      if (masterFrameRef.current) {
+        console.log('Forcing frame refresh');
+        const src = masterFrameRef.current.src;
+        masterFrameRef.current.src = '';
+        setTimeout(() => {
+          if (masterFrameRef.current) {
+            masterFrameRef.current.src = src;
+          }
+        }, 50);
+      }
+    }, 50);
+  }, []);
+
   const handleRetry = useCallback(() => {
     console.log('Retrying payment initialization');
     setState(prev => ({
       ...prev,
       paymentStatus: PaymentStatus.IDLE
     }));
-    initializePayment();
-  }, [initializePayment, setState]);
+    resetFrames(); // Reset frames before reinitializing
+    
+    // Slight delay to ensure frame reset completes
+    setTimeout(() => {
+      initializePayment();
+    }, 300);
+  }, [initializePayment, setState, resetFrames]);
 
   const submitPayment = useCallback(() => {
     if (paymentInProgress) {
@@ -79,7 +102,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
 
     if (!state.lowProfileCode) {
-      handleError("שגיאת אתחול תשלום, אנא רענן את הדף ונסה שנית");
+      console.error("Missing lowProfileCode for payment", state);
+      handleError("שגיאת אתחול תשלום - חסר קוד פרופיל, נא לרענן ולנסות שנית");
       return;
     }
 
@@ -100,6 +124,21 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
 
+      if (!cardholderName || !cardOwnerId || !email || !phone || !expirationMonth || !expirationYear) {
+        console.error("Missing required fields for payment");
+        toast.error('יש למלא את כל השדות המסומנים בכוכבית');
+        setPaymentInProgress(false);
+        return;
+      }
+
+      // Verify lowProfileCode is available again just before sending
+      if (!state.lowProfileCode) {
+        console.error("lowProfileCode missing before send");
+        handleError("חסר קוד פרופיל נמוך (lowProfileCode)");
+        setPaymentInProgress(false);
+        return;
+      }
+
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
@@ -109,13 +148,20 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
-        lowProfileCode: state.lowProfileCode,
+        lowProfileCode: state.lowProfileCode, // Ensure this is passed correctly
+        sessionId: state.sessionId, // Include sessionId for better tracking
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly"
       };
 
-      console.log('Sending transaction data:', formData);
+      console.log('Sending transaction data:', { 
+        ...formData,
+        lowProfileCode: formData.lowProfileCode,
+        sessionId: formData.sessionId
+      });
+
+      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
 
       startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
@@ -128,14 +174,16 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, planId, startStatusCheck]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, planId, startStatusCheck, setState]);
 
   return {
     ...state,
     operationType,
     masterFrameRef,
+    frameKey,
     initializePayment,
     handleRetry,
-    submitPayment
+    submitPayment,
+    resetFrames
   };
 };

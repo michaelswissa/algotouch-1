@@ -13,6 +13,7 @@ interface PaymentContentProps {
   terminalNumber: string;
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
+  frameKey?: number; // Add frameKey prop
   onNavigateToDashboard: () => void;
   onRetry: () => void;
   onCancel?: () => void;
@@ -25,6 +26,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   terminalNumber,
   cardcomUrl,
   masterFrameRef,
+  frameKey,
   onNavigateToDashboard,
   onRetry,
   operationType = 'payment'
@@ -55,6 +57,8 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}
+        frameKey={frameKey} // Pass frameKey to PaymentDetails
+        paymentStatus={paymentStatus}
       />
     </>
   );

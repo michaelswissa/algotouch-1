@@ -21,6 +21,11 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
+    setState(prev => ({ 
+      ...prev, 
+      paymentStatus: PaymentStatus.INITIALIZING 
+    }));
+
     // Determine operation based on plan and operationType
     let operation = "ChargeOnly";
     if (operationType === 'token_only' || planId === 'monthly') {
@@ -52,10 +57,23 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     
     if (error || !data?.success) {
       console.error("Payment initialization error:", error || data?.message);
+      setState(prev => ({ 
+        ...prev, 
+        paymentStatus: PaymentStatus.FAILED 
+      }));
       throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
     }
     
     console.log("Payment session created:", data.data);
+    
+    if (!data.data?.lowProfileCode) {
+      console.error("Missing lowProfileCode in payment initialization response");
+      setState(prev => ({ 
+        ...prev, 
+        paymentStatus: PaymentStatus.FAILED 
+      }));
+      throw new Error('חסר קוד פרופיל נמוך (lowProfileCode) בתשובה מהשרת');
+    }
     
     // Always use the fixed terminal number for CardCom
     const terminalNumber = '160138';
