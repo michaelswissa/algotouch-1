@@ -14,6 +14,7 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
     paymentStatus: PaymentStatus.IDLE,
     sessionId: '',
     lowProfileCode: '',
+    isFramesReady: false, // Added the missing property
   });
 
   // Changed to match the expected signature (no parameters)
