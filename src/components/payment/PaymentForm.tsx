@@ -32,7 +32,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     operationType,
     initializePayment,
     handleRetry,
-    handleCancel,
     submitPayment
   } = usePayment({
     planId,
@@ -55,11 +54,22 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   };
 
   const handleSubmitPayment = () => {
-    // Quick validation - similar to example
-    const cardholderName = document.querySelector<HTMLInputElement>('#cardholder-name')?.value;
+    const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
     
     if (!cardholderName) {
       toast.error('יש למלא את שם בעל הכרטיס');
+      return;
+    }
+
+    const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value;
+    if (!email) {
+      toast.error('יש למלא כתובת דואר אלקטרוני');
+      return;
+    }
+
+    const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value;
+    if (!phone) {
+      toast.error('יש למלא מספר טלפון');
       return;
     }
     
@@ -96,7 +106,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master iframe with correct ID, name and terminal number parameter */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -114,7 +123,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           masterFrameRef={masterFrameRef}
           onNavigateToDashboard={() => window.location.href = '/dashboard'}
           onRetry={handleRetry}
-          onCancel={handleCancel}
           operationType={operationType}
         />
       </CardContent>

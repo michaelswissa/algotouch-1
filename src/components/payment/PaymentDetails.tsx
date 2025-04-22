@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -23,7 +22,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [cardholderName, setCardholderName] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
-  const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -41,7 +39,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     expiryMonth,
     expiryYear
   });
-  
+
   // Update card owner details in the master frame when they change
   React.useEffect(() => {
     if (masterFrameRef.current?.contentWindow) {
@@ -87,6 +85,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           placeholder="example@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
         />
       </div>
 
@@ -98,6 +97,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           placeholder="05xxxxxxxx"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          required
         />
       </div>
 
