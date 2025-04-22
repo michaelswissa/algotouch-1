@@ -48,7 +48,8 @@ serve(async (req) => {
       ReturnValue: reference,
       TokenInfo: tokenInfo,
       TranzactionId: transactionId,
-      ResponseCode: responseCode
+      ResponseCode: responseCode,
+      Operation: operation
     } = payload;
 
     if (!lowProfileCode) {
@@ -83,7 +84,7 @@ serve(async (req) => {
       .from('payment_sessions')
       .update({
         status,
-        transaction_id: transactionId,
+        transaction_id: transactionId || (tokenInfo?.Token ? tokenInfo.Token : null),
         transaction_data: payload,
         updated_at: new Date().toISOString()
       })
@@ -119,11 +120,30 @@ serve(async (req) => {
       .single();
 
     // Prepare the payment method info from token or transaction
-    const paymentMethodInfo = {
-      lastFourDigits: (tokenInfo?.CardYear ? tokenInfo.CardNumberLastDigits : transactionInfo?.Last4CardDigits) || '',
-      expiryMonth: (tokenInfo?.CardYear ? tokenInfo.CardMonth : transactionInfo?.CardMonth) || '',
-      expiryYear: (tokenInfo?.CardYear ? tokenInfo.CardYear : transactionInfo?.CardYear) || ''
-    };
+    let paymentMethodInfo = {};
+    
+    // Handle token creation (from TokenInfo object)
+    if (tokenInfo?.Token) {
+      paymentMethodInfo = {
+        lastFourDigits: tokenInfo.CardNumberLastDigits || '',
+        expiryMonth: tokenInfo.CardMonth || '',
+        expiryYear: tokenInfo.CardYear || '',
+        cardOwnerName: payload.UIValues?.CardOwnerName || '',
+        cardOwnerPhone: payload.UIValues?.CardOwnerPhone || '',
+        cardOwnerEmail: payload.UIValues?.CardOwnerEmail || '',
+      };
+    } 
+    // Handle transaction info
+    else if (transactionInfo) {
+      paymentMethodInfo = {
+        lastFourDigits: transactionInfo.Last4CardDigits || '',
+        expiryMonth: transactionInfo.CardMonth || '',
+        expiryYear: transactionInfo.CardYear || '',
+        cardOwnerName: transactionInfo.CardOwnerName || payload.UIValues?.CardOwnerName || '',
+        cardOwnerPhone: transactionInfo.CardOwnerPhone || payload.UIValues?.CardOwnerPhone || '',
+        cardOwnerEmail: transactionInfo.CardOwnerEmail || payload.UIValues?.CardOwnerEmail || '',
+      };
+    }
     
     // Get user email for records
     const { data: profile } = await supabaseAdmin
@@ -132,10 +152,10 @@ serve(async (req) => {
       .eq('id', userId)
       .single();
     
-    const userEmail = profile?.email || '';
+    const userEmail = profile?.email || payload.UIValues?.CardOwnerEmail || '';
 
     // Handle payment result based on plan type and operation
-    if (planId === 'monthly') {
+    if (planId === 'monthly' || operationType === 'token_only') {
       // For monthly plans with token creation
       const token = tokenInfo?.Token;
       
@@ -156,11 +176,12 @@ serve(async (req) => {
           .from('subscriptions')
           .update({
             plan_type: planId,
-            status: 'active',
+            status: 'trial',
             payment_token: token,
             payment_method: paymentMethodInfo,
             trial_ends_at: trialEndDate.toISOString(),
             next_charge_date: nextChargeDate,
+            payment_status: 'pending_first_payment',
             first_payment_processed: false,
             payment_failures: 0,
             updated_at: new Date().toISOString()
@@ -173,11 +194,12 @@ serve(async (req) => {
           .insert({
             user_id: userId,
             plan_type: planId,
-            status: 'active',
+            status: 'trial',
             payment_token: token,
             payment_method: paymentMethodInfo,
             trial_ends_at: trialEndDate.toISOString(),
             next_charge_date: nextChargeDate,
+            payment_status: 'pending_first_payment',
             first_payment_processed: false,
             payment_failures: 0,
             user_email: userEmail
@@ -219,6 +241,7 @@ serve(async (req) => {
             status: 'active',
             payment_token: token,
             payment_method: paymentMethodInfo,
+            payment_status: 'success',
             current_period_ends_at: planId === 'vip' ? null : periodEndDate.toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -233,6 +256,7 @@ serve(async (req) => {
             status: 'active',
             payment_token: token,
             payment_method: paymentMethodInfo,
+            payment_status: 'success',
             current_period_ends_at: planId === 'vip' ? null : periodEndDate.toISOString(),
             user_email: userEmail
           });

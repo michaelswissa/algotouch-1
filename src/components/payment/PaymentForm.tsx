@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     handleRetry,
     submitPayment,
     lowProfileCode,
-    sessionId
+    sessionId,
+    isFramesReady
   } = usePayment({
     planId,
     onPaymentComplete
@@ -110,8 +112,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       submitPayment();
       
       setTimeout(() => {
-        setIsSubmitting(false);
-      }, 3000);
+        if (paymentStatus !== PaymentStatus.SUCCESS) {
+          setIsSubmitting(false);
+        }
+      }, 15000); // Add a timeout to reset button if no response after 15 seconds
     } catch (error) {
       console.error('Error submitting payment:', error);
       toast.error('אירעה שגיאה בשליחת התשלום');
@@ -126,6 +130,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     lowProfileCode && 
     sessionId && 
     isMasterFrameLoaded && 
+    isFramesReady &&
     paymentStatus !== PaymentStatus.INITIALIZING;
 
   return (

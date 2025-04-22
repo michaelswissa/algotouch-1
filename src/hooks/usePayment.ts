@@ -100,6 +100,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
+      const currentOperationType = state.operationType || operationType;
+      console.log('Current operation type:', currentOperationType);
+      
       // CardCom requires "lowProfileCode" param for each doTransaction
       const formData: any = {
         action: 'doTransaction',
@@ -112,9 +115,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
-        Operation: state.operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
-        lowProfileCode: state.lowProfileCode, // Ensure always present
-        LowProfileCode: state.lowProfileCode  // For extra compatibility
+        // For monthly plan, we only create token without charging
+        Operation: currentOperationType === 'token_only' ? "CreateTokenOnly" : "ChargeOnly",
+        // Critical for CardCom - make sure both forms are included
+        lowProfileCode: state.lowProfileCode,
+        LowProfileCode: state.lowProfileCode
       };
 
       console.log('Sending transaction data to CardCom:', formData);
@@ -126,17 +131,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }));
       
       // Start status check with required params
-      startStatusCheck(state.lowProfileCode, state.sessionId, state.operationType, planId);
-      
-      setTimeout(() => {
-        setPaymentInProgress(false);
-      }, 5000);
+      startStatusCheck(state.lowProfileCode, state.sessionId, currentOperationType, planId);
     } catch (error) {
       console.error("Error submitting payment:", error);
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, state.operationType, handleError, paymentInProgress, setState, startStatusCheck, planId]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, state.operationType, handleError, paymentInProgress, setState, startStatusCheck, planId, operationType]);
 
   return {
     ...state,

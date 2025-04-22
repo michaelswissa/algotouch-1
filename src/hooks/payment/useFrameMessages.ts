@@ -1,126 +1,105 @@
 
 import { useEffect } from 'react';
-import { PaymentStatus } from '@/components/payment/types/payment';
-import { toast } from 'sonner';
+import { PaymentState } from '@/components/payment/types/payment';
 
 interface UseFrameMessagesProps {
+  setState: (updater: (prev: PaymentState) => PaymentState) => void;
   handlePaymentSuccess: () => void;
-  setState: (updater: any) => void;
-  checkPaymentStatus: (lowProfileCode: string, sessionId: string, operationType?: 'payment' | 'token_only', planType?: string) => void;
-  lowProfileCode: string;
-  sessionId: string;
+  checkPaymentStatus: () => void;
+  lowProfileCode?: string;
+  sessionId?: string;
   operationType?: 'payment' | 'token_only';
   planType?: string;
 }
 
 export const useFrameMessages = ({
-  handlePaymentSuccess,
   setState,
+  handlePaymentSuccess,
   checkPaymentStatus,
   lowProfileCode,
   sessionId,
-  operationType = 'payment',
+  operationType,
   planType
 }: UseFrameMessagesProps) => {
   useEffect(() => {
-    if (!lowProfileCode || !sessionId) return;
-
     const handleMessage = (event: MessageEvent) => {
-      try {
-        // Safety check for message origin
-        if (!event.origin.includes('cardcom.solutions') && 
-            !event.origin.includes('localhost') && 
-            !event.origin.includes(window.location.origin)) {
-          return;
+      const data = event.data;
+      
+      // Ignore non-CardCom messages
+      if (!data || typeof data !== 'object' || !data.action) {
+        return;
+      }
+      
+      // Log received message for debugging
+      console.log('Received message from iframe:', data);
+      
+      // Handle different message types
+      if (data.action === 'loaded') {
+        // Iframe has loaded
+        console.log('CardCom iframe loaded:', data);
+      } 
+      else if (data.action === 'ready') {
+        // CardCom component is ready
+        console.log('CardCom component ready:', data);
+      }
+      else if (data.action === 'frame-ready') {
+        // Card number frame is ready
+        console.log('Card number frame ready:', data);
+      }
+      else if (data.action === 'card-validated' || data.action === 'card-validation-error') {
+        // Card validation feedback
+        console.log('Card validation result:', data);
+        
+        if (data.action === 'card-validated') {
+          setState(prev => ({
+            ...prev,
+            cardBrand: data.cardBrand,
+            cardType: data.cardType
+          }));
         }
-
-        const message = event.data;
-        console.log('Received message from iframe:', message);
-
-        if (!message || typeof message !== 'object') {
-          return;
-        }
-
-        // Handle HandleSubmit (success case)
-        if (message.action === 'HandleSubmit' || message.action === 'handleSubmit') {
-          console.log('HandleSubmit message received:', message);
-          
-          if (message.data?.IsSuccess) {
-            console.log('Payment submission successful');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-            
-            // Start checking payment status
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+      }
+      else if (data.action === 'cvv-validated' || data.action === 'cvv-validation-error') {
+        // CVV validation feedback
+        console.log('CVV validation result:', data);
+      }
+      else if (data.action === 'doTransaction-result') {
+        // Transaction result received
+        console.log('Transaction result:', data);
+        
+        if (data.success) {
+          // For token-only operation (monthly subscription with delayed charge)
+          if (operationType === 'token_only' || planType === 'monthly') {
+            console.log('Token creation successful, checking status with backend');
+            checkPaymentStatus();
           } else {
-            console.error('Payment submission failed:', message.data?.Description);
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-            toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
+            // For regular payment operations
+            console.log('Payment successful, checking status with backend');
+            checkPaymentStatus();
           }
-          return;
+        } else {
+          // Transaction failed
+          console.error('Transaction failed:', data.error || 'Unknown error');
+          setState(prev => ({
+            ...prev,
+            paymentStatus: 'failed',
+            error: data.error || 'Unknown error'
+          }));
         }
-
-        // Handle HandleError (error case)
-        if (message.action === 'HandleError' || message.action === 'HandleEror') {
-          console.error('Payment error:', message.message || 'Unknown error');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          
-          // Show more specific error messages
-          if (message.message && message.message.includes('lowProfileCode')) {
-            toast.error('פרמטר lowProfileCode חובה');
-          } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
-            toast.error('תאריך תוקף שגוי');
-          } else if (message.message && message.message.includes('CardComCardNumber')) {
-            toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
-          } else {
-            toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
-          }
-          return;
+      }
+      else if (data.action === 'payment-status-update') {
+        // Status update from our backend status check
+        if (data.status === 'success') {
+          handlePaymentSuccess();
         }
-
-        // Handle tokenization messages
-        if (message.action === 'tokenCreationStarted') {
-          console.log('Token creation started');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-          return;
-        }
-
-        if (message.action === 'tokenCreationCompleted') {
-          console.log('Token creation completed');
-          // Continue checking status to confirm token was saved properly
-          checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-          return;
-        }
-
-        // Handle 3DS processing status
-        if (message.action === '3DSProcessStarted') {
-          console.log('3DS process started');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-          return;
-        }
-
-        if (message.action === '3DSProcessCompleted') {
-          console.log('3DS process completed, checking payment status');
-          checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-          return;
-        }
-
-        // Handle validation feedback
-        if (message.action === 'handleValidations') {
-          console.log('Validation message:', message);
-          // Don't change the payment state for validation messages
-          return;
-        }
-      } catch (error) {
-        console.error('Error handling message from iframe:', error);
       }
     };
-
-    // Add event listener for messages from iframe
+    
+    // Add event listener for iframe messages
     window.addEventListener('message', handleMessage);
-
+    
     // Cleanup
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType]);
+  }, [setState, handlePaymentSuccess, checkPaymentStatus, lowProfileCode, sessionId, operationType, planType]);
 };

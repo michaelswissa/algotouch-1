@@ -1,3 +1,4 @@
+
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
@@ -97,7 +98,7 @@ export const useCardcomInitializer = () => {
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
-            operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+            operation: operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
           };
 
           console.log('Sending initialization config to CardCom iframe:', config);

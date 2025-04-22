@@ -51,7 +51,7 @@ export const usePaymentInitialization = ({
 
       // Step 3: Determine operation type based on plan
       // Monthly plans only need token creation, with first charge after trial
-      const effectiveOperationType = planId === 'monthly' ? 'token_only' : 'payment';
+      const effectiveOperationType = planId === 'monthly' ? 'token_only' : operationType;
       
       // Step 4: Initialize payment session to get lowProfileCode
       console.log('Initializing payment session with plan:', planId, 'operationType:', effectiveOperationType);
@@ -98,6 +98,10 @@ export const usePaymentInitialization = ({
           }
           
           console.log('CardCom fields initialized successfully');
+          setState(prev => ({
+            ...prev,
+            isFramesReady: true
+          }));
         } catch (error) {
           console.error('Error during CardCom field initialization:', error);
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));

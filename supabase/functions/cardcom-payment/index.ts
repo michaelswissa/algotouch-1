@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -58,7 +59,7 @@ serve(async (req) => {
       operationType
     });
 
-    if (!planId || !amount || !redirectUrls) {
+    if (!planId || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -91,14 +92,23 @@ serve(async (req) => {
       fullName
     });
 
-    // Determine operation type based on plan
+    // Determine operation type and amount based on plan
     // For monthly plans, we only want to create a token without charging
     let operation = "ChargeOnly";
+    let actualAmount = amount;
+    
     if (planId === 'monthly') {
-      operation = "ChargeAndCreateToken";
+      operation = "CreateTokenOnly"; // Only create token without charging
+      actualAmount = 0; // Set amount to 0 for token creation
     } else {
       operation = planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken';
     }
+
+    logStep("Operation details", {
+      operation,
+      actualAmount,
+      planId
+    });
 
     // Create CardCom API request body for payment initialization
     const cardcomPayload = {
@@ -106,7 +116,7 @@ serve(async (req) => {
       ApiName: Deno.env.get('CARDCOM_API_NAME'),
       Operation: operation,
       ReturnValue: transactionRef,
-      Amount: amount,
+      Amount: actualAmount,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
@@ -135,14 +145,13 @@ serve(async (req) => {
         }]
       } : undefined,
       AdvancedDefinition: {
-        // For monthly plan, we only create the token and will charge later
-        // For other plans, we charge immediately
-        IsCreateToken: planId === 'monthly',
-        IsAutoRecurringPayment: false // We'll handle recurring payments through our own system
+        // For monthly plan, we create a token without charging
+        JValidateType: planId === 'monthly' ? 2 : 5, // J2 for validation only, J5 for authorization
+        ShouldOpenPinpadOnPageLoad: false
       }
     };
     
-    logStep("Sending request to CardCom");
+    logStep("Sending request to CardCom", cardcomPayload);
     
     // Initialize payment session with CardCom
     const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
@@ -223,7 +232,8 @@ serve(async (req) => {
           sessionId: dbSessionId || `temp-${Date.now()}`,
           lowProfileCode: responseData.LowProfileId,
           terminalNumber: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
-          cardcomUrl: "https://secure.cardcom.solutions"
+          cardcomUrl: "https://secure.cardcom.solutions",
+          operationType: planId === 'monthly' ? 'token_only' : 'payment'
         }
       }),
       {
@@ -249,7 +259,7 @@ serve(async (req) => {
 });
 
 async function handleStatusCheck(supabaseAdmin, body, corsHeaders) {
-  const { lowProfileCode, sessionId } = body;
+  const { lowProfileCode, sessionId, planId, operationType } = body;
   
   if (!lowProfileCode || !sessionId) {
     return new Response(
@@ -265,7 +275,7 @@ async function handleStatusCheck(supabaseAdmin, body, corsHeaders) {
     );
   }
 
-  logStep("Checking payment status", { lowProfileCode, sessionId });
+  logStep("Checking payment status", { lowProfileCode, sessionId, planId, operationType });
 
   try {
     // Query the payment sessions table
@@ -306,14 +316,17 @@ async function handleStatusCheck(supabaseAdmin, body, corsHeaders) {
       );
     }
 
+    // Check if token-only operation
+    const isTokenOnly = operationType === 'token_only' || session.operation_type === 'token_only';
+
     // Check payment status
-    if (session.status === 'success') {
+    if (session.status === 'completed' || session.status === 'success') {
       return new Response(
         JSON.stringify({
           success: true,
           processing: false,
           failed: false,
-          message: "Payment successful",
+          message: isTokenOnly ? "Token created successfully" : "Payment successful",
           data: session.transaction_data
         }), {
           status: 200,
