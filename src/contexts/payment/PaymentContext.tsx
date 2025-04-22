@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useRef, useState } from 'react';
 import { PaymentState, PaymentStatus, PaymentContextType, PaymentResponse } from '@/components/payment/types/payment';
 import { usePaymentInitialization } from '@/hooks/payment/usePaymentInitialization';
@@ -202,7 +201,7 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({
     resetFrames();
   };
 
-  const value = {
+  const value: PaymentContextType = {
     state,
     initializePayment,
     submitPayment,

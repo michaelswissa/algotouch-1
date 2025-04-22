@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,6 @@ interface PaymentFormProps {
   onBack?: () => void;
 }
 
-// Internal component that uses the payment context
 const PaymentFormContent: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -199,7 +197,6 @@ const PaymentFormContent: React.FC<PaymentFormProps> = ({ planId, onPaymentCompl
   );
 };
 
-// Main component that provides the payment context
 const PaymentForm: React.FC<PaymentFormProps> = (props) => {
   return (
     <PaymentProvider planId={props.planId} onPaymentComplete={props.onPaymentComplete}>

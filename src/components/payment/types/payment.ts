@@ -1,4 +1,3 @@
-
 // Define the payment status as a proper union type
 export type PaymentStatusType = 'IDLE' | 'INITIALIZING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
 
@@ -52,8 +51,6 @@ export interface PaymentState {
   paymentStatus: PaymentStatusType;
   sessionId: string;
   lowProfileCode: string;
-  operationType?: 'payment' | 'token_only';
-  transactionId?: string;
 }
 
 export interface PaymentContextType {
