@@ -15,12 +15,13 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   isReady
 }) => {
-  const iframeSrc = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
+  // Only construct iframe source URL if we're ready to display it
+  const iframeSrc = isReady ? `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}` : '';
   
   return (
     <div className="credit-cvv-container">
       <div className={`credit-card-field ${!isReady ? 'field-loading' : ''}`}>
-        {isReady && (
+        {isReady ? (
           <iframe
             id="CardComCvv"
             name="CardComCvv"
@@ -29,6 +30,10 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
             onLoad={onLoad}
             title="קוד אבטחה"
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="h-5 w-5 border-t-2 border-primary rounded-full animate-spin"></div>
+          </div>
         )}
       </div>
     </div>

@@ -78,6 +78,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       return;
     }
     
+    if (!state.lowProfileCode) {
+      handleError("חסר מזהה יחודי לעסקה, אנא נסה/י שנית");
+      return;
+    }
+    
     setPaymentInProgress(true);
     console.log('Submitting payment transaction');
     
@@ -112,6 +117,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.log('Sending transaction data:', formData);
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatus.PROCESSING
+      }));
+      
+      // Start status check after a delay
+      startStatusCheck();
+      
       setTimeout(() => {
         setPaymentInProgress(false);
       }, 5000);
@@ -120,12 +133,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, handleError, operationType, paymentInProgress]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, handleError, operationType, paymentInProgress, setState, startStatusCheck]);
 
   return {
     ...state,
     operationType,
     masterFrameRef,
+    lowProfileCode: state.lowProfileCode,
+    sessionId: state.sessionId,
     initializePayment,
     handleRetry,
     submitPayment

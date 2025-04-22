@@ -17,6 +17,7 @@ interface PaymentContentProps {
   onRetry: () => void;
   onCancel?: () => void;
   operationType?: 'payment' | 'token_only';
+  isReady?: boolean;
 }
 
 const PaymentContent: React.FC<PaymentContentProps> = ({
@@ -27,9 +28,10 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   masterFrameRef,
   onNavigateToDashboard,
   onRetry,
-  operationType = 'payment'
+  operationType = 'payment',
+  isReady = false
 }) => {
-  console.log('Current payment status:', paymentStatus);
+  console.log('Current payment status:', paymentStatus, 'isReady:', isReady);
   
   if (paymentStatus === PaymentStatus.SUCCESS) {
     return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
@@ -55,6 +57,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}
+        isReady={isReady}
       />
     </>
   );

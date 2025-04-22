@@ -15,6 +15,7 @@ export interface PaymentResponse {
     sessionId: string;
     lowProfileCode: string;
     terminalNumber: string;
+    cardcomUrl?: string;
   };
   message?: string;
 }
@@ -31,11 +32,11 @@ export interface CardComMessage {
 export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
-  sessionId: string;
+  sessionId?: string;
   terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
-  reCaptchaFieldCSS?: string; // Add this missing property
+  reCaptchaFieldCSS: string;
   language: string;
   operationType?: 'payment' | 'token_only';
   placeholder?: string;

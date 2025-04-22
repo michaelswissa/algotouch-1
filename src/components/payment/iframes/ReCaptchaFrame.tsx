@@ -15,14 +15,14 @@ const ReCaptchaFrame: React.FC<ReCaptchaFrameProps> = ({
   const iframeSrc = `${cardcomUrl}/api/openfields/reCaptcha?terminalNumber=${terminalNumber}`;
   
   return (
-    <div className="relative">
+    <div className="flex justify-start mt-2" style={{ minHeight: '78px' }}>
       <iframe
-        id="CardComReCaptcha"
-        name="CardComReCaptcha"
+        id="CardComCaptchaIframe"
+        name="CardComCaptchaIframe"
         src={iframeSrc}
-        className="w-full h-[78px] border-none"
+        style={{ height: '78px', width: '300px', border: 'none', overflow: 'hidden' }}
         onLoad={onLoad}
-        title="אימות reCaptcha"
+        title="אימות אנושי"
       />
     </div>
   );

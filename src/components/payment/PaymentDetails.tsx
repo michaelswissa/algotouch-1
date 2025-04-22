@@ -13,21 +13,21 @@ interface PaymentDetailsProps {
   terminalNumber: string;
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
+  isReady?: boolean;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   terminalNumber, 
   cardcomUrl,
-  masterFrameRef 
+  masterFrameRef,
+  isReady = false
 }) => {
   const [cardholderName, setCardholderName] = useState('');
-  const [cardOwnerId, setCardOwnerId] = useState(''); // Added ID field
+  const [cardOwnerId, setCardOwnerId] = useState(''); 
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [isMasterFrameReady, setIsMasterFrameReady] = useState(false);
-  const [areFieldsReady, setAreFieldsReady] = useState(false);
   const [loadedFields, setLoadedFields] = useState(new Set<string>());
 
   const {
@@ -36,11 +36,11 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     cvvError,
     cardholderNameError,
     expiryError,
-    idNumberError, // Added validation for ID
+    idNumberError,
     isValid,
     validateCardNumber,
     validateCvv,
-    validateIdNumber // Added ID validation
+    validateIdNumber
   } = usePaymentValidation({
     cardholderName,
     cardOwnerId,
@@ -48,42 +48,23 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     expiryYear
   });
 
-  useEffect(() => {
-    const masterFrame = masterFrameRef.current;
-    if (!masterFrame) return;
-
-    const handleMasterLoad = () => {
-      console.log('Master frame loaded');
-      setIsMasterFrameReady(true);
-    };
-
-    masterFrame.addEventListener('load', handleMasterLoad);
-    return () => masterFrame.removeEventListener('load', handleMasterLoad);
-  }, [masterFrameRef]);
-
   const handleFieldLoad = useCallback((fieldName: string) => {
+    console.log(`Field loaded: ${fieldName}`);
     setLoadedFields(prev => {
       const newFields = new Set(prev);
       newFields.add(fieldName);
-      
-      if (newFields.size === 2) {
-        setAreFieldsReady(true);
-      }
-      
       return newFields;
     });
   }, []);
 
-  const showFields = isMasterFrameReady;
-
   useEffect(() => {
-    if (!isMasterFrameReady || !masterFrameRef.current?.contentWindow) return;
+    if (!isReady || !masterFrameRef.current?.contentWindow) return;
 
     const data = {
       action: 'setCardOwnerDetails',
       data: {
         cardOwnerName: cardholderName,
-        cardOwnerId: cardOwnerId, // Added ID field
+        cardOwnerId: cardOwnerId,
         cardOwnerEmail: email,
         cardOwnerPhone: phone,
         expirationMonth: expiryMonth,
@@ -91,8 +72,9 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       }
     };
     
+    console.log('Setting card owner details:', data);
     masterFrameRef.current.contentWindow.postMessage(data, '*');
-  }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isMasterFrameReady, masterFrameRef]);
+  }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isReady, masterFrameRef]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -165,7 +147,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
             onLoad={() => handleFieldLoad('cardNumber')}
-            isReady={showFields}
+            isReady={isReady}
           />
           {cardNumberError && (
             <p className="text-sm text-red-500">{cardNumberError}</p>
@@ -193,7 +175,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
             onLoad={() => handleFieldLoad('cvv')}
-            isReady={showFields}
+            isReady={isReady}
           />
           {cvvError && (
             <p className="text-sm text-red-500">{cvvError}</p>

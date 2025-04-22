@@ -8,6 +8,7 @@ import { usePayment } from '@/hooks/usePayment';
 import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
+import InitializingPayment from './states/InitializingPayment';
 
 interface PaymentFormProps {
   planId: string;
@@ -32,15 +33,40 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     operationType,
     initializePayment,
     handleRetry,
-    submitPayment
+    submitPayment,
+    lowProfileCode,
+    sessionId
   } = usePayment({
     planId,
     onPaymentComplete
   });
 
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
+
+  // Monitor when master frame is loaded
+  useEffect(() => {
+    const masterFrame = masterFrameRef.current;
+    if (!masterFrame) return;
+
+    const handleMasterLoad = () => {
+      console.log('Master frame loaded');
+      setIsMasterFrameLoaded(true);
+    };
+
+    masterFrame.addEventListener('load', handleMasterLoad);
+    return () => masterFrame.removeEventListener('load', handleMasterLoad);
+  }, [masterFrameRef]);
+
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
-    initializePayment();
+    const initProcess = async () => {
+      setIsInitializing(true);
+      await initializePayment();
+      setIsInitializing(false);
+    };
+    
+    initProcess();
   }, []); // Run only once on mount
   
   const getButtonText = () => {
@@ -94,6 +120,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     }
   };
 
+  // Determine if the iframe content is ready to be shown
+  const isContentReady = !isInitializing && 
+    terminalNumber && 
+    cardcomUrl && 
+    lowProfileCode && 
+    sessionId && 
+    isMasterFrameLoaded && 
+    paymentStatus !== PaymentStatus.INITIALIZING;
+
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
       <CardHeader>
@@ -111,6 +146,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Master iframe is always loaded but hidden */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -120,26 +156,31 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           title="CardCom Master Frame"
         />
         
-        <PaymentContent
-          paymentStatus={paymentStatus}
-          plan={plan}
-          terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl}
-          masterFrameRef={masterFrameRef}
-          onNavigateToDashboard={() => window.location.href = '/dashboard'}
-          onRetry={handleRetry}
-          operationType={operationType}
-        />
+        {isInitializing ? (
+          <InitializingPayment />
+        ) : (
+          <PaymentContent
+            paymentStatus={paymentStatus}
+            plan={plan}
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            masterFrameRef={masterFrameRef}
+            onNavigateToDashboard={() => window.location.href = '/dashboard'}
+            onRetry={handleRetry}
+            operationType={operationType}
+            isReady={isContentReady}
+          />
+        )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && (
+        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && !isInitializing && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !isContentReady}
             >
               {getButtonText()}
             </Button>
