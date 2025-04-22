@@ -2,8 +2,6 @@
 import React from 'react';
 import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
-import InitializingPayment from './states/InitializingPayment';
-import ProcessingPayment from './ProcessingPayment';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import PaymentDetails from './PaymentDetails';
@@ -29,23 +27,9 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   masterFrameRef,
   onNavigateToDashboard,
   onRetry,
-  onCancel,
   operationType = 'payment'
 }) => {
   console.log('Current payment status:', paymentStatus);
-  
-  // Render different content based on payment status
-  if (paymentStatus === PaymentStatus.INITIALIZING) {
-    return <InitializingPayment />;
-  }
-  
-  if (paymentStatus === PaymentStatus.PROCESSING) {
-    return <ProcessingPayment 
-      onCancel={onCancel} 
-      operationType={operationType}
-      planType={plan.id}
-    />;
-  }
   
   if (paymentStatus === PaymentStatus.SUCCESS) {
     return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;

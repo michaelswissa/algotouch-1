@@ -65,49 +65,16 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
   const handleRetry = useCallback(() => {
     console.log('Retrying payment initialization');
-    
-    setState(prev => ({
-      ...prev,
-      paymentStatus: PaymentStatus.IDLE,
-      sessionId: '',
-      lowProfileCode: ''
-    }));
-    
-    cleanupStatusCheck();
-    
-    // Reinitialize with a slight delay
-    setTimeout(() => {
-      initializePayment().then(data => {
-        if (data) {
-          console.log('Payment reinitialized successfully');
-          startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
-        } else {
-          handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
-        }
-      }).catch(err => {
-        console.error('Failed to reinitialize payment:', err);
-        handleError('אירעה שגיאה באתחול התשלום');
-      });
-    }, 500);
-  }, [initializePayment, setState, startStatusCheck, cleanupStatusCheck, handleError, operationType, planId]);
-
-  const handleCancel = useCallback(() => {
-    console.log('User cancelled payment process');
-    
-    cleanupStatusCheck();
-    
     setState(prev => ({
       ...prev,
       paymentStatus: PaymentStatus.IDLE
     }));
-    
-    toast.info('תהליך התשלום בוטל');
-  }, [setState, cleanupStatusCheck]);
+    initializePayment();
+  }, [initializePayment, setState]);
 
   const submitPayment = useCallback(() => {
-    // Prevent double submission
     if (paymentInProgress) {
-      console.log('Payment submission already in progress, ignoring duplicate request');
+      console.log('Payment submission already in progress');
       return;
     }
     
@@ -115,21 +82,18 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     console.log('Submitting payment transaction');
     
     if (!masterFrameRef.current?.contentWindow) {
-      console.error("Master frame not available for transaction");
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
       setPaymentInProgress(false);
       return;
     }
     
     try {
-      // Get form values using exact IDs to match GitHub example
       const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
       const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
       const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      // Simplified form data matching GitHub example structure
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
@@ -138,27 +102,15 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
-        // Create transaction ID from timestamp + random
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly"
       };
 
-      console.log('Sending transaction data to CardCom iframe:', formData);
+      console.log('Sending transaction data:', formData);
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
-      // Update state to processing
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-      
-      // Start status check
-      if (state.lowProfileCode && state.sessionId) {
-        console.log('Starting transaction status check');
-        startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
-      } else {
-        console.error('Missing lowProfileCode or sessionId for status check');
-      }
-      
-      // Reset in-progress flag after a timeout to prevent UI getting stuck
+      // Reset in-progress flag after a timeout
       setTimeout(() => {
         setPaymentInProgress(false);
       }, 5000);
@@ -167,40 +119,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [
-    masterFrameRef, 
-    setState, 
-    handleError, 
-    state.lowProfileCode, 
-    state.sessionId, 
-    state.terminalNumber, 
-    startStatusCheck, 
-    operationType, 
-    planId,
-    paymentInProgress
-  ]);
+  }, [masterFrameRef, state.terminalNumber, handleError, operationType, paymentInProgress]);
 
   return {
     ...state,
     operationType,
     masterFrameRef,
-    initializePayment: () => {
-      console.log('Initializing payment with plan:', planId);
-      
-      initializePayment().then(data => {
-        if (data) {
-          console.log('Payment initialized successfully, starting status check');
-          startStatusCheck(data.lowProfileCode, data.sessionId, operationType, planId);
-        } else {
-          handleError('אתחול התשלום נכשל, אנא טען מחדש את הדף ונסה שנית');
-        }
-      }).catch(err => {
-        console.error('Failed to initialize payment:', err);
-        handleError('אירעה שגיאה באתחול התשלום');
-      });
-    },
+    initializePayment,
     handleRetry,
-    handleCancel,
     submitPayment
   };
 };
