@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { PaymentProvider, usePayment } from '@/contexts/payment/PaymentContext';
@@ -5,7 +6,7 @@ import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import PaymentFormHeader from './sections/PaymentFormHeader';
-import PaymentFormContent from './sections/PaymentFormContent';
+import PaymentContentSection from './sections/PaymentFormContent'; // Rename import
 import PaymentFormActions from './sections/PaymentFormActions';
 
 interface PaymentFormProps {
@@ -108,7 +109,7 @@ const PaymentFormContent: React.FC<PaymentFormProps> = ({ planId, onPaymentCompl
         operationType={operationType} 
       />
       
-      <PaymentFormContent
+      <PaymentContentSection
         isInitializing={isInitializing}
         paymentStatus={paymentStatus}
         plan={plan}
