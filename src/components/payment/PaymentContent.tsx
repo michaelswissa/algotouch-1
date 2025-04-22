@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PaymentStatus } from './types/payment';
+import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
@@ -8,7 +8,7 @@ import PaymentDetails from './PaymentDetails';
 import PlanSummary from './PlanSummary';
 
 interface PaymentContentProps {
-  paymentStatus: string;  // Changed from PaymentStatus to string
+  paymentStatus: PaymentStatusType;  // Fixed type to use PaymentStatusType
   plan: SubscriptionPlan;
   terminalNumber: string;
   cardcomUrl: string;

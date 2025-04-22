@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -15,8 +14,8 @@ interface PaymentDetailsProps {
   terminalNumber: string;
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
-  frameKey?: number; // Add frameKey prop
-  paymentStatus?: PaymentStatusType;
+  frameKey?: number;
+  paymentStatus: PaymentStatusType;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
@@ -27,7 +26,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   paymentStatus
 }) => {
   const [cardholderName, setCardholderName] = useState('');
-  const [cardOwnerId, setCardOwnerId] = useState(''); // Added ID field
+  const [cardOwnerId, setCardOwnerId] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
@@ -43,12 +42,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     cvvError,
     cardholderNameError,
     expiryError,
-    idNumberError, // Added validation for ID
+    idNumberError,
     isValid,
     validateCardNumber,
     validateCvv,
-    validateIdNumber, // Added ID validation
-    resetValidation // Move this up before it's used
+    validateIdNumber,
+    resetValidation
   } = usePaymentValidation({
     cardholderName,
     cardOwnerId,
@@ -56,12 +55,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     expiryYear
   });
 
-  // Reset loaded fields when frameKey changes or retry is initiated
   useEffect(() => {
     setLoadingFields(new Set());
     setAreFieldsReady(false);
     
-    // Reset validation state
     resetValidation();
   }, [frameKey, paymentStatus, resetValidation]);
 
@@ -83,7 +80,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       const newFields = new Set(prev);
       newFields.add(fieldName);
       
-      // Only set fields as ready when both card number and CVV are loaded
       if (newFields.has('cardNumber') && newFields.has('cvv')) {
         console.log('All payment fields loaded');
         setAreFieldsReady(true);
@@ -92,18 +88,15 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       return newFields;
     });
   }, []);
-  
-  // Reset validation when needed
+
   useEffect(() => {
     if (frameKey || paymentStatus === PaymentStatus.IDLE) {
       resetValidation();
     }
   }, [frameKey, paymentStatus, resetValidation]);
 
-  // Show fields only when master frame is ready
   const showFields = isMasterFrameReady && paymentStatus !== PaymentStatus.PROCESSING;
 
-  // Show loading skeleton when fields are not ready
   if (!showFields) {
     return (
       <div className="space-y-4">
@@ -121,7 +114,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       action: 'setCardOwnerDetails',
       data: {
         cardOwnerName: cardholderName,
-        cardOwnerId: cardOwnerId, // Added ID field
+        cardOwnerId: cardOwnerId,
         cardOwnerEmail: email,
         cardOwnerPhone: phone,
         expirationMonth: expiryMonth,
@@ -200,7 +193,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <Label htmlFor="CardComCardNumber">מספר כרטיס</Label>
         <div className="relative">
           <CardNumberFrame
-            key={`cardnumber-${frameKey}`} // Add key for reinitialization
+            key={`cardnumber-${frameKey}`}
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
             onLoad={() => handleFieldLoad('cardNumber')}
@@ -229,7 +222,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <Label htmlFor="CardComCvv">קוד אבטחה (CVV)</Label>
         <div className="relative">
           <CVVFrame
-            key={`cvv-${frameKey}`} // Add key for reinitialization
+            key={`cvv-${frameKey}`}
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
             onLoad={() => handleFieldLoad('cvv')}
@@ -243,7 +236,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
       <div className="space-y-2">
         <ReCaptchaFrame
-          key={`recaptcha-${frameKey}`} // Add key for reinitialization
+          key={`recaptcha-${frameKey}`}
           terminalNumber={terminalNumber}
           cardcomUrl={cardcomUrl}
           onLoad={() => {}}
