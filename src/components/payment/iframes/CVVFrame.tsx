@@ -6,28 +6,31 @@ interface CVVFrameProps {
   terminalNumber: string;
   cardcomUrl: string;
   onLoad: () => void;
-  frameLoadAttempts: number;
+  isReady: boolean;
 }
 
 const CVVFrame: React.FC<CVVFrameProps> = ({
   terminalNumber,
   cardcomUrl,
   onLoad,
-  frameLoadAttempts
+  isReady
 }) => {
   const iframeSrc = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
   
   return (
-    <div className="relative credit-cvv-container">
-      <iframe
-        id="CardComCvv"
-        name="CardComCvv"
-        src={iframeSrc}
-        className="w-full"
-        onLoad={onLoad}
-        title="קוד אבטחה"
-        key={`cvv-${frameLoadAttempts}-${terminalNumber}`}
-      />
+    <div className="credit-cvv-container">
+      <div className={`credit-card-field ${!isReady ? 'field-loading' : ''}`}>
+        {isReady && (
+          <iframe
+            id="CardComCvv"
+            name="CardComCvv"
+            src={iframeSrc}
+            className="w-full"
+            onLoad={onLoad}
+            title="קוד אבטחה"
+          />
+        )}
+      </div>
     </div>
   );
 };

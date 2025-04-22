@@ -24,7 +24,9 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [frameLoadAttempts, setFrameLoadAttempts] = useState(0);
+  const [isMasterFrameReady, setIsMasterFrameReady] = useState(false);
+  const [areFieldsReady, setAreFieldsReady] = useState(false);
+  const [loadedFields, setLoadedFields] = useState(new Set<string>());
 
   const {
     cardNumberError,
@@ -41,37 +43,50 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     expiryYear
   });
 
-  const handleIframeLoad = useCallback(() => {
-    setFrameLoadAttempts(prev => prev + 1);
-    console.log('Frame loaded, attempt:', frameLoadAttempts + 1);
-  }, [frameLoadAttempts]);
-
   useEffect(() => {
     const masterFrame = masterFrameRef.current;
-    if (masterFrame) {
-      masterFrame.onload = () => {
-        console.log('Master frame loaded');
-        setFrameLoadAttempts(prev => prev + 1);
-      };
-    }
+    if (!masterFrame) return;
+
+    const handleMasterLoad = () => {
+      console.log('Master frame loaded');
+      setIsMasterFrameReady(true);
+    };
+
+    masterFrame.addEventListener('load', handleMasterLoad);
+    return () => masterFrame.removeEventListener('load', handleMasterLoad);
   }, [masterFrameRef]);
 
-  useEffect(() => {
-    if (masterFrameRef.current?.contentWindow && frameLoadAttempts > 0) {
-      const data = {
-        action: 'setCardOwnerDetails',
-        data: {
-          cardOwnerName: cardholderName,
-          cardOwnerEmail: email,
-          cardOwnerPhone: phone,
-          expirationMonth: expiryMonth,
-          expirationYear: expiryYear
-        }
-      };
+  const handleFieldLoad = useCallback((fieldName: string) => {
+    setLoadedFields(prev => {
+      const newFields = new Set(prev);
+      newFields.add(fieldName);
       
-      masterFrameRef.current.contentWindow.postMessage(data, '*');
-    }
-  }, [cardholderName, email, phone, expiryMonth, expiryYear, frameLoadAttempts, masterFrameRef]);
+      if (newFields.size === 2) {
+        setAreFieldsReady(true);
+      }
+      
+      return newFields;
+    });
+  }, []);
+
+  const showFields = isMasterFrameReady;
+
+  useEffect(() => {
+    if (!isMasterFrameReady || !masterFrameRef.current?.contentWindow) return;
+
+    const data = {
+      action: 'setCardOwnerDetails',
+      data: {
+        cardOwnerName: cardholderName,
+        cardOwnerEmail: email,
+        cardOwnerPhone: phone,
+        expirationMonth: expiryMonth,
+        expirationYear: expiryYear
+      }
+    };
+    
+    masterFrameRef.current.contentWindow.postMessage(data, '*');
+  }, [cardholderName, email, phone, expiryMonth, expiryYear, isMasterFrameReady, masterFrameRef]);
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -119,14 +134,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       <div className="space-y-2">
         <Label htmlFor="CardComCardNumber">מספר כרטיס</Label>
         <div className="relative">
-          {frameLoadAttempts > 0 && (
-            <CardNumberFrame
-              terminalNumber={terminalNumber}
-              cardcomUrl={cardcomUrl}
-              onLoad={handleIframeLoad}
-              frameLoadAttempts={frameLoadAttempts}
-            />
-          )}
+          <CardNumberFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => handleFieldLoad('cardNumber')}
+            isReady={showFields}
+          />
           {cardNumberError && (
             <p className="text-sm text-red-500">{cardNumberError}</p>
           )}
@@ -149,14 +162,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       <div className="space-y-2">
         <Label htmlFor="CardComCvv">קוד אבטחה (CVV)</Label>
         <div className="relative">
-          {frameLoadAttempts > 0 && (
-            <CVVFrame
-              terminalNumber={terminalNumber}
-              cardcomUrl={cardcomUrl}
-              onLoad={handleIframeLoad}
-              frameLoadAttempts={frameLoadAttempts}
-            />
-          )}
+          <CVVFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => handleFieldLoad('cvv')}
+            isReady={showFields}
+          />
           {cvvError && (
             <p className="text-sm text-red-500">{cvvError}</p>
           )}

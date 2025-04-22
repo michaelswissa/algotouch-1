@@ -1,29 +1,55 @@
 
+/* Base styles for card fields container */
+.credit-card-field-container {
+  min-height: 57px;
+  position: relative;
+  width: 100%;
+  background: transparent;
+}
+
 /* Base styles for card fields */
 .credit-card-field {
   border: 1px solid #ccc;
-  border-radius: 3px;
-  height: 57px !important; /* Fixed height as per example */
+  border-radius: 4px;
+  height: 57px !important;
   width: 100%;
   box-sizing: border-box;
   margin: 0;
+  position: relative;
 }
 
 .credit-cvv-container {
   max-width: 188px !important;
+  min-height: 57px;
+  position: relative;
 }
 
 /* Match iframe heights */
 #CardComCardNumber,
 #CardComCvv {
   height: 57px !important;
+  width: 100%;
   border: 1px solid #ccc;
   border-radius: 4px;
   transition: border-color 0.2s ease;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-#CardComCvv {
-  width: 100%;
+/* Loading state styles */
+.field-loading {
+  background-color: #f3f4f6;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Focus and error states */
