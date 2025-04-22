@@ -75,7 +75,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     cleanupStatusCheck();
     
-    // Reinitialize with a slight delay - similar to example
+    // Reinitialize with a slight delay
     setTimeout(() => {
       initializePayment().then(data => {
         if (data) {
@@ -105,7 +105,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   }, [setState, cleanupStatusCheck]);
 
   const submitPayment = useCallback(() => {
-    // Prevent double submission - common issue in the example
+    // Prevent double submission
     if (paymentInProgress) {
       console.log('Payment submission already in progress, ignoring duplicate request');
       return;
@@ -122,14 +122,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
     
     try {
-      // Collect values directly - similar to example
-      const cardholderName = document.querySelector<HTMLInputElement>('#cardholder-name')?.value || '';
-      const email = document.querySelector<HTMLInputElement>('#email')?.value || '';
-      const phone = document.querySelector<HTMLInputElement>('#phone')?.value || '';
-      const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expiryMonth"]')?.value || '';
-      const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expiryYear"]')?.value || '';
+      // Get form values using exact IDs to match GitHub example
+      const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
+      const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
+      const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
+      const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
+      const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      // Simplified form data similar to example
+      // Simplified form data matching GitHub example structure
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
@@ -141,17 +141,16 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         // Create transaction ID from timestamp + random
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
-        // Set operation type based on plan - similar to example
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly"
       };
 
-      console.log('Sending transaction data to CardCom iframe');
+      console.log('Sending transaction data to CardCom iframe:', formData);
       masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
       // Update state to processing
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
       
-      // Start status check - but rely more on iframe events like the example
+      // Start status check
       if (state.lowProfileCode && state.sessionId) {
         console.log('Starting transaction status check');
         startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);

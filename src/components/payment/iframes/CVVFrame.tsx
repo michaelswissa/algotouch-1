@@ -14,6 +14,7 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   frameLoadAttempts
 }) => {
+  // Make sure to include terminalNumber parameter in the URL exactly as in the example
   const iframeSrc = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
   
   return (

@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -56,11 +57,14 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     
     console.log("Payment session created:", data.data);
     
+    // Always use the fixed terminal number for CardCom
+    const terminalNumber = '160138';
+    
     setState(prev => ({
       ...prev,
       sessionId: data.data.sessionId,
       lowProfileCode: data.data.lowProfileCode,
-      terminalNumber: '160138', // Set fixed terminal number
+      terminalNumber: terminalNumber,
       cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
       paymentStatus: PaymentStatus.IDLE
     }));
@@ -68,7 +72,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     return { 
       lowProfileCode: data.data.lowProfileCode, 
       sessionId: data.data.sessionId,
-      terminalNumber: '160138' // Always return the fixed terminal number
+      terminalNumber: terminalNumber
     };
   };
 

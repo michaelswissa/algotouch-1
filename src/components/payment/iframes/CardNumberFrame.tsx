@@ -14,6 +14,7 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
   onLoad,
   frameLoadAttempts
 }) => {
+  // Make sure to include terminalNumber parameter in the URL exactly as in the example
   const iframeSrc = `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`;
   
   return (

@@ -24,6 +24,7 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
           <Label htmlFor="expiry-month">חודש תפוגה</Label>
           <select
             id="expiry-month"
+            name="expirationMonth" // Match the name in the GitHub example
             className={`w-full h-10 rounded-md border bg-background px-3 py-2 ${
               error ? 'border-red-500' : 'border-input'
             }`}
@@ -33,6 +34,7 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
           >
             <option value="" disabled>חודש</option>
             {Array.from({ length: 12 }, (_, i) => {
+              // Format with leading zero to match MM format
               const month = (i + 1).toString().padStart(2, '0');
               return (
                 <option key={month} value={month}>
@@ -46,6 +48,7 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
           <Label htmlFor="expiry-year">שנת תפוגה</Label>
           <select
             id="expiry-year"
+            name="expirationYear" // Match the name in the GitHub example
             className={`w-full h-10 rounded-md border bg-background px-3 py-2 ${
               error ? 'border-red-500' : 'border-input'
             }`}
@@ -55,6 +58,7 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
           >
             <option value="" disabled>שנה</option>
             {Array.from({ length: 10 }, (_, i) => {
+              // Format as YY only (2 digits) to match the expected format
               const year = (new Date().getFullYear() + i).toString().slice(2);
               return (
                 <option key={year} value={year}>

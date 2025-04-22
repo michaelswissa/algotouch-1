@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -26,10 +27,10 @@ export const useFrameMessages = ({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        // Validate message origin for security
-        const isTrustedOrigin = event.origin.includes('cardcom.solutions');
-        if (!isTrustedOrigin) {
-          console.log('Ignoring message from untrusted origin:', event.origin);
+        // Safety check for message origin
+        if (!event.origin.includes('cardcom.solutions') && 
+            !event.origin.includes('localhost') && 
+            !event.origin.includes(window.location.origin)) {
           return;
         }
 
@@ -40,37 +41,14 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle initialization success message
-        if (message.action === 'initialized') {
-          console.log('CardCom fields initialized successfully');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
-          return;
-        }
-
-        // Handle initialization error
-        if (message.action === 'initializationError') {
-          console.error('CardCom initialization error:', message);
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error('שגיאה באתחול טופס התשלום');
-          return;
-        }
-
-        // Follow the example's simpler approach to message handling
+        // Handle HandleSubmit (success case)
         if (message.action === 'HandleSubmit' || message.action === 'handleSubmit') {
           console.log('HandleSubmit message received:', message);
           
           if (message.data?.IsSuccess) {
-            console.log('Payment submission successful, processing payment...');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-            
-            // Skip redundant status checks and rely directly on the iframe result
-            // This is more similar to the example's approach
-            setTimeout(() => {
-              handlePaymentSuccess();
-              
-              // Still keep a single status check to ensure backend sync
-              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-            }, 2000);
+            console.log('Payment submission successful');
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+            handlePaymentSuccess();
           } else {
             console.error('Payment submission failed:', message.data?.Description);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
@@ -79,26 +57,45 @@ export const useFrameMessages = ({
           return;
         }
 
+        // Handle HandleError (error case)
         if (message.action === 'HandleError' || message.action === 'HandleEror') {
-          console.error('Payment error:', message);
+          console.error('Payment error:', message.message || 'Unknown error');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(message.message || 'שגיאה בביצוע התשלום');
+          
+          // Show more specific error messages
+          if (message.message && message.message.includes('lowProfileCode')) {
+            toast.error('פרמטר lowProfileCode חובה');
+          } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
+            toast.error('תאריך תוקף שגוי');
+          } else if (message.message && message.message.includes('CardComCardNumber')) {
+            toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
+          } else {
+            toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
+          }
           return;
         }
 
-        // Simple handling of validation messages
-        if (message.action === 'handleValidations') {
-          console.log('Field validation:', message);
-          // Validation handling is separated in the example
+        // Handle processing start/complete
+        if (message.action === '3DSProcessStarted') {
+          console.log('3DS process started');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
           return;
         }
-        
-        // Additional CardCom-specific events - handle simply
-        if (message.action?.includes('3DS') || 
-            message.action?.includes('payment') || 
-            message.action?.includes('token')) {
-          console.log('CardCom event received:', message.action);
-          // Simply log these events, similar to example which uses console.log
+
+        if (message.action === '3DSProcessCompleted') {
+          console.log('3DS process completed');
+          // Start status check to verify final result
+          if (lowProfileCode && sessionId) {
+            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+          }
+          return;
+        }
+
+        // Handle validations
+        if (message.action === 'handleValidations') {
+          console.log('Validation message for field:', message.field);
+          // Field validation is handled separately in usePaymentValidation
+          return;
         }
       } catch (error) {
         console.error('Error handling iframe message:', error);

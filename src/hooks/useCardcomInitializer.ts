@@ -9,6 +9,11 @@ export const useCardcomInitializer = () => {
     terminalNumber: string = '160138', // Default terminal number if not provided
     operationType: 'payment' | 'token_only' = 'payment'
   ) => {
+    if (!lowProfileCode || !sessionId) {
+      console.error("Missing required parameters for CardCom initialization");
+      return false;
+    }
+    
     if (!masterFrameRef.current) {
       console.error("Master frame reference is not available");
       return false;
@@ -27,15 +32,6 @@ export const useCardcomInitializer = () => {
     const maxAttempts = 5;
     let isInitialized = false;
 
-    // Load 3DS script dynamically AFTER iframes are ready
-    const loadScript = () => {
-      const script = document.createElement('script');
-      const time = new Date().getTime();
-      script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
-      document.head.appendChild(script);
-      console.log('3DS script loaded');
-    };
-
     const checkFramesAndInitialize = () => {
       attempts++;
       
@@ -46,16 +42,15 @@ export const useCardcomInitializer = () => {
 
       // Check if the master frame and iframes exist
       const masterFrame = masterFrameRef.current;
-      const cardNumberFrame = document.getElementById('CardComCardNumber');
-      const cvvFrame = document.getElementById('CardComCvv');
-
-      if (!masterFrame?.contentWindow || !cardNumberFrame || !cvvFrame) {
-        console.log(`Frames not ready (attempt ${attempts}/${maxAttempts}), retrying in 500ms`);
+      
+      if (!masterFrame?.contentWindow) {
+        console.log(`Master frame not ready (attempt ${attempts}/${maxAttempts}), retrying in 500ms`);
         setTimeout(checkFramesAndInitialize, 500);
         return false;
       }
 
       try {
+        // Match configuration structure with GitHub example
         const config: InitConfig = {
           action: 'init',
           lowProfileCode,
@@ -99,7 +94,6 @@ export const useCardcomInitializer = () => {
             .cvvField.invalid {
               border: 1px solid #c01111;
             }`,
-          // Using the field with proper type definition now
           reCaptchaFieldCSS: 'body { margin: 0; padding:0; display: flex; }',
           placeholder: "1111-2222-3333-4444",
           cvvPlaceholder: "123",
@@ -111,6 +105,11 @@ export const useCardcomInitializer = () => {
         masterFrame.contentWindow.postMessage(config, '*');
         isInitialized = true;
 
+        // Load 3DS script AFTER initialization is complete
+        setTimeout(() => {
+          loadScript();
+        }, 1000);
+
         return true;
       } catch (error) {
         console.error('Error initializing CardCom fields:', error);
@@ -121,13 +120,19 @@ export const useCardcomInitializer = () => {
       }
     };
 
-    // Ensure iframes are loaded before script initialization
-    setTimeout(() => {
-      if (checkFramesAndInitialize()) {
-        setTimeout(loadScript, 500); // Load 3DS script after successful initialization
-      }
-    }, 300);
+    // Load 3DS script dynamically with cache busting
+    const loadScript = () => {
+      console.log('Loading 3DS script...');
+      const script = document.createElement('script');
+      const time = new Date().getTime();
+      script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
+      document.head.appendChild(script);
+      console.log('3DS script loaded');
+    };
 
+    // Initial check with a short delay to ensure iframe is loaded
+    setTimeout(checkFramesAndInitialize, 300);
+    
     return true;
   };
 

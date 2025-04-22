@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import CardNumberFrame from './iframes/CardNumberFrame';
 import CVVFrame from './iframes/CVVFrame';
+import ReCaptchaFrame from './iframes/ReCaptchaFrame';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
 import { usePaymentValidation } from '@/hooks/payment/usePaymentValidation';
@@ -22,6 +23,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 }) => {
   const [cardNumberFrameLoaded, setCardNumberFrameLoaded] = useState(false);
   const [cvvFrameLoaded, setCvvFrameLoaded] = useState(false);
+  const [recaptchaFrameLoaded, setRecaptchaFrameLoaded] = useState(false);
   const [cardholderName, setCardholderName] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
@@ -49,6 +51,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     if (terminalNumber) {
       setCardNumberFrameLoaded(false);
       setCvvFrameLoaded(false);
+      setRecaptchaFrameLoaded(false);
       setFrameLoadAttempts(prev => prev + 1);
       console.log(`Frames reset for terminal ${terminalNumber}`);
     }
@@ -57,7 +60,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   // Retry loading frames if they fail
   useEffect(() => {
     if (!cardNumberFrameLoaded || !cvvFrameLoaded) {
-      const maxAttempts = 5; // Increase max attempts
+      const maxAttempts = 5;
       if (frameLoadAttempts < maxAttempts && terminalNumber) {
         const timer = setTimeout(() => {
           console.log(`Retrying frame load, attempt ${frameLoadAttempts + 1}`);
@@ -88,12 +91,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
   }, [cardholderName, email, phone, expiryMonth, expiryYear, masterFrameRef]);
 
-  // Validate all fields before submission
-  const validateFields = () => {
-    validateCardNumber();
-    validateCvv();
-  };
-
   const handleCardNumberFrameLoaded = () => {
     console.log('Card number frame loaded');
     setCardNumberFrameLoaded(true);
@@ -104,12 +101,18 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     setCvvFrameLoaded(true);
   };
 
+  const handleRecaptchaFrameLoaded = () => {
+    console.log('reCAPTCHA frame loaded');
+    setRecaptchaFrameLoaded(true);
+  };
+
   return (
     <div className="space-y-4" dir="rtl">
       <div className="space-y-2">
-        <Label htmlFor="cardholder-name">שם בעל הכרטיס</Label>
+        <Label htmlFor="cardOwnerName">שם בעל הכרטיס</Label>
         <Input
-          id="cardholder-name"
+          id="cardOwnerName"
+          name="cardOwnerName"
           placeholder="ישראל ישראלי"
           value={cardholderName}
           onChange={(e) => setCardholderName(e.target.value)}
@@ -122,9 +125,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">דוא"ל</Label>
+        <Label htmlFor="cardOwnerEmail">דוא"ל</Label>
         <Input
-          id="email"
+          id="cardOwnerEmail"
+          name="cardOwnerEmail"
           type="email"
           placeholder="example@example.com"
           value={email}
@@ -133,9 +137,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="phone">טלפון</Label>
+        <Label htmlFor="cardOwnerPhone">טלפון</Label>
         <Input
-          id="phone"
+          id="cardOwnerPhone"
+          name="cardOwnerPhone"
           placeholder="05xxxxxxxx"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -143,7 +148,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="card-number-frame">מספר כרטיס</Label>
+        <Label htmlFor="CardComCardNumber">מספר כרטיס</Label>
         <div className="relative">
           {!cardNumberFrameLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded border border-input">
@@ -176,7 +181,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       />
 
       <div className="space-y-2">
-        <Label htmlFor="cvv-frame">קוד אבטחה (CVV)</Label>
+        <Label htmlFor="CardComCvv">קוד אבטחה (CVV)</Label>
         <div className="relative">
           {!cvvFrameLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded border border-input">
@@ -192,6 +197,22 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           {cvvError && (
             <p className="text-sm text-red-500">{cvvError}</p>
           )}
+        </div>
+      </div>
+
+      {/* Add reCAPTCHA component */}
+      <div className="space-y-2">
+        <div className="relative">
+          {!recaptchaFrameLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          )}
+          <ReCaptchaFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={handleRecaptchaFrameLoaded}
+          />
         </div>
       </div>
 
