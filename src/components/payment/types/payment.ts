@@ -52,4 +52,5 @@ export interface PaymentState {
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
+  isFramesReady: boolean;
 }

@@ -11,9 +11,9 @@ interface UsePaymentStatusCheckProps {
 export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) => {
   const statusCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusCheckCountRef = useRef<number>(0);
-  const maxStatusCheckAttempts = 20; // Maximum number of attempts
-  const statusCheckIntervalMs = 3000; // Check every 3 seconds
-  const statusCheckTimeoutMs = 120000; // Timeout after 2 minutes
+  const maxStatusCheckAttempts = 20;
+  const statusCheckIntervalMs = 3000;
+  const statusCheckTimeoutMs = 120000;
   
   const checkPaymentStatus = useCallback(async (
     lowProfileCode: string, 
@@ -127,7 +127,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     planType?: string
   ) => {
     // Clear any existing timers
-    clearStatusCheckTimer();
+    if (statusCheckTimerRef.current) {
+      clearTimeout(statusCheckTimerRef.current);
+      statusCheckTimerRef.current = null;
+    }
     
     // Reset counter
     statusCheckCountRef.current = 0;
@@ -135,7 +138,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     // Set initial state
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
     
-    // Start checking after a short delay to allow CardCom to process the payment
+    // Start checking after a short delay
     statusCheckTimerRef.current = setTimeout(() => {
       checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
     }, 2000);

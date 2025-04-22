@@ -1,4 +1,3 @@
-
 import React from 'react';
 import '../styles/cardFields.css';
 
@@ -15,7 +14,6 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   isReady
 }) => {
-  // Only construct iframe source URL if we're ready to display it
   const iframeSrc = isReady ? `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}` : '';
   
   return (

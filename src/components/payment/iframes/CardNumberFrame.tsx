@@ -15,7 +15,6 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
   onLoad,
   isReady
 }) => {
-  // Only construct iframe source URL if we're ready to display it
   const iframeSrc = isReady ? `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}` : '';
   
   return (

@@ -103,7 +103,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
-        cardOwnerId, // Added ID field
+        cardOwnerId,
         cardOwnerEmail: email,
         cardOwnerPhone: phone,
         expirationMonth,
@@ -122,8 +122,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         paymentStatus: PaymentStatus.PROCESSING
       }));
       
-      // Start status check after a delay
-      startStatusCheck();
+      // Start status check with required params
+      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
       
       setTimeout(() => {
         setPaymentInProgress(false);
@@ -133,7 +133,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, handleError, operationType, paymentInProgress, setState, startStatusCheck]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
 
   return {
     ...state,
