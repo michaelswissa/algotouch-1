@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ interface PaymentFormProps {
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -42,7 +42,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
-    initializePayment();
+    setIsInitializing(true);
+    initializePayment().finally(() => {
+      setIsInitializing(false);
+    });
   }, [initializePayment, planId]);
   
   const getButtonText = () => {
@@ -83,6 +86,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     
     if (!lowProfileCode) {
       toast.error('שגיאה באתחול התשלום, אנא רענן ונסה שנית');
+      console.error('Missing lowProfileCode for payment');
+      handleRetry();
       return;
     }
     
@@ -100,6 +105,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       setIsSubmitting(false);
     }
   };
+
+  const showPaymentButton = !isInitializing && 
+    paymentStatus === PaymentStatus.IDLE && 
+    lowProfileCode && 
+    !isSubmitting;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -119,7 +129,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       
       <CardContent className="space-y-4">
         <iframe
-          key={frameKey} // Add key for proper re-rendering
+          key={frameKey}
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
@@ -128,27 +138,38 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           title="CardCom Master Frame"
         />
         
-        <PaymentContent
-          paymentStatus={paymentStatus}
-          plan={plan}
-          terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl}
-          masterFrameRef={masterFrameRef}
-          frameKey={frameKey}
-          onNavigateToDashboard={() => window.location.href = '/dashboard'}
-          onRetry={handleRetry}
-          operationType={operationType}
-        />
+        {isInitializing ? (
+          <div className="space-y-4 py-8">
+            <div className="flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <p className="text-center text-sm text-muted-foreground">
+              מאתחל טופס תשלום...
+            </p>
+          </div>
+        ) : (
+          <PaymentContent
+            paymentStatus={paymentStatus}
+            plan={plan}
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            masterFrameRef={masterFrameRef}
+            frameKey={frameKey}
+            onNavigateToDashboard={() => window.location.href = '/dashboard'}
+            onRetry={handleRetry}
+            operationType={operationType}
+          />
+        )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && (
+        {showPaymentButton && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !lowProfileCode}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
             >
               {getButtonText()}
             </Button>

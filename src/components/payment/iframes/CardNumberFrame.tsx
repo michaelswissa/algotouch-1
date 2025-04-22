@@ -1,5 +1,6 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import '../styles/cardFields.css';
 
 interface CardNumberFrameProps {
@@ -17,33 +18,52 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
 }) => {
   const iframeSrc = `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
   
-  // Add effect to reload iframe when needed
+  const loadFrame = () => {
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeSrc;
+    }
+  };
+
+  const handleLoad = () => {
+    setIsLoading(false);
+    onLoad();
+  };
+
+  const handleError = () => {
+    if (retryCount < maxRetries) {
+      setRetryCount(prev => prev + 1);
+      setTimeout(loadFrame, 1000); // Retry after 1 second
+    }
+  };
+  
   useEffect(() => {
     if (isReady && iframeRef.current) {
-      console.log('Initializing CardNumberFrame');
-      
-      // Force iframe reload if needed
-      if (iframeRef.current.src !== iframeSrc) {
-        iframeRef.current.src = iframeSrc;
-      }
+      setIsLoading(true);
+      loadFrame();
     }
   }, [isReady, iframeSrc]);
-  
+
+  if (!isReady) {
+    return <Skeleton className="h-10 w-full" />;
+  }
+
   return (
-    <div className="credit-card-field-container">
+    <div className="credit-card-field-container relative">
+      {isLoading && <Skeleton className="absolute inset-0 z-10" />}
       <div className={`credit-card-field ${!isReady ? 'field-loading' : ''}`}>
-        {isReady && (
-          <iframe
-            ref={iframeRef}
-            id="CardComCardNumber"
-            name="CardComCardNumber"
-            src={iframeSrc}
-            className="w-full"
-            onLoad={onLoad}
-            title="מספר כרטיס"
-          />
-        )}
+        <iframe
+          ref={iframeRef}
+          id="CardComCardNumber"
+          name="CardComCardNumber"
+          className="w-full"
+          onLoad={handleLoad}
+          onError={handleError}
+          title="מספר כרטיס"
+        />
       </div>
     </div>
   );

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
 import { usePaymentValidation } from '@/hooks/payment/usePaymentValidation';
 import { PaymentStatus, PaymentStatusType } from './types/payment';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PaymentDetailsProps {
   terminalNumber: string;
@@ -31,15 +31,47 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+
   const [isMasterFrameReady, setIsMasterFrameReady] = useState(false);
   const [areFieldsReady, setAreFieldsReady] = useState(false);
-  const [loadedFields, setLoadedFields] = useState(new Set<string>());
+  const [loadingFields, setLoadingFields] = useState(new Set<string>());
   
   // Reset loaded fields when frameKey changes or retry is initiated
   useEffect(() => {
-    setLoadedFields(new Set());
+    setLoadingFields(new Set());
     setAreFieldsReady(false);
-  }, [frameKey, paymentStatus]);
+    
+    // Reset validation state
+    resetValidation();
+  }, [frameKey, paymentStatus, resetValidation]);
+
+  useEffect(() => {
+    const masterFrame = masterFrameRef.current;
+    if (!masterFrame) return;
+
+    const handleMasterLoad = () => {
+      console.log('Master frame loaded');
+      setIsMasterFrameReady(true);
+    };
+
+    masterFrame.addEventListener('load', handleMasterLoad);
+    return () => masterFrame.removeEventListener('load', handleMasterLoad);
+  }, [masterFrameRef]);
+
+  const handleFieldLoad = useCallback((fieldName: string) => {
+    setLoadingFields(prev => {
+      const newFields = new Set(prev);
+      newFields.add(fieldName);
+      
+      // Only set fields as ready when both card number and CVV are loaded
+      if (newFields.has('cardNumber') && newFields.has('cvv')) {
+        console.log('All payment fields loaded');
+        setAreFieldsReady(true);
+      }
+      
+      return newFields;
+    });
+  }, []);
 
   const {
     cardNumberError,
@@ -67,33 +99,19 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     }
   }, [frameKey, paymentStatus, resetValidation]);
 
-  useEffect(() => {
-    const masterFrame = masterFrameRef.current;
-    if (!masterFrame) return;
+  // Show fields only when master frame is ready
+  const showFields = isMasterFrameReady && paymentStatus !== PaymentStatus.PROCESSING;
 
-    const handleMasterLoad = () => {
-      console.log('Master frame loaded');
-      setIsMasterFrameReady(true);
-    };
-
-    masterFrame.addEventListener('load', handleMasterLoad);
-    return () => masterFrame.removeEventListener('load', handleMasterLoad);
-  }, [masterFrameRef]);
-
-  const handleFieldLoad = useCallback((fieldName: string) => {
-    setLoadedFields(prev => {
-      const newFields = new Set(prev);
-      newFields.add(fieldName);
-      
-      if (newFields.size === 2) {
-        setAreFieldsReady(true);
-      }
-      
-      return newFields;
-    });
-  }, []);
-
-  const showFields = isMasterFrameReady;
+  // Show loading skeleton when fields are not ready
+  if (!showFields) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!isMasterFrameReady || !masterFrameRef.current?.contentWindow) return;
