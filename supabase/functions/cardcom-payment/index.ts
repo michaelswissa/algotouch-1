@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -71,14 +70,12 @@ serve(async (req) => {
       );
     }
 
-    // Get user information and prepare transaction reference
+    // Gather reference and user data
     let userEmail = invoiceInfo?.email || registrationData?.email;
-    let fullName = invoiceInfo?.fullName || 
-                  (registrationData?.userData ? 
-                    `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
-                    undefined);
-    
-    const transactionRef = userId 
+    let fullName = invoiceInfo?.fullName ||
+      (registrationData?.userData ? `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : undefined);
+
+    const transactionRef = userId
       ? `${userId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
@@ -92,16 +89,18 @@ serve(async (req) => {
       fullName
     });
 
-    // Determine operation type and amount based on plan
-    // For monthly plans, we only want to create a token without charging
+    // Plan-to-amount and operation logic
     let operation = "ChargeOnly";
     let actualAmount = amount;
-    
+
     if (planId === 'monthly') {
-      operation = "CreateTokenOnly"; // Only create token without charging
-      actualAmount = 0; // Set amount to 0 for token creation
+      operation = "CreateTokenOnly";
+      actualAmount = 0; // token only, do not charge
+    } else if (planId === 'vip') {
+      operation = 'ChargeOnly';
+      // actualAmount left as is
     } else {
-      operation = planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken';
+      operation = 'ChargeAndCreateToken'; // default for annual?
     }
 
     logStep("Operation details", {
@@ -110,7 +109,30 @@ serve(async (req) => {
       planId
     });
 
-    // Create CardCom API request body for payment initialization
+    // === CRITICAL FIX for "document total product sum not equal to credit card sum to bill" ===
+
+    // Only send the Document block if it is relevant for invoicing
+    // Make sure the products sum = Amount exactly
+    let cardcomDocument: any = undefined;
+    if (invoiceInfo) {
+      // For monthly plan, unit cost must also be 0
+      let docAmount = planId === 'monthly' ? 0 : amount;
+      cardcomDocument = {
+        Name: fullName || userEmail,
+        Email: userEmail,
+        Products: [
+          {
+            Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+            UnitCost: docAmount,
+            Quantity: 1
+          }
+        ]
+        // Additional fields if absolutely needed can be added here
+      };
+    }
+
+    // === END FIX ===
+
     const cardcomPayload = {
       TerminalNumber: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
       ApiName: Deno.env.get('CARDCOM_API_NAME'),
@@ -123,7 +145,7 @@ serve(async (req) => {
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1, // No installments allowed
+      MaxNumOfPayments: 1,
       UIDefinition: {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
@@ -135,18 +157,9 @@ serve(async (req) => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123"
       },
-      Document: invoiceInfo ? {
-        Name: fullName || userEmail,
-        Email: userEmail,
-        Products: [{
-          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: amount,
-          Quantity: 1
-        }]
-      } : undefined,
+      Document: cardcomDocument, // only if required and properly structured
       AdvancedDefinition: {
-        // For monthly plan, we create a token without charging
-        JValidateType: planId === 'monthly' ? 2 : 5, // J2 for validation only, J5 for authorization
+        JValidateType: planId === 'monthly' ? 2 : 5,
         ShouldOpenPinpadOnPageLoad: false
       }
     };
