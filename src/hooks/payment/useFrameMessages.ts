@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -47,8 +46,17 @@ export const useFrameMessages = ({
           
           if (message.data?.IsSuccess) {
             console.log('Payment submission successful');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-            handlePaymentSuccess();
+            if (planType === 'monthly') {
+              // For monthly plan, we only created a token here, so keep in processing state
+              // until the webhook confirms the token was created
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+              // Start checking status to see if the webhook has processed the token
+              checkPaymentStatus(lowProfileCode, sessionId, 'token_only', planType);
+            } else {
+              // For annual and VIP plans, this is the actual payment, so mark as success
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+              handlePaymentSuccess();
+            }
           } else {
             console.error('Payment submission failed:', message.data?.Description);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED, isSubmitting: false }));
@@ -88,9 +96,12 @@ export const useFrameMessages = ({
 
         if (message.action === 'tokenCreationCompleted') {
           console.log('Token creation completed');
-          // Start payment status check specifically for token operation
-          if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, 'token_only', planType);
+          // For monthly plan, we need to check if the token was created successfully
+          if (planType === 'monthly') {
+            // Start payment status check specifically for token operation
+            if (lowProfileCode && sessionId) {
+              checkPaymentStatus(lowProfileCode, sessionId, 'token_only', planType);
+            }
           }
           return;
         }

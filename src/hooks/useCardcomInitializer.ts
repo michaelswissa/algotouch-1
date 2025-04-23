@@ -1,3 +1,4 @@
+
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
@@ -6,7 +7,8 @@ export const useCardcomInitializer = () => {
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
-    operationType: 'payment' | 'token_only' = 'payment'
+    operationType: 'payment' | 'token_only' = 'payment',
+    planId: string = 'monthly'
   ) => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization:", { 
@@ -26,6 +28,7 @@ export const useCardcomInitializer = () => {
       sessionId,
       terminalNumber,
       operationType,
+      planId,
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
@@ -51,6 +54,14 @@ export const useCardcomInitializer = () => {
         }
 
         try {
+          // Determine operation type based on plan
+          let operation = "ChargeOnly";
+          if (planId === 'monthly') {
+            operation = "CreateTokenOnly";
+          } else if (planId === 'annual') {
+            operation = "ChargeAndCreateToken";
+          }
+
           const config: any = {
             action: 'init',
             lowProfileCode,
@@ -97,7 +108,8 @@ export const useCardcomInitializer = () => {
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
-            operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+            operation: operation,
+            ApiName: "bLaocQRMSnwphQRUVG3b"
           };
 
           console.log('Sending initialization config to CardCom iframe:', config);

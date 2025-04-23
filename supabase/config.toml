@@ -1,11 +1,104 @@
 
-project_id = "ndhakvhrrkczgylcmyoc"
+project_id = "aqa-tab"
 
-[functions.cardcom-payment]
-verify_jwt = false
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
-[functions.cardcom-status]
-verify_jwt = false
+[api.rate_limits]
+unauthenticated.enabled = true
+unauthenticated.request_count = 100
+unauthenticated.time_window = "1m"
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[local_development]
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[functions]
+serve_port = 54324
+system_schema = "supabase_functions"
 
 [functions.cardcom-webhook]
 verify_jwt = false
+
+[functions.cardcom-payment]
+verify_jwt = false  # Allow public access for payment initialization
+
+[functions.cardcom-recurring]
+verify_jwt = true  # Require authentication for recurring payment operations
+
+[inbucket]
+enabled = true
+port = 54325
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.sms]
+twilio_enabled = false
+
+[auth.external.github]
+enabled = false
+client_id = ""
+secret = ""
+
+[auth.email_template.invite]
+subject = "You have been invited"
+content_path = ""
+
+[auth.email_template.confirmation]
+subject = "Confirm Your Signup"
+content_path = ""
+
+[auth.email_template.recovery]
+subject = "Reset Your Password"
+content_path = ""
+
+[auth.email_template.magic_link]
+subject = "Your Magic Link"
+content_path = ""
+
+[auth.email_template.email_change]
+subject = "Confirm Email Change"
+content_path = ""
+
+[auth.email_template.sms_otp]
+template = "%s is your Supabase verification code"
+
+[auth.email_template.email_otp]
+subject = "%s is your Supabase verification code"
+content_path = ""
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend = "postgres"

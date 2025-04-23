@@ -21,17 +21,29 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
-    // Determine operation based on plan and operationType
+    // Determine amount and operation based on plan type
+    let amount = 0;
     let operation = "ChargeOnly";
-    if (operationType === 'token_only' || planId === 'monthly') {
+    
+    if (planId === 'monthly') {
+      // Monthly plan: token first, then charge later (371₪)
+      amount = 0; // No immediate charge
+      operation = "CreateTokenOnly";
+    } else if (planId === 'annual') {
+      // Annual plan: charge 3,371₪ and create token
+      amount = 3371;
       operation = "ChargeAndCreateToken";
+    } else if (planId === 'vip') {
+      // VIP plan: one-time charge of 13,121₪
+      amount = 13121;
+      operation = "ChargeOnly";
     }
 
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
       body: {
         planId,
-        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        amount: amount,
         invoiceInfo: {
           fullName: paymentUser.fullName || paymentUser.email,
           email: paymentUser.email,
@@ -39,8 +51,12 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         currency: "ILS",
         operation: operation,
         redirectUrls: {
-          success: `${window.location.origin}/subscription/success`,
-          failed: `${window.location.origin}/subscription/failed`
+          success: planId === 'monthly' 
+            ? `${window.location.origin}/token-success`
+            : `${window.location.origin}/payment-success`,
+          failed: planId === 'monthly'
+            ? `${window.location.origin}/token-failed`
+            : `${window.location.origin}/payment-failed`
         },
         userId: userId,
         operationType,
@@ -57,7 +73,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     
     console.log("Payment session created:", data.data);
     
-    // Always use the fixed terminal number for CardCom
+    // CardCom terminal number as provided
     const terminalNumber = '160138';
     
     setState(prev => ({

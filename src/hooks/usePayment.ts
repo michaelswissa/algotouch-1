@@ -89,6 +89,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     console.log('Submitting payment transaction', { 
       operationType, 
+      planId,
       lowProfileCode: state.lowProfileCode 
     });
 
@@ -107,6 +108,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
+      // Determine operation based on plan type
+      let operation = "ChargeOnly";
+      if (planId === 'monthly') {
+        operation = "CreateTokenOnly";
+      } else if (planId === 'annual') {
+        operation = "ChargeAndCreateToken";
+      }
+      
       // CardCom requires "lowProfileCode" param for each doTransaction
       const formData: any = {
         action: 'doTransaction',
@@ -119,9 +128,10 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
-        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        Operation: operation,
         lowProfileCode: state.lowProfileCode, // Ensure always present
-        LowProfileCode: state.lowProfileCode  // For extra compatibility
+        LowProfileCode: state.lowProfileCode,  // For extra compatibility
+        ApiName: "bLaocQRMSnwphQRUVG3b"
       };
 
       console.log('Sending transaction data to CardCom:', formData);

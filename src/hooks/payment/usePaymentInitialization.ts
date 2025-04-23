@@ -25,7 +25,7 @@ export const usePaymentInitialization = ({
   const { initializePaymentSession } = usePaymentSession({ setState });
 
   const initializePayment = async () => {
-    console.log('Starting payment initialization process');
+    console.log('Starting payment initialization process for plan:', planId);
     setState(prev => ({ 
       ...prev, 
       paymentStatus: PaymentStatus.INITIALIZING 
@@ -49,13 +49,19 @@ export const usePaymentInitialization = ({
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
 
+      // Determine operation type based on plan
+      let paymentOpType: 'payment' | 'token_only' = 'payment';
+      if (planId === 'monthly') {
+        paymentOpType = 'token_only';
+      }
+
       // Step 3: Initialize payment session to get lowProfileCode
       console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
         userId,
         { email: userEmail, fullName: fullName || userEmail },
-        operationType
+        paymentOpType
       );
       
       if (!paymentData || !paymentData.lowProfileCode) {
@@ -64,9 +70,6 @@ export const usePaymentInitialization = ({
       }
       
       console.log('Payment session initialized with lowProfileCode:', paymentData.lowProfileCode);
-
-      // Step 4: Master frame should be loaded by the parent component
-      // We must ensure the iframes are ready before initialization
       
       // Set initial payment state
       setState(prev => ({ 
@@ -84,7 +87,8 @@ export const usePaymentInitialization = ({
             paymentData.lowProfileCode, 
             paymentData.sessionId,
             paymentData.terminalNumber,
-            operationType
+            paymentOpType,
+            planId
           );
           
           if (!initialized) {
