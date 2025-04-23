@@ -30,10 +30,6 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     getDiagnosticsSummary 
   } = usePaymentDiagnostics();
 
-  // Declare the realtime state variables first before they're used
-  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
-  const [realtimeRetries, setRealtimeRetries] = useState(0);
-
   // Initialize poller hook
   const {
     attempt,
@@ -44,16 +40,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     isMounted,
     updateDiagnostics
   });
-
-  // Initialize realtime subscription handling
-  const {
-    realtimeConnected,
-    setupRealtimeSubscription
-  } = usePaymentRealtime({ 
-    setState, 
-    cleanupStatusCheck: () => {}, // Temporary placeholder - will update below
-    isMounted 
-  });
+  
+  // Declare the state variables first before they're used
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
+  const [realtimeRetries, setRealtimeRetries] = useState(0);
 
   // Cleanup callback for re-use
   const cleanupStatusCheck = useCallback(() => {
@@ -88,6 +78,16 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     
     resetDiagnostics();
   }, [intervalId, realtimeChannel, attempt, getDiagnosticsSummary, resetDiagnostics]);
+
+  // Initialize realtime subscription handling
+  const {
+    realtimeConnected,
+    setupRealtimeSubscription
+  } = usePaymentRealtime({ 
+    setState, 
+    cleanupStatusCheck, 
+    isMounted 
+  });
 
   // Cleanup on unmount
   useEffect(() => {
@@ -130,7 +130,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     setAttempt(0);
     
     // Set up realtime subscription
-    const channel = setupRealtimeSubscription(sessionId, cleanupStatusCheck);
+    const channel = setupRealtimeSubscription(sessionId, cleanupStatusCheck, operationType);
     if (channel) {
       setRealtimeChannel(channel);
     }
