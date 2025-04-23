@@ -4,7 +4,7 @@ import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentDiagnostics } from './state/usePaymentDiagnostics';
 import { usePaymentRealtime } from './realtime/usePaymentRealtime';
 import { usePaymentStatusPoller } from './status/usePaymentStatusPoller';
-import { supabase } from '@/integrations/supabase/client'; // Add missing import
+import { supabase } from '@/integrations/supabase/client';
 
 interface UsePaymentStatusCheckProps {
   setState: (updater: any) => void;
@@ -30,7 +30,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     getDiagnosticsSummary 
   } = usePaymentDiagnostics();
 
-  // Initialize poller hook - must come before cleanupStatusCheck
+  // Declare the realtime state variables first before they're used
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
+  const [realtimeRetries, setRealtimeRetries] = useState(0);
+
+  // Initialize poller hook
   const {
     attempt,
     setAttempt,
@@ -39,6 +43,16 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     setState,
     isMounted,
     updateDiagnostics
+  });
+
+  // Initialize realtime subscription handling
+  const {
+    realtimeConnected,
+    setupRealtimeSubscription
+  } = usePaymentRealtime({ 
+    setState, 
+    cleanupStatusCheck: () => {}, // Temporary placeholder - will update below
+    isMounted 
   });
 
   // Cleanup callback for re-use
@@ -73,21 +87,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     console.log('Payment status check diagnostics:', summary);
     
     resetDiagnostics();
-  }, [intervalId, realtimeChannel, attempt, getDiagnosticsSummary, resetDiagnostics, setRealtimeChannel, setRealtimeRetries]);
-
-  // Initialize realtime subscription handling
-  const {
-    realtimeChannel,
-    setRealtimeChannel,
-    realtimeConnected,
-    realtimeRetries,
-    setRealtimeRetries,
-    setupRealtimeSubscription
-  } = usePaymentRealtime({ 
-    setState, 
-    cleanupStatusCheck,
-    isMounted 
-  });
+  }, [intervalId, realtimeChannel, attempt, getDiagnosticsSummary, resetDiagnostics]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -130,7 +130,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     setAttempt(0);
     
     // Set up realtime subscription
-    const channel = setupRealtimeSubscription(sessionId);
+    const channel = setupRealtimeSubscription(sessionId, cleanupStatusCheck);
     if (channel) {
       setRealtimeChannel(channel);
     }
@@ -157,8 +157,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkPaymentStatus, 
     setupRealtimeSubscription, 
     initializeDiagnostics,
-    updateDiagnostics,
-    setRealtimeChannel
+    updateDiagnostics
   ]);
   
   return {

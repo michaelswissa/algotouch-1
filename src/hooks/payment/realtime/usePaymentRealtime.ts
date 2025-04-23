@@ -15,11 +15,10 @@ export const usePaymentRealtime = ({
   cleanupStatusCheck, 
   isMounted 
 }: UsePaymentRealtimeProps) => {
-  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [realtimeRetries, setRealtimeRetries] = useState(0);
 
-  const setupRealtimeSubscription = useCallback((sessionId: string) => {
+  const setupRealtimeSubscription = useCallback((sessionId: string, cleanup: () => void) => {
     if (!sessionId) return null;
     
     if (realtimeRetries > 3) {
@@ -52,7 +51,7 @@ export const usePaymentRealtime = ({
             
             if (newStatus === 'completed') {
               console.log('Payment completed via realtime notification!');
-              cleanupStatusCheck();
+              cleanup();
               setState(prev => ({ 
                 ...prev, 
                 paymentStatus: PaymentStatus.SUCCESS,
@@ -66,7 +65,7 @@ export const usePaymentRealtime = ({
               }, window.location.origin);
             } else if (newStatus === 'failed') {
               console.log('Payment failed via realtime notification');
-              cleanupStatusCheck();
+              cleanup();
               setState(prev => ({ 
                 ...prev, 
                 paymentStatus: PaymentStatus.FAILED,
@@ -97,18 +96,15 @@ export const usePaymentRealtime = ({
           }
         });
       
-      setRealtimeChannel(channel);
       return channel;
     } catch (error) {
       console.error('Error setting up realtime subscription:', error);
       setRealtimeRetries(prev => prev + 1);
       return null;
     }
-  }, [cleanupStatusCheck, setState, realtimeRetries, isMounted]);
+  }, [setState, isMounted, realtimeRetries]);
 
   return {
-    realtimeChannel,
-    setRealtimeChannel,
     realtimeConnected,
     realtimeRetries,
     setRealtimeRetries,

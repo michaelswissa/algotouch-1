@@ -74,8 +74,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   // Enhanced timeout handling with multiple stages
   const handleTimeout = useCallback(() => {
     console.log('Payment timeout triggered, checking status again');
-    if (paymentStatusCheck && lowProfileCode && sessionId) {
-      paymentStatusCheck.checkPaymentStatus(lowProfileCode, sessionId, operationType || 'payment')
+    if (paymentStatusCheck && lowProfileCode && sessionId && operationType) {
+      paymentStatusCheck.checkPaymentStatus(lowProfileCode, sessionId, operationType)
         .catch(console.error);
     }
   }, [paymentStatusCheck, lowProfileCode, sessionId, operationType]);
