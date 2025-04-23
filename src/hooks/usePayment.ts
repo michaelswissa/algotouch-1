@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -218,12 +219,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         paymentStatus: PaymentStatus.PROCESSING
       }));
       
-      // Start status check with required params
+      // Start status check with required params - Fix: Make sure all 4 arguments are passed
       startStatusCheck(
-        state.lowProfileCode, 
-        state.sessionId, 
-        currentOperationType || 'payment', 
-        planId || ''
+        state.lowProfileCode,
+        state.sessionId,
+        currentOperationType,
+        planId
       );
     } catch (error) {
       console.error("Error submitting payment:", error);
@@ -269,3 +270,4 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     paymentStatusCheck
   };
 };
+
