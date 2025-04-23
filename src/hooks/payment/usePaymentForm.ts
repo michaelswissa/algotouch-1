@@ -96,13 +96,13 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
   const isInitializing = paymentStatus === PaymentStatus.INITIALIZING;
 
   // Determine if the iframe content is ready to be shown
-  const isContentReady = !isInitializing && 
-    terminalNumber && 
-    cardcomUrl && 
-    lowProfileCode && 
-    sessionId && 
-    isMasterFrameLoaded && 
-    paymentStatus !== PaymentStatus.INITIALIZING;
+  const isContentReady = 
+    !isInitializing && 
+    !!terminalNumber && 
+    !!cardcomUrl && 
+    !!lowProfileCode && 
+    !!sessionId && 
+    isMasterFrameLoaded;
 
   return {
     isSubmitting,
