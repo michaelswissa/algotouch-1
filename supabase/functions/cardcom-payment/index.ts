@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -87,7 +86,7 @@ serve(async (req) => {
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
     // Prepare webhook URL with full domain
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
+    const webhookUrl = `https://algotouch.lovable.app/functions/v1/cardcom-webhook`;
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,

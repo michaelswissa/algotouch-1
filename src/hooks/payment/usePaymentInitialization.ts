@@ -1,4 +1,3 @@
-
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from '../useCardcomInitializer';
@@ -77,10 +76,8 @@ export const usePaymentInitialization = ({
         paymentStatus: PaymentStatus.IDLE
       }));
       
-      // Step 5: Initialize CardCom fields with the lowProfileCode
-      console.log('Setting up to initialize CardCom fields');
+      // Initialize CardCom fields with proper timing
       setTimeout(async () => {
-        console.log('Starting CardCom fields initialization');
         try {
           const initialized = await initializeCardcomFields(
             masterFrameRef, 
@@ -88,11 +85,9 @@ export const usePaymentInitialization = ({
             paymentData.sessionId,
             paymentData.terminalNumber,
             paymentOpType,
-            planId
           );
           
           if (!initialized) {
-            console.error("Failed to initialize CardCom fields");
             throw new Error('שגיאה באתחול שדות התשלום');
           }
           
@@ -100,9 +95,9 @@ export const usePaymentInitialization = ({
         } catch (error) {
           console.error('Error during CardCom field initialization:', error);
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(error.message || 'שגיאה באתחול שדות התשלום');
+          toast.error(error instanceof Error ? error.message : 'שגיאה באתחול שדות התשלום');
         }
-      }, 500); // Short delay to ensure master frame is loaded
+      }, 500);
       
       return paymentData;
     } catch (error) {
