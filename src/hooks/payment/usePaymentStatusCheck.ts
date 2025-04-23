@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
@@ -310,7 +309,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     setPlanId(newPlanId);
     setAttempt(0);
     
-    // Set up realtime subscription
+    // Set up realtime subscription with full session info
     const channel = setupRealtimeSubscription(newSessionId);
     if (channel) {
       setRealtimeChannel(channel);
