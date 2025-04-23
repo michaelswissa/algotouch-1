@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { usePayment } from '@/hooks/usePayment';
 import { toast } from 'sonner';
 import { getSubscriptionPlans } from '@/components/payment/utils/paymentHelpers';
+import { PaymentStatus } from '@/components/payment/types/payment';
 
 interface UsePaymentFormProps {
   planId: string;
@@ -92,7 +93,7 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
   };
 
   // Define isInitializing for better state management
-  const isInitializing = paymentStatus === 'initializing';
+  const isInitializing = paymentStatus === PaymentStatus.INITIALIZING;
 
   // Determine if the iframe content is ready to be shown
   const isContentReady = !isInitializing && 
@@ -101,7 +102,7 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     lowProfileCode && 
     sessionId && 
     isMasterFrameLoaded && 
-    paymentStatus !== 'initializing';
+    paymentStatus !== PaymentStatus.INITIALIZING;
 
   return {
     isSubmitting,
