@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +5,13 @@ import { toast } from 'sonner';
 
 interface UsePaymentStatusCheckProps {
   setState: (updater: any) => void;
+}
+
+interface StartStatusCheckParams {
+  lowProfileCode: string;
+  sessionId: string;
+  operationType: 'payment' | 'token_only';
+  planId: string;
 }
 
 export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) => {
@@ -278,22 +284,26 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     }
   }, [cleanupStatusCheck, setState, realtimeRetries]);
   
-  // Start status check with a robust initialization
-  // FIX: Function signature updated to match the call sites
+  // Start status check with proper parameter typing
   const startStatusCheck = useCallback((
-    newLowProfileCode: string, 
-    newSessionId: string,
-    newOperationType: 'payment' | 'token_only' = 'payment',
-    newPlanId: string = ''
+    lowProfileCode: string,
+    sessionId: string,
+    operationType: 'payment' | 'token_only',
+    planId: string
   ) => {
+    if (!lowProfileCode || !sessionId) {
+      console.error('Missing required parameters for status check:', { lowProfileCode, sessionId });
+      return;
+    }
+
     // Clean up any existing status check first
     cleanupStatusCheck();
     
     console.log('Starting payment status check for:', {
-      lowProfileCode: newLowProfileCode,
-      sessionId: newSessionId,
-      operationType: newOperationType,
-      planId: newPlanId
+      lowProfileCode,
+      sessionId,
+      operationType,
+      planId
     });
     
     // Initialize diagnostic data
@@ -305,14 +315,14 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     };
     
     // Set state
-    setLowProfileCode(newLowProfileCode);
-    setSessionId(newSessionId);
-    setOperationType(newOperationType);
-    setPlanId(newPlanId);
+    setLowProfileCode(lowProfileCode);
+    setSessionId(sessionId);
+    setOperationType(operationType);
+    setPlanId(planId);
     setAttempt(0);
     
-    // Set up realtime subscription with full session info
-    const channel = setupRealtimeSubscription(newSessionId);
+    // Set up realtime subscription
+    const channel = setupRealtimeSubscription(sessionId);
     if (channel) {
       setRealtimeChannel(channel);
     }

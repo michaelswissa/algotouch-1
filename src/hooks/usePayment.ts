@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -142,7 +141,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
   }, [initializePayment, setState, cleanupStatusCheck, handleError, isRetrying, recoveryAttempts]);
 
-  // Submit payment with state machine validation
+  // Submit payment with proper parameter passing
   const submitPayment = useCallback(() => {
     // Prevent invalid state transitions
     if (paymentInProgress || isRetrying) {
@@ -211,7 +210,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       });
       
       // Send the data to the iframe
-      masterFrameRef.current.contentWindow.postMessage(formData, '*');
+      masterFrameRef.current?.contentWindow?.postMessage(formData, '*');
       
       // Update state
       setState(prev => ({
@@ -219,7 +218,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         paymentStatus: PaymentStatus.PROCESSING
       }));
       
-      // Start status check with required params - FIX: pass all 4 required parameters correctly
+      // Start status check with all required parameters
       startStatusCheck(
         state.lowProfileCode,
         state.sessionId,
@@ -237,13 +236,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     state.terminalNumber, 
     state.lowProfileCode, 
     state.sessionId, 
-    state.operationType, 
-    handleError, 
+    state.operationType,
+    handleError,
     paymentInProgress, 
     setState, 
     startStatusCheck, 
     planId, 
-    operationType, 
+    operationType,
     isRetrying
   ]);
 
