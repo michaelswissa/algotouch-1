@@ -1,5 +1,4 @@
 
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { CARDCOM } from '@/config/cardcom';
@@ -59,7 +58,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       ApiName: CARDCOM.API_NAME,
       Operation: operation,
       ReturnValue: returnValue,
-      Amount: amount,
+      Amount: amount.toString(), // Convert amount to string
       WebHookUrl: CARDCOM.WEBHOOK_URL,
       SuccessRedirectUrl: CARDCOM.SUCCESS_URL,
       FailedRedirectUrl: CARDCOM.FAILED_URL,
@@ -71,7 +70,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         Email: paymentUser.email,
         Products: [{
           Description: planNames[planId as keyof typeof planNames] || 'מנוי',
-          UnitCost: amount,
+          UnitCost: amount.toString(), // Convert UnitCost to string
           Quantity: 1
         }]
       }
@@ -87,7 +86,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
-          amount: amount,
+          amount: amount.toString(), // Convert amount to string
           invoiceInfo: {
             fullName: paymentUser.fullName || paymentUser.email,
             email: paymentUser.email,
