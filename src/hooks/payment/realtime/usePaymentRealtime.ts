@@ -18,7 +18,11 @@ export const usePaymentRealtime = ({
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [realtimeRetries, setRealtimeRetries] = useState(0);
 
-  const setupRealtimeSubscription = useCallback((sessionId: string, cleanup: () => void, operationType: 'payment' | 'token_only' = 'payment') => {
+  const setupRealtimeSubscription = useCallback((
+    sessionId: string, 
+    cleanup: () => void, 
+    operationType: 'payment' | 'token_only' = 'payment'
+  ) => {
     if (!sessionId) return null;
     
     if (realtimeRetries > 3) {
