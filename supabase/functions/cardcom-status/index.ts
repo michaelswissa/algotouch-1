@@ -1,17 +1,17 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 // Enhanced logging function with structured output
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-STATUS] ${step}${detailsStr}`);
-};
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -318,6 +318,7 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep('Unexpected error', { error: errorMessage });

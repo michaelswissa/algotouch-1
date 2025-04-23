@@ -1,291 +1,171 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 // Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const detailsStr = details ? ` ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-WEBHOOK] ${step}${detailsStr}`);
-};
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Create Supabase admin client for database operations that bypass RLS
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error("Missing Supabase configuration");
-    }
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const payload = await req.json()
+    logStep("Webhook payload received", payload)
 
-    // Parse the webhook payload from CardCom
-    let payload;
-    try {
-      payload = await req.json();
-    } catch (error) {
-      logStep("Invalid JSON payload", { error: error.message });
-      return new Response("Invalid payload", { status: 400 });
+    if (!payload || !payload.LowProfileId) {
+      throw new Error("Invalid webhook payload")
     }
 
-    logStep("Received webhook payload", payload);
-    
-    // Extract the required information from the payload
-    const { 
-      LowProfileId: lowProfileCode, 
-      TranzactionInfo: transactionInfo, 
-      ReturnValue: reference,
-      TokenInfo: tokenInfo,
-      TranzactionId: transactionId,
-      ResponseCode: responseCode,
-      Operation: operation
-    } = payload;
+    // Initialize Supabase client
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    if (!lowProfileCode) {
-      logStep("Missing lowProfileCode");
-      return new Response("Missing lowProfileCode", { status: 400 });
-    }
-
-    // Query the payment session
+    // Fetch the payment session
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .select('*')
-      .eq('low_profile_code', lowProfileCode)
-      .single();
+      .eq('low_profile_code', payload.LowProfileId)
+      .maybeSingle()
 
-    if (sessionError || !session) {
-      logStep("Payment session not found", { lowProfileCode, error: sessionError?.message });
-      return new Response("Payment session not found", { status: 404 });
+    if (sessionError) {
+      throw new Error(`Error fetching session: ${sessionError.message}`)
     }
 
-    const userId = session.user_id;
-    if (!userId) {
-      logStep("Anonymous payment not supported");
-      return new Response("Anonymous payment not supported", { status: 400 });
+    if (!session) {
+      logStep("Session not found", { lowProfileId: payload.LowProfileId })
+      return new Response(
+        JSON.stringify({ success: false, message: "Session not found" }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Check if payment was successful based on ResponseCode
-    const isSuccess = responseCode === 0;
-    const status = isSuccess ? 'success' : 'failed';
-    
+    let updateData: any = {
+      status: payload.success ? 'completed' : 'failed',
+      updated_at: new Date().toISOString(),
+      transaction_data: payload
+    }
+
+    // For successful transactions, store additional data
+    if (payload.success) {
+      updateData.transaction_id = payload.TransactionId || payload.TokenInfo?.Token
+      
+      // Store payment method info if token was created
+      if (payload.TokenInfo) {
+        const paymentMethod = {
+          type: 'card',
+          token: payload.TokenInfo.Token,
+          expMonth: payload.TokenInfo.CardMonth,
+          expYear: payload.TokenInfo.CardYear,
+          last4: payload.TranzactionInfo?.Last4CardDigits?.toString()?.padStart(4, '0'),
+          cardType: payload.TranzactionInfo?.CardName
+        }
+        updateData.payment_method = paymentMethod
+      }
+
+      // Create payment log
+      await supabaseAdmin
+        .from('payment_logs')
+        .insert({
+          user_id: session.user_id,
+          plan_id: session.plan_id,
+          amount: session.amount,
+          currency: session.currency,
+          payment_status: 'success',
+          transaction_id: updateData.transaction_id,
+          payment_data: payload
+        })
+        .then(({ error }) => {
+          if (error) logStep("Error creating payment log", { error })
+        })
+
+      // For token-only operations, store the token as a recurring payment method
+      if (session.operation_type === 'token_only' && payload.TokenInfo?.Token) {
+        await supabaseAdmin
+          .from('recurring_payments')
+          .insert({
+            user_id: session.user_id,
+            token: payload.TokenInfo.Token,
+            token_expiry: new Date(payload.TokenInfo.TokenExDate),
+            last_4_digits: payload.TranzactionInfo?.Last4CardDigits?.toString()
+          })
+          .then(({ error }) => {
+            if (error) logStep("Error storing recurring payment", { error })
+          })
+      }
+
+      // Update subscription if user exists
+      if (session.user_id) {
+        const updates = {
+          user_id: session.user_id,
+          plan_type: session.plan_id,
+          status: session.plan_id === 'monthly' ? 'trial' : 'active',
+          payment_method: updateData.payment_method
+        }
+
+        if (session.initial_next_charge_date) {
+          updates.next_charge_date = session.initial_next_charge_date
+        }
+
+        await supabaseAdmin
+          .from('subscriptions')
+          .upsert(updates)
+          .then(({ error }) => {
+            if (error) logStep("Error updating subscription", { error })
+          })
+      }
+    } else {
+      // Log failed payment
+      await supabaseAdmin
+        .from('payment_errors')
+        .insert({
+          user_id: session.user_id,
+          error_code: payload.ResponseCode?.toString(),
+          error_message: payload.Description,
+          request_data: session,
+          response_data: payload
+        })
+        .then(({ error }) => {
+          if (error) logStep("Error logging payment error", { error })
+        })
+    }
+
     // Update the payment session
     await supabaseAdmin
       .from('payment_sessions')
-      .update({
-        status,
-        transaction_id: transactionId || (tokenInfo?.Token ? tokenInfo.Token : null),
-        transaction_data: payload,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', session.id);
+      .update(updateData)
+      .eq('low_profile_code', payload.LowProfileId)
 
-    logStep("Updated payment session", { status });
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        message: "Webhook processed successfully" 
+      }), 
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
-    // If payment failed, log error and return
-    if (!isSuccess) {
-      await supabaseAdmin.from('payment_errors').insert({
-        user_id: userId,
-        error_code: responseCode.toString(),
-        error_message: payload.Description || "Payment failed",
-        response_data: payload
-      });
-      
-      return new Response("Payment failed", { status: 200 });
-    }
-
-    // Handle successful payment or token creation
-    const planId = session.plan_id;
-    const operationType = session.operation_type || (planId === 'monthly' ? 'token_only' : 'payment');
-    
-    logStep("Processing successful payment", { planId, operationType });
-
-    // Check for existing subscription
-    const { data: existingSubscription } = await supabaseAdmin
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .not('status', 'eq', 'cancelled')
-      .not('status', 'eq', 'expired')
-      .single();
-
-    // Prepare the payment method info from token or transaction
-    let paymentMethodInfo = {};
-    
-    // Handle token creation (from TokenInfo object)
-    if (tokenInfo?.Token) {
-      paymentMethodInfo = {
-        lastFourDigits: tokenInfo.CardNumberLastDigits || '',
-        expiryMonth: tokenInfo.CardMonth || '',
-        expiryYear: tokenInfo.CardYear || '',
-        cardOwnerName: payload.UIValues?.CardOwnerName || '',
-        cardOwnerPhone: payload.UIValues?.CardOwnerPhone || '',
-        cardOwnerEmail: payload.UIValues?.CardOwnerEmail || '',
-      };
-    } 
-    // Handle transaction info
-    else if (transactionInfo) {
-      paymentMethodInfo = {
-        lastFourDigits: transactionInfo.Last4CardDigits || '',
-        expiryMonth: transactionInfo.CardMonth || '',
-        expiryYear: transactionInfo.CardYear || '',
-        cardOwnerName: transactionInfo.CardOwnerName || payload.UIValues?.CardOwnerName || '',
-        cardOwnerPhone: transactionInfo.CardOwnerPhone || payload.UIValues?.CardOwnerPhone || '',
-        cardOwnerEmail: transactionInfo.CardOwnerEmail || payload.UIValues?.CardOwnerEmail || '',
-      };
-    }
-    
-    // Get user email for records
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('email')
-      .eq('id', userId)
-      .single();
-    
-    const userEmail = profile?.email || payload.UIValues?.CardOwnerEmail || '';
-
-    // Handle payment result based on plan type and operation
-    if (planId === 'monthly' || operationType === 'token_only') {
-      // For monthly plans with token creation
-      const token = tokenInfo?.Token;
-      
-      // Calculate the next charge date (30 days from today)
-      const nextChargeDate = session.initial_next_charge_date || (() => {
-        const date = new Date();
-        date.setDate(date.getDate() + 30);
-        return date.toISOString();
-      })();
-
-      // Calculate the trial end date (30 days from today)
-      const trialEndDate = new Date();
-      trialEndDate.setDate(trialEndDate.getDate() + 30);
-
-      if (existingSubscription) {
-        // Update existing subscription with new token and extend period
-        await supabaseAdmin
-          .from('subscriptions')
-          .update({
-            plan_type: planId,
-            status: 'trial',
-            payment_token: token,
-            payment_method: paymentMethodInfo,
-            trial_ends_at: trialEndDate.toISOString(),
-            next_charge_date: nextChargeDate,
-            payment_status: 'pending_first_payment',
-            first_payment_processed: false,
-            payment_failures: 0,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingSubscription.id);
-      } else {
-        // Create a new subscription
-        await supabaseAdmin
-          .from('subscriptions')
-          .insert({
-            user_id: userId,
-            plan_type: planId,
-            status: 'trial',
-            payment_token: token,
-            payment_method: paymentMethodInfo,
-            trial_ends_at: trialEndDate.toISOString(),
-            next_charge_date: nextChargeDate,
-            payment_status: 'pending_first_payment',
-            first_payment_processed: false,
-            payment_failures: 0,
-            user_email: userEmail
-          });
-      }
-
-      // Log the token creation
-      await supabaseAdmin
-        .from('user_payment_logs')
-        .insert({
-          user_id: userId,
-          token: token || lowProfileCode,
-          amount: 0, // No charge for token creation
-          status: 'token_created',
-          payment_data: {
-            lowProfileCode,
-            tokenInfo,
-            paymentMethodInfo
-          }
-        });
-
-    } else {
-      // For annual and VIP plans with immediate payment
-      const amount = session.amount;
-      const token = tokenInfo?.Token;
-
-      // Calculate period end date based on plan
-      const periodEndDate = new Date();
-      if (planId === 'annual') {
-        periodEndDate.setFullYear(periodEndDate.getFullYear() + 1);
-      }
-
-      if (existingSubscription) {
-        // Update existing subscription
-        await supabaseAdmin
-          .from('subscriptions')
-          .update({
-            plan_type: planId,
-            status: 'active',
-            payment_token: token,
-            payment_method: paymentMethodInfo,
-            payment_status: 'success',
-            current_period_ends_at: planId === 'vip' ? null : periodEndDate.toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingSubscription.id);
-      } else {
-        // Create a new subscription
-        await supabaseAdmin
-          .from('subscriptions')
-          .insert({
-            user_id: userId,
-            plan_type: planId,
-            status: 'active',
-            payment_token: token,
-            payment_method: paymentMethodInfo,
-            payment_status: 'success',
-            current_period_ends_at: planId === 'vip' ? null : periodEndDate.toISOString(),
-            user_email: userEmail
-          });
-      }
-
-      // Log the payment
-      await supabaseAdmin
-        .from('user_payment_logs')
-        .insert({
-          user_id: userId,
-          token: token || lowProfileCode,
-          amount,
-          status: 'payment_success',
-          transaction_id: transactionId,
-          payment_data: payload
-        });
-    }
-
-    logStep("Subscription processed successfully");
-    
-    return new Response("OK", { status: 200 });
-    
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    logStep("Error processing webhook", { error: errorMessage })
     
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+      JSON.stringify({ 
+        success: false, 
+        message: "Error processing webhook",
+        error: errorMessage
+      }), 
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
-});
+})
