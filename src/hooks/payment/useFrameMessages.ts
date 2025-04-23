@@ -39,7 +39,10 @@ export const useFrameMessages = ({
     const handleMessage = async (event: MessageEvent) => {
       try {
         // Verify origin
-        if (event.origin !== 'https://secure.cardcom.solutions') return;
+        if (event.origin !== 'https://secure.cardcom.solutions') {
+          console.log('Ignored message from unknown origin:', event.origin);
+          return;
+        }
         console.log('Received message from CardCom:', event.data);
 
         const data = event.data;

@@ -12,18 +12,35 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   cardcomUrl,
   terminalNumber
 }) => {
-  // Ensure we use the master frame URL from CardCom
   const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
 
   return (
-    <iframe
-      ref={masterFrameRef}
-      id="CardComMasterFrame"
-      name="CardComMasterFrame"
-      src={masterFrameUrl}
-      style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
-      title="CardCom Master Frame"
-    />
+    <div className="space-y-4">
+      <iframe
+        ref={masterFrameRef}
+        id="CardComMasterFrame"
+        name="CardComMasterFrame"
+        src={masterFrameUrl}
+        style={{ display: 'none' }}
+        title="CardCom Master Frame"
+      />
+      <div className="space-y-2">
+        <iframe
+          id="CardComCardNumber"
+          name="CardComCardNumber"
+          src={`${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`}
+          className="w-full h-[57px] border-none"
+          title="מספר כרטיס"
+        />
+        <iframe
+          id="CardComCvv"
+          name="CardComCvv"
+          src={`${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`}
+          className="w-[188px] h-[57px] border-none"
+          title="קוד אבטחה"
+        />
+      </div>
+    </div>
   );
 };
 
