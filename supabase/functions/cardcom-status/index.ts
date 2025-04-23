@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,13 +7,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { lowProfileCode, sessionId, terminalNumber, timestamp, attempt, operationType } = await req.json();
+    const { lowProfileCode, sessionId, timestamp, attempt, operationType } = await req.json();
     
     console.log('Payment status check request:', { 
       lowProfileCode, 
@@ -35,13 +33,11 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // First check: Look for a completed payment session
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .select('*')
@@ -67,11 +63,9 @@ serve(async (req) => {
       hasTransactionId: !!sessionData.transaction_id
     });
 
-    // Check if session is completed
     if (sessionData.status === 'completed' && sessionData.transaction_id) {
       const tokenOperation = operationType === 'token_only';
       
-      // Success response for completed session
       return new Response(
         JSON.stringify({
           success: true,
@@ -87,7 +81,6 @@ serve(async (req) => {
       );
     }
 
-    // Check if payment session has failed
     if (sessionData.status === 'failed') {
       return new Response(
         JSON.stringify({
@@ -100,7 +93,6 @@ serve(async (req) => {
       );
     }
 
-    // Second check: Check payment logs for transaction with this LowProfileId
     const { data: paymentLogs } = await supabaseAdmin
       .from('payment_logs')
       .select('*')
@@ -110,7 +102,6 @@ serve(async (req) => {
     if (paymentLogs) {
       console.log('Found completed payment in logs:', paymentLogs);
       
-      // Update the session as completed
       await supabaseAdmin
         .from('payment_sessions')
         .update({
@@ -133,9 +124,7 @@ serve(async (req) => {
       );
     }
 
-    // Third check: For token operations specifically, check for token in payment_method
     if (operationType === 'token_only' && sessionData.payment_method?.token) {
-      // Update session as completed with token ID
       await supabaseAdmin
         .from('payment_sessions')
         .update({
@@ -158,7 +147,6 @@ serve(async (req) => {
       );
     }
 
-    // Fourth check: Look for a matching subscription with active status
     if (sessionData.user_id) {
       const { data: subscription } = await supabaseAdmin
         .from('subscriptions')
@@ -171,7 +159,6 @@ serve(async (req) => {
       if (subscription) {
         console.log('Found active subscription:', subscription);
         
-        // Update session as completed
         await supabaseAdmin
           .from('payment_sessions')
           .update({
@@ -195,8 +182,6 @@ serve(async (req) => {
       }
     }
 
-    // If we've reached here, payment is still processing
-    // For very high attempt counts, consider timing out
     if (attempt > 30) {
       return new Response(
         JSON.stringify({
