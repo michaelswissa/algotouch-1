@@ -97,6 +97,7 @@ export const usePaymentRealtime = ({
           }
         });
       
+      setRealtimeChannel(channel);
       return channel;
     } catch (error) {
       console.error('Error setting up realtime subscription:', error);

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -149,7 +148,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
 
-  // Validate and submit payment
   const handleSubmitPayment = () => {
     // Get form values
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
@@ -188,7 +186,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       // Safety timeout to reset UI if no response
       const safetyTimeout = setTimeout(() => {
         if (paymentStatus !== PaymentStatus.SUCCESS && paymentStatus !== PaymentStatus.PROCESSING) {
-          setIsSubmitting(false);
           toast.warning('לא התקבלה תגובה מהשרת, נסה שנית');
         }
       }, 15000);
