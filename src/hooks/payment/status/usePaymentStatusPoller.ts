@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 interface UsePaymentStatusPollerProps {
   setState: (updater: any) => void;
-  cleanupStatusCheck: () => void;
+  cleanupStatusCheck?: () => void;
   isMounted: React.MutableRefObject<boolean>;
   updateDiagnostics: (error?: string) => void;
 }
@@ -59,7 +59,7 @@ export const usePaymentStatusPoller = ({
       
       if (data.success) {
         console.log('Payment successful!');
-        if (isMounted.current) {
+        if (isMounted.current && cleanupStatusCheck) {
           cleanupStatusCheck();
           setState(prev => ({ 
             ...prev, 
@@ -77,7 +77,7 @@ export const usePaymentStatusPoller = ({
       } 
       else if (data.failed || data.timeout) {
         console.log('Payment failed or timed out:', data);
-        if (isMounted.current) {
+        if (isMounted.current && cleanupStatusCheck) {
           cleanupStatusCheck();
           setState(prev => ({ 
             ...prev, 

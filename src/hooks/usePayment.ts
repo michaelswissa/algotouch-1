@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentState } from './payment/usePaymentState';
@@ -71,7 +72,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   useFrameMessages({
     handlePaymentSuccess,
     setState,
-    checkPaymentStatus,
+    checkPaymentStatus: (lowProfileCode: string, sessionId: string, opType: 'payment' | 'token_only') => {
+      return checkPaymentStatus(lowProfileCode, sessionId, opType);
+    },
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     operationType: state.operationType || operationType,

@@ -4,6 +4,7 @@ import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentDiagnostics } from './state/usePaymentDiagnostics';
 import { usePaymentRealtime } from './realtime/usePaymentRealtime';
 import { usePaymentStatusPoller } from './status/usePaymentStatusPoller';
+import { supabase } from '@/integrations/supabase/client'; // Add missing import
 
 interface UsePaymentStatusCheckProps {
   setState: (updater: any) => void;
@@ -20,7 +21,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   // Reference to track if component is mounted
   const isMounted = useRef(true);
   
-  // Initialize sub-hooks with dependencies
+  // Initialize diagnostic hook
   const { 
     diagnosticRef,
     resetDiagnostics,
@@ -28,6 +29,17 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     updateDiagnostics,
     getDiagnosticsSummary 
   } = usePaymentDiagnostics();
+
+  // Initialize poller hook - must come before cleanupStatusCheck
+  const {
+    attempt,
+    setAttempt,
+    checkPaymentStatus
+  } = usePaymentStatusPoller({
+    setState,
+    isMounted,
+    updateDiagnostics
+  });
 
   // Cleanup callback for re-use
   const cleanupStatusCheck = useCallback(() => {
@@ -49,7 +61,6 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         console.warn('Error removing Supabase channel:', e);
       }
       setRealtimeChannel(null);
-      setRealtimeConnected(false);
     }
     
     setAttempt(0);
@@ -62,7 +73,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     console.log('Payment status check diagnostics:', summary);
     
     resetDiagnostics();
-  }, [intervalId, realtimeChannel, attempt, getDiagnosticsSummary, resetDiagnostics]);
+  }, [intervalId, realtimeChannel, attempt, getDiagnosticsSummary, resetDiagnostics, setRealtimeChannel, setRealtimeRetries]);
 
   // Initialize realtime subscription handling
   const {
@@ -76,18 +87,6 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     setState, 
     cleanupStatusCheck,
     isMounted 
-  });
-
-  // Initialize status polling
-  const {
-    attempt,
-    setAttempt,
-    checkPaymentStatus
-  } = usePaymentStatusPoller({
-    setState,
-    cleanupStatusCheck,
-    isMounted,
-    updateDiagnostics
   });
 
   // Cleanup on unmount
@@ -158,7 +157,8 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     checkPaymentStatus, 
     setupRealtimeSubscription, 
     initializeDiagnostics,
-    updateDiagnostics
+    updateDiagnostics,
+    setRealtimeChannel
   ]);
   
   return {
