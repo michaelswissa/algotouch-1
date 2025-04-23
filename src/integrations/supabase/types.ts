@@ -739,9 +739,17 @@ export type Database = {
         Args: { low_profile_id: string }
         Returns: boolean
       }
+      check_duplicate_payment_extended: {
+        Args: { low_profile_id: string }
+        Returns: Json
+      }
       check_row_exists: {
         Args: { p_table_name: string; p_column_name: string; p_value: string }
         Returns: boolean
+      }
+      cleanup_expired_payment_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       cleanup_user_payment_sessions: {
         Args: { user_id_param: string }
@@ -762,6 +770,10 @@ export type Database = {
       }
       is_admin: {
         Args: { user_id: string }
+        Returns: boolean
+      }
+      validate_payment_session: {
+        Args: { session_id: string }
         Returns: boolean
       }
     }
