@@ -1,5 +1,4 @@
-
-import { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
@@ -199,16 +198,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: uniqueId,
         TerminalNumber: state.terminalNumber,
-        // For monthly plan, we only create token without charging
         Operation: currentOperationType === 'token_only' ? "CreateTokenOnly" : "ChargeOnly",
-        // Critical for CardCom - make sure both forms are included
         lowProfileCode: state.lowProfileCode,
         LowProfileCode: state.lowProfileCode
       };
 
       console.log('Sending transaction data to CardCom:', {
         ...formData,
-        // Don't log certain sensitive fields
         cardOwnerId: '***********',
         ExternalUniqTranId: uniqueId.substring(0, 10) + '...',
       });
@@ -223,7 +219,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }));
       
       // Start status check with required params
-      startStatusCheck(state.lowProfileCode, state.sessionId, currentOperationType, planId);
+      startStatusCheck(
+        state.lowProfileCode, 
+        state.sessionId, 
+        currentOperationType || 'payment', 
+        planId || ''
+      );
     } catch (error) {
       console.error("Error submitting payment:", error);
       handleError("שגיאה בשליחת פרטי התשלום");
