@@ -2,22 +2,11 @@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
+import { CARDCOM } from '@/config/cardcom';
 
 interface UsePaymentSessionProps {
   setState: (updater: any) => void;
 }
-
-// CardCom configuration
-const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6",
-  domain: "https://algotouch.lovable.app",
-  successUrl: "https://algotouch.lovable.app/payment/success",
-  failedUrl: "https://algotouch.lovable.app/payment/failed",
-  webhookUrl: "https://algotouch.lovable.app/api/cardcom-webhook",
-  cardcomUrl: "https://secure.cardcom.solutions",
-};
 
 export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
   const initializePaymentSession = async (
@@ -33,9 +22,13 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
+    if (!paymentUser.email) {
+      throw new Error('חסרה כתובת דוא"ל לביצוע התשלום');
+    }
+
     // Determine amount and operation based on plan type
     let amount = 0;
-    let operation = "ChargeOnly";
+    let operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken" = "ChargeOnly";
     
     if (planId === 'monthly') {
       // Monthly plan: token first, then charge later (371₪)
@@ -57,72 +50,94 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       'vip': 'מנוי VIP'
     };
 
-    // Call CardCom payment initialization Edge Function
-    const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-      body: {
-        planId,
-        amount: amount,
-        invoiceInfo: {
-          fullName: paymentUser.fullName || paymentUser.email,
-          email: paymentUser.email,
-        },
-        currency: "ILS",
-        operation: operation,
-        redirectUrls: {
-          success: CARDCOM_CONFIG.successUrl,
-          failed: CARDCOM_CONFIG.failedUrl
-        },
-        userId: userId,
-        operationType,
-        registrationData: sessionStorage.getItem('registration_data') 
-          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-          : null,
-        payload: {
-          TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-          ApiName: CARDCOM_CONFIG.apiName,
-          Operation: operation, 
-          ReturnValue: `${planId}-${Date.now()}`,
-          Amount: amount,
-          WebHookUrl: CARDCOM_CONFIG.webhookUrl,
-          SuccessRedirectUrl: CARDCOM_CONFIG.successUrl,
-          FailedRedirectUrl: CARDCOM_CONFIG.failedUrl,
-          ProductName: planNames[planId as keyof typeof planNames] || 'מנוי',
-          Language: "he",
-          ISOCoinId: 1, // ILS
-          Document: {
-            Name: paymentUser.fullName || paymentUser.email,
-            Email: paymentUser.email,
-            Products: [{
-              Description: planNames[planId as keyof typeof planNames] || 'מנוי',
-              UnitCost: amount,
-              Quantity: 1
-            }]
-          }
-        }
+    // Generate a unique reference value
+    const returnValue = `${planId}-${userId || 'guest'}-${Date.now()}`;
+
+    // Prepare the payload for CardCom API
+    const payload = {
+      TerminalNumber: CARDCOM.TERMINAL_NUMBER,
+      ApiName: CARDCOM.API_NAME,
+      Operation: operation,
+      ReturnValue: returnValue,
+      Amount: amount,
+      WebHookUrl: CARDCOM.WEBHOOK_URL,
+      SuccessRedirectUrl: CARDCOM.SUCCESS_URL,
+      FailedRedirectUrl: CARDCOM.FAILED_URL,
+      ProductName: planNames[planId as keyof typeof planNames] || 'מנוי',
+      Language: "he",
+      ISOCoinId: 1, // ILS
+      Document: {
+        Name: paymentUser.fullName || paymentUser.email,
+        Email: paymentUser.email,
+        Products: [{
+          Description: planNames[planId as keyof typeof planNames] || 'מנוי',
+          UnitCost: amount,
+          Quantity: 1
+        }]
       }
-    });
-    
-    if (error || !data?.success) {
-      console.error("Payment initialization error:", error || data?.message);
-      throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
-    }
-    
-    console.log("Payment session created:", data.data);
-    
-    setState(prev => ({
-      ...prev,
-      sessionId: data.data.sessionId,
-      lowProfileCode: data.data.lowProfileCode,
-      terminalNumber: CARDCOM_CONFIG.terminalNumber,
-      cardcomUrl: CARDCOM_CONFIG.cardcomUrl,
-      paymentStatus: PaymentStatus.IDLE
-    }));
-    
-    return { 
-      lowProfileCode: data.data.lowProfileCode, 
-      sessionId: data.data.sessionId,
-      terminalNumber: CARDCOM_CONFIG.terminalNumber
     };
+
+    try {
+      console.log("Calling CardCom payment API with payload:", {
+        ...payload,
+        Document: { ...payload.Document, Products: '[Products array]' }
+      });
+
+      // Call CardCom payment initialization Edge Function
+      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+        body: {
+          planId,
+          amount: amount,
+          invoiceInfo: {
+            fullName: paymentUser.fullName || paymentUser.email,
+            email: paymentUser.email,
+          },
+          currency: "ILS",
+          operation: operation,
+          redirectUrls: {
+            success: CARDCOM.SUCCESS_URL,
+            failed: CARDCOM.FAILED_URL
+          },
+          userId: userId,
+          operationType,
+          registrationData: sessionStorage.getItem('registration_data') 
+            ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+            : null,
+          payload
+        }
+      });
+      
+      if (error || !data?.success) {
+        console.error("Payment initialization error:", error || data?.message);
+        throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
+      }
+      
+      console.log("Payment session created:", data.data);
+      
+      setState(prev => ({
+        ...prev,
+        sessionId: data.data.sessionId,
+        lowProfileCode: data.data.lowProfileCode,
+        terminalNumber: CARDCOM.TERMINAL_NUMBER,
+        cardcomUrl: "https://secure.cardcom.solutions",
+        paymentStatus: PaymentStatus.IDLE
+      }));
+      
+      return { 
+        lowProfileCode: data.data.lowProfileCode, 
+        sessionId: data.data.sessionId,
+        terminalNumber: CARDCOM.TERMINAL_NUMBER
+      };
+    } catch (error) {
+      console.error('Error during payment initialization:', error);
+      
+      // Handle specific errors
+      if (error instanceof Error && error.message.includes('Missing required parameters')) {
+        throw new Error('חסרים פרטים נדרשים לביצוע התשלום');
+      }
+      
+      throw error;
+    }
   };
 
   return { initializePaymentSession };

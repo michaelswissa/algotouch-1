@@ -6,13 +6,7 @@ import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
 import { toast } from 'sonner';
-
-// CardCom configuration
-const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6"
-};
+import { CARDCOM } from '@/config/cardcom';
 
 interface UsePaymentProps {
   planId: string;
@@ -116,7 +110,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
       // Determine operation based on plan type
-      let operation = "ChargeOnly";
+      let operation: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly" = "ChargeOnly";
       if (planId === 'monthly') {
         operation = "CreateTokenOnly";
       } else if (planId === 'annual') {
@@ -139,11 +133,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationYear,
         numberOfPayments: "1",
         ExternalUniqTranId: externalUniqTranId,
-        TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-        Operation: operation,
+        TerminalNumber: CARDCOM.TERMINAL_NUMBER,
+        Operation: operation, 
         lowProfileCode: state.lowProfileCode,
         LowProfileCode: state.lowProfileCode,  // For extra compatibility
-        ApiName: CARDCOM_CONFIG.apiName
+        ApiName: CARDCOM.API_NAME
       };
 
       console.log('Sending transaction data to CardCom:', formData);

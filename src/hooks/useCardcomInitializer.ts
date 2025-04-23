@@ -55,7 +55,7 @@ export const useCardcomInitializer = () => {
 
         try {
           // Determine operation type based on plan
-          let operation = "ChargeOnly";
+          let operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken" = "ChargeOnly";
           if (planId === 'monthly') {
             operation = "CreateTokenOnly";
           } else if (planId === 'annual') {

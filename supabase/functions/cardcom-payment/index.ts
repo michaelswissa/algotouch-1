@@ -9,7 +9,7 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
+  terminalNumber: 160138,
   apiName: "bLaocQRMSnwphQRUVG3b",
   apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
@@ -81,11 +81,12 @@ serve(async (req) => {
       hasPayload: !!payload
     });
 
-    if (!planId || (amount === undefined && !payload?.Amount) || (!redirectUrls && !payload)) {
+    // Validate required fields
+    if (!planId || (amount === undefined && !payload?.Amount)) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "חסרים פרטים נדרשים לביצוע העסקה",
+          message: "Missing required parameters",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -389,7 +390,7 @@ async function handleStatusCheck(requestData, supabaseAdmin) {
         );
       } 
       // For payment operations, check TransactionInfo
-      else if (operationType === 'payment' && result.TranzactionInfo) {
+      else if (result.TranzactionInfo) {
         // Save payment details to database
         try {
           let paymentDetails: any = {

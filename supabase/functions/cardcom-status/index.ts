@@ -9,7 +9,7 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
+  terminalNumber: 160138,
   apiName: "bLaocQRMSnwphQRUVG3b",
   apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
@@ -42,13 +42,17 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    const { lowProfileCode, sessionId, operationType, planType } = await req.json();
+    // Parse request data
+    const requestData = await req.json();
+    const { lowProfileCode, sessionId, operationType, planType } = requestData;
+    
+    logStep("Checking payment status for", { lowProfileCode, sessionId, operationType, planType });
     
     if (!lowProfileCode) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "חסר מזהה ייחודי לעסקה"
+          message: "חסר מזהה עסקה (LowProfileCode)"
         }),
         {
           status: 200,
@@ -57,30 +61,28 @@ serve(async (req) => {
       );
     }
     
-    logStep("Checking payment status", { lowProfileCode, operationType, planType });
-    
-    // First check DB for existing completed payment
+    // First check if we already have a completed payment session
     try {
-      // Check if we already have a completed payment with this low profile ID
-      const { data: sessionData, error: sessionError } = await supabaseAdmin
+      const { data: existingSession, error: sessionError } = await supabaseAdmin
         .from('payment_sessions')
         .select('*')
         .eq('low_profile_code', lowProfileCode)
         .eq('status', 'completed')
         .maybeSingle();
         
-      if (!sessionError && sessionData) {
-        logStep("Found completed payment in database", sessionData);
+      if (!sessionError && existingSession) {
+        logStep("Found completed session in database", { id: existingSession.id });
         
+        // Session already complete, return success
         return new Response(
           JSON.stringify({
             success: true,
             message: "תשלום הושלם בהצלחה",
             data: {
-              transactionId: sessionData.transaction_id,
-              token: sessionData.payment_details?.token,
-              tokenExpiryDate: sessionData.payment_details?.tokenExpiryDate,
-              lastFourDigits: sessionData.payment_details?.lastFourDigits
+              transactionId: existingSession.transaction_id,
+              token: existingSession.payment_details?.token || null,
+              tokenExpiryDate: existingSession.payment_details?.tokenExpiryDate || null,
+              lastFourDigits: existingSession.payment_details?.lastFourDigits || null
             }
           }),
           {
@@ -90,26 +92,28 @@ serve(async (req) => {
         );
       }
       
-      // Check payment logs
-      const { data: paymentLogData, error: paymentLogError } = await supabaseAdmin
+      // Also check payment logs
+      const { data: paymentLog, error: paymentLogError } = await supabaseAdmin
         .from('user_payment_logs')
         .select('*')
         .eq('token', lowProfileCode)
-        .in('status', ['payment_success', 'token_created'])
+        .order('created_at', { ascending: false })
         .maybeSingle();
         
-      if (!paymentLogError && paymentLogData) {
-        logStep("Found payment log entry", paymentLogData);
+      if (!paymentLogError && paymentLog && 
+          (paymentLog.status === 'payment_success' || paymentLog.status === 'token_created')) {
+        logStep("Found successful payment log", { id: paymentLog.id });
         
+        // Payment logged as successful
         return new Response(
           JSON.stringify({
             success: true,
             message: "תשלום הושלם בהצלחה",
             data: {
-              transactionId: paymentLogData.transaction_id,
-              token: paymentLogData.payment_data?.token,
-              tokenExpiryDate: paymentLogData.payment_data?.tokenExpiryDate,
-              lastFourDigits: paymentLogData.payment_data?.lastFourDigits
+              transactionId: paymentLog.transaction_id,
+              token: paymentLog.payment_data?.token || null,
+              tokenExpiryDate: paymentLog.payment_data?.tokenExpiryDate || null,
+              lastFourDigits: paymentLog.payment_data?.lastFourDigits || null
             }
           }),
           {
@@ -119,200 +123,211 @@ serve(async (req) => {
         );
       }
     } catch (dbError) {
-      logStep("Error checking database for payment status", { error: dbError.message });
-      // Continue to check CardCom API
+      logStep("Error checking database", { error: dbError.message });
+      // Continue to API check if DB check fails
     }
     
-    // Check CardCom API for status
-    try {
-      const request = {
-        ApiName: CARDCOM_CONFIG.apiName,
-        ApiPassword: CARDCOM_CONFIG.apiPassword,
-        LowProfileId: lowProfileCode
-      };
-      
-      logStep("Sending request to CardCom getLpResult endpoint", request);
-      
-      const response = await fetch(CARDCOM_CONFIG.endpoints.getLpResult, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(request),
-      });
-      
-      const result = await response.json();
-      logStep("CardCom status check response", result);
-      
-      // Failed API call
-      if (typeof result.ResponseCode !== 'number') {
+    // Call CardCom API to get current status
+    const payload = {
+      ApiName: CARDCOM_CONFIG.apiName,
+      ApiPassword: CARDCOM_CONFIG.apiPassword,
+      LowProfileId: lowProfileCode
+    };
+    
+    logStep("Calling CardCom API to check status");
+    
+    const response = await fetch(CARDCOM_CONFIG.endpoints.getLpResult, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    const result = await response.json();
+    logStep("CardCom API response", { responseCode: result.ResponseCode });
+    
+    // Process the result
+    if (result.ResponseCode === 0) {
+      // Transaction succeeded
+      if (result.TranzactionInfo?.ResponseCode === 0) {
+        const transactionId = result.TranzactionInfo.TranzactionId;
+        let tokenData = null;
+        
+        // Check for token creation
+        if (result.TokenInfo?.Token) {
+          tokenData = {
+            token: result.TokenInfo.Token,
+            tokenExpiryDate: result.TokenInfo.TokenExDate,
+            lastFourDigits: result.TranzactionInfo?.Last4CardDigits,
+            cardMonth: result.TranzactionInfo?.CardMonth,
+            cardYear: result.TranzactionInfo?.CardYear
+          };
+          
+          logStep("Token created", { token: tokenData.token });
+          
+          // Save token data to database
+          try {
+            // First update the payment session
+            const { error: sessionUpdateError } = await supabaseAdmin
+              .from('payment_sessions')
+              .update({
+                status: 'completed',
+                transaction_id: transactionId,
+                payment_details: {
+                  ...tokenData,
+                  webhookData: result
+                }
+              })
+              .eq('low_profile_code', lowProfileCode);
+              
+            if (sessionUpdateError) {
+              logStep("Error updating session with token", { error: sessionUpdateError.message });
+            }
+            
+            // Then log the token creation
+            const { error: logError } = await supabaseAdmin
+              .from('user_payment_logs')
+              .insert({
+                user_id: null, // Will be linked by webhook
+                token: lowProfileCode,
+                transaction_id: transactionId,
+                status: 'token_created',
+                amount: result.TranzactionInfo.Amount || 0,
+                payment_data: {
+                  ...tokenData,
+                  planId: planType,
+                  webhookData: result
+                }
+              });
+              
+            if (logError) {
+              logStep("Error logging token creation", { error: logError.message });
+            }
+          } catch (dbError) {
+            logStep("Database error saving token", { error: dbError.message });
+          }
+        }
+        
+        // Save transaction data
+        try {
+          // Update payment session with transaction info
+          const sessionUpdateData: any = {
+            status: 'completed',
+            transaction_id: transactionId,
+            payment_details: {
+              amount: result.TranzactionInfo.Amount,
+              webhookData: result
+            }
+          };
+          
+          if (tokenData) {
+            sessionUpdateData.payment_details = {
+              ...sessionUpdateData.payment_details,
+              ...tokenData
+            };
+          }
+          
+          const { error: sessionUpdateError } = await supabaseAdmin
+            .from('payment_sessions')
+            .update(sessionUpdateData)
+            .eq('low_profile_code', lowProfileCode);
+            
+          if (sessionUpdateError) {
+            logStep("Error updating session with transaction", { error: sessionUpdateError.message });
+          }
+          
+          // Log the payment
+          if (result.TranzactionInfo.Amount > 0) {
+            const { error: logError } = await supabaseAdmin
+              .from('user_payment_logs')
+              .insert({
+                user_id: null, // Will be linked by webhook
+                token: lowProfileCode,
+                transaction_id: transactionId,
+                status: 'payment_success',
+                amount: result.TranzactionInfo.Amount,
+                payment_data: {
+                  planId: planType,
+                  webhookData: result,
+                  ...(tokenData || {})
+                }
+              });
+              
+            if (logError) {
+              logStep("Error logging payment", { error: logError.message });
+            }
+          }
+        } catch (dbError) {
+          logStep("Database error saving transaction", { error: dbError.message });
+        }
+        
+        // Return success with transaction and optional token data
         return new Response(
           JSON.stringify({
-            processing: true,
-            message: "לא ניתן לבדוק את סטטוס התשלום כרגע, אנא נסה שוב מאוחר יותר"
+            success: true,
+            message: (result.TranzactionInfo.Amount > 0) 
+              ? "התשלום הושלם בהצלחה" 
+              : "פעולת התשלום הושלמה בהצלחה",
+            data: {
+              transactionId,
+              amount: result.TranzactionInfo.Amount,
+              ...(tokenData || {})
+            }
           }),
           {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
         );
-      }
-      
-      // Success response
-      if (result.ResponseCode === 0 && result.TranzactionInfo?.ResponseCode === 0) {
-        // For token operations, check TokenInfo
-        if ((operationType === 'token_only' || planType === 'monthly') && result.TokenInfo?.Token) {
-          // Save payment details to database
-          try {
-            await updatePaymentSession(supabaseAdmin, lowProfileCode, {
-              status: 'completed',
-              transaction_id: result.TranzactionInfo.TranzactionId,
-              payment_details: {
-                token: result.TokenInfo.Token,
-                tokenExpiryDate: result.TokenInfo.TokenExDate,
-                lastFourDigits: result.TranzactionInfo.Last4CardDigits,
-                responseData: result
-              }
-            });
-            
-            // Also save to payment logs
-            await supabaseAdmin
-              .from('user_payment_logs')
-              .insert({
-                token: lowProfileCode,
-                transaction_id: result.TranzactionInfo.TranzactionId,
-                status: 'token_created',
-                payment_data: {
-                  token: result.TokenInfo.Token,
-                  tokenExpiryDate: result.TokenInfo.TokenExDate,
-                  lastFourDigits: result.TranzactionInfo.Last4CardDigits,
-                  planType: planType,
-                  operationType: operationType
-                }
-              });
-              
-          } catch (dbError) {
-            logStep("Error updating database with token info", { error: dbError.message });
-          }
-          
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: "אמצעי התשלום נשמר בהצלחה",
-              data: {
-                token: result.TokenInfo.Token,
-                tokenExpiryDate: result.TokenInfo.TokenExDate,
-                lastFourDigits: result.TranzactionInfo.Last4CardDigits,
-                transactionId: result.TranzactionInfo.TranzactionId
-              }
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-          );
-        } 
-        // For payment operations, check TransactionInfo
-        else if ((operationType === 'payment' || planType === 'annual' || planType === 'vip') && result.TranzactionInfo) {
-          // Save payment details to database
-          try {
-            let paymentDetails: any = {
-              transactionId: result.TranzactionInfo.TranzactionId,
-              responseData: result
-            };
-            
-            // If token was also created (for annual plan)
-            if (result.TokenInfo?.Token) {
-              paymentDetails.token = result.TokenInfo.Token;
-              paymentDetails.tokenExpiryDate = result.TokenInfo.TokenExDate;
-              paymentDetails.lastFourDigits = result.TranzactionInfo.Last4CardDigits;
-            }
-            
-            await updatePaymentSession(supabaseAdmin, lowProfileCode, {
-              status: 'completed',
-              transaction_id: result.TranzactionInfo.TranzactionId,
-              payment_details: paymentDetails
-            });
-            
-            // Also save to payment logs
-            await supabaseAdmin
-              .from('user_payment_logs')
-              .insert({
-                token: lowProfileCode,
-                transaction_id: result.TranzactionInfo.TranzactionId,
-                status: 'payment_success',
-                amount: result.TranzactionInfo.Amount,
-                payment_data: {
-                  ...paymentDetails,
-                  planType: planType,
-                  operationType: operationType
-                }
-              });
-              
-          } catch (dbError) {
-            logStep("Error updating database with payment info", { error: dbError.message });
-          }
-          
-          const responseData: any = {
-            transactionId: result.TranzactionInfo.TranzactionId
-          };
-          
-          // Include token info if available
-          if (result.TokenInfo?.Token) {
-            responseData.token = result.TokenInfo.Token;
-            responseData.tokenExpiryDate = result.TokenInfo.TokenExDate;
-            responseData.lastFourDigits = result.TranzactionInfo.Last4CardDigits;
-          }
-          
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: "התשלום הושלם בהצלחה",
-              data: responseData
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-          );
-        }
-      }
-      
-      // Failed payment
-      if (result.TranzactionInfo?.ResponseCode !== 0) {
-        // Update payment session to failed
+      } 
+      // Transaction failed or still processing
+      else if (result.TranzactionInfo?.ResponseCode !== 0) {
+        logStep("Transaction failed", { 
+          code: result.TranzactionInfo.ResponseCode, 
+          description: result.TranzactionInfo.Description 
+        });
+        
+        // Update session with failure
         try {
-          await updatePaymentSession(supabaseAdmin, lowProfileCode, {
-            status: 'failed',
-            payment_details: {
-              failureReason: result.TranzactionInfo.Description || 'Transaction failed',
-              responseData: result
-            }
-          });
-          
-          // Also save to payment logs
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              status: 'failed',
+              payment_details: {
+                errorCode: result.TranzactionInfo.ResponseCode,
+                errorMessage: result.TranzactionInfo.Description,
+                webhookData: result
+              }
+            })
+            .eq('low_profile_code', lowProfileCode);
+            
+          // Log the failure
           await supabaseAdmin
             .from('user_payment_logs')
             .insert({
+              user_id: null,
               token: lowProfileCode,
               status: 'payment_failed',
               payment_data: {
-                error: result.TranzactionInfo.Description,
-                planType: planType,
-                operationType: operationType,
-                responseData: result
+                planId: planType,
+                errorCode: result.TranzactionInfo.ResponseCode,
+                errorMessage: result.TranzactionInfo.Description,
+                webhookData: result
               }
             });
-            
         } catch (dbError) {
-          logStep("Error updating database with failure info", { error: dbError.message });
+          logStep("Error logging transaction failure", { error: dbError.message });
         }
         
         return new Response(
           JSON.stringify({
             failed: true,
             message: result.TranzactionInfo.Description || "התשלום נכשל",
-            error: result
+            error: {
+              code: result.TranzactionInfo.ResponseCode,
+              message: result.TranzactionInfo.Description
+            }
           }),
           {
             status: 200,
@@ -320,36 +335,19 @@ serve(async (req) => {
           }
         );
       }
-      
-      // Still processing or no specific status found
-      return new Response(
-        JSON.stringify({
-          processing: true,
-          message: "התשלום בתהליך עיבוד",
-          details: result
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logStep("Error checking payment status via API", { error: errorMessage });
-      
-      return new Response(
-        JSON.stringify({
-          processing: true,
-          message: "שגיאה בבדיקת סטטוס התשלום",
-          error: errorMessage
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
     }
+    
+    // Transaction is still processing or not started
+    return new Response(
+      JSON.stringify({
+        processing: true,
+        message: "התשלום בתהליך עיבוד"
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -357,7 +355,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({
-        processing: true,
+        success: false,
         message: "שגיאה בבדיקת סטטוס התשלום",
         error: errorMessage
       }),
@@ -368,15 +366,3 @@ serve(async (req) => {
     );
   }
 });
-
-async function updatePaymentSession(supabase, lowProfileCode, updateData) {
-  const { error } = await supabase
-    .from('payment_sessions')
-    .update(updateData)
-    .eq('low_profile_code', lowProfileCode);
-    
-  if (error) {
-    logStep("Error updating payment session", { error: error.message });
-    throw error;
-  }
-}
