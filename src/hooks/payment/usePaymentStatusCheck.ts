@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
