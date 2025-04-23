@@ -1,11 +1,29 @@
 
 import { useState, useEffect } from 'react';
 
+interface ExpiryValidationProps {
+  expiryMonth: string;
+  expiryYear: string;
+  messages?: {
+    invalidMonth?: string;
+    invalidYear?: string;
+    expired?: string;
+  };
+}
+
 interface ExpiryValidationState {
   expiryError: string;
 }
 
-export const useExpiryValidation = (expiryMonth: string, expiryYear: string) => {
+export const useExpiryValidation = ({ 
+  expiryMonth, 
+  expiryYear,
+  messages = {
+    invalidMonth: 'פורמט חודש לא תקין (דרוש 01-12)',
+    invalidYear: 'פורמט שנה לא תקין (דרוש 2 ספרות)',
+    expired: 'תאריך תפוגה לא תקין - הכרטיס פג תוקף'
+  }
+}: ExpiryValidationProps) => {
   const [validationState, setValidationState] = useState<ExpiryValidationState>({
     expiryError: '',
   });
@@ -16,7 +34,7 @@ export const useExpiryValidation = (expiryMonth: string, expiryYear: string) => 
       if (!/^(0[1-9]|1[0-2])$/.test(expiryMonth)) {
         setValidationState(prev => ({
           ...prev,
-          expiryError: 'פורמט חודש לא תקין (דרוש 01-12)'
+          expiryError: messages.invalidMonth
         }));
         return;
       }
@@ -25,14 +43,14 @@ export const useExpiryValidation = (expiryMonth: string, expiryYear: string) => 
       if (!/^\d{2}$/.test(expiryYear)) {
         setValidationState(prev => ({
           ...prev,
-          expiryError: 'פורמט שנה לא תקין (דרוש 2 ספרות)'
+          expiryError: messages.invalidYear
         }));
         return;
       }
 
       // Check if date is in the future
       const currentDate = new Date();
-      const currentYear = currentDate.getFullYear() % 100; // 2-digit year
+      const currentYear = currentDate.getFullYear() % 100;
       const currentMonth = currentDate.getMonth() + 1;
       const selectedYear = parseInt(expiryYear);
       const selectedMonth = parseInt(expiryMonth);
@@ -41,13 +59,13 @@ export const useExpiryValidation = (expiryMonth: string, expiryYear: string) => 
          (selectedYear === currentYear && selectedMonth < currentMonth)) {
         setValidationState(prev => ({
           ...prev,
-          expiryError: 'תאריך תפוגה לא תקין - הכרטיס פג תוקף'
+          expiryError: messages.expired
         }));
       } else {
         setValidationState(prev => ({ ...prev, expiryError: '' }));
       }
     }
-  }, [expiryMonth, expiryYear]);
+  }, [expiryMonth, expiryYear, messages]);
 
   return validationState;
 };
