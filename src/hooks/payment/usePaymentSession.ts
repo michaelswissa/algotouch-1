@@ -1,32 +1,10 @@
+import { CreateLowProfilePayload } from './types';
+import { CARDCOM } from '@/config/cardcom';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
-import { CARDCOM } from '@/config/cardcom';
 
 interface UsePaymentSessionProps {
   setState: (updater: any) => void;
-}
-
-interface CreateLowProfilePayload {
-  TerminalNumber: number;
-  ApiName: string;
-  Operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
-  ReturnValue: string;
-  Amount: string; // Must be string for CardCom API
-  SuccessRedirectUrl: string;
-  FailedRedirectUrl: string;
-  WebHookUrl: string;
-  ProductName?: string;
-  Language?: string;
-  ISOCoinId?: number;
-  Document: {
-    Name: string;
-    Email: string;
-    Products: Array<{
-      Description: string;
-      UnitCost: string; // Must be string for CardCom API
-      Quantity?: number;
-    }>;
-  };
 }
 
 export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {

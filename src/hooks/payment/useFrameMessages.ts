@@ -56,7 +56,8 @@ export const useFrameMessages = ({
           console.log('3DS authentication process completed');
           setState((prev: any) => ({
             ...prev,
-            is3DSInProgress: false
+            is3DSInProgress: false,
+            isSubmitting: false
           }));
           await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
         }
