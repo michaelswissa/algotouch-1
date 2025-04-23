@@ -24,17 +24,11 @@ export const usePaymentInitialization = ({
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
-  const initializePayment = async (isRetry: boolean = false) => {
-    console.log('Starting payment initialization process', isRetry ? '(retry attempt)' : '');
-    
-    // Always reset state first - crucial for retry attempts
+  const initializePayment = async () => {
+    console.log('Starting payment initialization process');
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatus.INITIALIZING,
-      isFramesReady: false,
-      lowProfileCode: '',
-      sessionId: '',
-      error: undefined
+      paymentStatus: PaymentStatus.INITIALIZING 
     }));
     
     try {
@@ -55,17 +49,13 @@ export const usePaymentInitialization = ({
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
 
-      // Step 3: Determine operation type based on plan
-      // Monthly plans only need token creation, with first charge after trial
-      const effectiveOperationType = planId === 'monthly' ? 'token_only' : operationType;
-      
-      // Step 4: Initialize payment session to get lowProfileCode
-      console.log('Initializing payment session with plan:', planId, 'operationType:', effectiveOperationType);
+      // Step 3: Initialize payment session to get lowProfileCode
+      console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
         userId,
         { email: userEmail, fullName: fullName || userEmail },
-        effectiveOperationType
+        operationType
       );
       
       if (!paymentData || !paymentData.lowProfileCode) {
@@ -75,29 +65,17 @@ export const usePaymentInitialization = ({
       
       console.log('Payment session initialized with lowProfileCode:', paymentData.lowProfileCode);
 
-      // Step 5: Master frame should be loaded by the parent component
+      // Step 4: Master frame should be loaded by the parent component
       // We must ensure the iframes are ready before initialization
       
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE,
-        operationType: effectiveOperationType
+        paymentStatus: PaymentStatus.IDLE
       }));
       
-      // Step 6: Initialize CardCom fields with the lowProfileCode
+      // Step 5: Initialize CardCom fields with the lowProfileCode
       console.log('Setting up to initialize CardCom fields');
-      
-      // Clear existing iframe contents if this is a retry attempt
-      if (isRetry && masterFrameRef.current?.contentWindow) {
-        console.log('Retry attempt: Clearing existing iframe content');
-        try {
-          masterFrameRef.current.contentWindow.postMessage({ action: 'reset' }, '*');
-        } catch (error) {
-          console.log('Unable to reset iframe content, will reload instead');
-        }
-      }
-      
       setTimeout(async () => {
         console.log('Starting CardCom fields initialization');
         try {
@@ -106,7 +84,7 @@ export const usePaymentInitialization = ({
             paymentData.lowProfileCode, 
             paymentData.sessionId,
             paymentData.terminalNumber,
-            effectiveOperationType
+            operationType
           );
           
           if (!initialized) {
@@ -115,10 +93,6 @@ export const usePaymentInitialization = ({
           }
           
           console.log('CardCom fields initialized successfully');
-          setState(prev => ({
-            ...prev,
-            isFramesReady: true
-          }));
         } catch (error) {
           console.error('Error during CardCom field initialization:', error);
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));

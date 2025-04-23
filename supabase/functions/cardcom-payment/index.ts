@@ -1,36 +1,69 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
-// Enhanced logging function with structured output
+// CardCom Configuration
+const CARDCOM_CONFIG = {
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  endpoints: {
+    master: "https://secure.cardcom.solutions/api/openfields/master",
+    cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
+    cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
+    createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
+  }
+};
+
+// Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` ${JSON.stringify(details)}` : '';
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-PAYMENT] ${step}${detailsStr}`);
-}
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    const body = await req.json()
-    const { planId, amount, currency = "ILS", invoiceInfo, userId, registrationData, redirectUrls } = body
+    logStep("Function started");
+    
+    // Create Supabase admin client for database operations that bypass RLS
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Missing Supabase configuration");
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { 
+      planId, 
+      amount, 
+      currency = "ILS", 
+      invoiceInfo, 
+      userId,
+      registrationData,
+      redirectUrls
+    } = await req.json();
     
     logStep("Received request data", { 
       planId, 
       amount, 
-      currency, 
-      hasUserId: !!userId, 
-      hasInvoiceInfo: !!invoiceInfo 
-    })
+      currency,
+      hasUserId: !!userId,
+      hasRegistrationData: !!registrationData
+    });
 
-    if (!planId || !redirectUrls) {
+    if (!planId || !amount || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -39,84 +72,44 @@ serve(async (req) => {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
-      )
+      );
     }
-    
-    // Gather reference and user data
-    let userEmail = invoiceInfo?.email || registrationData?.email
+
+    // Get user information and prepare transaction reference
+    let userEmail = invoiceInfo?.email || registrationData?.email;
     let fullName = invoiceInfo?.fullName || 
-      (registrationData?.userData ? `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : undefined)
+                  (registrationData?.userData ? 
+                    `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
+                    undefined);
     
-    // Generate unique reference
     const transactionRef = userId 
-      ? `${userId}-${Date.now()}` 
-      : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`
+      ? `${userId}-${Date.now()}`
+      : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
     // Prepare webhook URL with full domain
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
       transactionRef,
       userEmail,
       fullName
-    })
-    
-    // Plan-to-amount and operation logic
-    let operation = "ChargeOnly"
-    let actualAmount = amount
+    });
 
-    if (planId === 'monthly') {
-      operation = "CreateTokenOnly"
-      actualAmount = 0 // token only, do not charge
-    } else if (planId === 'vip') {
-      operation = 'ChargeOnly'
-      // actualAmount left as is
-    } else {
-      operation = 'ChargeAndCreateToken' // default for annual?
-    }
-    
-    logStep("Operation details", {
-      operation,
-      actualAmount,
-      planId
-    })
-    
-    // === CRITICAL FIX for "document total product sum not equal to credit card sum to bill" ===
-    
-    // Only send the Document block if it is relevant for invoicing
-    // Make sure the products sum = Amount exactly
-    let cardcomDocument: any = undefined
-    if (invoiceInfo) {
-      // For monthly plan, unit cost must also be 0  
-      let docAmount = planId === 'monthly' ? 0 : amount
-      cardcomDocument = {
-        Name: fullName || userEmail,
-        Email: userEmail,
-        Products: [{
-          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: docAmount,
-          Quantity: 1
-        }]
-        // Additional fields if absolutely needed can be added here
-      }
-    }
-    
-    // === END FIX ===
-
+    // Create CardCom API request body for payment initialization
     const cardcomPayload = {
-      TerminalNumber: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
-      ApiName: Deno.env.get('CARDCOM_API_NAME'),
-      Operation: operation,
+      TerminalNumber: CARDCOM_CONFIG.terminalNumber,
+      ApiName: CARDCOM_CONFIG.apiName,
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
       ReturnValue: transactionRef,
-      Amount: actualAmount,
+      Amount: amount,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1,
+      MaxNumOfPayments: 1, // No installments allowed
       UIDefinition: {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
@@ -128,27 +121,31 @@ serve(async (req) => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123"
       },
-      Document: cardcomDocument, // only if required and properly structured
-      AdvancedDefinition: {
-        JValidateType: planId === 'monthly' ? 2 : 5,
-        ShouldOpenPinpadOnPageLoad: false
-      }
-    }
+      Document: invoiceInfo ? {
+        Name: fullName || userEmail,
+        Email: userEmail,
+        Products: [{
+          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+          UnitCost: amount,
+          Quantity: 1
+        }]
+      } : undefined
+    };
     
-    logStep("Sending request to CardCom", cardcomPayload)
+    logStep("Sending request to CardCom");
     
     // Initialize payment session with CardCom
-    const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
+    const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(cardcomPayload),
-    })
+    });
     
-    const responseData = await response.json()
+    const responseData = await response.json();
     
-    logStep("CardCom response", responseData)
+    logStep("CardCom response", responseData);
     
     if (responseData.ResponseCode !== 0) {
       return new Response(
@@ -159,20 +156,10 @@ serve(async (req) => {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
-      )
+      );
     }
     
-    // Store payment session in database
-    const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000) // 30 min expiry
-    
-    // For monthly plans, set next charge date to 30 days from now
-    let initialNextChargeDate = null
-    if (planId === 'monthly') {
-      const nextChargeDate = new Date()
-      nextChargeDate.setDate(nextChargeDate.getDate() + 30)
-      initialNextChargeDate = nextChargeDate.toISOString()
-    }
-
+    // Store payment session in database 
     const sessionData = {
       user_id: userId,
       low_profile_code: responseData.LowProfileId,
@@ -181,36 +168,28 @@ serve(async (req) => {
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: sessionExpiry.toISOString(),
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
-      cardcom_terminal_number: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
-      operation_type: planId === 'monthly' ? 'token_only' : 'payment',
-      initial_next_charge_date: initialNextChargeDate
-    }
+      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
+    };
     
-    let dbSessionId = null
+    let dbSessionId = null;
     
     try {
       if (userId) {
-        // Initialize Supabase client
-        const supabaseAdmin = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-        
         const { data: dbSession, error: sessionError } = await supabaseAdmin
           .from('payment_sessions')
           .insert(sessionData)
           .select('id')
-          .single()
+          .single();
             
         if (!sessionError && dbSession) {
-          dbSessionId = dbSession.id
-          logStep("Payment session stored in DB", { sessionId: dbSessionId })
+          dbSessionId = dbSession.id;
+          logStep("Payment session stored in DB", { sessionId: dbSessionId });
         }
       }
     } catch (dbError) {
-      logStep("Error storing payment session", { error: dbError.message })
+      logStep("Error storing payment session", { error: dbError.message });
       // Don't fail the request if DB storage fails
     }
     
@@ -221,20 +200,18 @@ serve(async (req) => {
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
           lowProfileCode: responseData.LowProfileId,
-          terminalNumber: Deno.env.get('CARDCOM_TERMINAL_NUMBER'),
-          cardcomUrl: "https://secure.cardcom.solutions",
-          operationType: planId === 'monthly' ? 'token_only' : 'payment'
+          terminalNumber: CARDCOM_CONFIG.terminalNumber,
+          cardcomUrl: "https://secure.cardcom.solutions"
         }
       }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
-
+    );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    logStep("ERROR", { message: errorMessage })
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR", { message: errorMessage });
     
     return new Response(
       JSON.stringify({
@@ -245,6 +222,6 @@ serve(async (req) => {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
+    );
   }
-})
+});

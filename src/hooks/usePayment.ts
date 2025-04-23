@@ -1,11 +1,10 @@
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
-import { usePaymentState } from './payment/usePaymentState';
+import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
-import { usePaymentSubmission } from './payment/usePaymentSubmission';
 import { toast } from 'sonner';
 
 interface UsePaymentProps {
@@ -14,15 +13,9 @@ interface UsePaymentProps {
 }
 
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
-  // Core refs and state
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [recoveryAttempts, setRecoveryAttempts] = useState(0);
-  
-  // State machine flags to prevent invalid transitions
-  const isProcessingRef = useRef(false);
-  const hasCompletedRef = useRef(false);
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
   
   // Determine operation type based on plan ID
   useEffect(() => {
@@ -33,15 +26,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
   }, [planId]);
   
-  // Payment status management
   const {
     state,
     setState,
     handlePaymentSuccess,
     handleError
-  } = usePaymentState({ onPaymentComplete });
+  } = usePaymentStatus({ onPaymentComplete });
 
-  // Payment initialization
   const { initializePayment } = usePaymentInitialization({ 
     planId, 
     setState,
@@ -49,35 +40,19 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     operationType
   });
 
-  // Payment status checking
-  const paymentStatusCheck = usePaymentStatusCheck({ setState });
   const {
     startStatusCheck,
     checkPaymentStatus,
     cleanupStatusCheck
-  } = paymentStatusCheck;
+  } = usePaymentStatusCheck({ setState });
 
-  // Payment submission
-  const { submitPayment } = usePaymentSubmission({
-    masterFrameRef,
-    state,
-    setState,
-    handleError,
-    startStatusCheck,
-    isRetrying,
-    operationType
-  });
-
-  // Set up message handling
   useFrameMessages({
-    handlePaymentSuccess,
+    handlePaymentSuccess: handlePaymentSuccess,
     setState,
-    checkPaymentStatus: (lowProfileCode: string, sessionId: string, opType: 'payment' | 'token_only') => {
-      return checkPaymentStatus(lowProfileCode, sessionId, opType);
-    },
+    checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
-    operationType: state.operationType || operationType,
+    operationType,
     planType: planId
   });
 
@@ -88,92 +63,89 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     };
   }, [cleanupStatusCheck]);
 
-  // Handle retry with robust cleanup
-  const handleRetry = useCallback(async () => {
+  const handleRetry = useCallback(() => {
     console.log('Retrying payment initialization');
-    
-    // Prevent multiple retries
-    if (isRetrying) {
-      console.log('Retry already in progress, ignoring');
-      return;
-    }
-    
-    // Increment recovery attempts
-    setRecoveryAttempts(prev => prev + 1);
-    
-    // If we've tried too many times, suggest page refresh
-    if (recoveryAttempts >= 3) {
-      toast.error('לא ניתן לאתחל מחדש את התשלום לאחר מספר ניסיונות, אנא רענן את העמוד ונסה שנית');
-      return;
-    }
-    
-    // Stop any pending status checks
-    cleanupStatusCheck();
-    
-    // Mark that we're retrying
-    setIsRetrying(true);
-    
-    // Reset form state
     setState(prev => ({
       ...prev,
-      paymentStatus: PaymentStatus.INITIALIZING,
-      isFramesReady: false,
-      error: undefined
+      paymentStatus: PaymentStatus.IDLE
     }));
+    initializePayment();
+  }, [initializePayment, setState]);
+
+  const submitPayment = useCallback(() => {
+    if (paymentInProgress) {
+      console.log('Payment submission already in progress');
+      return;
+    }
+    
+    if (!state.lowProfileCode) {
+      handleError("חסר מזהה יחודי לעסקה, אנא נסה/י שנית");
+      return;
+    }
+    
+    setPaymentInProgress(true);
+    console.log('Submitting payment transaction');
+
+    if (!masterFrameRef.current?.contentWindow) {
+      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
+      setPaymentInProgress(false);
+      return;
+    }
     
     try {
-      // Force reload the master iframe to ensure clean state
-      if (masterFrameRef.current) {
-        const currentSrc = masterFrameRef.current.src;
-        masterFrameRef.current.src = '';
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (masterFrameRef.current) {
-          // Add timestamp to prevent caching
-          masterFrameRef.current.src = `${currentSrc}${currentSrc.includes('?') ? '&' : '?'}t=${Date.now()}`;
-        }
-      }
+      const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
+      const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
+      const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
+      const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
+      const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
+      const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      // Wait for iframe reset
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Initialize with retry flag
-      const result = await initializePayment(true);
-      
-      if (result) {
-        toast.info('מערכת התשלום אותחלה מחדש, אנא נסה שוב');
-      } else {
-        throw new Error('אתחול מחדש נכשל');
-      }
-    } catch (error) {
-      console.error('Error during payment retry:', error);
-      handleError("אירעה שגיאה בניסיון מחדש, אנא רענן את העמוד");
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [initializePayment, setState, cleanupStatusCheck, handleError, isRetrying, recoveryAttempts]);
+      // CardCom requires "lowProfileCode" param for each doTransaction
+      const formData: any = {
+        action: 'doTransaction',
+        cardOwnerName: cardholderName,
+        cardOwnerId,
+        cardOwnerEmail: email,
+        cardOwnerPhone: phone,
+        expirationMonth,
+        expirationYear,
+        numberOfPayments: "1",
+        ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        TerminalNumber: state.terminalNumber,
+        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        lowProfileCode: state.lowProfileCode, // Ensure always present
+        LowProfileCode: state.lowProfileCode  // For extra compatibility
+      };
 
-  // Mark completed when status becomes SUCCESS
-  useEffect(() => {
-    if (state.paymentStatus === PaymentStatus.SUCCESS) {
-      hasCompletedRef.current = true;
-      isProcessingRef.current = false;
-    } else if (state.paymentStatus === PaymentStatus.FAILED) {
-      isProcessingRef.current = false;
+      console.log('Sending transaction data to CardCom:', formData);
+      masterFrameRef.current.contentWindow.postMessage(formData, '*');
+      
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatus.PROCESSING
+      }));
+      
+      // Start status check with required params
+      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+      
+      setTimeout(() => {
+        setPaymentInProgress(false);
+      }, 5000);
+    } catch (error) {
+      console.error("Error submitting payment:", error);
+      handleError("שגיאה בשליחת פרטי התשלום");
+      setPaymentInProgress(false);
     }
-  }, [state.paymentStatus]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
 
   return {
     ...state,
-    operationType: state.operationType || operationType,
+    operationType,
     masterFrameRef,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     initializePayment,
     handleRetry,
-    submitPayment,
-    isRetrying,
-    paymentStatusCheck
+    submitPayment
   };
 };
