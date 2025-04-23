@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, RefreshCw } from 'lucide-react';
@@ -9,6 +10,7 @@ import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import InitializingPayment from './states/InitializingPayment';
 import { usePaymentTimeout } from '@/hooks/payment/usePaymentTimeout';
+import { PaymentProgress } from './PaymentProgress';
 
 interface PaymentFormProps {
   planId: string;
@@ -17,7 +19,12 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
+  // State management
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initializationAttempts, setInitializationAttempts] = useState(0);
+  const formReadyRef = useRef(false);
+  
+  // Load plan details
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -25,6 +32,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
+  // Use our payment hook with enhanced state management
   const {
     terminalNumber,
     cardcomUrl,
@@ -38,15 +46,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     sessionId,
     isFramesReady,
     isRetrying,
-    error
+    error,
+    paymentStatusCheck
   } = usePayment({
     planId,
     onPaymentComplete
   });
 
+  // Track initialization state
   const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
 
+  // Monitor master frame loading
   useEffect(() => {
     const masterFrame = masterFrameRef.current;
     if (!masterFrame) return;
@@ -60,23 +72,69 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => masterFrame.removeEventListener('load', handleMasterLoad);
   }, [masterFrameRef]);
 
-  useEffect(() => {
-    console.log("Initializing payment for plan:", planId);
-    const initProcess = async () => {
-      setIsInitializing(true);
-      await initializePayment();
-      setIsInitializing(false);
-    };
+  // Enhanced timeout handling with multiple stages
+  const handleTimeout = useCallback(() => {
+    console.log('Payment timeout triggered, checking status again');
+    if (paymentStatusCheck) {
+      paymentStatusCheck.checkPaymentStatus().catch(console.error);
+    }
+  }, [paymentStatusCheck]);
+
+  const handleFinalTimeout = useCallback(() => {
+    console.log('Final payment timeout triggered, attempting recovery');
+    handleRetry();
+  }, [handleRetry]);
+
+  const { timeoutStage } = usePaymentTimeout({
+    paymentStatus,
+    onTimeout: handleTimeout,
+    onFinalTimeout: handleFinalTimeout
+  });
+
+  // FSM-based initialization process with retry capability
+  const initializePaymentProcess = useCallback(async () => {
+    setIsInitializing(true);
+    setInitializationError(null);
     
-    initProcess();
-  }, []); // Run only once on mount
+    try {
+      console.log(`Initializing payment for plan: ${planId} (attempt ${initializationAttempts + 1})`);
+      const result = await initializePayment(initializationAttempts > 0);
+      
+      if (!result) {
+        throw new Error('אתחול תהליך התשלום נכשל');
+      }
+      
+      console.log('Payment initialization successful');
+      formReadyRef.current = true;
+    } catch (error) {
+      console.error('Payment initialization error:', error);
+      setInitializationError(error instanceof Error ? error.message : 'שגיאה באתחול תהליך התשלום');
+      
+      // Auto-retry once on failure
+      if (initializationAttempts < 1) {
+        console.log('Auto-retrying payment initialization');
+        setInitializationAttempts(prev => prev + 1);
+        setTimeout(() => initializePaymentProcess(), 1000);
+        return;
+      }
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [planId, initializePayment, initializationAttempts]);
+
+  // Initial payment setup
+  useEffect(() => {
+    initializePaymentProcess();
+  }, [initializePaymentProcess]);
   
+  // Reset submission state based on payment status
   useEffect(() => {
     if (paymentStatus === PaymentStatus.IDLE) {
       setIsSubmitting(false);
     }
   }, [paymentStatus]);
   
+  // Determine button text based on current state
   const getButtonText = () => {
     if (isRetrying) {
       return <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" />מאתחל...</span>;
@@ -91,10 +149,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
 
+  // Validate and submit payment
   const handleSubmitPayment = () => {
+    // Get form values
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
     const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value;
+    const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value;
+    const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value;
     
+    // Form validation
     if (!cardholderName) {
       toast.error('יש למלא את שם בעל הכרטיס');
       return;
@@ -105,28 +168,33 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       return;
     }
 
-    const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value;
     if (!email) {
       toast.error('יש למלא כתובת דואר אלקטרוני');
       return;
     }
 
-    const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value;
     if (!phone) {
       toast.error('יש למלא מספר טלפון');
       return;
     }
     
+    // Set submitting state
     setIsSubmitting(true);
     
     try {
+      // Submit payment through our hook
       submitPayment();
       
-      setTimeout(() => {
+      // Safety timeout to reset UI if no response
+      const safetyTimeout = setTimeout(() => {
         if (paymentStatus !== PaymentStatus.SUCCESS && paymentStatus !== PaymentStatus.PROCESSING) {
           setIsSubmitting(false);
+          toast.warning('לא התקבלה תגובה מהשרת, נסה שנית');
         }
-      }, 15000); // Add a timeout to reset button if no response after 15 seconds
+      }, 15000);
+      
+      // Clean up safety timeout
+      return () => clearTimeout(safetyTimeout);
     } catch (error) {
       console.error('Error submitting payment:', error);
       toast.error('אירעה שגיאה בשליחת התשלום');
@@ -134,15 +202,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     }
   };
 
-  const handleTimeout = () => {
-    handleRetry();
-  };
-
-  usePaymentTimeout({
-    paymentStatus,
-    onTimeout: handleTimeout
-  });
-
+  // Check if content is ready to be displayed
   const isContentReady = !isInitializing && 
     terminalNumber && 
     cardcomUrl && 
@@ -152,7 +212,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     isFramesReady &&
     paymentStatus !== PaymentStatus.INITIALIZING;
 
-  const needsRetry = paymentStatus === PaymentStatus.FAILED;
+  // Check if we need to retry due to failure
+  const needsRetry = paymentStatus === PaymentStatus.FAILED || initializationError !== null;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -173,6 +234,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Hidden iframe for CardCom master frame */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -182,9 +244,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           title="CardCom Master Frame"
         />
         
-        {isInitializing || isRetrying ? (
-          <InitializingPayment />
-        ) : (
+        {/* Show initialization loader or error */}
+        {(isInitializing || isRetrying) && (
+          <InitializingPayment error={initializationError} />
+        )}
+        
+        {/* Show payment content when ready */}
+        {!isInitializing && !isRetrying && (
           <PaymentContent
             paymentStatus={paymentStatus}
             plan={plan}
@@ -197,10 +263,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             isReady={isContentReady}
           />
         )}
+        
+        {/* Show progress component for processing state */}
+        {paymentStatus === PaymentStatus.PROCESSING && paymentStatusCheck && (
+          <PaymentProgress 
+            status={paymentStatus} 
+            attempt={paymentStatusCheck.currentAttempt}
+            timeoutStage={timeoutStage}
+            isRealtimeConnected={paymentStatusCheck.isRealtimeConnected}
+          />
+        )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {paymentStatus === PaymentStatus.FAILED && (
+        {/* Show retry button for failed payments */}
+        {needsRetry && (
           <Button 
             type="button" 
             className="w-full flex items-center justify-center"
@@ -213,6 +290,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           </Button>
         )}
         
+        {/* Show submit button for idle or processing states */}
         {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && !isInitializing && (
           <>
             <Button 
@@ -233,6 +311,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           </>
         )}
         
+        {/* Show back button if provided and not in success state */}
         {onBack && paymentStatus !== PaymentStatus.SUCCESS && (
           <Button 
             variant="outline" 

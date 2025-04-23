@@ -7,6 +7,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Enhanced logging function with structured output
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` ${JSON.stringify(details)}` : '';
+  console.log(`[CARDCOM-STATUS] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -15,11 +21,13 @@ serve(async (req) => {
   try {
     const { lowProfileCode, sessionId, timestamp, attempt, operationType } = await req.json();
     
-    console.log('Payment status check request:', { 
+    // Log the incoming request
+    logStep('Payment status check request received', { 
       lowProfileCode, 
-      sessionId, 
+      sessionId,
       attempt, 
-      operationType
+      operationType,
+      timestamp
     });
 
     if (!lowProfileCode || !sessionId) {
@@ -34,11 +42,50 @@ serve(async (req) => {
       );
     }
 
+    // Initialize Supabase admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Perform a duplicate check first to catch already processed payments that may not be reflected in sessions table
+    logStep('Performing duplicate payment check');
+    const { data: duplicateCheck, error: duplicateError } = await supabaseAdmin.rpc(
+      'check_duplicate_payment_extended',
+      { low_profile_id: lowProfileCode }
+    );
+
+    if (duplicateError) {
+      logStep('Error checking for duplicates', { error: duplicateError.message });
+    } else if (duplicateCheck?.exists) {
+      logStep('Found duplicate payment', duplicateCheck);
+      
+      // If a duplicate exists, update the session and return success
+      await supabaseAdmin
+        .from('payment_sessions')
+        .update({
+          status: 'completed',
+          transaction_id: duplicateCheck.transaction_id || duplicateCheck.token,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+        
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Payment already processed",
+          processing: false,
+          data: {
+            transactionId: duplicateCheck.transaction_id || duplicateCheck.token,
+            isTokenOperation: operationType === 'token_only'
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch the payment session
+    logStep('Fetching payment session');
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .select('*')
@@ -47,7 +94,7 @@ serve(async (req) => {
       .single();
 
     if (sessionError) {
-      console.error('Error fetching payment session:', sessionError);
+      logStep('Error fetching payment session', { error: sessionError.message });
       return new Response(
         JSON.stringify({
           success: false, 
@@ -59,12 +106,39 @@ serve(async (req) => {
       );
     }
 
-    console.log('Session data found:', {
+    logStep('Session data found', {
       status: sessionData.status,
       hasTransactionId: !!sessionData.transaction_id
     });
 
+    // Check for expired session
+    const isExpired = new Date(sessionData.expires_at) < new Date();
+    if (isExpired) {
+      logStep('Session expired');
+      
+      // Update session status if needed
+      if (sessionData.status !== 'expired') {
+        await supabaseAdmin
+          .from('payment_sessions')
+          .update({ status: 'expired', updated_at: new Date().toISOString() })
+          .eq('id', sessionId);
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Payment session expired",
+          processing: false,
+          failed: true,
+          timeout: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check session states
     if (sessionData.status === 'completed' && sessionData.transaction_id) {
+      logStep('Session marked as completed');
       const tokenOperation = operationType === 'token_only';
       
       return new Response(
@@ -75,7 +149,9 @@ serve(async (req) => {
           data: {
             transactionId: sessionData.transaction_id,
             isTokenOperation: tokenOperation,
-            token: tokenOperation ? sessionData.transaction_id : null
+            token: tokenOperation ? sessionData.transaction_id : null,
+            // Include details needed by the frontend
+            details: sessionData.transaction_data || {}
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -83,32 +159,37 @@ serve(async (req) => {
     }
 
     if (sessionData.status === 'failed') {
+      logStep('Session marked as failed');
       return new Response(
         JSON.stringify({
           success: false,
           message: "Payment failed",
           processing: false,
-          failed: true
+          failed: true,
+          errorDetails: sessionData.transaction_data?.error || {}
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check for existing payment in logs
+    // Check for existing payment in logs that might not be reflected in the session
+    logStep('Checking payment logs');
     const { data: paymentLogs } = await supabaseAdmin
       .from('payment_logs')
       .select('*')
-      .eq('transaction_id', lowProfileCode)
+      .eq('token', lowProfileCode)
       .single();
 
     if (paymentLogs) {
-      console.log('Found completed payment in logs:', paymentLogs);
+      logStep('Found completed payment in logs', paymentLogs);
       
       await supabaseAdmin
         .from('payment_sessions')
         .update({
           status: 'completed',
-          transaction_id: paymentLogs.transaction_id
+          transaction_id: paymentLogs.transaction_id,
+          transaction_data: paymentLogs.payment_data,
+          updated_at: new Date().toISOString()
         })
         .eq('id', sessionId);
         
@@ -119,19 +200,23 @@ serve(async (req) => {
           processing: false,
           data: {
             transactionId: paymentLogs.transaction_id,
-            isTokenOperation: operationType === 'token_only'
+            isTokenOperation: operationType === 'token_only',
+            details: paymentLogs.payment_data || {}
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Special handling for token-only operations where we might have token data
     if (operationType === 'token_only' && sessionData.payment_method?.token) {
+      logStep('Found token for token-only operation');
       await supabaseAdmin
         .from('payment_sessions')
         .update({
           status: 'completed',
-          transaction_id: sessionData.payment_method.token
+          transaction_id: sessionData.payment_method.token,
+          updated_at: new Date().toISOString()
         })
         .eq('id', sessionId);
         
@@ -149,7 +234,9 @@ serve(async (req) => {
       );
     }
 
+    // Check subscription status for user if available
     if (sessionData.user_id) {
+      logStep('Checking user subscriptions');
       const { data: subscription } = await supabaseAdmin
         .from('subscriptions')
         .select('*')
@@ -159,13 +246,14 @@ serve(async (req) => {
         .maybeSingle();
         
       if (subscription) {
-        console.log('Found active subscription:', subscription);
+        logStep('Found active subscription', subscription);
         
         await supabaseAdmin
           .from('payment_sessions')
           .update({
             status: 'completed',
-            transaction_id: subscription.id
+            transaction_id: subscription.id,
+            updated_at: new Date().toISOString()
           })
           .eq('id', sessionId);
           
@@ -176,7 +264,12 @@ serve(async (req) => {
             processing: false,
             data: {
               transactionId: subscription.id,
-              isTokenOperation: operationType === 'token_only'
+              isTokenOperation: operationType === 'token_only',
+              subscriptionDetails: {
+                plan: subscription.plan_type,
+                startDate: subscription.created_at,
+                nextChargeDate: subscription.next_charge_date
+              }
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -184,7 +277,24 @@ serve(async (req) => {
       }
     }
 
+    // Check for timeout based on attempt count
     if (attempt > 30) {
+      logStep('Maximum attempts reached, timing out');
+      
+      // Update session status
+      await supabaseAdmin
+        .from('payment_sessions')
+        .update({ 
+          status: 'timeout', 
+          updated_at: new Date().toISOString(),
+          transaction_data: { 
+            ...sessionData.transaction_data || {},
+            timeoutAt: new Date().toISOString(),
+            attemptCount: attempt
+          }
+        })
+        .eq('id', sessionId);
+      
       return new Response(
         JSON.stringify({
           success: false,
@@ -196,22 +306,26 @@ serve(async (req) => {
       );
     }
 
+    // If we reach here, the payment is still processing
+    logStep('Payment still processing', { attempt });
     return new Response(
       JSON.stringify({
         success: false,
         message: "Payment is still processing",
         processing: true,
-        attempt
+        attempt,
+        timestamp: new Date().toISOString()
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error checking payment status:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep('Unexpected error', { error: errorMessage });
     
     return new Response(
       JSON.stringify({
         success: false,
-        message: error instanceof Error ? error.message : "Unknown error occurred",
+        message: errorMessage || "Unknown error occurred",
         processing: false,
         error: true
       }),
