@@ -24,11 +24,17 @@ export const usePaymentInitialization = ({
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
-  const initializePayment = async () => {
-    console.log('Starting payment initialization process');
+  const initializePayment = async (isRetry: boolean = false) => {
+    console.log('Starting payment initialization process', isRetry ? '(retry attempt)' : '');
+    
+    // Always reset state first - crucial for retry attempts
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatus.INITIALIZING 
+      paymentStatus: PaymentStatus.INITIALIZING,
+      isFramesReady: false,
+      lowProfileCode: '',
+      sessionId: '',
+      error: undefined
     }));
     
     try {
@@ -81,6 +87,17 @@ export const usePaymentInitialization = ({
       
       // Step 6: Initialize CardCom fields with the lowProfileCode
       console.log('Setting up to initialize CardCom fields');
+      
+      // Clear existing iframe contents if this is a retry attempt
+      if (isRetry && masterFrameRef.current?.contentWindow) {
+        console.log('Retry attempt: Clearing existing iframe content');
+        try {
+          masterFrameRef.current.contentWindow.postMessage({ action: 'reset' }, '*');
+        } catch (error) {
+          console.log('Unable to reset iframe content, will reload instead');
+        }
+      }
+      
       setTimeout(async () => {
         console.log('Starting CardCom fields initialization');
         try {

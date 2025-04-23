@@ -28,7 +28,11 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   const [expiryYear, setExpiryYear] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [loadedFields, setLoadedFields] = useState(new Set<string>());
+  const [loadedFrames, setLoadedFrames] = useState({
+    cardNumber: false,
+    cvv: false,
+    captcha: false
+  });
 
   const {
     cardNumberError,
@@ -50,12 +54,22 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
   const handleFieldLoad = useCallback((fieldName: string) => {
     console.log(`Field loaded: ${fieldName}`);
-    setLoadedFields(prev => {
-      const newFields = new Set(prev);
-      newFields.add(fieldName);
-      return newFields;
-    });
+    setLoadedFrames(prev => ({
+      ...prev,
+      [fieldName]: true
+    }));
   }, []);
+  
+  // Reset loaded frames state when ready state changes
+  useEffect(() => {
+    if (!isReady) {
+      setLoadedFrames({
+        cardNumber: false,
+        cvv: false,
+        captcha: false
+      });
+    }
+  }, [isReady]);
 
   useEffect(() => {
     if (!isReady || !masterFrameRef.current?.contentWindow) return;
@@ -73,7 +87,11 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
     };
     
     console.log('Setting card owner details:', data);
-    masterFrameRef.current.contentWindow.postMessage(data, '*');
+    try {
+      masterFrameRef.current.contentWindow.postMessage(data, '*');
+    } catch (error) {
+      console.error('Error updating card owner details:', error);
+    }
   }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isReady, masterFrameRef]);
 
   return (
@@ -187,7 +205,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <ReCaptchaFrame
           terminalNumber={terminalNumber}
           cardcomUrl={cardcomUrl}
-          onLoad={() => {}}
+          onLoad={() => handleFieldLoad('captcha')}
         />
       </div>
 

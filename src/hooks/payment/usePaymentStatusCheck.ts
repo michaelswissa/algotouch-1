@@ -1,71 +1,57 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface UsePaymentStatusCheckProps {
   setState: (updater: any) => void;
 }
 
 export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) => {
-  const [statusCheckParams, setStatusCheckParams] = useState<{
-    lowProfileCode: string;
-    sessionId: string;
-    operationType?: string;
-    planType?: string;
-  } | null>(null);
-  const [statusInterval, setStatusInterval] = useState<number | null>(null);
-  const [statusCheckAttempts, setStatusCheckAttempts] = useState(0);
-
+  const [intervalId, setIntervalId] = useState<number | null>(null);
+  const [lowProfileCode, setLowProfileCode] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
+  const [planId, setPlanId] = useState<string>('');
+  
   const cleanupStatusCheck = useCallback(() => {
-    if (statusInterval) {
-      clearInterval(statusInterval);
+    if (intervalId) {
+      console.log('Clearing payment status check interval:', intervalId);
+      clearInterval(intervalId);
+      setIntervalId(null);
+      setAttempt(0);
+      setLowProfileCode(null);
+      setSessionId(null);
     }
-  }, [statusInterval]);
-
-  const startStatusCheck = useCallback((lowProfileCode: string, sessionId: string, operationType?: string, planType?: string) => {
-    console.log('Starting payment status check for:', { lowProfileCode, sessionId, operationType, planType });
-    setStatusCheckParams({ lowProfileCode, sessionId, operationType, planType });
-    setStatusCheckAttempts(0);
-    
-    if (statusInterval) {
-      clearInterval(statusInterval);
+  }, [intervalId]);
+  
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [intervalId]);
+  
+  const checkPaymentStatus = useCallback(async () => {
+    if (!lowProfileCode || !sessionId) {
+      console.error('Missing required parameters for payment status check');
+      return false;
     }
     
-    const interval = window.setInterval(() => {
-      setStatusCheckAttempts(prev => prev + 1);
-    }, 2000);
-    
-    setStatusInterval(interval);
-    
-    setTimeout(() => {
-      performStatusCheck(lowProfileCode, sessionId, operationType, planType, 1);
-    }, 500);
-  }, [statusInterval]);
-
-  const performStatusCheck = async (
-    lowProfileCode: string, 
-    sessionId: string, 
-    operationType?: string, 
-    planType?: string,
-    attempt: number = 0
-  ) => {
-    console.log(`Checking payment status (attempt ${attempt}):`, { 
-      lowProfileCode, 
-      sessionId, 
-      operationType, 
-      planType 
-    });
+    console.log(`Checking payment status (attempt ${attempt}):`, { lowProfileCode, sessionId, operationType });
     
     try {
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: {
-          action: 'check-status',
           lowProfileCode,
           sessionId,
-          planId: planType,
-          operationType,
           timestamp: new Date().toISOString(),
-          attempt: attempt || statusCheckAttempts
+          attempt,
+          operationType
         }
       });
       
@@ -73,57 +59,83 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       
       if (error) {
         console.error('Error checking payment status:', error);
-        return;
+        return false;
       }
       
       if (data.success) {
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+        console.log('Payment successful!');
+        cleanupStatusCheck();
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.SUCCESS,
+          transaction_data: data.data
+        }));
+        
+        // Post a message to parent window for potential listeners
         window.postMessage({
           action: 'payment-status-update',
           status: 'success',
-          isTokenOnly: operationType === 'token_only'
-        }, '*');
-        cleanupStatusCheck();
+          data: data.data
+        }, window.location.origin);
+        
+        return true;
       } else if (data.failed || data.timeout) {
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+        console.log('Payment failed or timed out');
         cleanupStatusCheck();
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          error: data.message || 'התשלום נכשל'
+        }));
+        
+        if (data.timeout) {
+          toast.error('תהליך התשלום נמשך יותר מדי זמן - נסה שנית');
+        } else {
+          toast.error(data.message || 'התשלום נכשל');
+        }
+        
+        return false;
       }
+      
+      setAttempt(prev => prev + 1);
+      return false;
     } catch (error) {
-      console.error('Error in status check:', error);
+      console.error('Error checking payment status:', error);
+      return false;
     }
-  };
-
-  const checkPaymentStatus = useCallback(() => {
-    if (!statusCheckParams) {
-      console.error('Cannot check status: missing parameters');
-      return;
-    }
+  }, [lowProfileCode, sessionId, attempt, operationType, setState, cleanupStatusCheck]);
+  
+  const startStatusCheck = useCallback((
+    newLowProfileCode: string, 
+    newSessionId: string,
+    newOperationType: 'payment' | 'token_only' = 'payment',
+    newPlanId: string = ''
+  ) => {
+    // Clean up any existing interval first
+    cleanupStatusCheck();
     
-    const { lowProfileCode, sessionId, operationType, planType } = statusCheckParams;
-    performStatusCheck(lowProfileCode, sessionId, operationType, planType, statusCheckAttempts + 1);
-  }, [statusCheckParams, statusCheckAttempts]);
-
-  useEffect(() => {
-    if (!statusInterval || !statusCheckParams) return;
+    console.log('Starting payment status check for:', {
+      lowProfileCode: newLowProfileCode,
+      sessionId: newSessionId,
+      operationType: newOperationType,
+      planId: newPlanId
+    });
     
-    const { lowProfileCode, sessionId, operationType, planType } = statusCheckParams;
+    // Save the parameters
+    setLowProfileCode(newLowProfileCode);
+    setSessionId(newSessionId);
+    setOperationType(newOperationType);
+    setPlanId(newPlanId);
+    setAttempt(0);
     
-    if (statusCheckAttempts >= 150) {
-      console.log('Maximum status check attempts reached, stopping checks');
-      cleanupStatusCheck();
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-      return;
-    }
+    // Start a new interval
+    const id = window.setInterval(checkPaymentStatus, 3000);
+    setIntervalId(id);
     
-    if (statusCheckAttempts > 0 && statusCheckAttempts % (statusCheckAttempts < 10 ? 2 : (statusCheckAttempts < 30 ? 5 : 10)) === 0) {
-      performStatusCheck(lowProfileCode, sessionId, operationType, planType, statusCheckAttempts);
-    }
-  }, [statusCheckAttempts, statusCheckParams, statusInterval, setState, cleanupStatusCheck]);
-
-  useEffect(() => {
-    return cleanupStatusCheck;
-  }, [cleanupStatusCheck]);
-
+    // Run initial check immediately
+    setTimeout(checkPaymentStatus, 500);
+  }, [cleanupStatusCheck, checkPaymentStatus]);
+  
   return {
     startStatusCheck,
     checkPaymentStatus,

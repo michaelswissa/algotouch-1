@@ -52,6 +52,13 @@ export const useCardcomInitializer = () => {
         }
 
         try {
+          // First send a cleanup message to ensure we're working with fresh iframes
+          try {
+            masterFrame.contentWindow.postMessage({ action: 'cleanup' }, '*');
+          } catch (e) {
+            console.log('Cleanup message failed, continuing with initialization');
+          }
+          
           const config: any = {
             action: 'init',
             lowProfileCode,
@@ -121,6 +128,12 @@ export const useCardcomInitializer = () => {
 
       const loadScript = () => {
         console.log('Loading 3DS script...');
+        // Remove any existing script first
+        const oldScript = document.querySelector('script[src*="3DS.js"]');
+        if (oldScript) {
+          oldScript.remove();
+        }
+        
         const script = document.createElement('script');
         const time = new Date().getTime();
         script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { CreditCard, Loader2, RefreshCw } from 'lucide-react';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
 import { PaymentStatus } from './types/payment';
@@ -36,7 +36,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     submitPayment,
     lowProfileCode,
     sessionId,
-    isFramesReady
+    isFramesReady,
+    isRetrying
   } = usePayment({
     planId,
     onPaymentComplete
@@ -70,7 +71,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     initProcess();
   }, []); // Run only once on mount
   
+  // Reset submission state when payment status changes to IDLE (after retry)
+  useEffect(() => {
+    if (paymentStatus === PaymentStatus.IDLE) {
+      setIsSubmitting(false);
+    }
+  }, [paymentStatus]);
+  
   const getButtonText = () => {
+    if (isRetrying) {
+      return <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" />מאתחל...</span>;
+    }
+    
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
@@ -112,7 +124,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       submitPayment();
       
       setTimeout(() => {
-        if (paymentStatus !== PaymentStatus.SUCCESS) {
+        if (paymentStatus !== PaymentStatus.SUCCESS && paymentStatus !== PaymentStatus.PROCESSING) {
           setIsSubmitting(false);
         }
       }, 15000); // Add a timeout to reset button if no response after 15 seconds
@@ -132,6 +144,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     isMasterFrameLoaded && 
     isFramesReady &&
     paymentStatus !== PaymentStatus.INITIALIZING;
+
+  // Track if there's been a failure that requires retry
+  const needsRetry = paymentStatus === PaymentStatus.FAILED;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -162,7 +177,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           title="CardCom Master Frame"
         />
         
-        {isInitializing ? (
+        {isInitializing || isRetrying ? (
           <InitializingPayment />
         ) : (
           <PaymentContent
@@ -180,6 +195,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
+        {paymentStatus === PaymentStatus.FAILED && (
+          <Button 
+            type="button" 
+            className="w-full flex items-center justify-center"
+            variant="outline"
+            onClick={handleRetry}
+            disabled={isRetrying}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {isRetrying ? 'מאתחל מחדש...' : 'נסה שנית'}
+          </Button>
+        )}
+        
         {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && !isInitializing && (
           <>
             <Button 
@@ -205,7 +233,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             variant="outline" 
             onClick={onBack} 
             className="absolute top-4 right-4"
-            disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
+            disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || isRetrying}
           >
             חזור
           </Button>

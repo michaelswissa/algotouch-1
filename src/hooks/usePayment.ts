@@ -16,6 +16,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   
   // Determine operation type based on plan ID
   useEffect(() => {
@@ -63,18 +64,54 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     };
   }, [cleanupStatusCheck]);
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(async () => {
     console.log('Retrying payment initialization');
+    
+    // Stop any pending status checks
+    cleanupStatusCheck();
+    
+    // Mark that we're retrying
+    setIsRetrying(true);
+    setPaymentInProgress(false);
+    
+    // Reset form fields
     setState(prev => ({
       ...prev,
-      paymentStatus: PaymentStatus.IDLE
+      paymentStatus: PaymentStatus.INITIALIZING,
+      isFramesReady: false,
+      error: undefined
     }));
-    initializePayment();
-  }, [initializePayment, setState]);
+    
+    try {
+      // Force reload the master iframe to ensure clean state
+      if (masterFrameRef.current) {
+        const currentSrc = masterFrameRef.current.src;
+        masterFrameRef.current.src = '';
+        setTimeout(() => {
+          if (masterFrameRef.current) {
+            masterFrameRef.current.src = currentSrc + '?t=' + Date.now();
+          }
+        }, 100);
+      }
+      
+      // Wait a moment for iframe reset
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Initialize with retry flag
+      await initializePayment(true);
+      
+      toast.info('מערכת התשלום אותחלה מחדש, אנא נסה שוב');
+    } catch (error) {
+      console.error('Error during payment retry:', error);
+      handleError("אירעה שגיאה בניסיון מחדש, אנא רענן את העמוד");
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [initializePayment, setState, cleanupStatusCheck, handleError]);
 
   const submitPayment = useCallback(() => {
-    if (paymentInProgress) {
-      console.log('Payment submission already in progress');
+    if (paymentInProgress || isRetrying) {
+      console.log('Payment submission already in progress or retry in progress');
       return;
     }
     
@@ -137,7 +174,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, state.operationType, handleError, paymentInProgress, setState, startStatusCheck, planId, operationType]);
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, state.operationType, handleError, paymentInProgress, setState, startStatusCheck, planId, operationType, isRetrying]);
 
   return {
     ...state,
@@ -147,6 +184,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     sessionId: state.sessionId,
     initializePayment,
     handleRetry,
-    submitPayment
+    submitPayment,
+    isRetrying
   };
 };
