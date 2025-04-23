@@ -10,8 +10,6 @@ interface UsePaymentFormProps {
 }
 
 export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProps) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
   const planDetails = getSubscriptionPlans();
@@ -27,6 +25,7 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     paymentStatus,
     masterFrameRef,
     operationType,
+    isSubmitting,
     initializePayment,
     handleRetry,
     submitPayment,
@@ -52,9 +51,7 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
     const initProcess = async () => {
-      setIsInitializing(true);
       await initializePayment();
-      setIsInitializing(false);
     };
     
     initProcess();
@@ -86,17 +83,16 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
       return;
     }
     
-    setIsSubmitting(true);
-    
     try {
       submitPayment();
-      setTimeout(() => { setIsSubmitting(false); }, 3000);
     } catch (error) {
       console.error('Error submitting payment:', error);
       toast.error('אירעה שגיאה בשליחת התשלום');
-      setIsSubmitting(false);
     }
   };
+
+  // Define isInitializing for better state management
+  const isInitializing = paymentStatus === 'initializing';
 
   // Determine if the iframe content is ready to be shown
   const isContentReady = !isInitializing && 
@@ -109,7 +105,6 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
 
   return {
     isSubmitting,
-    setIsSubmitting,
     isInitializing,
     isContentReady,
     isMasterFrameLoaded,

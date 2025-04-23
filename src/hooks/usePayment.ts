@@ -15,7 +15,7 @@ interface UsePaymentProps {
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
-  const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Determine operation type based on plan ID
   useEffect(() => {
@@ -67,13 +67,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     console.log('Retrying payment initialization');
     setState(prev => ({
       ...prev,
-      paymentStatus: PaymentStatus.IDLE
+      paymentStatus: PaymentStatus.IDLE,
+      isSubmitting: false
     }));
     initializePayment();
   }, [initializePayment, setState]);
 
   const submitPayment = useCallback(() => {
-    if (paymentInProgress) {
+    if (isSubmitting) {
       console.log('Payment submission already in progress');
       return;
     }
@@ -83,12 +84,18 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       return;
     }
     
-    setPaymentInProgress(true);
-    console.log('Submitting payment transaction');
+    setIsSubmitting(true);
+    setState(prev => ({ ...prev, isSubmitting: true }));
+    
+    console.log('Submitting payment transaction', { 
+      operationType, 
+      lowProfileCode: state.lowProfileCode 
+    });
 
     if (!masterFrameRef.current?.contentWindow) {
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
-      setPaymentInProgress(false);
+      setIsSubmitting(false);
+      setState(prev => ({ ...prev, isSubmitting: false }));
       return;
     }
     
@@ -128,15 +135,36 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       // Start status check with required params
       startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
       
+      // Add a fallback timeout to reset submitting state if no response
       setTimeout(() => {
-        setPaymentInProgress(false);
-      }, 5000);
+        // Only reset if still submitting - don't interfere with successful completions
+        setState(prev => {
+          if (prev.paymentStatus === PaymentStatus.PROCESSING) {
+            return prev; // Don't change state if we're still processing
+          }
+          return { ...prev, isSubmitting: false };
+        });
+        setIsSubmitting(false);
+      }, 30000); // 30 second timeout
+      
     } catch (error) {
       console.error("Error submitting payment:", error);
       handleError("שגיאה בשליחת פרטי התשלום");
-      setPaymentInProgress(false);
+      setIsSubmitting(false);
+      setState(prev => ({ ...prev, isSubmitting: false }));
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
+  }, [
+    masterFrameRef, 
+    state.terminalNumber, 
+    state.lowProfileCode, 
+    state.sessionId, 
+    handleError, 
+    operationType, 
+    isSubmitting, 
+    setState, 
+    startStatusCheck, 
+    planId
+  ]);
 
   return {
     ...state,
@@ -144,6 +172,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     masterFrameRef,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
+    isSubmitting,
     initializePayment,
     handleRetry,
     submitPayment

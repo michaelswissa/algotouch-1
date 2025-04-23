@@ -22,7 +22,7 @@ export const usePaymentValidation = ({
 }: PaymentValidationProps) => {
   // Initialize all validation hooks
   const cardValidation = useCardValidation();
-  const cardholderValidation = useCardholderValidation(cardholderName, cardOwnerId);
+  const cardholderValidation = useCardholderValidation(cardholderName, cardOwnerId); // Fixed: only passing 1 param as expected
   const expiryValidation = useExpiryValidation(expiryMonth, expiryYear);
 
   // Combined validation function that checks all validation rules

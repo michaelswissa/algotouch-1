@@ -7,6 +7,8 @@ import InitializingPayment from './states/InitializingPayment';
 import PaymentHeader from './PaymentHeader';
 import PaymentFooter from './PaymentFooter';
 import PaymentIframe from './PaymentIframe';
+import LoadingPaymentState from './states/LoadingPaymentState';
+import { PaymentStatus } from './types/payment';
 
 interface PaymentFormProps {
   planId: string;
@@ -51,6 +53,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         
         {isInitializing ? (
           <InitializingPayment />
+        ) : paymentStatus === PaymentStatus.PROCESSING ? (
+          <LoadingPaymentState 
+            message={operationType === 'token_only' ? 
+              'מעבד שמירת אמצעי תשלום...' : 
+              'מעבד את התשלום...'} 
+          />
         ) : (
           <PaymentContent
             paymentStatus={paymentStatus}

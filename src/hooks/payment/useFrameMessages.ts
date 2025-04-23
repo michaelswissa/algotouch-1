@@ -51,7 +51,7 @@ export const useFrameMessages = ({
             handlePaymentSuccess();
           } else {
             console.error('Payment submission failed:', message.data?.Description);
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED, isSubmitting: false }));
             toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
           }
           return;
@@ -60,7 +60,11 @@ export const useFrameMessages = ({
         // Handle HandleError (error case)
         if (message.action === 'HandleError' || message.action === 'HandleEror') {
           console.error('Payment error:', message.message || 'Unknown error');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          setState(prev => ({ 
+            ...prev, 
+            paymentStatus: PaymentStatus.FAILED,
+            isSubmitting: false
+          }));
           
           // Show more specific error messages
           if (message.message && message.message.includes('lowProfileCode')) {
@@ -75,7 +79,23 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle processing start/complete
+        // Handle token creation messages
+        if (message.action === 'tokenCreationStarted') {
+          console.log('Token creation started');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+          return;
+        }
+
+        if (message.action === 'tokenCreationCompleted') {
+          console.log('Token creation completed');
+          // Start payment status check specifically for token operation
+          if (lowProfileCode && sessionId) {
+            checkPaymentStatus(lowProfileCode, sessionId, 'token_only', planType);
+          }
+          return;
+        }
+
+        // Handle 3DS processing messages
         if (message.action === '3DSProcessStarted') {
           console.log('3DS process started');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
@@ -99,6 +119,13 @@ export const useFrameMessages = ({
         }
       } catch (error) {
         console.error('Error handling iframe message:', error);
+        // Reset state on unexpected errors
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          isSubmitting: false
+        }));
+        toast.error('אירעה שגיאה בעיבוד התשלום');
       }
     };
 

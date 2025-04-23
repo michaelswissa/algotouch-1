@@ -22,35 +22,63 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   ) => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for status check");
+      setState(prev => ({ 
+        ...prev, 
+        paymentStatus: PaymentStatus.FAILED,
+        isSubmitting: false
+      }));
       return;
     }
     
     try {
       statusCheckCountRef.current += 1;
-      console.log('Checking payment status:', { lowProfileCode, sessionId, attempt: statusCheckCountRef.current });
+      console.log('Checking payment status:', { 
+        lowProfileCode, 
+        sessionId, 
+        attempt: statusCheckCountRef.current,
+        operationType,
+        planType
+      });
       
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           action: 'check-status',
           lowProfileCode,
-          sessionId
+          sessionId,
+          operationType // Pass through the operation type
         }
       });
       
       if (error) {
         console.error('Error checking payment status:', error);
         if (statusCheckCountRef.current > 3) {
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          setState(prev => ({ 
+            ...prev, 
+            paymentStatus: PaymentStatus.FAILED,
+            isSubmitting: false
+          }));
           toast.error('שגיאה בבדיקת סטטוס התשלום');
+          clearStatusCheckTimer();
+        } else {
+          scheduleNextCheck(lowProfileCode, sessionId, operationType, planType);
         }
         return;
       }
       
-      // Handle successful payment
+      console.log('Payment status check response:', data);
+      
+      // Handle successful payment (both regular payment and token creation)
       if (data?.success) {
         console.log('Payment successful:', data);
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-        toast.success('התשלום בוצע בהצלחה!');
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.SUCCESS,
+          isSubmitting: false,
+          transactionId: data.data?.transactionId || null,
+          tokenId: data.data?.token || null
+        }));
+        toast.success(operationType === 'token_only' ? 
+          'אמצעי התשלום נשמר בהצלחה!' : 'התשלום בוצע בהצלחה!');
         clearStatusCheckTimer();
         return;
       }
@@ -58,7 +86,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       // Handle failed payment
       if (data?.failed) {
         console.error('Payment failed:', data);
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          isSubmitting: false
+        }));
         toast.error(data.message || 'התשלום נכשל');
         clearStatusCheckTimer();
         return;
@@ -66,6 +98,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       
       // Handle payment still processing
       if (data?.processing) {
+        console.log('Payment still processing...');
         if (hasExceededMaxAttempts()) {
           handleTimeout(operationType);
           return;
@@ -75,8 +108,13 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     } catch (error) {
       console.error('Exception checking payment status:', error);
       if (statusCheckCountRef.current > 3) {
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.FAILED,
+          isSubmitting: false 
+        }));
         toast.error('אירעה שגיאה בבדיקת סטטוס התשלום');
+        clearStatusCheckTimer();
       } else {
         scheduleNextCheck(lowProfileCode, sessionId, operationType, planType);
       }
@@ -89,8 +127,14 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   
   const handleTimeout = (operationType?: string) => {
     console.log(`Payment processing timeout exceeded for ${operationType}`);
-    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-    toast.error('תהליך התשלום לקח יותר מדי זמן. אנא נסה שנית.');
+    setState(prev => ({ 
+      ...prev, 
+      paymentStatus: PaymentStatus.FAILED,
+      isSubmitting: false 
+    }));
+    toast.error(operationType === 'token_only' ? 
+      'תהליך שמירת אמצעי התשלום לקח יותר מדי זמן. אנא נסה שנית.' : 
+      'תהליך התשלום לקח יותר מדי זמן. אנא נסה שנית.');
     clearStatusCheckTimer();
   };
   

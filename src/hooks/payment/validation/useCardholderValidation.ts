@@ -59,4 +59,3 @@ export const useCardholderValidation = (cardholderName: string, cardOwnerId: str
     validateIdNumber,
   };
 };
-
