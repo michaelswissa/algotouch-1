@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,26 +14,31 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   const [attempt, setAttempt] = useState(0);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [planId, setPlanId] = useState<string>('');
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
   
   const cleanupStatusCheck = useCallback(() => {
     if (intervalId) {
       console.log('Clearing payment status check interval:', intervalId);
       clearInterval(intervalId);
       setIntervalId(null);
-      setAttempt(0);
-      setLowProfileCode(null);
-      setSessionId(null);
     }
-  }, [intervalId]);
+    
+    if (realtimeChannel) {
+      console.log('Removing realtime subscription');
+      supabase.removeChannel(realtimeChannel);
+      setRealtimeChannel(null);
+    }
+    
+    setAttempt(0);
+    setLowProfileCode(null);
+    setSessionId(null);
+  }, [intervalId, realtimeChannel]);
   
-  // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      cleanupStatusCheck();
     };
-  }, [intervalId]);
+  }, [cleanupStatusCheck]);
   
   const checkPaymentStatus = useCallback(async () => {
     if (!lowProfileCode || !sessionId) {
@@ -71,7 +75,6 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           transaction_data: data.data
         }));
         
-        // Post a message to parent window for potential listeners
         window.postMessage({
           action: 'payment-status-update',
           status: 'success',
@@ -105,13 +108,65 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     }
   }, [lowProfileCode, sessionId, attempt, operationType, setState, cleanupStatusCheck]);
   
+  const setupRealtimeSubscription = useCallback((sessionId: string) => {
+    if (!sessionId) return;
+    
+    console.log('Setting up realtime subscription for payment session:', sessionId);
+    
+    const channel = supabase
+      .channel('payment-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'payment_sessions',
+          filter: `id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('Realtime update received:', payload);
+          
+          const newStatus = payload.new.status;
+          
+          if (newStatus === 'completed') {
+            console.log('Payment completed via realtime notification!');
+            cleanupStatusCheck();
+            setState(prev => ({ 
+              ...prev, 
+              paymentStatus: PaymentStatus.SUCCESS,
+              transaction_data: payload.new.transaction_data
+            }));
+            
+            window.postMessage({
+              action: 'payment-status-update',
+              status: 'success',
+              data: payload.new.transaction_data
+            }, window.location.origin);
+            
+          } else if (newStatus === 'failed') {
+            console.log('Payment failed via realtime notification');
+            cleanupStatusCheck();
+            setState(prev => ({ 
+              ...prev, 
+              paymentStatus: PaymentStatus.FAILED,
+              error: 'התשלום נכשל'
+            }));
+            
+            toast.error('התשלום נכשל');
+          }
+        }
+      )
+      .subscribe();
+    
+    setRealtimeChannel(channel);
+  }, [cleanupStatusCheck, setState]);
+  
   const startStatusCheck = useCallback((
     newLowProfileCode: string, 
     newSessionId: string,
     newOperationType: 'payment' | 'token_only' = 'payment',
     newPlanId: string = ''
   ) => {
-    // Clean up any existing interval first
     cleanupStatusCheck();
     
     console.log('Starting payment status check for:', {
@@ -121,20 +176,19 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       planId: newPlanId
     });
     
-    // Save the parameters
     setLowProfileCode(newLowProfileCode);
     setSessionId(newSessionId);
     setOperationType(newOperationType);
     setPlanId(newPlanId);
     setAttempt(0);
     
-    // Start a new interval
-    const id = window.setInterval(checkPaymentStatus, 3000);
+    setupRealtimeSubscription(newSessionId);
+    
+    const id = window.setInterval(checkPaymentStatus, 5000);
     setIntervalId(id);
     
-    // Run initial check immediately
     setTimeout(checkPaymentStatus, 500);
-  }, [cleanupStatusCheck, checkPaymentStatus]);
+  }, [cleanupStatusCheck, checkPaymentStatus, setupRealtimeSubscription]);
   
   return {
     startStatusCheck,
