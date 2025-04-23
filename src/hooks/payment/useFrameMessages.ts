@@ -1,6 +1,8 @@
+
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
@@ -24,12 +26,16 @@ export const useFrameMessages = ({
   useEffect(() => {
     if (!lowProfileCode || !sessionId) return;
 
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       try {
         // Safety check for message origin
-        if (!event.origin.includes('cardcom.solutions') && 
-            !event.origin.includes('localhost') && 
-            !event.origin.includes(window.location.origin)) {
+        const isTrustedOrigin = 
+          event.origin.includes('cardcom.solutions') || 
+          event.origin.includes('localhost') || 
+          event.origin.includes(window.location.origin);
+          
+        if (!isTrustedOrigin) {
+          console.log('Rejected message from untrusted origin:', event.origin);
           return;
         }
 
@@ -46,6 +52,7 @@ export const useFrameMessages = ({
           
           if (message.data?.IsSuccess) {
             console.log('Payment submission successful');
+            
             if (planType === 'monthly') {
               // For monthly plan, we only created a token here, so keep in processing state
               // until the webhook confirms the token was created
@@ -54,8 +61,9 @@ export const useFrameMessages = ({
               checkPaymentStatus(lowProfileCode, sessionId, 'token_only', planType);
             } else {
               // For annual and VIP plans, this is the actual payment, so mark as success
-              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-              handlePaymentSuccess();
+              // but still check status to confirm on server
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
             }
           } else {
             console.error('Payment submission failed:', message.data?.Description);
@@ -76,11 +84,11 @@ export const useFrameMessages = ({
           
           // Show more specific error messages
           if (message.message && message.message.includes('lowProfileCode')) {
-            toast.error('פרמטר lowProfileCode חובה');
+            toast.error('פרמטר lowProfileCode חסר, אנא נסה שנית');
           } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
             toast.error('תאריך תוקף שגוי');
           } else if (message.message && message.message.includes('CardComCardNumber')) {
-            toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
+            toast.error('שגיאה בטעינת שדות כרטיס האשראי, אנא רענן את הדף ונסה שנית');
           } else {
             toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
           }

@@ -7,6 +7,18 @@ interface UsePaymentSessionProps {
   setState: (updater: any) => void;
 }
 
+// CardCom configuration
+const CARDCOM_CONFIG = {
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  domain: "https://algotouch.lovable.app",
+  successUrl: "https://algotouch.lovable.app/payment/success",
+  failedUrl: "https://algotouch.lovable.app/payment/failed",
+  webhookUrl: "https://algotouch.lovable.app/api/cardcom-webhook",
+  cardcomUrl: "https://secure.cardcom.solutions",
+};
+
 export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
   const initializePaymentSession = async (
     planId: string,
@@ -39,6 +51,12 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operation = "ChargeOnly";
     }
 
+    const planNames = {
+      'monthly': 'מנוי חודשי',
+      'annual': 'מנוי שנתי',
+      'vip': 'מנוי VIP'
+    };
+
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
       body: {
@@ -51,18 +69,36 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         currency: "ILS",
         operation: operation,
         redirectUrls: {
-          success: planId === 'monthly' 
-            ? `${window.location.origin}/token-success`
-            : `${window.location.origin}/payment-success`,
-          failed: planId === 'monthly'
-            ? `${window.location.origin}/token-failed`
-            : `${window.location.origin}/payment-failed`
+          success: CARDCOM_CONFIG.successUrl,
+          failed: CARDCOM_CONFIG.failedUrl
         },
         userId: userId,
         operationType,
         registrationData: sessionStorage.getItem('registration_data') 
           ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-          : null
+          : null,
+        payload: {
+          TerminalNumber: CARDCOM_CONFIG.terminalNumber,
+          ApiName: CARDCOM_CONFIG.apiName,
+          Operation: operation, 
+          ReturnValue: `${planId}-${Date.now()}`,
+          Amount: amount,
+          WebHookUrl: CARDCOM_CONFIG.webhookUrl,
+          SuccessRedirectUrl: CARDCOM_CONFIG.successUrl,
+          FailedRedirectUrl: CARDCOM_CONFIG.failedUrl,
+          ProductName: planNames[planId as keyof typeof planNames] || 'מנוי',
+          Language: "he",
+          ISOCoinId: 1, // ILS
+          Document: {
+            Name: paymentUser.fullName || paymentUser.email,
+            Email: paymentUser.email,
+            Products: [{
+              Description: planNames[planId as keyof typeof planNames] || 'מנוי',
+              UnitCost: amount,
+              Quantity: 1
+            }]
+          }
+        }
       }
     });
     
@@ -73,22 +109,19 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     
     console.log("Payment session created:", data.data);
     
-    // CardCom terminal number as provided
-    const terminalNumber = '160138';
-    
     setState(prev => ({
       ...prev,
       sessionId: data.data.sessionId,
       lowProfileCode: data.data.lowProfileCode,
-      terminalNumber: terminalNumber,
-      cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+      terminalNumber: CARDCOM_CONFIG.terminalNumber,
+      cardcomUrl: CARDCOM_CONFIG.cardcomUrl,
       paymentStatus: PaymentStatus.IDLE
     }));
     
     return { 
       lowProfileCode: data.data.lowProfileCode, 
       sessionId: data.data.sessionId,
-      terminalNumber: terminalNumber
+      terminalNumber: CARDCOM_CONFIG.terminalNumber
     };
   };
 

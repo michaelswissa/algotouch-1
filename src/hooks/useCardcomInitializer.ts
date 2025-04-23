@@ -60,9 +60,11 @@ export const useCardcomInitializer = () => {
             operation = "CreateTokenOnly";
           } else if (planId === 'annual') {
             operation = "ChargeAndCreateToken";
+          } else if (planId === 'vip') {
+            operation = "ChargeOnly";
           }
 
-          const config: any = {
+          const config: InitConfig = {
             action: 'init',
             lowProfileCode,
             LowProfileCode: lowProfileCode,
@@ -108,11 +110,16 @@ export const useCardcomInitializer = () => {
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
-            operation: operation,
-            ApiName: "bLaocQRMSnwphQRUVG3b"
+            operationType,
+            operation
           };
 
-          console.log('Sending initialization config to CardCom iframe:', config);
+          console.log('Sending initialization config to CardCom iframe:', {
+            ...config,
+            cardFieldCSS: '[CSS content]',
+            cvvFieldCSS: '[CSS content]'
+          });
+          
           masterFrame.contentWindow.postMessage(config, '*');
           
           setTimeout(() => {

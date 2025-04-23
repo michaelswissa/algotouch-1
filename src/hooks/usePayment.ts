@@ -7,6 +7,13 @@ import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
 import { toast } from 'sonner';
 
+// CardCom configuration
+const CARDCOM_CONFIG = {
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6"
+};
+
 interface UsePaymentProps {
   planId: string;
   onPaymentComplete: () => void;
@@ -114,10 +121,15 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         operation = "CreateTokenOnly";
       } else if (planId === 'annual') {
         operation = "ChargeAndCreateToken";
+      } else if (planId === 'vip') {
+        operation = "ChargeOnly";
       }
       
+      // External unique transaction ID to prevent duplicate transactions
+      const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
       // CardCom requires "lowProfileCode" param for each doTransaction
-      const formData: any = {
+      const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
         cardOwnerId,
@@ -126,12 +138,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
-        ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        TerminalNumber: state.terminalNumber,
+        ExternalUniqTranId: externalUniqTranId,
+        TerminalNumber: CARDCOM_CONFIG.terminalNumber,
         Operation: operation,
-        lowProfileCode: state.lowProfileCode, // Ensure always present
+        lowProfileCode: state.lowProfileCode,
         LowProfileCode: state.lowProfileCode,  // For extra compatibility
-        ApiName: "bLaocQRMSnwphQRUVG3b"
+        ApiName: CARDCOM_CONFIG.apiName
       };
 
       console.log('Sending transaction data to CardCom:', formData);
@@ -165,7 +177,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
   }, [
     masterFrameRef, 
-    state.terminalNumber, 
     state.lowProfileCode, 
     state.sessionId, 
     handleError, 

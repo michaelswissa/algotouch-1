@@ -1,3 +1,4 @@
+
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from '../useCardcomInitializer';
@@ -73,7 +74,10 @@ export const usePaymentInitialization = ({
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE
+        paymentStatus: PaymentStatus.IDLE,
+        lowProfileCode: paymentData.lowProfileCode,
+        sessionId: paymentData.sessionId,
+        terminalNumber: paymentData.terminalNumber
       }));
       
       // Initialize CardCom fields with proper timing
@@ -85,6 +89,7 @@ export const usePaymentInitialization = ({
             paymentData.sessionId,
             paymentData.terminalNumber,
             paymentOpType,
+            planId
           );
           
           if (!initialized) {
@@ -102,7 +107,7 @@ export const usePaymentInitialization = ({
       return paymentData;
     } catch (error) {
       console.error('Payment initialization error:', error);
-      toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
+      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
     }

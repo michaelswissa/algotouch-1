@@ -2,7 +2,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,9 +13,21 @@ const CARDCOM_CONFIG = {
   apiName: "bLaocQRMSnwphQRUVG3b",
   apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
-    transaction: "https://secure.cardcom.solutions/api/v11/Transactions/Transaction",
-    tokenInfo: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult"
+    transactions: "https://secure.cardcom.solutions/api/v11/Transactions/Transaction"
   }
+};
+
+// Plan prices
+const PLAN_PRICES = {
+  monthly: 371,
+  annual: 3371,
+  vip: 13121
+};
+
+// Helper logging function
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CARDCOM-RECURRING] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -26,7 +37,9 @@ serve(async (req) => {
   }
 
   try {
-    // Create Supabase client
+    logStep("Function started");
+    
+    // Create Supabase admin client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -36,209 +49,216 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Get request data
-    const { 
-      action, 
-      userId,
-      subscriptionId,
-      amount,
-      tokenData,
-      description 
-    } = await req.json();
-
-    console.log(`Processing ${action} request for user ${userId}`);
-
-    // Handle different actions
-    switch (action) {
-      case 'charge_monthly':
-        return await processRecurringCharge(supabaseAdmin, userId, subscriptionId, amount, tokenData, description);
-      case 'get_token_info':
-        return await getTokenInfo(tokenData.lowProfileCode);
-      default:
+    const { action, token, planType, tokenExpiryDate, lastFourDigits, nextChargeDate } = await req.json();
+    
+    if (action !== 'setup' || !token || !planType) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "חסרים פרטים נדרשים להגדרת תשלום מחזורי"
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
+    logStep("Setting up recurring payment", { planType, token, hasExpiry: !!tokenExpiryDate });
+    
+    // For monthly plan, we need to set up immediate charge after trial
+    if (planType === 'monthly') {
+      // Calculate trial end date (30 days from now)
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 30);
+      
+      // Save subscription information
+      const subscriptionData = {
+        plan_id: planType,
+        token: token,
+        token_expiry_date: tokenExpiryDate,
+        last_four_digits: lastFourDigits,
+        status: 'active',
+        next_payment_date: trialEndDate.toISOString(),
+        amount: PLAN_PRICES.monthly,
+        payment_details: {
+          planType: planType,
+          trialEndsAt: trialEndDate.toISOString(),
+          tokenCreatedAt: new Date().toISOString()
+        }
+      };
+      
+      try {
+        const { data: subscription, error: subscriptionError } = await supabaseAdmin
+          .from('user_subscriptions')
+          .insert(subscriptionData)
+          .select('id')
+          .single();
+          
+        if (subscriptionError) {
+          logStep("Error saving subscription", { error: subscriptionError.message });
+          throw new Error("שגיאה בשמירת פרטי המנוי");
+        }
+        
+        logStep("Monthly subscription set up successfully", { subscriptionId: subscription.id });
+        
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: "Invalid action specified" 
+          JSON.stringify({
+            success: true,
+            message: "תשלום מחזורי הוגדר בהצלחה",
+            data: {
+              subscriptionId: subscription.id,
+              planType: planType,
+              nextPaymentDate: trialEndDate.toISOString(),
+              amount: PLAN_PRICES.monthly
+            }
           }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
         );
+      } catch (error) {
+        throw error;
+      }
+    } 
+    // For annual plan, set up renewal in 1 year
+    else if (planType === 'annual') {
+      // Calculate renewal date
+      const renewalDate = nextChargeDate || (() => {
+        const date = new Date();
+        date.setFullYear(date.getFullYear() + 1);
+        return date.toISOString();
+      })();
+      
+      // Save subscription information
+      const subscriptionData = {
+        plan_id: planType,
+        token: token,
+        token_expiry_date: tokenExpiryDate,
+        last_four_digits: lastFourDigits,
+        status: 'active',
+        next_payment_date: renewalDate,
+        amount: PLAN_PRICES.annual,
+        payment_details: {
+          planType: planType,
+          tokenCreatedAt: new Date().toISOString(),
+          paidUntil: renewalDate
+        }
+      };
+      
+      try {
+        const { data: subscription, error: subscriptionError } = await supabaseAdmin
+          .from('user_subscriptions')
+          .insert(subscriptionData)
+          .select('id')
+          .single();
+          
+        if (subscriptionError) {
+          logStep("Error saving subscription", { error: subscriptionError.message });
+          throw new Error("שגיאה בשמירת פרטי המנוי");
+        }
+        
+        logStep("Annual subscription set up successfully", { subscriptionId: subscription.id });
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "תשלום שנתי הוגדר בהצלחה",
+            data: {
+              subscriptionId: subscription.id,
+              planType: planType,
+              nextPaymentDate: renewalDate,
+              amount: PLAN_PRICES.annual
+            }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        throw error;
+      }
     }
+    // For VIP plan, no recurring setup needed, just mark as lifetime
+    else if (planType === 'vip') {
+      // Save subscription information
+      const subscriptionData = {
+        plan_id: planType,
+        token: token,
+        token_expiry_date: tokenExpiryDate,
+        last_four_digits: lastFourDigits,
+        status: 'lifetime',
+        amount: PLAN_PRICES.vip,
+        payment_details: {
+          planType: planType,
+          purchasedAt: new Date().toISOString(),
+          isLifetime: true
+        }
+      };
+      
+      try {
+        const { data: subscription, error: subscriptionError } = await supabaseAdmin
+          .from('user_subscriptions')
+          .insert(subscriptionData)
+          .select('id')
+          .single();
+          
+        if (subscriptionError) {
+          logStep("Error saving subscription", { error: subscriptionError.message });
+          throw new Error("שגיאה בשמירת פרטי המנוי");
+        }
+        
+        logStep("VIP subscription set up successfully", { subscriptionId: subscription.id });
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "מנוי VIP הוגדר בהצלחה",
+            data: {
+              subscriptionId: subscription.id,
+              planType: planType,
+              isLifetime: true,
+              amount: PLAN_PRICES.vip
+            }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        throw error;
+      }
+    }
+    
+    // Unknown plan type
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: "סוג מנוי לא מוכר"
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+    
   } catch (error) {
-    console.error("Error in cardcom-recurring function:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR", { message: errorMessage });
     
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: error instanceof Error ? error.message : "Unknown error occurred"
+      JSON.stringify({
+        success: false,
+        message: "שגיאה בהגדרת תשלום מחזורי",
+        error: errorMessage
       }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
 });
-
-// Process a recurring charge using a saved token
-async function processRecurringCharge(
-  supabase: any,
-  userId: string,
-  subscriptionId: string,
-  amount: number,
-  tokenData: any,
-  description: string = "Monthly subscription charge"
-) {
-  // Validate required data
-  if (!tokenData?.token) {
-    throw new Error("Missing token information");
-  }
-
-  // Create unique reference for this transaction
-  const transactionRef = `monthly-${userId}-${Date.now()}`;
-  
-  console.log(`Processing ${amount} ILS charge for subscription ${subscriptionId}`);
-  
-  // Prepare CardCom transaction payload
-  const payload = {
-    TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-    ApiName: CARDCOM_CONFIG.apiName,
-    ApiPassword: CARDCOM_CONFIG.apiPassword,
-    Token: tokenData.token,
-    Amount: amount,
-    ExternalMerchantId: transactionRef,
-    CardOwnerInformation: {
-      Phone: "nnn",
-      FullName: "nnn",
-      CardOwnerEmail: "nnn"
-    },
-    ISOCoinId: 1, // ILS
-    Document: {
-      Name: tokenData.cardOwnerName || "Subscriber",
-      Email: tokenData.cardOwnerEmail,
-      DocumentTypeToCreate: "Receipt", // Receipt or TaxInvoiceAndReceipt
-      Products: [
-        {
-          Description: description || "Monthly subscription",
-          UnitCost: amount,
-          Quantity: 1
-        }
-      ]
-    }
-  };
-  
-  // Call CardCom API to process the charge
-  const response = await fetch(CARDCOM_CONFIG.endpoints.transaction, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  
-  const responseData = await response.json();
-  console.log("CardCom transaction response:", responseData);
-  
-  // Process the response
-  const isSuccess = responseData.ResponseCode === 0;
-  
-  // Record transaction in database
-  try {
-    const { error } = await supabase
-      .from('payment_logs')
-      .insert({
-        user_id: userId,
-        transaction_id: responseData.TranzactionId,
-        amount: amount,
-        currency: "ILS",
-        plan_id: "monthly",
-        payment_status: isSuccess ? 'succeeded' : 'failed',
-        payment_data: responseData
-      });
-      
-    if (error) {
-      console.error("Error recording payment:", error);
-    }
-    
-    // If successful, update subscription record
-    if (isSuccess) {
-      const now = new Date();
-      const nextPeriodEnd = new Date();
-      nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1);
-      
-      const { error: subError } = await supabase
-        .from('subscriptions')
-        .update({
-          current_period_ends_at: nextPeriodEnd.toISOString(),
-          next_charge_date: nextPeriodEnd.toISOString(),
-          status: 'active',
-          updated_at: now.toISOString()
-        })
-        .eq('id', subscriptionId);
-        
-      if (subError) {
-        console.error("Error updating subscription:", subError);
-      }
-    }
-  } catch (dbError) {
-    console.error("Database error:", dbError);
-    // Continue with the response even if DB operations fail
-  }
-  
-  return new Response(
-    JSON.stringify({ 
-      success: isSuccess, 
-      transaction: {
-        id: responseData.TranzactionId,
-        amount: amount,
-        reference: transactionRef,
-        status: isSuccess ? 'succeeded' : 'failed'
-      },
-      message: responseData.Description || (isSuccess ? "Transaction successful" : "Transaction failed") 
-    }),
-    { 
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  );
-}
-
-// Get token information from a lowProfileCode
-async function getTokenInfo(lowProfileCode: string) {
-  if (!lowProfileCode) {
-    throw new Error("Missing lowProfileCode");
-  }
-  
-  const payload = {
-    ApiName: CARDCOM_CONFIG.apiName,
-    ApiPassword: CARDCOM_CONFIG.apiPassword,
-    LowProfileId: lowProfileCode
-  };
-  
-  const response = await fetch(CARDCOM_CONFIG.endpoints.tokenInfo, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  
-  const responseData = await response.json();
-  
-  if (responseData.ResponseCode !== 0) {
-    throw new Error(`Error getting token info: ${responseData.Description || "Unknown error"}`);
-  }
-  
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      tokenInfo: responseData.TokenInfo 
-    }),
-    { 
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  );
-}

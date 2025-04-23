@@ -21,7 +21,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     planType?: string
   ) => {
     if (!lowProfileCode || !sessionId) {
-      console.error("Missing required parameters for status check");
+      console.error("Missing required parameters for status check:", { 
+        hasLowProfileCode: Boolean(lowProfileCode), 
+        hasSessionId: Boolean(sessionId) 
+      });
       setState(prev => ({ 
         ...prev, 
         paymentStatus: PaymentStatus.FAILED,
@@ -40,9 +43,9 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         planType
       });
       
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      // Call the endpoint to check the transaction status
+      const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: {
-          action: 'check-status',
           lowProfileCode,
           sessionId,
           operationType,
@@ -76,7 +79,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         if (planType === 'monthly' && operationType === 'token_only' && data.data?.token) {
           console.log('Token created successfully, processing initial subscription');
           
-          // Call the recurring payment setup
+          // Call the recurring payment setup for monthly plan
           const { data: recurringData, error: recurringError } = await supabase.functions.invoke('cardcom-recurring', {
             body: {
               action: 'setup',
@@ -100,6 +103,26 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           }
           
           console.log('Recurring payment set up successfully:', recurringData);
+        } 
+        // For annual plan, set up recurring payment for next year if token was created
+        else if (planType === 'annual' && data.data?.token) {
+          console.log('Annual payment successful, setting up renewal for next year');
+          
+          const { data: recurringData, error: recurringError } = await supabase.functions.invoke('cardcom-recurring', {
+            body: {
+              action: 'setup',
+              token: data.data.token,
+              planType: 'annual',
+              tokenExpiryDate: data.data.tokenExpiryDate,
+              lastFourDigits: data.data.lastFourDigits,
+              nextChargeDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year from now
+            }
+          });
+          
+          if (recurringError) {
+            console.error('Error setting up annual renewal:', recurringError);
+            // Continue with success but log the error - renewal can be set up later
+          }
         }
         
         setState(prev => ({ 
