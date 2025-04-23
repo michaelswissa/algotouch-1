@@ -26,15 +26,24 @@ export const useFrameMessages = ({
   useEffect(() => {
     if (!lowProfileCode || !sessionId) return;
 
+    // Set a 30-second timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setState((prev: any) => ({
+        ...prev,
+        paymentStatus: PaymentStatus.FAILED,
+        isSubmitting: false
+      }));
+      toast.error('תגובת תשלום איטית מדי, אנא נסה שוב');
+    }, 30000);
+
     const handleMessage = async (event: MessageEvent) => {
       try {
+        // Verify origin
+        if (event.origin !== 'https://secure.cardcom.solutions') return;
+        console.log('Received message from CardCom:', event.data);
+
         const data = event.data;
-
-        if (!data || typeof data !== 'object') {
-          return; // Not our message
-        }
-
-        console.log('Received message from iframe:', data);
+        if (!data || typeof data !== 'object') return;
 
         // Handle 3DS messages
         if (data.action === '3DSProcessStarted') {
@@ -49,17 +58,13 @@ export const useFrameMessages = ({
             ...prev,
             is3DSInProgress: false
           }));
-          
-          // Check payment status after 3DS completes
           await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
         }
 
         // Handle validation messages
         else if (data.action === 'handleValidations') {
           console.log('Field validation:', { field: data.field, isValid: data.isValid });
-          
           if (data.field && data.isValid === false && data.message) {
-            // Show validation errors as toast messages
             toast.error(data.message);
           }
         }
@@ -67,58 +72,19 @@ export const useFrameMessages = ({
         // Handle submission result
         else if (data.action === 'HandleSubmit') {
           console.log('Payment form submitted successfully:', data.data);
-          
-          // Explicitly trigger status check after form submission
+          clearTimeout(timeoutId);
           await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-        }
-
-        // Handle token creation
-        else if (data.action === 'tokenCreationStarted') {
-          console.log('Token creation started');
           setState((prev: any) => ({
             ...prev,
-            isTokenCreationInProgress: true
+            isSubmitting: false
           }));
-        } else if (data.action === 'tokenCreationCompleted') {
-          console.log('Token creation completed:', data.data);
-          setState((prev: any) => ({
-            ...prev,
-            isTokenCreationInProgress: false
-          }));
-          
-          // For monthly plan, setup recurring after token creation
-          if (operationType === 'token_only' && planType === 'monthly' && data.data?.token) {
-            try {
-              const { data: recurringData, error: recurringError } = await supabase.functions.invoke('cardcom-recurring', {
-                body: {
-                  action: 'setup',
-                  token: data.data.token,
-                  planType: 'monthly',
-                  tokenExpiryDate: data.data.tokenExpiryDate,
-                  lastFourDigits: data.data.lastFourDigits
-                }
-              });
-              
-              if (recurringError) {
-                console.error('Error setting up recurring payment:', recurringError);
-                toast.error('שגיאה בהגדרת תשלום מחזורי');
-              } else {
-                console.log('Monthly recurring payment setup successful:', recurringData);
-              }
-            } catch (error) {
-              console.error('Exception setting up recurring payment:', error);
-            }
-          }
-          
-          // Check payment status after token creation
-          await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
         }
 
         // Handle errors
-        else if (data.action === 'HandleError') {
+        else if (data.action === 'HandleEror') {
           console.error('Payment error received:', data.message);
+          clearTimeout(timeoutId);
           toast.error(data.message || 'שגיאה בתהליך התשלום');
-          
           setState((prev: any) => ({
             ...prev,
             paymentStatus: PaymentStatus.FAILED,
@@ -128,6 +94,12 @@ export const useFrameMessages = ({
 
       } catch (error) {
         console.error('Error handling iframe message:', error);
+        clearTimeout(timeoutId);
+        setState((prev: any) => ({
+          ...prev,
+          paymentStatus: PaymentStatus.FAILED,
+          isSubmitting: false
+        }));
       }
     };
 
@@ -135,6 +107,7 @@ export const useFrameMessages = ({
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      clearTimeout(timeoutId);
     };
   }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
 };

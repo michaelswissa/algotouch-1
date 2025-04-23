@@ -1,10 +1,32 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { CARDCOM } from '@/config/cardcom';
 
 interface UsePaymentSessionProps {
   setState: (updater: any) => void;
+}
+
+interface CreateLowProfilePayload {
+  TerminalNumber: number;
+  ApiName: string;
+  Operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
+  ReturnValue: string;
+  Amount: string; // Must be string for CardCom API
+  SuccessRedirectUrl: string;
+  FailedRedirectUrl: string;
+  WebHookUrl: string;
+  ProductName?: string;
+  Language?: string;
+  ISOCoinId?: number;
+  Document: {
+    Name: string;
+    Email: string;
+    Products: Array<{
+      Description: string;
+      UnitCost: string; // Must be string for CardCom API
+      Quantity?: number;
+    }>;
+  };
 }
 
 export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
@@ -25,20 +47,16 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       throw new Error('חסרה כתובת דוא"ל לביצוע התשלום');
     }
 
-    // Determine amount and operation based on plan type
     let amount = 0;
     let operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken" = "ChargeOnly";
     
     if (planId === 'monthly') {
-      // Monthly plan: token first, then charge later (371₪)
-      amount = 0; // No immediate charge
+      amount = 0;
       operation = "CreateTokenOnly";
     } else if (planId === 'annual') {
-      // Annual plan: charge 3,371₪ and create token
       amount = 3371;
       operation = "ChargeAndCreateToken";
     } else if (planId === 'vip') {
-      // VIP plan: one-time charge of 13,121₪
       amount = 13121;
       operation = "ChargeOnly";
     }
@@ -49,28 +67,26 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       'vip': 'מנוי VIP'
     };
 
-    // Generate a unique reference value
     const returnValue = `${planId}-${userId || 'guest'}-${Date.now()}`;
 
-    // Prepare the payload for CardCom API
-    const payload = {
+    const payload: CreateLowProfilePayload = {
       TerminalNumber: CARDCOM.TERMINAL_NUMBER,
       ApiName: CARDCOM.API_NAME,
       Operation: operation,
       ReturnValue: returnValue,
-      Amount: amount.toString(), // Convert amount to string
+      Amount: amount.toString(),
       WebHookUrl: CARDCOM.WEBHOOK_URL,
       SuccessRedirectUrl: CARDCOM.SUCCESS_URL,
       FailedRedirectUrl: CARDCOM.FAILED_URL,
       ProductName: planNames[planId as keyof typeof planNames] || 'מנוי',
       Language: "he",
-      ISOCoinId: 1, // ILS
+      ISOCoinId: 1,
       Document: {
         Name: paymentUser.fullName || paymentUser.email,
         Email: paymentUser.email,
         Products: [{
           Description: planNames[planId as keyof typeof planNames] || 'מנוי',
-          UnitCost: amount.toString(), // Convert UnitCost to string
+          UnitCost: amount.toString(),
           Quantity: 1
         }]
       }
@@ -82,11 +98,10 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         Document: { ...payload.Document, Products: '[Products array]' }
       });
 
-      // Call CardCom payment initialization Edge Function
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
-          amount: amount.toString(), // Convert amount to string
+          amount: amount.toString(),
           invoiceInfo: {
             fullName: paymentUser.fullName || paymentUser.email,
             email: paymentUser.email,
@@ -130,7 +145,6 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     } catch (error) {
       console.error('Error during payment initialization:', error);
       
-      // Handle specific errors
       if (error instanceof Error && error.message.includes('Missing required parameters')) {
         throw new Error('חסרים פרטים נדרשים לביצוע התשלום');
       }
