@@ -345,4 +345,3 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     diagnostics: diagnosticRef.current
   };
 };
-
