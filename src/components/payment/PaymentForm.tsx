@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import InitializingPayment from './states/InitializingPayment';
+import { usePaymentTimeout } from '@/hooks/payment/usePaymentTimeout';
 
 interface PaymentFormProps {
   planId: string;
@@ -37,7 +37,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     lowProfileCode,
     sessionId,
     isFramesReady,
-    isRetrying
+    isRetrying,
+    error
   } = usePayment({
     planId,
     onPaymentComplete
@@ -46,7 +47,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
-  // Monitor when master frame is loaded
   useEffect(() => {
     const masterFrame = masterFrameRef.current;
     if (!masterFrame) return;
@@ -71,7 +71,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     initProcess();
   }, []); // Run only once on mount
   
-  // Reset submission state when payment status changes to IDLE (after retry)
   useEffect(() => {
     if (paymentStatus === PaymentStatus.IDLE) {
       setIsSubmitting(false);
@@ -135,7 +134,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     }
   };
 
-  // Determine if the iframe content is ready to be shown
+  const handleTimeout = () => {
+    handleRetry();
+  };
+
+  usePaymentTimeout({
+    paymentStatus,
+    onTimeout: handleTimeout
+  });
+
   const isContentReady = !isInitializing && 
     terminalNumber && 
     cardcomUrl && 
@@ -145,7 +152,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     isFramesReady &&
     paymentStatus !== PaymentStatus.INITIALIZING;
 
-  // Track if there's been a failure that requires retry
   const needsRetry = paymentStatus === PaymentStatus.FAILED;
 
   return (
@@ -167,7 +173,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master iframe is always loaded but hidden */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"

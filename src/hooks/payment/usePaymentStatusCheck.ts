@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,14 +18,17 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
   
   const cleanupStatusCheck = useCallback(() => {
+    console.log('Cleaning up payment status check:', {
+      hasInterval: !!intervalId,
+      hasChannel: !!realtimeChannel
+    });
+    
     if (intervalId) {
-      console.log('Clearing payment status check interval:', intervalId);
       clearInterval(intervalId);
       setIntervalId(null);
     }
     
     if (realtimeChannel) {
-      console.log('Removing realtime subscription');
       supabase.removeChannel(realtimeChannel);
       setRealtimeChannel(null);
     }
@@ -46,7 +50,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       return false;
     }
     
-    console.log(`Checking payment status (attempt ${attempt}):`, { lowProfileCode, sessionId, operationType });
+    console.log(`Checking payment status (attempt ${attempt}):`, { 
+      lowProfileCode, 
+      sessionId, 
+      operationType 
+    });
     
     try {
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
