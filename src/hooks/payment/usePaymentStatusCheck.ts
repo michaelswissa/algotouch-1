@@ -279,7 +279,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
   }, [cleanupStatusCheck, setState, realtimeRetries]);
   
   // Start status check with a robust initialization
-  // FIX: Ensure all 4 required parameters are properly typed and used
+  // FIX: Function signature updated to match the call sites
   const startStatusCheck = useCallback((
     newLowProfileCode: string, 
     newSessionId: string,

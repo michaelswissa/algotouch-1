@@ -219,7 +219,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         paymentStatus: PaymentStatus.PROCESSING
       }));
       
-      // Start status check with required params - Fix: Make sure all 4 arguments are passed correctly
+      // Start status check with required params - FIX: pass all 4 required parameters correctly
       startStatusCheck(
         state.lowProfileCode,
         state.sessionId,
