@@ -1,6 +1,6 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // CORS headers for cross-origin requests
 const corsHeaders = {
@@ -8,10 +8,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper logging function for enhanced debugging
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CARDCOM-RECURRING] ${step}${detailsStr}`);
+// CardCom Configuration
+const CARDCOM_CONFIG = {
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  endpoints: {
+    transaction: "https://secure.cardcom.solutions/api/v11/Transactions/Transaction",
+    tokenInfo: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult"
+  }
 };
 
 serve(async (req) => {
@@ -21,223 +26,219 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
-
-    // Create Supabase client with service role to bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
-
-    // Parse request body
-    const requestData = await req.json();
-    const { action, token, planType, tokenExpiryDate, lastFourDigits, subscriptionId } = requestData;
-
-    logStep("Request data received", { action, planType });
-
-    // Get user details from the request
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header provided");
-    }
-
-    const token_string = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token_string);
-    if (userError) {
-      throw new Error(`Authentication error: ${userError.message}`);
-    }
-    const user = userData.user;
-    if (!user?.id) {
-      throw new Error("User not authenticated");
-    }
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    logStep("User authenticated", { userId: user.id });
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Missing Supabase configuration");
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get request data
+    const { 
+      action, 
+      userId,
+      subscriptionId,
+      amount,
+      tokenData,
+      description 
+    } = await req.json();
+
+    console.log(`Processing ${action} request for user ${userId}`);
 
     // Handle different actions
     switch (action) {
-      case 'setup': {
-        if (!token || !planType) {
-          throw new Error("Missing required parameters: token or planType");
-        }
-
-        logStep("Setting up recurring payment", { planType, token });
-
-        // Store token in recurring_payments table
-        const { data: paymentData, error: paymentError } = await supabaseAdmin
-          .from('recurring_payments')
-          .insert({
-            user_id: user.id,
-            token: token,
-            token_expiry: tokenExpiryDate,
-            status: 'active',
-            last_4_digits: lastFourDigits || 'XXXX'
-          })
-          .select()
-          .single();
-
-        if (paymentError) {
-          throw new Error(`Failed to store token: ${paymentError.message}`);
-        }
-
-        logStep("Token stored successfully", { paymentId: paymentData.id });
-
-        // Now set up the subscription based on plan type
-        const now = new Date();
-        let nextChargeDate = null;
-        let currentPeriodEndsAt = null;
-        let trialEndsAt = null;
-        
-        if (planType === 'monthly') {
-          // 7-day trial for monthly plan
-          trialEndsAt = new Date(now);
-          trialEndsAt.setDate(trialEndsAt.getDate() + 7);
-          nextChargeDate = new Date(trialEndsAt);
-          currentPeriodEndsAt = new Date(trialEndsAt);
-          currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
-        }
-        
-        // Create or update subscription record
-        const { data: existingSubscription } = await supabaseAdmin
-          .from('subscriptions')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (existingSubscription) {
-          await supabaseAdmin
-            .from('subscriptions')
-            .update({
-              plan_type: planType,
-              status: 'trial',
-              next_charge_date: nextChargeDate,
-              trial_ends_at: trialEndsAt,
-              current_period_ends_at: currentPeriodEndsAt,
-              payment_method: {
-                token: token,
-                tokenExpiryDate: tokenExpiryDate,
-                lastFourDigits: lastFourDigits || 'XXXX',
-              },
-              updated_at: now.toISOString()
-            })
-            .eq('id', existingSubscription.id);
-            
-          logStep("Updated existing subscription", { subscriptionId: existingSubscription.id });
-        } else {
-          const { data: newSubscription, error: subError } = await supabaseAdmin
-            .from('subscriptions')
-            .insert({
-              user_id: user.id,
-              plan_type: planType,
-              status: 'trial',
-              next_charge_date: nextChargeDate,
-              trial_ends_at: trialEndsAt,
-              current_period_ends_at: currentPeriodEndsAt,
-              payment_method: {
-                token: token,
-                tokenExpiryDate: tokenExpiryDate,
-                lastFourDigits: lastFourDigits || 'XXXX',
-              }
-            })
-            .select()
-            .single();
-            
-          if (subError) {
-            throw new Error(`Failed to create subscription: ${subError.message}`);
-          }
-          
-          logStep("Created new subscription", { subscriptionId: newSubscription.id });
-        }
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: "Recurring payment set up successfully" 
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 
-          }
-        );
-      }
-      
-      case 'cancel': {
-        if (!subscriptionId) {
-          throw new Error("Missing required parameter: subscriptionId");
-        }
-        
-        logStep("Cancelling subscription", { subscriptionId });
-        
-        // Get subscription to verify ownership
-        const { data: subscription, error: subError } = await supabaseAdmin
-          .from('subscriptions')
-          .select('*')
-          .eq('id', subscriptionId)
-          .single();
-          
-        if (subError || !subscription) {
-          throw new Error("Subscription not found");
-        }
-        
-        // Verify subscription belongs to user
-        if (subscription.user_id !== user.id) {
-          throw new Error("You do not have permission to cancel this subscription");
-        }
-        
-        // Update subscription status
-        const { error: updateError } = await supabaseAdmin
-          .from('subscriptions')
-          .update({
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString(),
-          })
-          .eq('id', subscriptionId);
-          
-        if (updateError) {
-          throw new Error(`Failed to cancel subscription: ${updateError.message}`);
-        }
-        
-        // Also update recurring payment if exists
-        if (subscription.payment_method?.token) {
-          await supabaseAdmin
-            .from('recurring_payments')
-            .update({
-              status: 'cancelled'
-            })
-            .eq('token', subscription.payment_method.token)
-            .eq('user_id', user.id);
-        }
-        
-        logStep("Subscription cancelled successfully", { subscriptionId });
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: "Subscription cancelled successfully" 
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 
-          }
-        );
-      }
-
+      case 'charge_monthly':
+        return await processRecurringCharge(supabaseAdmin, userId, subscriptionId, amount, tokenData, description);
+      case 'get_token_info':
+        return await getTokenInfo(tokenData.lowProfileCode);
       default:
-        throw new Error(`Unknown action: ${action}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "Invalid action specified" 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
     }
-  } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-
+  } catch (error) {
+    console.error("Error in cardcom-recurring function:", error);
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: errorMessage || "An unknown error occurred"
+      JSON.stringify({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error occurred"
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 });
+
+// Process a recurring charge using a saved token
+async function processRecurringCharge(
+  supabase: any,
+  userId: string,
+  subscriptionId: string,
+  amount: number,
+  tokenData: any,
+  description: string = "Monthly subscription charge"
+) {
+  // Validate required data
+  if (!tokenData?.token) {
+    throw new Error("Missing token information");
+  }
+
+  // Create unique reference for this transaction
+  const transactionRef = `monthly-${userId}-${Date.now()}`;
+  
+  console.log(`Processing ${amount} ILS charge for subscription ${subscriptionId}`);
+  
+  // Prepare CardCom transaction payload
+  const payload = {
+    TerminalNumber: CARDCOM_CONFIG.terminalNumber,
+    ApiName: CARDCOM_CONFIG.apiName,
+    ApiPassword: CARDCOM_CONFIG.apiPassword,
+    Token: tokenData.token,
+    Amount: amount,
+    ExternalMerchantId: transactionRef,
+    CardOwnerInformation: {
+      Phone: "nnn",
+      FullName: "nnn",
+      CardOwnerEmail: "nnn"
+    },
+    ISOCoinId: 1, // ILS
+    Document: {
+      Name: tokenData.cardOwnerName || "Subscriber",
+      Email: tokenData.cardOwnerEmail,
+      DocumentTypeToCreate: "Receipt", // Receipt or TaxInvoiceAndReceipt
+      Products: [
+        {
+          Description: description || "Monthly subscription",
+          UnitCost: amount,
+          Quantity: 1
+        }
+      ]
+    }
+  };
+  
+  // Call CardCom API to process the charge
+  const response = await fetch(CARDCOM_CONFIG.endpoints.transaction, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  
+  const responseData = await response.json();
+  console.log("CardCom transaction response:", responseData);
+  
+  // Process the response
+  const isSuccess = responseData.ResponseCode === 0;
+  
+  // Record transaction in database
+  try {
+    const { error } = await supabase
+      .from('payment_logs')
+      .insert({
+        user_id: userId,
+        transaction_id: responseData.TranzactionId,
+        amount: amount,
+        currency: "ILS",
+        plan_id: "monthly",
+        payment_status: isSuccess ? 'succeeded' : 'failed',
+        payment_data: responseData
+      });
+      
+    if (error) {
+      console.error("Error recording payment:", error);
+    }
+    
+    // If successful, update subscription record
+    if (isSuccess) {
+      const now = new Date();
+      const nextPeriodEnd = new Date();
+      nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1);
+      
+      const { error: subError } = await supabase
+        .from('subscriptions')
+        .update({
+          current_period_ends_at: nextPeriodEnd.toISOString(),
+          next_charge_date: nextPeriodEnd.toISOString(),
+          status: 'active',
+          updated_at: now.toISOString()
+        })
+        .eq('id', subscriptionId);
+        
+      if (subError) {
+        console.error("Error updating subscription:", subError);
+      }
+    }
+  } catch (dbError) {
+    console.error("Database error:", dbError);
+    // Continue with the response even if DB operations fail
+  }
+  
+  return new Response(
+    JSON.stringify({ 
+      success: isSuccess, 
+      transaction: {
+        id: responseData.TranzactionId,
+        amount: amount,
+        reference: transactionRef,
+        status: isSuccess ? 'succeeded' : 'failed'
+      },
+      message: responseData.Description || (isSuccess ? "Transaction successful" : "Transaction failed") 
+    }),
+    { 
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  );
+}
+
+// Get token information from a lowProfileCode
+async function getTokenInfo(lowProfileCode: string) {
+  if (!lowProfileCode) {
+    throw new Error("Missing lowProfileCode");
+  }
+  
+  const payload = {
+    ApiName: CARDCOM_CONFIG.apiName,
+    ApiPassword: CARDCOM_CONFIG.apiPassword,
+    LowProfileId: lowProfileCode
+  };
+  
+  const response = await fetch(CARDCOM_CONFIG.endpoints.tokenInfo, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  
+  const responseData = await response.json();
+  
+  if (responseData.ResponseCode !== 0) {
+    throw new Error(`Error getting token info: ${responseData.Description || "Unknown error"}`);
+  }
+  
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      tokenInfo: responseData.TokenInfo 
+    }),
+    { 
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  );
+}
