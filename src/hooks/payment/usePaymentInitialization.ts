@@ -1,4 +1,3 @@
-
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from '../useCardcomInitializer';
@@ -87,7 +86,7 @@ export const usePaymentInitialization = ({
             masterFrameRef, 
             paymentData.lowProfileCode, 
             paymentData.sessionId,
-            paymentData.terminalNumber,
+            paymentData.terminalNumber.toString(),
             paymentOpType,
             planId
           );
