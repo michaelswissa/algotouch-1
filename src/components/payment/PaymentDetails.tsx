@@ -15,7 +15,8 @@ interface PaymentDetailsProps {
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   isReady?: boolean;
-  onMasterFrameLoad: () => void;  // Added prop
+  /** optional – forwarded to the iframe */
+  onMasterFrameLoad?: () => void;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
@@ -23,7 +24,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   cardcomUrl,
   masterFrameRef,
   isReady = false,
-  onMasterFrameLoad  // Added destructuring
+  onMasterFrameLoad
 }) => {
   const [cardholderName, setCardholderName] = useState('');
   const [cardOwnerId, setCardOwnerId] = useState(''); 
@@ -86,7 +87,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           masterFrameRef={masterFrameRef}
           cardcomUrl={cardcomUrl}
           terminalNumber={terminalNumber}
-          onMasterFrameLoad={onMasterFrameLoad}  // Added prop
+          onMasterFrameLoad={onMasterFrameLoad}
         />
       )}
 

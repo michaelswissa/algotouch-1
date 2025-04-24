@@ -48,6 +48,16 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     }
   }, [isMasterFrameLoaded, initializePayment]);
 
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!isMasterFrameLoaded && masterFrameRef.current) {
+        console.warn('Master frame onLoad did not fire – forcing ready state');
+        setIsMasterFrameLoaded(true);
+      }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [isMasterFrameLoaded, masterFrameRef]);
+
   const handleSubmitPayment = () => {
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
     const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value;

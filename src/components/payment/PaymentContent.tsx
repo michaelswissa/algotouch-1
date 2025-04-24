@@ -16,7 +16,8 @@ interface PaymentContentProps {
   onRetry: () => void;
   operationType?: 'payment' | 'token_only';
   isReady?: boolean;
-  onMasterFrameLoad: () => void;
+  /** optional – forwarded down to PaymentDetails */
+  onMasterFrameLoad?: () => void;
 }
 
 const PaymentContent: React.FC<PaymentContentProps> = ({
