@@ -3,3 +3,4 @@ project_id = "ndhakvhrrkczgylcmyoc"
 
 [functions.cardcom-recurring]
 verify_jwt = false
+

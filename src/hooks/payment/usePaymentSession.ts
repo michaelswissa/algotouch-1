@@ -3,6 +3,7 @@ import { CreateLowProfilePayload } from './types';
 import { CARDCOM } from '@/config/cardcom';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
+import { toast } from 'sonner';
 
 interface UsePaymentSessionProps {
   setState: (updater: any) => void;
@@ -77,6 +78,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         Document: { ...payload.Document, Products: '[Products array]' }
       });
 
+      // Improved error handling for Edge Function calls
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
@@ -100,9 +102,15 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         }
       });
       
-      if (error || !data?.success) {
-        console.error("Payment initialization error:", error || data?.message);
-        throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
+      // Enhanced error handling with specific error messages
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(`שגיאת שרת: ${error.message || 'אירעה שגיאה בעת יצירת סשן תשלום'}`);
+      }
+      
+      if (!data || data?.success !== true) {
+        console.error("Non-successful response from edge function:", data);
+        throw new Error(data?.message || 'פונקציית הקצה החזירה קוד שגיאה');
       }
       
       console.log("Payment session created:", data.data);
@@ -124,8 +132,12 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     } catch (error) {
       console.error('Error during payment initialization:', error);
       
-      if (error instanceof Error && error.message.includes('Missing required parameters')) {
-        throw new Error('חסרים פרטים נדרשים לביצוע התשלום');
+      if (error instanceof Error) {
+        if (error.message.includes('Missing required parameters')) {
+          throw new Error('חסרים פרטים נדרשים לביצוע התשלום');
+        }
+        // Show error message to user
+        toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
       }
       
       throw error;

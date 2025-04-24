@@ -18,13 +18,18 @@ export const useCardcomInitializer = () => {
   ): Promise<boolean> => {
     try {
       if (!masterFrameRef.current || !lowProfileCode || !sessionId) {
-        console.error('Missing required references for CardCom initialization');
+        console.error('Missing required references for CardCom initialization', { 
+          hasMasterFrame: Boolean(masterFrameRef.current), 
+          lowProfileCode, 
+          sessionId 
+        });
         return false;
       }
 
       console.log('Initializing CardCom fields with:', {
         lowProfileCode,
         sessionId: sessionId.substring(0, 8) + '...',
+        terminalNumber,
         operationType,
         planType,
       });
@@ -69,15 +74,9 @@ export const useCardcomInitializer = () => {
         // Add the message listener
         window.addEventListener('message', handleInitMessage);
 
-        // Customize card and CVV field appearance
+        // Improved CSS that targets specific elements instead of global styles
         const cardFieldCSS = `
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Rubik', sans-serif;
-            direction: rtl;
-          }
-          input {
+          #CardComCardNumber input {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -88,7 +87,7 @@ export const useCardcomInitializer = () => {
             direction: ltr;
             font-family: 'Rubik', sans-serif;
           }
-          input:focus {
+          #CardComCardNumber input:focus {
             border-color: #7c3aed;
             outline: none;
             box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
@@ -96,12 +95,7 @@ export const useCardcomInitializer = () => {
         `;
 
         const cvvFieldCSS = `
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Rubik', sans-serif;
-          }
-          input {
+          #CardComCvv input {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -112,14 +106,14 @@ export const useCardcomInitializer = () => {
             direction: ltr;
             font-family: 'Rubik', sans-serif;
           }
-          input:focus {
+          #CardComCvv input:focus {
             border-color: #7c3aed;
             outline: none;
             box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
           }
         `;
 
-        // Send init message to CardCom
+        // Send init message to CardCom with correct lowProfileCode and sessionId
         frameWindow.postMessage({
           action: 'init',
           terminalNumber: terminalNumber,
