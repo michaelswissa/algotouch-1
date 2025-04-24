@@ -1,4 +1,3 @@
-
 export type CardcomOperation = 
   | "ChargeOnly" 
   | "ChargeAndCreateToken" 
@@ -78,3 +77,47 @@ export interface TransactionInfo {
   CardOwnerIdentityNumber?: string;
 }
 
+export interface GetLowProfileResult {
+  ResponseCode: number;
+  Description?: string;
+  TerminalNumber: number;
+  LowProfileId: string;
+  TranzactionId: number;
+  ReturnValue?: string;
+  Operation?: CardcomOperation;
+  UIValues: LowProfileUIValues;
+  DocumentInfo?: DocumentInfo;
+  TokenInfo?: TokenInfo;
+  SuspendedInfo?: SuspendedInfo;
+  TranzactionInfo?: TransactionInfo;
+  ExternalPaymentVector?: string;
+  Country?: string;
+  UTM?: LPUtmData;
+  IssuerAuthCodeDescription?: string;
+}
+
+export interface LowProfileUIValues {
+  CardOwnerEmail?: string;
+  CardOwnerName?: string;
+  CardOwnerPhone?: string;
+  CardOwnerIdentityNumber?: string;
+  NumOfPayments?: number;
+  CardYear?: number;
+  CardMonth?: number;
+  CustomFields?: Array<CustomField>;
+  IsAbroadCard?: boolean;
+}
+
+export interface LPUtmData {
+  Source?: string;
+  Medium?: string;
+  Campaign?: string;
+  Content?: string;
+  Term?: string;
+}
+
+export interface GetLowProfileRequest {
+  TerminalNumber: number;
+  ApiName: string;
+  LowProfileId: string;
+}

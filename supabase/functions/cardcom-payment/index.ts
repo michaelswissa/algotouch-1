@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -29,6 +28,87 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
+    const { action, lowProfileCode, sessionId } = await req.json();
+    
+    // Handle status check action
+    if (action === 'check-status' && lowProfileCode) {
+      logStep("Checking transaction status", { lowProfileCode });
+      
+      const getLowProfileRequest: GetLowProfileRequest = {
+        TerminalNumber: parseInt(CARDCOM_CONFIG.terminalNumber),
+        ApiName: CARDCOM_CONFIG.apiName,
+        LowProfileId: lowProfileCode
+      };
+
+      const response = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/GetById', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(getLowProfileRequest),
+      });
+      
+      const responseData: GetLowProfileResult = await response.json();
+      logStep("Status check response", responseData);
+      
+      // Handle different response scenarios
+      if (responseData.ResponseCode === 0) {
+        // Transaction completed successfully
+        if (responseData.TranzactionInfo?.ResponseCode === 0) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: responseData,
+              message: "Transaction completed successfully"
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        
+        // Transaction failed
+        if (responseData.TranzactionInfo?.ResponseCode > 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              failed: true,
+              data: responseData,
+              message: responseData.TranzactionInfo.Description || "Transaction failed"
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        
+        // Transaction still processing
+        return new Response(
+          JSON.stringify({
+            success: false,
+            processing: true,
+            data: responseData,
+            message: "Transaction is still processing"
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      // Low profile not found or other error
+      return new Response(
+        JSON.stringify({
+          success: false,
+          data: responseData,
+          message: responseData.Description || "Error checking transaction status"
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
