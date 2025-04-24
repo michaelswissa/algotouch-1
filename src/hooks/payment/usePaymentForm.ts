@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { usePayment } from '@/hooks/usePayment';
 import { toast } from 'sonner';
@@ -38,16 +37,17 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
   });
 
   const handleMasterFrameLoad = () => {
-    console.log('💡 Master frame loaded (onLoad event)');
+    console.log('💡 Master frame loaded');
     setIsMasterFrameLoaded(true);
   };
 
   useEffect(() => {
-    if (isMasterFrameLoaded) {
-      console.log('Master frame loaded, initializing payment...');
-      initializePayment();
+    if (isMasterFrameLoaded && lowProfileCode && terminalNumber) {
+      console.log('Initializing CardCom fields...');
+      initializePayment()
+        .catch(() => toast.error('אתחול שדות האשראי נכשל'));
     }
-  }, [isMasterFrameLoaded, initializePayment]);
+  }, [isMasterFrameLoaded, lowProfileCode, terminalNumber]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -108,7 +108,6 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     isInitializing,
     isContentReady,
     isMasterFrameLoaded,
-    areFieldsInitialized: isMasterFrameLoaded,
     plan,
     terminalNumber,
     cardcomUrl,
