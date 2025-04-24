@@ -67,14 +67,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   return (
     <div className="space-y-4" dir="rtl">
       {/* Only render PaymentIframe after initialization */}
-      {isReady && (
-        <PaymentIframe
-          masterFrameRef={masterFrameRef}
-          cardcomUrl={cardcomUrl}
-          terminalNumber={terminalNumber}
-          onMasterFrameLoad={onMasterFrameLoad}
-        />
-      )}
+      <PaymentIframe
+        masterFrameRef={masterFrameRef}
+        cardcomUrl={cardcomUrl}
+        terminalNumber={terminalNumber}
+        onMasterFrameLoad={onMasterFrameLoad}
+      />
 
       <CardOwnerDetails
         cardholderName={cardholderName}

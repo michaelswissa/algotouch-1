@@ -48,6 +48,16 @@ export const useFrameMessages = ({
         const data = event.data;
         if (!data || typeof data !== 'object') return;
 
+        // Handle initCompleted message
+        if (data.action === 'initCompleted') {
+          console.log('CardCom fields initialization completed');
+          setState((prev: any) => ({
+            ...prev,
+            isContentReady: true
+          }));
+          return;
+        }
+
         // Handle 3DS messages
         if (data.action === '3DSProcessStarted') {
           console.log('3DS authentication process started');
@@ -84,8 +94,8 @@ export const useFrameMessages = ({
           }));
         }
 
-        // Handle errors
-        else if (data.action === 'HandleEror') {
+        // Handle errors - fixed typo from 'HandleEror' to 'HandleError'
+        else if (data.action === 'HandleError') {
           console.error('Payment error received:', data.message);
           clearTimeout(timeoutId);
           toast.error(data.message || 'שגיאה בתהליך התשלום');

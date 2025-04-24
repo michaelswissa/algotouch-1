@@ -17,7 +17,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   // Add the 3DS.js script when the component mounts
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + Date.now();
+    script.src = `${cardcomUrl}/External/OpenFields/3DS.js?v=${Date.now()}`;
     document.head.appendChild(script);
     
     // Cleanup function to remove script when component unmounts
@@ -28,14 +28,14 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         // Script might have already been removed
       }
     };
-  }, []);
+  }, [cardcomUrl]);
 
   // Master frame URL has terminal number as query param
   const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
 
   return (
     <div className="relative space-y-4">
-      {/* Hidden master frame */}
+      {/* Hidden master iframe */}
       <iframe
         ref={masterFrameRef}
         id="CardComMasterFrame"
@@ -67,8 +67,6 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
           title="CVV"
         />
       </div>
-
-      {/* No manual reCAPTCHA frame - will be injected by 3DS.js when needed */}
     </div>
   );
 };
