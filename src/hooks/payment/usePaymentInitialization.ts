@@ -74,7 +74,11 @@ export const usePaymentInitialization = ({
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE
+        paymentStatus: PaymentStatus.IDLE,
+        sessionId: paymentData.sessionId,
+        lowProfileCode: paymentData.lowProfileCode,
+        terminalNumber: paymentData.terminalNumber,
+        isReady: true // Set isReady flag to true to enable iframe initialization
       }));
       
       // Step 5: Initialize CardCom fields with the lowProfileCode

@@ -13,7 +13,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string }> => {
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; cardcomUrl?: string }> => {
     console.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -21,32 +21,55 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
+    // Get registration data for sending to the edge function
+    const registrationData = sessionStorage.getItem('registration_data');
+    let parsedRegistrationData = null;
+    if (registrationData) {
+      try {
+        parsedRegistrationData = JSON.parse(registrationData);
+      } catch (e) {
+        console.error("Error parsing registration data:", e);
+      }
+    }
+
     // Determine operation based on plan and operationType
+    let amount = 0;
     let operation = "ChargeOnly";
     if (operationType === 'token_only' || planId === 'monthly') {
+      operation = "CreateTokenOnly";
+      amount = planId === 'monthly' ? 0 : 0; // Free trial for monthly
+    } else if (planId === 'annual') {
+      amount = 3371;
       operation = "ChargeAndCreateToken";
+    } else if (planId === 'vip') {
+      amount = 13121;
+      operation = "ChargeOnly";
     }
+
+    console.log("Calling cardcom-payment edge function with:", {
+      planId,
+      amount,
+      operation,
+      userId
+    });
 
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
       body: {
         planId,
-        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        amount: amount,
         invoiceInfo: {
           fullName: paymentUser.fullName || paymentUser.email,
           email: paymentUser.email,
         },
         currency: "ILS",
-        operation: operation,
+        operationType: operation,
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
         },
         userId: userId,
-        operationType,
-        registrationData: sessionStorage.getItem('registration_data') 
-          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-          : null
+        registrationData: parsedRegistrationData
       }
     });
     
@@ -66,13 +89,15 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       lowProfileCode: data.data.lowProfileCode,
       terminalNumber: terminalNumber,
       cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
-      paymentStatus: PaymentStatus.IDLE
+      paymentStatus: PaymentStatus.IDLE,
+      isReady: true
     }));
     
     return { 
       lowProfileCode: data.data.lowProfileCode, 
       sessionId: data.data.sessionId,
-      terminalNumber: terminalNumber
+      terminalNumber: terminalNumber,
+      cardcomUrl: data.data.cardcomUrl
     };
   };
 
