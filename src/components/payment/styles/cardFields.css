@@ -24,16 +24,14 @@
   position: relative;
 }
 
-/* Match iframe heights */
+/* Match iframe heights but remove absolute positioning */
 #CardComCardNumber,
 #CardComCvv {
   height: 57px !important;
   width: 100%;
   border: none;
   transition: border-color 0.2s ease;
-  position: absolute;
-  top: 0;
-  left: 0;
+  box-sizing: border-box;
 }
 
 /* Loading state styles */

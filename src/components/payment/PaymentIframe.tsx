@@ -28,21 +28,21 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
       
       {/* Card fields container with proper styling */}
       <div className="card-fields-wrapper space-y-4">
-        <div className="card-number-container">
+        <div className="w-full h-[57px] border border-gray-300 rounded-md overflow-hidden">
           <iframe
             id="CardComCardNumber"
             name="CardComCardNumber"
             src={`${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`}
-            className="w-full h-[57px] border border-gray-300 rounded-md"
+            className="w-full h-full"
             title="מספר כרטיס"
           />
         </div>
-        <div className="cvv-container">
+        <div className="w-[188px] h-[57px] border border-gray-300 rounded-md overflow-hidden">
           <iframe
             id="CardComCvv"
             name="CardComCvv"
             src={`${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`}
-            className="w-[188px] h-[57px] border border-gray-300 rounded-md"
+            className="w-full h-full"
             title="קוד אבטחה"
           />
         </div>

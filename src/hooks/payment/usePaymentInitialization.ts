@@ -1,3 +1,4 @@
+
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from '../useCardcomInitializer';
@@ -82,13 +83,12 @@ export const usePaymentInitialization = ({
       // Initialize CardCom fields with proper timing
       setTimeout(async () => {
         try {
+          // FIX: Pass only the required arguments to initializeCardcomFields
           const initialized = await initializeCardcomFields(
             masterFrameRef, 
             paymentData.lowProfileCode, 
-            paymentData.sessionId,
             paymentData.terminalNumber.toString(),
-            paymentOpType,
-            planId
+            paymentOpType
           );
           
           if (!initialized) {
