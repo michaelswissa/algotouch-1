@@ -1,9 +1,9 @@
 
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { initializeCardcomFields } from '../useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
+import { useCardcomInitializer } from '../useCardcomInitializer'; // Fixed import
 import { toast } from 'sonner';
 
 interface UsePaymentInitializationProps {
@@ -17,6 +17,7 @@ export const usePaymentInitialization = ({ planId, setState, masterFrameRef, ope
   const { handleRegistrationData } = useRegistrationHandler();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
+  const { initializeCardcomFields } = useCardcomInitializer(); // Use the imported hook
 
   const waitForMasterFrame = async (): Promise<void> => {
     // Check if masterFrameRef is available

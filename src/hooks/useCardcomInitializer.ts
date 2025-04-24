@@ -51,7 +51,7 @@ export const useCardcomInitializer = () => {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: Number(terminalNumber),
+        terminalNumber: String(terminalNumber), // Convert to string here
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
@@ -128,3 +128,5 @@ export const useCardcomInitializer = () => {
 
   return { initializeCardcomFields };
 };
+
+export default useCardcomInitializer;
