@@ -47,13 +47,6 @@ export const useCardcomInitializer = () => {
             lowProfileCode,
             terminalNumber: Number(terminalNumber),
             operation: operation === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly',
-            // Using empty CSS - inject real CSS here if needed
-            cardFieldCSS: '',
-            cvvFieldCSS: '',
-            reCaptchaFieldCSS: '',
-            placeholder: '1111-2222-3333-4444',
-            cvvPlaceholder: '123',
-            language: 'he'
           };
 
           console.debug('📤 Sending init message to CardCom master frame:', payload);
@@ -85,4 +78,3 @@ export const useCardcomInitializer = () => {
     },
   };
 };
-

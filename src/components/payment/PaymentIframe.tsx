@@ -15,34 +15,27 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   terminalNumber,
   onMasterFrameLoad,
 }) => {
-  const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
+  const masterSrc = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
 
   return (
-    <div className="payment-frames-container relative space-y-4">
-      {/* hidden master frame used for postMessage transport */}
+    <div className="relative space-y-4">
+      {/* master (hidden) */}
       <iframe
         ref={masterFrameRef}
         id="CardComMasterFrame"
         name="CardComMasterFrame"
-        src={masterFrameUrl}
-        style={{
-          width: 0,
-          height: 0,
-          border: 'none',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-        }}
+        src={masterSrc}
+        style={{ width: 0, height: 0, border: 'none', position: 'absolute', top: 0, left: 0 }}
         onLoad={onMasterFrameLoad}
-        title="CardCom Master Frame"
+        title="CardCom Master"
       />
 
-      {/* card number */}
+      {/* NUMBER – NO params! */}
       <div className="w-full h-[57px] border border-input bg-background rounded-md overflow-hidden">
         <iframe
           id="CardComCardNumber"
           name="CardComCardNumber"
-          src={`${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`}
+          src={`${cardcomUrl}/api/openfields/cardNumber`}
           className="w-full h-full"
           title="מספר כרטיס"
         />
@@ -53,18 +46,18 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         <iframe
           id="CardComCvv"
           name="CardComCvv"
-          src={`${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`}
+          src={`${cardcomUrl}/api/openfields/CVV`}
           className="w-full h-full"
           title="CVV"
         />
       </div>
 
-      {/* reCAPTCHA – required when 3-DS is on */}
+      {/* reCAPTCHA – required for 3-DS */}
       <div className="w-full h-[80px] overflow-hidden">
         <iframe
           id="CardComReCaptcha"
           name="CardComReCaptcha"
-          src={`${cardcomUrl}/api/openfields/recaptcha?terminalNumber=${terminalNumber}`}
+          src={`${cardcomUrl}/api/openfields/recaptcha`}
           className="w-full h-full"
           title="reCAPTCHA"
         />
