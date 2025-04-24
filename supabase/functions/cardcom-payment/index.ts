@@ -418,16 +418,13 @@ serve(async (req) => {
                       `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                       undefined);
     
-    const transactionRef = userId 
-      ? `${userId}-${Date.now()}`
-      : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
-    
+    const transactionRef = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
     
     logStep("Creating Cardcom request", { webhookUrl, transactionRef });
 
     const cardcomPayload = {
-      TerminalNumber: CARDCOM_CONFIG.terminalNumber,
+      TerminalNumber: parseInt(CARDCOM_CONFIG.terminalNumber),
       ApiName: CARDCOM_CONFIG.apiName,
       Operation: operationType === 'token_only' || planId === 'monthly' ? "ChargeAndCreateToken" : "ChargeOnly",
       ReturnValue: transactionRef,
@@ -443,27 +440,14 @@ serve(async (req) => {
         IsHideCardOwnerEmail: false,
         IsHideCardOwnerPhone: false,
         CardOwnerEmailValue: invoiceInfo?.email || registrationData?.email,
-        CardOwnerNameValue: invoiceInfo?.fullName || 
-          (registrationData?.userData ? 
-            `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
-            undefined),
+        CardOwnerNameValue: fullName,
         IsCardOwnerEmailRequired: true,
-        IsCardOwnerPhoneRequired: true
-      },
-      Document: invoiceInfo ? {
-        Name: fullName || userEmail,
-        Email: userEmail,
-        DocumentTypeToCreate: "Receipt",
-        Products: [{
-          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: amount,
-          Quantity: 1,
-          TotalLineCost: amount
-        }]
-      } : undefined
+        IsCardOwnerPhoneRequired: true,
+        IsHideCardOwnerIdentityNumber: false
+      }
     };
     
-    logStep("Sending request to Cardcom");
+    logStep("Sending request to Cardcom", cardcomPayload);
     
     const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
       method: "POST",
@@ -478,10 +462,24 @@ serve(async (req) => {
     logStep("Cardcom response", responseData);
     
     if (responseData.ResponseCode !== 0) {
+      logStep("Error response from Cardcom", responseData);
       return new Response(
         JSON.stringify({
           success: false,
           message: responseData.Description || "Cardcom initialization failed",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!responseData.LowProfileId) {
+      logStep("Missing LowProfileId in response", responseData);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Missing LowProfileId in Cardcom response",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -501,24 +499,32 @@ serve(async (req) => {
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
-    
-    let dbSessionId = null;
+
+    let dbSessionId;
     
     try {
-      if (userId) {
-        const { data: dbSession, error: sessionError } = await supabaseAdmin
-          .from('payment_sessions')
-          .insert(sessionData)
-          .select('id')
-          .single();
+      const { data: dbSession, error: sessionError } = await supabaseAdmin
+        .from('payment_sessions')
+        .insert(sessionData)
+        .select('id')
+        .single();
             
-        if (!sessionError && dbSession) {
-          dbSessionId = dbSession.id;
-          logStep("Payment session stored", { sessionId: dbSessionId });
-        }
+      if (sessionError) {
+        logStep("Error creating payment session", sessionError);
+        throw new Error("Failed to create payment session");
       }
+
+      if (!dbSession?.id) {
+        logStep("No session ID returned", dbSession);
+        throw new Error("No session ID returned from database");
+      }
+
+      dbSessionId = dbSession.id;
+      logStep("Payment session stored", { sessionId: dbSessionId });
+
     } catch (dbError) {
-      logStep("Error storing payment session", { error: dbError.message });
+      logStep("Database error", dbError);
+      throw new Error("Failed to store payment session");
     }
     
     return new Response(
@@ -526,7 +532,7 @@ serve(async (req) => {
         success: true,
         message: "Payment session created",
         data: {
-          sessionId: dbSessionId || `temp-${Date.now()}`,
+          sessionId: dbSessionId,
           lowProfileCode: responseData.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
