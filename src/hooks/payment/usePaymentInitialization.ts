@@ -51,6 +51,8 @@ export const usePaymentInitialization = ({
 
       // Step 3: Initialize payment session to get lowProfileCode
       console.log('Initializing payment session with plan:', planId);
+      
+      // Make a single call to initialize the payment session
       const paymentData = await initializePaymentSession(
         planId,
         userId,

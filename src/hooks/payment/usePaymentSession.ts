@@ -21,33 +21,30 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
-    // Determine operation based on plan and operationType
-    let operation = "ChargeOnly";
-    if (operationType === 'token_only' || planId === 'monthly') {
-      operation = "ChargeAndCreateToken";
-    }
+    // Create the payload once before sending
+    const payload = {
+      planId,
+      amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+      invoiceInfo: {
+        fullName: paymentUser.fullName || paymentUser.email,
+        email: paymentUser.email,
+      },
+      currency: "ILS",
+      operation: operationType === 'token_only' || planId === 'monthly' ? "ChargeAndCreateToken" : "ChargeOnly",
+      redirectUrls: {
+        success: `${window.location.origin}/subscription/success`,
+        failed: `${window.location.origin}/subscription/failed`
+      },
+      userId: userId,
+      operationType,
+      registrationData: sessionStorage.getItem('registration_data') 
+        ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+        : null
+    };
 
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-      body: {
-        planId,
-        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
-        invoiceInfo: {
-          fullName: paymentUser.fullName || paymentUser.email,
-          email: paymentUser.email,
-        },
-        currency: "ILS",
-        operation: operation,
-        redirectUrls: {
-          success: `${window.location.origin}/subscription/success`,
-          failed: `${window.location.origin}/subscription/failed`
-        },
-        userId: userId,
-        operationType,
-        registrationData: sessionStorage.getItem('registration_data') 
-          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-          : null
-      }
+      body: payload
     });
     
     if (error || !data?.success) {

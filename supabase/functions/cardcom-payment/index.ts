@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -28,7 +29,10 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    const { action, lowProfileCode, sessionId } = await req.json();
+    // Clone the request to read the body multiple times if needed
+    const reqClone = req.clone();
+    const requestData = await reqClone.json();
+    const { action } = requestData;
     
     // Handle direct transaction requests
     if (action === 'doTransaction') {
@@ -41,7 +45,7 @@ serve(async (req) => {
         externalUniqTranId,
         numOfPayments,
         document
-      } = await req.json();
+      } = requestData;
       
       logStep("Processing transaction", { 
         hasToken: !!token, 
@@ -98,7 +102,8 @@ serve(async (req) => {
     }
 
     // Handle status check action
-    if (action === 'check-status' && lowProfileCode) {
+    if (action === 'check-status') {
+      const { lowProfileCode } = requestData;
       logStep("Checking transaction status", { lowProfileCode });
       
       const getLowProfileRequest: GetLowProfileRequest = {
@@ -185,6 +190,7 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
+    // Extract all payment initialization data from the cloned request
     const { 
       planId, 
       amount, 
@@ -194,7 +200,7 @@ serve(async (req) => {
       registrationData,
       redirectUrls,
       operationType = 'payment'
-    } = await req.json();
+    } = requestData;
     
     logStep("Received request data", { planId, amount, currency, operationType });
 
