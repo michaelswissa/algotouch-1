@@ -24,15 +24,26 @@ export const usePaymentInitialization = ({
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
-  const waitForMasterFrame = async () => {
-    return new Promise<void>((resolve, reject) => {
-      const iframe = masterFrameRef.current;
-      if (!iframe) {
-        return reject(new Error('Master frame reference not available'));
-      }
+  const waitForMasterFrame = async (): Promise<void> => {
+    // Poll until the ref is filled
+    let pollAttempts = 0;
+    while (!masterFrameRef.current && pollAttempts < 100) {
+      await new Promise(r => setTimeout(r, 50));
+      pollAttempts++;
+    }
+    
+    if (!masterFrameRef.current) {
+      console.warn('Master frame reference still not available after polling');
+      throw new Error('Master frame reference not available');
+    }
 
-      // אם ה-iframe כבר נטען, נפתור מיד
-      if (iframe.contentWindow && iframe.complete) {
+    const iframe = masterFrameRef.current;
+    
+    // Now wait for the document to load
+    return new Promise<void>((resolve, reject) => {
+      // Check if already loaded
+      const docReady = iframe.contentDocument?.readyState === 'complete';
+      if (iframe.contentWindow && docReady) {
         console.log('Master frame already loaded');
         return resolve();
       }
@@ -47,7 +58,7 @@ export const usePaymentInitialization = ({
 
       iframe.addEventListener('load', onLoad);
 
-      // Timeout למניעת תקיעות אינסופית
+      // Timeout to prevent infinite wait
       setTimeout(() => {
         console.warn('Master frame load timeout after 10s, proceeding anyway');
         iframe.removeEventListener('load', onLoad);
