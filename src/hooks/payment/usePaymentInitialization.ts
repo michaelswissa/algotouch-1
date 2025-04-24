@@ -1,4 +1,3 @@
-
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from './useCardcomInitializer';
@@ -53,7 +52,7 @@ export const usePaymentInitialization = ({
       console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
-        userId,
+        userId,  // Use the userId from handleRegistrationData
         { email: userEmail, fullName: fullName },
         operationType
       );
@@ -115,9 +114,8 @@ export const usePaymentInitialization = ({
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       
       // If error is related to missing user data, redirect to auth page
-      if (error.message?.includes('חסרים פרטי משתמש') || !userId) {
+      if (error.message?.includes('חסרים פרטי משתמש')) {
         console.log('Redirecting to auth page due to missing user data');
-        // Store current plan selection in session storage for later use
         try {
           sessionStorage.setItem('selected_plan', planId);
         } catch (e) {

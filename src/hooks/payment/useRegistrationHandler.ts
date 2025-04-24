@@ -1,15 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
-interface RegistrationResult {
-  userId: string;
-  userEmail: string;
-  fullName: string;
-}
-
 export const useRegistrationHandler = () => {
-  const handleRegistrationData = async (): Promise<RegistrationResult> => {
+  const handleRegistrationData = async () => {
     console.log('Getting registration data');
     
     // Get registration data if available
@@ -63,5 +56,7 @@ export const useRegistrationHandler = () => {
     return { userId, userEmail, fullName: fullName || userEmail };
   };
 
-  return { handleRegistrationData };
+  return {
+    handleRegistrationData
+  };
 };
