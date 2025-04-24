@@ -1,3 +1,4 @@
+
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { initializeCardcomFields } from '../useCardcomInitializer';

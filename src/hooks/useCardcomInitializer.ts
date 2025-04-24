@@ -3,40 +3,53 @@ import { toast } from 'sonner';
 
 /**
  * Initialise CardCom open-fields.
- * Returns true if the init message was posted.
+ * Returns true if the init message was posted and we received 'initCompleted'.
  */
 export const initializeCardcomFields = async (
   masterRef: React.RefObject<HTMLIFrameElement>,
   lowProfileCode: string,
   terminalNumber: string,
-  op: 'payment' | 'token_only' = 'payment'
+  op: 'payment' | 'token_only' = 'payment',
 ): Promise<boolean> => {
-  const iframe = masterRef.current;
-  if (!iframe) {
-    console.error('🛑 masterFrameRef empty');
-    toast.error('שגיאה בטעינת שדות האשראי');
+  const mf = masterRef.current;
+  if (!mf) {
+    toast.error('Master frame missing');
     return false;
   }
 
-  /* wait for iframe to finish loading */
-  if (!iframe.contentWindow) {
+  /* wait until iframe has a contentWindow */
+  if (!mf.contentWindow) {
     await new Promise<void>((r) =>
-      iframe.addEventListener('load', () => r(), { once: true })
+      mf.addEventListener('load', () => r(), { once: true }),
     );
   }
 
-  /* build minimal payload exactly like CardCom sample */
-  const msg = {
+  const payload = {
     action: 'init',
     lowProfileCode,
     terminalNumber: Number(terminalNumber),
     operation: op === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly',
-    cardFieldCSS: '',
+    cardFieldCSS: '',        // keep empty → CardCom default
     cvvFieldCSS: '',
     reCaptchaFieldCSS: '',
   };
-  iframe.contentWindow!.postMessage(msg, '*');
-  console.debug('📤 init posted to master frame', msg);
+  console.debug('📤 postMessage → master', payload);
+  mf.contentWindow!.postMessage(payload, '*');
 
-  return true;
+  /* resolve once CardCom replies */
+  return new Promise<boolean>((res) => {
+    const to = setTimeout(() => {
+      console.warn('initCompleted timeout');
+      res(false);
+    }, 8_000);
+
+    const handler = (ev: MessageEvent) => {
+      if (ev.data?.action !== 'initCompleted') return;
+      clearTimeout(to);
+      window.removeEventListener('message', handler);
+      console.debug('✅ initCompleted received');
+      res(true);
+    };
+    window.addEventListener('message', handler);
+  });
 };

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { usePayment } from '@/hooks/usePayment';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ interface UsePaymentFormProps {
 
 export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProps) => {
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
+  const [initSent, setInitSent] = useState(false);
 
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' ? planDetails.annual :
@@ -39,16 +41,21 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     setIsMasterFrameLoaded(true);
   };
 
-  useEffect(() => {
-    if (!isMasterFrameLoaded || !lowProfileCode || !terminalNumber) return;
+  const readyToInit =
+    isMasterFrameLoaded && lowProfileCode && terminalNumber && !initSent;
 
+  useEffect(() => {
+    if (!readyToInit) return;
+    setInitSent(true);
     initializeCardcomFields(
       masterFrameRef,
-      lowProfileCode,
-      terminalNumber.toString(),
-      operationType
-    ).catch(() => toast.error('CardCom init failed'));
-  }, [isMasterFrameLoaded, lowProfileCode, terminalNumber, masterFrameRef, operationType]);
+      lowProfileCode!,
+      terminalNumber!.toString(),
+      operationType,
+    ).then((ok) => {
+      if (!ok) toast.error('CardCom init failed');
+    });
+  }, [readyToInit, masterFrameRef, lowProfileCode, terminalNumber, operationType]);
 
   useEffect(() => {
     const t = setTimeout(() => {
