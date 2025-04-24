@@ -13,9 +13,8 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
     cardcomUrl: '',
     paymentStatus: PaymentStatus.IDLE,
     sessionId: '',
-    lowProfileId: '',
-    url: '',
-    isFramesReady: false
+    lowProfileCode: '',
+    isFramesReady: false, // Added the missing property
   });
 
   // Changed to match the expected signature (no parameters)

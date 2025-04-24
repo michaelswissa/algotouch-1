@@ -1,6 +1,7 @@
 
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
+import { useCardcomInitializer } from '../useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ export const usePaymentInitialization = ({
   operationType = 'payment'
 }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
+  const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
@@ -32,7 +34,7 @@ export const usePaymentInitialization = ({
     try {
       // Step 1: Get and validate registration data
       const { userId, userEmail, fullName } = await handleRegistrationData();
-      console.log('Registration data loaded:', { userId, userEmail, fullName });
+      console.log('Registration data loaded:', { userId, userEmail });
       
       if (!userEmail) {
         console.error("No user email found for payment");
@@ -47,7 +49,7 @@ export const usePaymentInitialization = ({
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
 
-      // Step 3: Initialize payment session with proper error handling
+      // Step 3: Initialize payment session to get lowProfileCode
       console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
@@ -56,33 +58,52 @@ export const usePaymentInitialization = ({
         operationType
       );
       
-      if (!paymentData?.lowProfileId) {
-        console.error("Missing lowProfileId in payment data:", paymentData);
+      if (!paymentData || !paymentData.lowProfileCode) {
+        console.error("Failed to initialize payment session or missing lowProfileCode", paymentData);
         throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
       }
       
-      console.log('Payment session initialized:', {
-        lowProfileId: paymentData.lowProfileId,
-        sessionId: paymentData.sessionId,
-        terminalNumber: paymentData.terminalNumber,
-        cardcomUrl: paymentData.cardcomUrl
-      });
+      console.log('Payment session initialized with lowProfileCode:', paymentData.lowProfileCode);
 
-      // Set initial payment state after payment session initialization
+      // Step 4: Master frame should be loaded by the parent component
+      // We must ensure the iframes are ready before initialization
+      
+      // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE,
-        lowProfileId: paymentData.lowProfileId,
-        sessionId: paymentData.sessionId,
-        terminalNumber: paymentData.terminalNumber,
-        cardcomUrl: paymentData.cardcomUrl || 'https://secure.cardcom.solutions',
-        isReady: true,
+        paymentStatus: PaymentStatus.IDLE
       }));
-
+      
+      // Step 5: Initialize CardCom fields with the lowProfileCode
+      console.log('Setting up to initialize CardCom fields');
+      setTimeout(async () => {
+        console.log('Starting CardCom fields initialization');
+        try {
+          const initialized = await initializeCardcomFields(
+            masterFrameRef, 
+            paymentData.lowProfileCode, 
+            paymentData.sessionId,
+            paymentData.terminalNumber,
+            operationType
+          );
+          
+          if (!initialized) {
+            console.error("Failed to initialize CardCom fields");
+            throw new Error('שגיאה באתחול שדות התשלום');
+          }
+          
+          console.log('CardCom fields initialized successfully');
+        } catch (error) {
+          console.error('Error during CardCom field initialization:', error);
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          toast.error(error.message || 'שגיאה באתחול שדות התשלום');
+        }
+      }, 500); // Short delay to ensure master frame is loaded
+      
       return paymentData;
     } catch (error) {
       console.error('Payment initialization error:', error);
-      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
+      toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
     }

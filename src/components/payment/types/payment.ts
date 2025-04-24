@@ -13,10 +13,9 @@ export interface PaymentResponse {
   success: boolean;
   data: {
     sessionId: string;
-    lowProfileId: string;
+    lowProfileCode: string;
     terminalNumber: string;
     cardcomUrl?: string;
-    url: string;
   };
   message?: string;
 }
@@ -30,17 +29,9 @@ export interface CardComMessage {
   cardType?: string;
 }
 
-export type OperationType = 
-  | "ChargeOnly" 
-  | "ChargeAndCreateToken"
-  | "CreateTokenOnly"
-  | "SuspendedDeal"
-  | "Do3DSAndSubmit";
-
 export interface InitConfig {
   action: 'init';
-  lowProfileId: string;
-  url?: string;
+  lowProfileCode: string;
   sessionId?: string;
   terminalNumber: string;
   cardFieldCSS: string;
@@ -50,7 +41,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: OperationType;
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
 }
 
 export interface PaymentState {
@@ -58,10 +49,8 @@ export interface PaymentState {
   cardcomUrl: string;
   paymentStatus: PaymentStatusType;
   sessionId: string;
-  lowProfileId: string;
-  url: string;
+  lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
   isFramesReady: boolean;
-  is3DSInProgress?: boolean;
 }

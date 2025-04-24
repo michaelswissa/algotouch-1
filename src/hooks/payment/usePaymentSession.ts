@@ -13,7 +13,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ) => {
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string }> => {
     console.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -21,63 +21,59 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
-    try {
-      // Determine amount based on plan and operation type
-      let amount = 0;
-      if (operationType === 'payment') {
-        amount = planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121;
-      }
+    // Determine operation based on plan and operationType
+    let operation = "ChargeOnly";
+    if (operationType === 'token_only' || planId === 'monthly') {
+      operation = "ChargeAndCreateToken";
+    }
 
-      const payload = {
+    // Call CardCom payment initialization Edge Function
+    const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      body: {
         planId,
-        amount: amount.toString(),
+        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
         invoiceInfo: {
           fullName: paymentUser.fullName || paymentUser.email,
           email: paymentUser.email,
         },
         currency: "ILS",
-        operationType,
+        operation: operation,
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
         },
         userId: userId,
+        operationType,
         registrationData: sessionStorage.getItem('registration_data') 
           ? JSON.parse(sessionStorage.getItem('registration_data')!) 
           : null
-      };
-
-      console.log("Sending payment initialization request with payload:", payload);
-      
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-        body: payload
-      });
-      
-      console.log("Payment initialization response:", data);
-      
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw new Error(error.message || 'אירעה שגיאה באתחול התשלום');
       }
-      
-      if (!data?.success) {
-        console.error("Payment initialization failed:", data?.message);
-        throw new Error(data?.message || 'אירעה שגיאה באתחול התשלום');
-      }
-      
-      if (!data.data?.lowProfileId) {
-        console.error("Missing lowProfileId in response:", data.data);
-        throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
-      }
-      
-      console.log("Payment session created successfully:", data.data);
-      return data.data;
-    } catch (error) {
-      console.error("Payment initialization error:", error);
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
-      throw error;
+    });
+    
+    if (error || !data?.success) {
+      console.error("Payment initialization error:", error || data?.message);
+      throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
     }
+    
+    console.log("Payment session created:", data.data);
+    
+    // Always use the fixed terminal number for CardCom
+    const terminalNumber = '160138';
+    
+    setState(prev => ({
+      ...prev,
+      sessionId: data.data.sessionId,
+      lowProfileCode: data.data.lowProfileCode,
+      terminalNumber: terminalNumber,
+      cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+      paymentStatus: PaymentStatus.IDLE
+    }));
+    
+    return { 
+      lowProfileCode: data.data.lowProfileCode, 
+      sessionId: data.data.sessionId,
+      terminalNumber: terminalNumber
+    };
   };
 
   return { initializePaymentSession };

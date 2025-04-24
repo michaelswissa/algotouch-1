@@ -1,11 +1,10 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { PaymentStatus, OperationType } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
-import { useCardcomInitializer } from './payment/useCardcomInitializer';
 import { toast } from 'sonner';
 
 interface UsePaymentProps {
@@ -17,7 +16,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
-  const { initializeCardcomFields } = useCardcomInitializer();
   
   // Determine operation type based on plan ID
   useEffect(() => {
@@ -48,57 +46,15 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     cleanupStatusCheck
   } = usePaymentStatusCheck({ setState });
 
-  // Listen for frame messages
   useFrameMessages({
-    handlePaymentSuccess,
+    handlePaymentSuccess: handlePaymentSuccess,
     setState,
     checkPaymentStatus,
-    lowProfileId: state.lowProfileId,
+    lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     operationType,
     planType: planId
   });
-
-  // Initialize CardCom fields when payment data is ready
-  useEffect(() => {
-    const initializeFields = async () => {
-      if (
-        state.lowProfileId && 
-        state.sessionId && 
-        state.terminalNumber && 
-        masterFrameRef.current &&
-        state.paymentStatus !== PaymentStatus.PROCESSING &&
-        state.paymentStatus !== PaymentStatus.SUCCESS &&
-        state.paymentStatus !== PaymentStatus.FAILED
-      ) {
-        console.log("Initializing CardCom fields with available data");
-        
-        try {
-          const initialized = await initializeCardcomFields(
-            masterFrameRef,
-            state.lowProfileId,
-            state.sessionId,
-            state.terminalNumber,
-            operationType,
-            planId
-          );
-          
-          if (initialized) {
-            console.log("CardCom fields initialized successfully");
-            setState(prev => ({ ...prev, isFramesReady: true }));
-          } else {
-            console.error("Failed to initialize CardCom fields");
-            setState(prev => ({ ...prev, isFramesReady: false }));
-          }
-        } catch (error) {
-          console.error("Error during CardCom initialization:", error);
-          handleError("שגיאה באתחול שדות התשלום");
-        }
-      }
-    };
-
-    initializeFields();
-  }, [state.lowProfileId, state.sessionId, state.terminalNumber, operationType, setState, handleError, planId, initializeCardcomFields]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -122,7 +78,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       return;
     }
     
-    if (!state.lowProfileId) {
+    if (!state.lowProfileCode) {
       handleError("חסר מזהה יחודי לעסקה, אנא נסה/י שנית");
       return;
     }
@@ -144,7 +100,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      // CardCom requires "lowProfileId" param for each doTransaction
+      // CardCom requires "lowProfileCode" param for each doTransaction
       const formData: any = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
@@ -156,12 +112,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
-        Operation: getOperationType(operationType, planId),
-        lowProfileId: state.lowProfileId, // Ensure using consistent name
+        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        lowProfileCode: state.lowProfileCode, // Ensure always present
+        LowProfileCode: state.lowProfileCode  // For extra compatibility
       };
 
       console.log('Sending transaction data to CardCom:', formData);
-      masterFrameRef.current.contentWindow.postMessage(formData, 'https://secure.cardcom.solutions');
+      masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
       setState(prev => ({
         ...prev,
@@ -169,7 +126,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }));
       
       // Start status check with required params
-      startStatusCheck(state.lowProfileId, state.sessionId, operationType, planId);
+      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
       
       setTimeout(() => {
         setPaymentInProgress(false);
@@ -179,24 +136,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [state.lowProfileId, state.terminalNumber, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
-
-  // Helper to determine the correct operation type based on plan and payment type
-  const getOperationType = (operationType: 'payment' | 'token_only', planId: string): OperationType => {
-    if (operationType === 'token_only') {
-      return 'CreateTokenOnly';
-    } else if (planId === 'annual') {
-      return 'ChargeAndCreateToken';
-    } else {
-      return 'ChargeOnly';
-    }
-  };
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
 
   return {
     ...state,
     operationType,
     masterFrameRef,
-    lowProfileId: state.lowProfileId,
+    lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     initializePayment,
     handleRetry,

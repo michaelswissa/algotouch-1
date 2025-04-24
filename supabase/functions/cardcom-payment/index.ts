@@ -7,21 +7,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// CardCom Configuration
 const CARDCOM_CONFIG = {
   terminalNumber: "160138",
   apiName: "bLaocQRMSnwphQRUVG3b",
   apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
+    master: "https://secure.cardcom.solutions/api/openfields/master",
+    cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
+    cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
     createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
   }
 };
 
+// Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-PAYMENT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -29,6 +35,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
+    // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -38,15 +45,6 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    let requestBody;
-    try {
-      requestBody = await req.json();
-      logStep("Parsed request body", requestBody);
-    } catch (jsonError) {
-      logStep("ERROR: Failed to parse request body", { error: jsonError.message });
-      throw new Error("Invalid JSON in request body");
-    }
-    
     const { 
       planId, 
       amount, 
@@ -54,24 +52,22 @@ serve(async (req) => {
       invoiceInfo, 
       userId,
       registrationData,
-      redirectUrls,
-      operationType = 'payment'
-    } = requestBody;
+      redirectUrls
+    } = await req.json();
     
     logStep("Received request data", { 
       planId, 
       amount, 
       currency,
-      operationType,
       hasUserId: !!userId,
       hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !redirectUrls) {
+    if (!planId || !amount || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Missing required parameters (planId, redirectUrls)",
+          message: "Missing required parameters",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -79,8 +75,9 @@ serve(async (req) => {
       );
     }
 
-    const userEmail = invoiceInfo?.email || registrationData?.email;
-    const fullName = invoiceInfo?.fullName || 
+    // Get user information and prepare transaction reference
+    let userEmail = invoiceInfo?.email || registrationData?.email;
+    let fullName = invoiceInfo?.fullName || 
                   (registrationData?.userData ? 
                     `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                     undefined);
@@ -88,122 +85,89 @@ serve(async (req) => {
     const transactionRef = userId 
       ? `${userId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
-
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
-    // Determine operation type based on plan and operation
-    let cardcomOperation = "ChargeOnly";
-    if (operationType === 'token_only') {
-      cardcomOperation = "CreateTokenOnly";
-    } else if (planId === 'annual') {
-      cardcomOperation = "ChargeAndCreateToken";
-    }
+    // Prepare webhook URL with full domain
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
       transactionRef,
       userEmail,
-      fullName,
-      operation: cardcomOperation
+      fullName
     });
 
+    // Create CardCom API request body for payment initialization
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-      UserName: CARDCOM_CONFIG.apiName,
-      Password: CARDCOM_CONFIG.apiPassword,
-      Operation: cardcomOperation,
+      ApiName: CARDCOM_CONFIG.apiName,
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
       ReturnValue: transactionRef,
-      Amount: amount || "0", // In case of token_only, amount can be 0
+      Amount: amount,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1,
-      Email: userEmail,
-      InvoiceName: fullName || userEmail
+      MaxNumOfPayments: 1, // No installments allowed
+      UIDefinition: {
+        IsHideCardOwnerName: false,
+        IsHideCardOwnerEmail: false,
+        IsHideCardOwnerPhone: false,
+        CardOwnerEmailValue: userEmail,
+        CardOwnerNameValue: fullName,
+        IsCardOwnerEmailRequired: true,
+        reCaptchaFieldCSS: "body { margin: 0; padding:0; display: flex; }",
+        placeholder: "1111-2222-3333-4444",
+        cvvPlaceholder: "123"
+      },
+      Document: invoiceInfo ? {
+        Name: fullName || userEmail,
+        Email: userEmail,
+        Products: [{
+          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+          UnitCost: amount,
+          Quantity: 1
+        }]
+      } : undefined
     };
     
-    logStep("Sending request to CardCom", cardcomPayload);
+    logStep("Sending request to CardCom");
     
-    // Perform the API call with proper error handling
-    let res;
-    try {
-      res = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cardcomPayload),
-      });
-    } catch (fetchError) {
-      logStep("ERROR: Network error calling CardCom API", { error: fetchError.message });
-      throw new Error(`CardCom API network error: ${fetchError.message}`);
-    }
-
-    if (!res.ok) {
-      logStep("ERROR: CardCom Create returned HTTP", { 
-        status: res.status, 
-        statusText: res.statusText 
-      });
-      
-      // Try to get error details from response
-      try {
-        const errorText = await res.text();
-        logStep("CardCom error response", { errorText });
-      } catch (e) {
-        // Ignore error reading response
-      }
-      
-      throw new Error(`CardCom Create failed with status ${res.status}`);
+    // Initialize payment session with CardCom
+    const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(cardcomPayload),
+    });
+    
+    const responseData = await response.json();
+    
+    logStep("CardCom response", responseData);
+    
+    if (responseData.ResponseCode !== 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: responseData.Description || "CardCom initialization failed",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
     
-    // Get the response as text first to log it
-    let responseText;
-    try {
-      responseText = await res.text();
-      logStep("CardCom raw text response", { responseText });
-    } catch (textError) {
-      logStep("ERROR: Failed to read response text", { error: textError.message });
-      throw new Error("Failed to read CardCom response");
-    }
-    
-    // Parse as JSON
-    let response;
-    try {
-      response = JSON.parse(responseText);
-      logStep("CardCom parsed response", response);
-    } catch (parseError) {
-      logStep("ERROR: Failed to parse CardCom response as JSON", { error: parseError.message, text: responseText });
-      throw new Error("Invalid JSON response from CardCom");
-    }
-    
-    // Validate the response structure
-    if (!response) {
-      logStep("ERROR: Empty response from CardCom");
-      throw new Error("Empty response from CardCom");
-    }
-    
-    // Check for LowProfileId
-    if (!response.LowProfileId) {
-      logStep("ERROR: Missing LowProfileId in response", response);
-      // Check if there's an error message in the response
-      if (response.Description) {
-        throw new Error(`CardCom error: ${response.Description}`);
-      }
-      throw new Error("CardCom initialization failed - missing LowProfileId");
-    }
-
+    // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_id: response.LowProfileId,
+      low_profile_code: responseData.LowProfileId,
       reference: transactionRef,
       plan_id: planId,
-      amount: amount || 0,
+      amount: amount,
       currency: currency,
       status: 'initiated',
-      operation_type: operationType,
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
@@ -222,27 +186,22 @@ serve(async (req) => {
         if (!sessionError && dbSession) {
           dbSessionId = dbSession.id;
           logStep("Payment session stored in DB", { sessionId: dbSessionId });
-        } else {
-          logStep("Error storing payment session", { error: sessionError?.message });
         }
-      } else {
-        logStep("No userId provided, skipping DB storage");
       }
     } catch (dbError) {
-      logStep("Error during DB operation", { error: dbError.message });
-      // Continue even if DB storage fails
+      logStep("Error storing payment session", { error: dbError.message });
+      // Don't fail the request if DB storage fails
     }
     
-    // Construct the success response with consistent field names
     return new Response(
       JSON.stringify({
         success: true,
         message: "Payment session created",
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
-          lowProfileId: response.LowProfileId,
+          lowProfileCode: responseData.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
-          cardcomUrl: "https://secure.cardcom.solutions",
+          cardcomUrl: "https://secure.cardcom.solutions"
         }
       }),
       {

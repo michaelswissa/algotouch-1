@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
   setState: (updater: any) => void;
-  checkPaymentStatus: (lowProfileId: string, sessionId: string, operationType?: 'payment' | 'token_only', planType?: string) => void;
-  lowProfileId?: string;
+  checkPaymentStatus: (lowProfileCode: string, sessionId: string, operationType?: 'payment' | 'token_only', planType?: string) => void;
+  lowProfileCode: string;
   sessionId: string;
   operationType?: 'payment' | 'token_only';
   planType?: string;
@@ -17,18 +17,13 @@ export const useFrameMessages = ({
   handlePaymentSuccess,
   setState,
   checkPaymentStatus,
-  lowProfileId,
+  lowProfileCode,
   sessionId,
   operationType = 'payment',
   planType
 }: UseFrameMessagesProps) => {
   useEffect(() => {
-    if (!lowProfileId || !sessionId) {
-      console.log('Missing lowProfileId or sessionId, skipping message listener setup');
-      return;
-    }
-
-    console.log('Setting up message event listener with:', { lowProfileId, sessionId, operationType });
+    if (!lowProfileCode || !sessionId) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -40,7 +35,7 @@ export const useFrameMessages = ({
         }
 
         const message = event.data;
-        console.log('📬 Received message from iframe:', message);
+        console.log('Received message from iframe:', message);
 
         if (!message || typeof message !== 'object') {
           return;
@@ -69,7 +64,7 @@ export const useFrameMessages = ({
           
           // Show more specific error messages
           if (message.message && message.message.includes('lowProfileCode')) {
-            toast.error('פרמטר lowProfileId חובה');
+            toast.error('פרמטר lowProfileCode חובה');
           } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
             toast.error('תאריך תוקף שגוי');
           } else if (message.message && message.message.includes('CardComCardNumber')) {
@@ -80,42 +75,26 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle 3DS process events
+        // Handle processing start/complete
         if (message.action === '3DSProcessStarted') {
           console.log('3DS process started');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING, is3DSInProgress: true }));
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
           return;
         }
 
         if (message.action === '3DSProcessCompleted') {
           console.log('3DS process completed');
-          setState(prev => ({ ...prev, is3DSInProgress: false }));
           // Start status check to verify final result
-          if (lowProfileId && sessionId) {
-            checkPaymentStatus(lowProfileId, sessionId, operationType, planType);
+          if (lowProfileCode && sessionId) {
+            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
           }
           return;
         }
 
         // Handle validations
         if (message.action === 'handleValidations') {
-          console.log('Validation message for field:', message.field, 'isValid:', message.isValid);
-          return;
-        }
-
-        // Handle token creation events
-        if (message.action === 'tokenCreationStarted') {
-          console.log('Token creation started');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-          return;
-        }
-
-        if (message.action === 'tokenCreationCompleted') {
-          console.log('Token creation completed', message.data);
-          // Check the status to confirm successful token creation
-          if (lowProfileId && sessionId) {
-            checkPaymentStatus(lowProfileId, sessionId, operationType, planType);
-          }
+          console.log('Validation message for field:', message.field);
+          // Field validation is handled separately in usePaymentValidation
           return;
         }
       } catch (error) {
@@ -123,12 +102,12 @@ export const useFrameMessages = ({
       }
     };
 
-    console.log('Message event listener added');
+    console.log('Setting up message event listener for CardCom iframe');
     window.addEventListener('message', handleMessage);
     
     return () => {
-      console.log('Removing message event listener');
+      console.log('Removing message event listener for CardCom iframe');
       window.removeEventListener('message', handleMessage);
     };
-  }, [lowProfileId, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
+  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
 };

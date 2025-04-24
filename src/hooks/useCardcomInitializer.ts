@@ -1,18 +1,17 @@
-
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
-    lowProfileId: string, 
-    url: string,
+    lowProfileCode: string, 
+    sessionId: string,
     terminalNumber: string = '160138',
     operationType: 'payment' | 'token_only' = 'payment'
   ) => {
-    if (!lowProfileId || !url) {
+    if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization:", { 
-        hasLowProfileId: Boolean(lowProfileId), 
-        hasUrl: Boolean(url) 
+        hasLowProfileCode: Boolean(lowProfileCode), 
+        hasSessionId: Boolean(sessionId) 
       });
       return false;
     }
@@ -23,8 +22,8 @@ export const useCardcomInitializer = () => {
     }
 
     console.log('Starting CardCom fields initialization with:', { 
-      lowProfileId, 
-      url,
+      lowProfileCode, 
+      sessionId,
       terminalNumber,
       operationType,
       hasMasterFrame: Boolean(masterFrameRef.current)
@@ -52,10 +51,11 @@ export const useCardcomInitializer = () => {
         }
 
         try {
-          const config: InitConfig = {
+          const config: any = {
             action: 'init',
-            lowProfileId,
-            url,
+            lowProfileCode,
+            LowProfileCode: lowProfileCode,
+            sessionId,
             terminalNumber,
             cardFieldCSS: `
               body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
@@ -97,11 +97,11 @@ export const useCardcomInitializer = () => {
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
-            operation: operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
+            operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
           };
 
           console.log('Sending initialization config to CardCom iframe:', config);
-          masterFrame.contentWindow.postMessage(config, 'https://secure.cardcom.solutions');
+          masterFrame.contentWindow.postMessage(config, '*');
           
           setTimeout(() => {
             loadScript();
@@ -121,7 +121,8 @@ export const useCardcomInitializer = () => {
       const loadScript = () => {
         console.log('Loading 3DS script...');
         const script = document.createElement('script');
-        script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js';
+        const time = new Date().getTime();
+        script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
         document.head.appendChild(script);
         console.log('3DS script loaded');
       };
