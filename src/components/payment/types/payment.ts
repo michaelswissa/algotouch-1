@@ -29,6 +29,13 @@ export interface CardComMessage {
   cardType?: string;
 }
 
+export type OperationType = 
+  | "ChargeOnly" 
+  | "ChargeAndCreateToken"
+  | "CreateTokenOnly"
+  | "SuspendedDeal"
+  | "Do3DSAndSubmit";
+
 export interface InitConfig {
   action: 'init';
   lowProfileId: string;
@@ -42,7 +49,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
+  operation?: OperationType;
 }
 
 export interface PaymentState {

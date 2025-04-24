@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -7,23 +6,27 @@ interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
   setState: (updater: any) => void;
   checkPaymentStatus: (lowProfileCode: string, sessionId: string, operationType?: 'payment' | 'token_only', planType?: string) => void;
-  lowProfileCode: string;
-  sessionId: string;
-  operationType?: 'payment' | 'token_only';
-  planType?: string;
+  lowProfileId?:     string;
+  lowProfileCode?:   string;
+  sessionId:         string;
+  operationType?:    'payment' | 'token_only';
+  planType?:         string;
 }
 
 export const useFrameMessages = ({
   handlePaymentSuccess,
   setState,
   checkPaymentStatus,
+  lowProfileId,
   lowProfileCode,
   sessionId,
   operationType = 'payment',
   planType
 }: UseFrameMessagesProps) => {
   useEffect(() => {
-    if (!lowProfileCode || !sessionId) return;
+    const profileCode = lowProfileId || lowProfileCode;
+    
+    if (!profileCode || !sessionId) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -85,8 +88,8 @@ export const useFrameMessages = ({
         if (message.action === '3DSProcessCompleted') {
           console.log('3DS process completed');
           // Start status check to verify final result
-          if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+          if (profileCode && sessionId) {
+            checkPaymentStatus(profileCode, sessionId, operationType, planType);
           }
           return;
         }
@@ -109,5 +112,5 @@ export const useFrameMessages = ({
       console.log('Removing message event listener for CardCom iframe');
       window.removeEventListener('message', handleMessage);
     };
-  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
+  }, [lowProfileId, lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
 };
