@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -50,7 +49,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     handlePaymentSuccess: handlePaymentSuccess,
     setState,
     checkPaymentStatus,
-    lowProfileCode: state.lowProfileCode,
+    lowProfileId: state.lowProfileId,
     sessionId: state.sessionId,
     operationType,
     planType: planId
@@ -78,7 +77,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       return;
     }
     
-    if (!state.lowProfileCode) {
+    if (!state.lowProfileId) {
       handleError("חסר מזהה יחודי לעסקה, אנא נסה/י שנית");
       return;
     }
@@ -113,8 +112,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
-        lowProfileCode: state.lowProfileCode, // Ensure always present
-        LowProfileCode: state.lowProfileCode  // For extra compatibility
+        lowProfileCode: state.lowProfileId, // Ensure always present
+        LowProfileCode: state.lowProfileId  // For extra compatibility
       };
 
       console.log('Sending transaction data to CardCom:', formData);
@@ -126,7 +125,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }));
       
       // Start status check with required params
-      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+      startStatusCheck(state.lowProfileId, state.sessionId, operationType, planId);
       
       setTimeout(() => {
         setPaymentInProgress(false);
@@ -136,13 +135,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
+  }, [state.lowProfileId, state.terminalNumber, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId, masterFrameRef, state.sessionId]);
 
   return {
     ...state,
     operationType,
     masterFrameRef,
-    lowProfileCode: state.lowProfileCode,
+    lowProfileId: state.lowProfileId,
     sessionId: state.sessionId,
     initializePayment,
     handleRetry,

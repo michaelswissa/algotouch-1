@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { InitConfig } from '@/components/payment/types/payment';
 
@@ -57,7 +56,7 @@ export const useCardcomInitializer = () => {
             action: 'init',
             lowProfileId,
             url,
-            terminalNumber: Number(terminalNumber),
+            terminalNumber: terminalNumber.toString(),
             cardFieldCSS: `
               body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
               .cardNumberField {

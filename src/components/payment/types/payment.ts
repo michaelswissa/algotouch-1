@@ -15,6 +15,7 @@ export interface PaymentResponse {
     lowProfileId: string;
     terminalNumber: string;
     cardcomUrl?: string;
+    url: string;
   };
   message?: string;
 }

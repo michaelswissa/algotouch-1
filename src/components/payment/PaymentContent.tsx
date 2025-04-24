@@ -12,6 +12,7 @@ interface PaymentContentProps {
   plan: SubscriptionPlan;
   terminalNumber: string;
   cardcomUrl: string;
+  url: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   onNavigateToDashboard: () => void;
   onRetry: () => void;
@@ -25,6 +26,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   plan,
   terminalNumber,
   cardcomUrl,
+  url,
   masterFrameRef,
   onNavigateToDashboard,
   onRetry,
