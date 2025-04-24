@@ -402,22 +402,27 @@ serve(async (req) => {
       currency = "ILS", 
       invoiceInfo, 
       userId,
-      registrationData,
+      anonymousData,
       redirectUrls,
       operationType = 'payment'
     } = requestData;
     
-    logStep("Processing payment session request", { planId, amount, currency, operationType });
+    logStep("Processing payment session request", { 
+      planId, 
+      amount, 
+      currency, 
+      operationType,
+      isAuthenticated: !!userId 
+    });
 
     if (!planId || !amount || !redirectUrls) {
       throw new Error("Missing required parameters");
     }
 
-    const userEmail = invoiceInfo?.email || registrationData?.email;
+    const userEmail = invoiceInfo?.email || (anonymousData?.email);
     const fullName = invoiceInfo?.fullName || 
-                    (registrationData?.userData ? 
-                      `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
-                      undefined);
+                    (anonymousData?.fullName) || 
+                    userEmail;
     
     if (!userEmail) {
       throw new Error("Missing email address");
@@ -450,8 +455,6 @@ serve(async (req) => {
         IsHideCardOwnerPhone: false,
         CardOwnerEmailValue: userEmail,
         CardOwnerNameValue: fullName || '',
-        CardOwnerIdValue: registrationData?.userData?.idNumber || '',
-        CardOwnerPhoneValue: registrationData?.userData?.phone || '',
         IsCardOwnerEmailRequired: true,
         IsCardOwnerPhoneRequired: true,
         IsHideCardOwnerIdentityNumber: false
@@ -549,7 +552,7 @@ serve(async (req) => {
           lowProfileCode: responseData.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions",
-          url: responseData.Url // Include original redirect URL from CardCom
+          url: responseData.Url
         }
       }), {
         status: 200,

@@ -18,7 +18,8 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       planId,
       email: paymentUser.email,
       fullName: paymentUser.fullName,
-      operationType
+      operationType,
+      isAuthenticated: !!userId
     });
 
     // Create the payload once before sending
@@ -37,9 +38,10 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       },
       userId: userId,
       operationType,
-      registrationData: sessionStorage.getItem('registration_data') 
-        ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-        : null
+      anonymousData: !userId ? { 
+        email: paymentUser.email,
+        fullName: paymentUser.fullName 
+      } : null
     };
 
     try {
@@ -80,7 +82,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         terminalNumber: terminalNumber,
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
         paymentStatus: PaymentStatus.IDLE,
-        paymentUrl: data.data.url // Store the redirect URL if provided
+        paymentUrl: data.data.url
       }));
       
       return { 

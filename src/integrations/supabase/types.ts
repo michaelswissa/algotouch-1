@@ -393,6 +393,7 @@ export type Database = {
       payment_sessions: {
         Row: {
           amount: number
+          anonymous_data: Json | null
           created_at: string
           currency: string
           expires_at: string
@@ -405,10 +406,11 @@ export type Database = {
           transaction_data: Json | null
           transaction_id: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           amount: number
+          anonymous_data?: Json | null
           created_at?: string
           currency?: string
           expires_at: string
@@ -421,10 +423,11 @@ export type Database = {
           transaction_data?: Json | null
           transaction_id?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
+          anonymous_data?: Json | null
           created_at?: string
           currency?: string
           expires_at?: string
@@ -437,7 +440,7 @@ export type Database = {
           transaction_data?: Json | null
           transaction_id?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
