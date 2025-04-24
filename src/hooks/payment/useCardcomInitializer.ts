@@ -1,14 +1,16 @@
 
+import { useCallback } from 'react';
 import { InitConfig } from '@/components/payment/types/payment';
+import { toast } from 'sonner';
 
 export const useCardcomInitializer = () => {
-  const initializeCardcomFields = async (
+  const initializeCardcomFields = useCallback(async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
     operationType: 'payment' | 'token_only' = 'payment'
-  ) => {
+  ): Promise<boolean> => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization");
       return false;
@@ -28,16 +30,32 @@ export const useCardcomInitializer = () => {
     });
 
     try {
+      // 1. Wait for the master frame to fully load before sending init message
+      await new Promise<void>((resolve) => {
+        const frame = masterFrameRef.current;
+        
+        // If frame is already loaded, continue after a short delay to ensure JS is ready
+        if (frame?.contentWindow?.document?.readyState === 'complete') {
+          setTimeout(resolve, 0);
+          return;
+        }
+        
+        // Wait for frame load then give its JS a tick to initialize
+        frame?.addEventListener('load', () => setTimeout(resolve, 0), { once: true });
+      });
+      
+      console.log('Master frame is fully loaded, sending init message');
+      
+      // 2. Prepare the initialization configuration
       const config: InitConfig = {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber,
+        terminalNumber: String(terminalNumber), // Convert to string here
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            border: none;
             height: 40px;
             width: 100%;
             padding: 0 10px;
@@ -46,7 +64,6 @@ export const useCardcomInitializer = () => {
             direction: ltr;
           }
           .cardNumberField:focus {
-            border-color: #3498db;
             outline: none;
           }
           .cardNumberField.invalid {
@@ -55,17 +72,16 @@ export const useCardcomInitializer = () => {
         cvvFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cvvField {
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            height: 39px;
-            margin: 0;
-            padding: 0 10px;
+            border: none;
+            height: 40px;
             width: 100%;
+            padding: 0 10px;
+            font-size: 16px;
+            text-align: center;
             box-sizing: border-box;
             direction: ltr;
           }
           .cvvField:focus {
-            border-color: #3498db;
             outline: none;
           }
           .cvvField.invalid {
@@ -75,18 +91,46 @@ export const useCardcomInitializer = () => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
         language: 'he',
-        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+        // Let the LowProfile's operation value take precedence by not specifying it here
       };
 
-      console.log('Sending initialization config to CardCom iframe');
-      masterFrameRef.current.contentWindow.postMessage(config, '*');
+      // 3. Send the init message to the master frame
+      console.log('📤 postMessage → master', config);
+      masterFrameRef.current.contentWindow?.postMessage(config, 'https://secure.cardcom.solutions');
 
-      return true;
+      // 4. Wait for initCompleted response
+      return new Promise<boolean>((resolve) => {
+        // Set timeout to prevent hanging if no response
+        const timeout = setTimeout(() => {
+          console.warn('initCompleted timeout');
+          resolve(false);
+        }, 8000);
+
+        // Listen for the initCompleted message
+        const messageHandler = (event: MessageEvent) => {
+          if (event.origin !== 'https://secure.cardcom.solutions') {
+            return;
+          }
+          
+          if (event.data?.action === 'initCompleted') {
+            console.log('✅ initCompleted received');
+            clearTimeout(timeout);
+            resolve(true);
+            window.removeEventListener('message', messageHandler);
+          }
+        };
+        
+        window.addEventListener('message', messageHandler);
+      });
+      
     } catch (error) {
       console.error('Error initializing CardCom fields:', error);
+      toast.error('שגיאה באתחול שדות התשלום');
       return false;
     }
-  };
+  }, []);
 
   return { initializeCardcomFields };
 };
+
+export default useCardcomInitializer;

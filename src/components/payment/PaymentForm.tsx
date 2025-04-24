@@ -33,8 +33,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     handleRetry,
     handleSubmitPayment,
     handleMasterFrameLoad,
-    plan
+    plan,
+    lowProfileCode,
+    sessionId
   } = usePaymentForm({ planId, onPaymentComplete });
+
+  console.log('PaymentForm state:', { 
+    isSubmitting, 
+    isInitializing, 
+    isContentReady, 
+    isMasterFrameLoaded,
+    paymentStatus
+  });
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -64,7 +74,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             onNavigateToDashboard={() => window.location.href = '/dashboard'}
             onRetry={handleRetry}
             operationType={operationType}
-            isReady={isContentReady}
+            isReady={isContentReady && isMasterFrameLoaded}
+            lowProfileCode={lowProfileCode}
+            sessionId={sessionId}
             onMasterFrameLoad={handleMasterFrameLoad}
           />
         )}

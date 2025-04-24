@@ -6,6 +6,7 @@ interface PaymentIframeProps {
   cardcomUrl: string;
   terminalNumber: string;
   onMasterFrameLoad?: () => void;
+  isReady?: boolean; // This prop indicates if we have lowProfileCode and sessionId
 }
 
 const PaymentIframe: React.FC<PaymentIframeProps> = ({
@@ -13,9 +14,11 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   cardcomUrl,
   terminalNumber,
   onMasterFrameLoad,
+  isReady = false, // Default to false
 }) => {
   // Add the 3DS.js script when the component mounts
   useEffect(() => {
+    console.log('Loading 3DS script...');
     const script = document.createElement('script');
     script.src = `${cardcomUrl}/External/OpenFields/3DS.js?v=${Date.now()}`;
     document.head.appendChild(script);
@@ -30,19 +33,31 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
     };
   }, [cardcomUrl]);
 
-  // Master frame URL has terminal number as query param
+  // Master frame URL always has terminal number as query param
   const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
+  
+  // Card/CVV URL construction happens when we've decided to render
+  const cardNumberUrl = `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`;
+  const cvvUrl = `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`;
+
+  // Log the master frame load event for debugging
+  const handleMasterFrameLoad = () => {
+    console.log('💡 Master frame loaded - PaymentIframe component');
+    if (onMasterFrameLoad) {
+      onMasterFrameLoad();
+    }
+  };
 
   return (
     <div className="relative space-y-4">
-      {/* Hidden master iframe */}
+      {/* Hidden master iframe - ALWAYS render this */}
       <iframe
         ref={masterFrameRef}
         id="CardComMasterFrame"
         name="CardComMasterFrame"
         src={masterFrameUrl}
         style={{ width: 0, height: 0, border: 'none', position: 'absolute' }}
-        onLoad={onMasterFrameLoad}
+        onLoad={handleMasterFrameLoad}
         title="CardCom Master"
       />
 
@@ -51,7 +66,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         <iframe
           id="CardComCardNumber"
           name="CardComCardNumber"
-          src={`${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`}
+          src={cardNumberUrl}
           className="w-full h-full"
           title="מספר כרטיס"
         />
@@ -62,7 +77,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         <iframe
           id="CardComCvv"
           name="CardComCvv"
-          src={`${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`}
+          src={cvvUrl}
           className="w-full h-full"
           title="CVV"
         />

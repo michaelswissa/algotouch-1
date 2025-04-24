@@ -3,7 +3,6 @@ import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
-import { useCardcomInitializer } from '../useCardcomInitializer'; // Fixed import
 import { toast } from 'sonner';
 
 interface UsePaymentInitializationProps {
@@ -13,21 +12,10 @@ interface UsePaymentInitializationProps {
   operationType?: 'payment' | 'token_only';
 }
 
-export const usePaymentInitialization = ({ planId, setState, masterFrameRef, operationType = 'payment' }: UsePaymentInitializationProps) => {
+export const usePaymentInitialization = ({ planId, setState, operationType = 'payment' }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
-  const { initializeCardcomFields } = useCardcomInitializer(); // Use the imported hook
-
-  const waitForMasterFrame = async (): Promise<void> => {
-    // Check if masterFrameRef is available
-    if (!masterFrameRef.current) {
-      console.warn('Master frame reference not available');
-      throw new Error('Master frame reference not available');
-    }
-    
-    return Promise.resolve();
-  };
 
   const initializePayment = async () => {
     console.log('Starting payment initialization for plan:', planId);
@@ -69,7 +57,7 @@ export const usePaymentInitialization = ({ planId, setState, masterFrameRef, ope
         throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
       }
       
-      console.log('Payment session initialized:', paymentData);
+      console.log('Payment session initialized successfully:', paymentData);
       
       // Set state with payment data
       setState(prev => ({ 

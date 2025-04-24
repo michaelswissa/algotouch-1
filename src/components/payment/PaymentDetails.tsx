@@ -46,7 +46,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   } = usePaymentFields();
 
   useEffect(() => {
-    if (!isReady || !masterFrameRef.current?.contentWindow) return;
+    if (!isReady || !masterFrameRef.current?.contentWindow) {
+      console.log('Not sending card owner details - not ready yet', {isReady, hasFrame: !!masterFrameRef.current?.contentWindow});
+      return;
+    }
 
     const data = {
       action: 'setCardOwnerDetails',
@@ -60,8 +63,8 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       }
     };
     
-    console.log('Setting card owner details');
-    masterFrameRef.current.contentWindow.postMessage(data, '*');
+    console.log('Setting card owner details', data);
+    masterFrameRef.current.contentWindow.postMessage(data, 'https://secure.cardcom.solutions');
   }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isReady, masterFrameRef]);
 
   return (
@@ -72,6 +75,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         cardcomUrl={cardcomUrl}
         terminalNumber={terminalNumber}
         onMasterFrameLoad={onMasterFrameLoad}
+        isReady={isReady}
       />
 
       <CardOwnerDetails

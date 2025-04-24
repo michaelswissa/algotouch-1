@@ -17,3 +17,4 @@ END $$;
 
 -- Update the anonymous_data usage - stored inside payment_details instead
 COMMENT ON COLUMN public.payment_sessions.payment_details IS 'Contains operation details, anonymous data for guest users, and processing results';
+

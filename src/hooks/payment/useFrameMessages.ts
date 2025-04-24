@@ -23,7 +23,16 @@ export const useFrameMessages = ({
   planType,
 }: UseFrameMessagesProps) => {
   useEffect(() => {
-    if (!lowProfileCode || !sessionId) return;
+    if (!lowProfileCode || !sessionId) {
+      console.log('Missing required parameters for message handler:', { lowProfileCode, sessionId });
+      return;
+    }
+
+    console.log('Setting up CardCom message handler with:', { 
+      lowProfileCode: lowProfileCode.substring(0, 8) + '...',  // Log partial for security 
+      sessionId: sessionId.substring(0, 8) + '...',            // Log partial for security
+      operationType
+    });
 
     // Set a 30-second timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
@@ -39,7 +48,7 @@ export const useFrameMessages = ({
       try {
         // Verify origin - strict check for CardCom's domain
         if (event.origin !== 'https://secure.cardcom.solutions') {
-          console.log('Ignored message from unknown origin:', event.origin);
+          console.log('Ignored message from unauthorized origin:', event.origin);
           return;
         }
         

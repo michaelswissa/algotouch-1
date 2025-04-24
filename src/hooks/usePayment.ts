@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -22,9 +21,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   useEffect(() => {
     if (planId === 'monthly') {
       setOperationType('token_only');
+    } else if (planId === 'annual') {
+      setOperationType('payment');
     } else {
       setOperationType('payment');
     }
+    
+    console.log('Set operation type:', { planId, operationType: planId === 'monthly' ? 'token_only' : 'payment' });
   }, [planId]);
   
   const {
@@ -60,7 +63,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   // Initialize payment when component mounts
   useEffect(() => {
     if (!state.lowProfileCode && paymentStatus !== PaymentStatus.INITIALIZING) {
-      console.log('Auto-initializing payment');
+      console.log('Auto-initializing payment for plan:', planId);
       initializePayment();
     }
   }, []);
@@ -159,7 +162,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
       console.log('Sending transaction data to CardCom:', formData);
       
-      // Specific target origin for security
+      // Use specific target origin for security
       masterFrameRef.current.contentWindow.postMessage(formData, 'https://secure.cardcom.solutions');
       
       setState(prev => ({

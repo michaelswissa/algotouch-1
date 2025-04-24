@@ -17,6 +17,8 @@ interface PaymentContentProps {
   onRetry: () => void;
   operationType?: 'payment' | 'token_only';
   isReady?: boolean;
+  lowProfileCode?: string;
+  sessionId?: string;
   /** optional – forwarded down to PaymentDetails */
   onMasterFrameLoad?: () => void;
 }
@@ -31,9 +33,16 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onRetry,
   operationType = 'payment',
   isReady = false,
+  lowProfileCode,
+  sessionId,
   onMasterFrameLoad
 }) => {
-  console.log('Current payment status:', paymentStatus, 'isReady:', isReady);
+  console.log('Rendering PaymentContent with:', { 
+    paymentStatus, 
+    isReady, 
+    hasLowProfileCode: Boolean(lowProfileCode),
+    hasSessionId: Boolean(sessionId)
+  });
   
   if (paymentStatus === PaymentStatus.SUCCESS) {
     return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
@@ -43,7 +52,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
     return <FailedPayment onRetry={onRetry} />;
   }
   
-  // Default state (IDLE)
+  // Default state (IDLE or PROCESSING)
   return (
     <>
       <PlanSummary 
@@ -59,7 +68,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}
-        isReady={isReady}
+        isReady={isReady && Boolean(lowProfileCode) && Boolean(sessionId)}
         onMasterFrameLoad={onMasterFrameLoad}
       />
     </>
