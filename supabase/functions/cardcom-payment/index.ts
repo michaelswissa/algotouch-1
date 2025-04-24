@@ -30,6 +30,73 @@ serve(async (req) => {
     
     const { action, lowProfileCode, sessionId } = await req.json();
     
+    // Handle direct transaction requests
+    if (action === 'doTransaction') {
+      const { 
+        terminalNumber, 
+        cardNumber,
+        token,
+        amount,
+        cardOwnerInformation,
+        externalUniqTranId,
+        numOfPayments,
+        document
+      } = await req.json();
+      
+      logStep("Processing transaction", { 
+        hasToken: !!token, 
+        hasCardNumber: !!cardNumber,
+        amount
+      });
+
+      const transactionPayload: TransactionRequest = {
+        TerminalNumber: terminalNumber || CARDCOM_CONFIG.terminalNumber,
+        ApiName: CARDCOM_CONFIG.apiName,
+        Amount: amount,
+        Token: token,
+        CardNumber: cardNumber,
+        ExternalUniqTranId: externalUniqTranId || `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+        NumOfPayments: numOfPayments || 1,
+        CardOwnerInformation: cardOwnerInformation,
+        Document: document
+      };
+
+      const response = await fetch('https://secure.cardcom.solutions/api/v11/Transaction/DoTransaction', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(transactionPayload),
+      });
+      
+      const responseData: TransactionResponse = await response.json();
+      logStep("Transaction response", responseData);
+      
+      if (responseData.ResponseCode === 0 || responseData.ResponseCode === 700 || responseData.ResponseCode === 701) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: responseData,
+            message: "Transaction completed successfully"
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          data: responseData,
+          message: responseData.Description || "Transaction failed"
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Handle status check action
     if (action === 'check-status' && lowProfileCode) {
       logStep("Checking transaction status", { lowProfileCode });
