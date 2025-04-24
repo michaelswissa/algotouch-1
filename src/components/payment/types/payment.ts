@@ -11,21 +11,21 @@ export const PaymentStatus = {
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
 // CardCom operation types
-export type CardComOperationType = 'ChargeOnly' | 'ChargeAndCreateToken';
+export type CardComOperationType = 'payment' | 'token_only';
 
-// CardCom initialization config type with string terminalNumber
+// CardCom initialization config type
 export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
   sessionId: string;
-  terminalNumber: string; // Changed from number to string for consistency
+  terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
   reCaptchaFieldCSS: string;
   placeholder: string;
   cvvPlaceholder: string;
   language: string;
-  operation: CardComOperationType;
+  operation: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
 }
 
 // Payment state type definition

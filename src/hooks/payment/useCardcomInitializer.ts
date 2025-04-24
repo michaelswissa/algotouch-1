@@ -1,13 +1,20 @@
 
-import { InitConfig } from '@/components/payment/types/payment';
+import { InitConfig, CardComOperationType } from '@/components/payment/types/payment';
 
-export const useCardcomInitializer = () => {
+interface CardcomInitializerProps {
+  terminalNumber?: string;
+  cardcomUrl?: string;
+}
+
+export const useCardcomInitializer = (
+  {terminalNumber = '160138', cardcomUrl = 'https://secure.cardcom.solutions'}: CardcomInitializerProps = {}
+) => {
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
-    operationType: 'payment' | 'token_only' = 'payment'
+    operationType: CardComOperationType = 'payment'
   ) => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization");
@@ -28,12 +35,11 @@ export const useCardcomInitializer = () => {
     });
 
     try {
-      // Fix: Make sure terminalNumber stays as string and operation type maps correctly
       const config: InitConfig = {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: terminalNumber, // Keep as string
+        terminalNumber,
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
@@ -76,8 +82,7 @@ export const useCardcomInitializer = () => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
         language: 'he',
-        // Fix: Map operationType to allowed CardCom operation values
-        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+        operation: operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
       };
 
       console.log('Sending initialization config to CardCom iframe');
