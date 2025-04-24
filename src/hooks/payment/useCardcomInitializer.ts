@@ -32,7 +32,7 @@ export const useCardcomInitializer = () => {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber,
+        terminalNumber: Number(terminalNumber), // Convert to number as required by CardCom
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
@@ -75,7 +75,7 @@ export const useCardcomInitializer = () => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
         language: 'he',
-        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+        operation: operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
       };
 
       console.log('Sending initialization config to CardCom iframe');

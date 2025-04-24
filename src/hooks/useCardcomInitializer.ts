@@ -39,7 +39,7 @@ export const useCardcomInitializer = (
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: Number(terminalNumber), // Convert to number as required by CardCom
+        terminalNumber: Number(terminalNumber), // Converting to number as required by CardCom's API
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {

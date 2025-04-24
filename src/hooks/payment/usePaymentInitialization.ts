@@ -1,7 +1,6 @@
-
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from '../useCardcomInitializer';
+import { useCardcomInitializer } from '@/hooks/useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
@@ -20,10 +19,7 @@ export const usePaymentInitialization = ({
   operationType = 'payment'
 }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
-  const { initializeCardcomFields } = useCardcomInitializer({
-    terminalNumber: '160138',  // Provide a default value
-    cardcomUrl: 'https://secure.cardcom.solutions'  // Provide a default value
-  });
+  const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
