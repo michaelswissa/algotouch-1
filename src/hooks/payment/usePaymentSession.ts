@@ -41,7 +41,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     }
 
     const planNames = {
-      'monthly': 'מנוי חודשי',
+      'monthly': 'מנוי חודשי – ניסיון חינם',
       'annual': 'מנוי שנתי',
       'vip': 'מנוי VIP'
     };
@@ -53,10 +53,10 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       ApiName: CARDCOM.API_NAME,
       Operation: operation,
       ReturnValue: returnValue,
-      Amount: amount.toString(),
-      WebHookUrl: CARDCOM.WEBHOOK_URL,
+      Amount: amount.toString(), // Convert to string as CardCom requires
       SuccessRedirectUrl: CARDCOM.SUCCESS_URL,
       FailedRedirectUrl: CARDCOM.FAILED_URL,
+      WebHookUrl: CARDCOM.WEBHOOK_URL,
       ProductName: planNames[planId as keyof typeof planNames] || 'מנוי',
       Language: "he",
       ISOCoinId: 1,
