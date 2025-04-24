@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -107,24 +106,22 @@ serve(async (req) => {
     
     logStep("Sending request to CardCom");
     
-    const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
+    const { data: response } = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(cardcomPayload),
-    });
+    }).then(res => res.json());
     
-    const responseData = await response.json();
+    logStep("CardCom raw response", response);
     
-    logStep("CardCom raw response", responseData);
-    
-    if (!responseData.LowProfileId) {
-      logStep("ERROR: Missing LowProfileId in response", responseData);
+    if (!response.LowProfileId) {
+      logStep("ERROR: Missing LowProfileId in response", response);
       return new Response(
         JSON.stringify({
           success: false,
-          message: responseData.Description || "CardCom initialization failed - missing LowProfileId",
+          message: response.Description || "CardCom initialization failed - missing LowProfileId",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -134,7 +131,7 @@ serve(async (req) => {
 
     const sessionData = {
       user_id: userId,
-      low_profile_id: responseData.LowProfileId,
+      low_profile_id: response.LowProfileId,
       reference: transactionRef,
       plan_id: planId,
       amount: amount,
@@ -170,8 +167,8 @@ serve(async (req) => {
         message: "Payment session created",
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
-          lowProfileId: responseData.LowProfileId,
-          url: responseData.Url,
+          lowProfileId: response.LowProfileId,
+          url: response.Url,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
         }

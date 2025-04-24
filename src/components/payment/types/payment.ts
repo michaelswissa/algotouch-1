@@ -1,4 +1,3 @@
-
 export const PaymentStatus = {
   IDLE: 'idle' as const,
   INITIALIZING: 'initializing' as const,
@@ -13,7 +12,7 @@ export interface PaymentResponse {
   success: boolean;
   data: {
     sessionId: string;
-    lowProfileCode: string;
+    lowProfileId: string;
     terminalNumber: string;
     cardcomUrl?: string;
   };
@@ -31,7 +30,8 @@ export interface CardComMessage {
 
 export interface InitConfig {
   action: 'init';
-  lowProfileCode: string;
+  lowProfileId: string;
+  url?: string;
   sessionId?: string;
   terminalNumber: string;
   cardFieldCSS: string;
@@ -49,7 +49,8 @@ export interface PaymentState {
   cardcomUrl: string;
   paymentStatus: PaymentStatusType;
   sessionId: string;
-  lowProfileCode: string;
+  lowProfileId: string;
+  url: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
   isFramesReady: boolean;

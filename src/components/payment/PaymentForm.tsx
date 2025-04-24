@@ -27,6 +27,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const {
     terminalNumber,
     cardcomUrl,
+    url,
     paymentStatus,
     masterFrameRef,
     operationType,
@@ -34,7 +35,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     handleRetry,
     submitPayment,
     lowProfileId,
-    url,
     sessionId
   } = usePayment({
     planId,
@@ -121,9 +121,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   const isContentReady = !isInitializing && 
     terminalNumber && 
-    cardcomUrl && 
-    lowProfileId && 
+    cardcomUrl &&
     url && 
+    lowProfileId && 
     sessionId && 
     isMasterFrameLoaded && 
     paymentStatus !== PaymentStatus.INITIALIZING;
@@ -162,6 +162,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             plan={plan}
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
+            url={url}
             masterFrameRef={masterFrameRef}
             onNavigateToDashboard={() => window.location.href = '/dashboard'}
             onRetry={handleRetry}
