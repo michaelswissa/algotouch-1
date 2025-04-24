@@ -15,13 +15,15 @@ interface PaymentDetailsProps {
   cardcomUrl: string;
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   isReady?: boolean;
+  onMasterFrameLoad: () => void;  // Added prop
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   terminalNumber, 
   cardcomUrl,
   masterFrameRef,
-  isReady = false
+  isReady = false,
+  onMasterFrameLoad  // Added destructuring
 }) => {
   const [cardholderName, setCardholderName] = useState('');
   const [cardOwnerId, setCardOwnerId] = useState(''); 
@@ -79,12 +81,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
   return (
     <div className="space-y-4" dir="rtl">
-      {/* Only show iframes once everything's ready */}
       {isReady && (
         <PaymentIframe
           masterFrameRef={masterFrameRef}
           cardcomUrl={cardcomUrl}
           terminalNumber={terminalNumber}
+          onMasterFrameLoad={onMasterFrameLoad}  // Added prop
         />
       )}
 

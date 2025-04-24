@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
@@ -15,9 +14,9 @@ interface PaymentContentProps {
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   onNavigateToDashboard: () => void;
   onRetry: () => void;
-  onCancel?: () => void;
   operationType?: 'payment' | 'token_only';
   isReady?: boolean;
+  onMasterFrameLoad: () => void;
 }
 
 const PaymentContent: React.FC<PaymentContentProps> = ({
@@ -29,7 +28,8 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onNavigateToDashboard,
   onRetry,
   operationType = 'payment',
-  isReady = false
+  isReady = false,
+  onMasterFrameLoad
 }) => {
   console.log('Current payment status:', paymentStatus, 'isReady:', isReady);
   
@@ -58,6 +58,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}
         isReady={isReady}
+        onMasterFrameLoad={onMasterFrameLoad}
       />
     </>
   );
