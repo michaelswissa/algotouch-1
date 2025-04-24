@@ -26,12 +26,25 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestData;
   try {
-    logStep("Function started");
-    
-    // Clone the request to read the body multiple times if needed
-    const reqClone = req.clone();
-    const requestData = await reqClone.json();
+    // Parse request body once at the start
+    requestData = await req.json();
+    logStep("Request received", { action: requestData.action });
+  } catch (error) {
+    logStep("Error parsing request body", { error: error.message });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: "Invalid request body",
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  try {
     const { action } = requestData;
     
     // Handle direct transaction requests
@@ -53,7 +66,7 @@ serve(async (req) => {
         amount
       });
 
-      const transactionPayload: TransactionRequest = {
+      const transactionPayload = {
         TerminalNumber: terminalNumber || CARDCOM_CONFIG.terminalNumber,
         ApiName: CARDCOM_CONFIG.apiName,
         Amount: amount,
@@ -73,7 +86,7 @@ serve(async (req) => {
         body: JSON.stringify(transactionPayload),
       });
       
-      const responseData: TransactionResponse = await response.json();
+      const responseData = await response.json();
       logStep("Transaction response", responseData);
       
       if (responseData.ResponseCode === 0 || responseData.ResponseCode === 700 || responseData.ResponseCode === 701) {
@@ -106,7 +119,7 @@ serve(async (req) => {
       const { lowProfileCode } = requestData;
       logStep("Checking transaction status", { lowProfileCode });
       
-      const getLowProfileRequest: GetLowProfileRequest = {
+      const getLowProfileRequest = {
         TerminalNumber: parseInt(CARDCOM_CONFIG.terminalNumber),
         ApiName: CARDCOM_CONFIG.apiName,
         LowProfileId: lowProfileCode
@@ -120,7 +133,7 @@ serve(async (req) => {
         body: JSON.stringify(getLowProfileRequest),
       });
       
-      const responseData: GetLowProfileResult = await response.json();
+      const responseData = await response.json();
       logStep("Status check response", responseData);
       
       // Handle different response scenarios
@@ -181,6 +194,7 @@ serve(async (req) => {
       );
     }
 
+    // Handle initial payment session creation
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -190,7 +204,6 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Extract all payment initialization data from the cloned request
     const { 
       planId, 
       amount, 
@@ -202,25 +215,17 @@ serve(async (req) => {
       operationType = 'payment'
     } = requestData;
     
-    logStep("Received request data", { planId, amount, currency, operationType });
+    logStep("Processing payment session request", { planId, amount, currency, operationType });
 
     if (!planId || !amount || !redirectUrls) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Missing required parameters",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      throw new Error("Missing required parameters");
     }
 
-    let userEmail = invoiceInfo?.email || registrationData?.email;
-    let fullName = invoiceInfo?.fullName || 
-                  (registrationData?.userData ? 
-                    `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
-                    undefined);
+    const userEmail = invoiceInfo?.email || registrationData?.email;
+    const fullName = invoiceInfo?.fullName || 
+                    (registrationData?.userData ? 
+                      `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
+                      undefined);
     
     const transactionRef = userId 
       ? `${userId}-${Date.now()}`
@@ -228,18 +233,12 @@ serve(async (req) => {
     
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
-    logStep("Preparing Cardcom request", { webhookUrl, transactionRef });
-
-    // Determine operation based on plan and operationType
-    let operation: string = "ChargeOnly";
-    if (operationType === 'token_only' || planId === 'monthly') {
-      operation = "ChargeAndCreateToken";
-    }
+    logStep("Creating Cardcom request", { webhookUrl, transactionRef });
 
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: operation,
+      Operation: operationType === 'token_only' || planId === 'monthly' ? "ChargeAndCreateToken" : "ChargeOnly",
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
@@ -338,8 +337,7 @@ serve(async (req) => {
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
         }
-      }),
-      {
+      }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
@@ -352,8 +350,7 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         message: errorMessage || "Payment initialization failed",
-      }),
-      {
+      }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
