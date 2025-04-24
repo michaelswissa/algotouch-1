@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import PaymentContent from './PaymentContent';
@@ -31,6 +32,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     operationType,
     handleRetry,
     handleSubmitPayment,
+    handleMasterFrameLoad,
     plan
   } = usePaymentForm({ planId, onPaymentComplete });
 
@@ -65,6 +67,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             onRetry={handleRetry}
             operationType={operationType}
             isReady={shouldShowFields}
+            onMasterFrameLoad={handleMasterFrameLoad}
           />
         )}
       </CardContent>

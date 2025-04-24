@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { usePayment } from '@/hooks/usePayment';
 import { toast } from 'sonner';
@@ -12,7 +11,6 @@ interface UsePaymentFormProps {
 
 export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProps) => {
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
-  const [areFieldsInitialized, setAreFieldsInitialized] = useState(false);
 
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -38,46 +36,17 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     onPaymentComplete
   });
 
-  useEffect(() => {
-    if (!masterFrameRef.current?.contentWindow) return;
-    
-    const handleMasterLoad = () => {
-      console.log('Master frame loaded');
-      setIsMasterFrameLoaded(true);
-    };
-
-    masterFrameRef.current.addEventListener('load', handleMasterLoad);
-    return () => masterFrameRef.current?.removeEventListener('load', handleMasterLoad);
-  }, [masterFrameRef]);
-
-  // Listen for initialization messages
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://secure.cardcom.solutions') return;
-      
-      try {
-        const data = event.data;
-        if (data?.action === 'InitCompleted') {
-          console.log('CardCom fields initialized successfully');
-          setAreFieldsInitialized(true);
-        }
-      } catch (error) {
-        console.error('Error handling message:', error);
-      }
-    };
-    
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  const handleMasterFrameLoad = () => {
+    console.log('💡 Master frame loaded (onLoad event)');
+    setIsMasterFrameLoaded(true);
+  };
 
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId);
-    const initProcess = async () => {
-      await initializePayment();
-    };
-    
-    initProcess();
-  }, []); // Run only once on mount
+    if (isMasterFrameLoaded) {
+      console.log('Master frame loaded, initializing payment...');
+      initializePayment();
+    }
+  }, [isMasterFrameLoaded, initializePayment]);
 
   const handleSubmitPayment = () => {
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
@@ -113,10 +82,8 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     }
   };
 
-  // Define isInitializing for better state management
   const isInitializing = paymentStatus === PaymentStatus.INITIALIZING;
 
-  // Determine if the iframe content is ready to be shown
   const isContentReady = 
     !isInitializing && 
     !!terminalNumber && 
@@ -130,7 +97,7 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     isInitializing,
     isContentReady,
     isMasterFrameLoaded,
-    areFieldsInitialized,
+    areFieldsInitialized: isMasterFrameLoaded,
     plan,
     terminalNumber,
     cardcomUrl,
@@ -139,5 +106,6 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     operationType,
     handleRetry,
     handleSubmitPayment,
+    handleMasterFrameLoad,
   };
 };

@@ -5,18 +5,19 @@ interface PaymentIframeProps {
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   cardcomUrl: string;
   terminalNumber: string;
+  onMasterFrameLoad: () => void;
 }
 
 const PaymentIframe: React.FC<PaymentIframeProps> = ({
   masterFrameRef,
   cardcomUrl,
-  terminalNumber
+  terminalNumber,
+  onMasterFrameLoad,
 }) => {
   const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
 
   return (
     <div className="payment-frames-container relative">
-      {/* חשוב: המיכל חייב להיות relative כדי שה-iframe הראשי יישאר בתוכו */}
       <iframe
         ref={masterFrameRef}
         id="CardComMasterFrame"
@@ -30,6 +31,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
           top: 0,
           left: 0
         }}
+        onLoad={onMasterFrameLoad}
         title="CardCom Master Frame"
       />
       
