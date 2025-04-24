@@ -35,13 +35,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     handleRetry,
     submitPayment,
     lowProfileCode,
-    sessionId,
-    isFramesReady
+    sessionId
   } = usePayment({
     planId,
     onPaymentComplete
   });
 
+  const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
   // Monitor when master frame is loaded
@@ -60,20 +60,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
-    initializePayment();
-  }, [planId]); // Run when planId changes
-
-  // Log state for debugging
-  useEffect(() => {
-    console.log("Payment state updated:", {
-      paymentStatus,
-      terminalNumber: Boolean(terminalNumber),
-      lowProfileCode: Boolean(lowProfileCode),
-      sessionId: Boolean(sessionId),
-      isFramesReady,
-      isMasterFrameLoaded
-    });
-  }, [paymentStatus, terminalNumber, lowProfileCode, sessionId, isFramesReady, isMasterFrameLoaded]);
+    const initProcess = async () => {
+      setIsInitializing(true);
+      await initializePayment();
+      setIsInitializing(false);
+    };
+    
+    initProcess();
+  }, []); // Run only once on mount
   
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
@@ -111,13 +105,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       return;
     }
     
-    // Validate that we have necessary payment data
-    if (!lowProfileCode) {
-      toast.error('חסר מזהה ייחודי לעסקה, אנא טען מחדש את הדף');
-      console.error("Missing lowProfileCode for payment submission");
-      return;
-    }
-    
     setIsSubmitting(true);
     
     try {
@@ -134,7 +121,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   };
 
   // Determine if the iframe content is ready to be shown
-  const isContentReady = terminalNumber && 
+  const isContentReady = !isInitializing && 
+    terminalNumber && 
     cardcomUrl && 
     lowProfileCode && 
     sessionId && 
@@ -163,12 +151,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           ref={masterFrameRef}
           id="CardComMasterFrame"
           name="CardComMasterFrame"
-          src={`${cardcomUrl || 'https://secure.cardcom.solutions'}/api/openfields/master?terminalNumber=${terminalNumber || '160138'}`}
+          src={`${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`}
           style={{ display: 'block', width: '0px', height: '0px', border: 'none' }}
           title="CardCom Master Frame"
         />
         
-        {paymentStatus === PaymentStatus.INITIALIZING ? (
+        {isInitializing ? (
           <InitializingPayment />
         ) : (
           <PaymentContent
@@ -180,23 +168,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             onNavigateToDashboard={() => window.location.href = '/dashboard'}
             onRetry={handleRetry}
             operationType={operationType}
-            isReady={isContentReady && isFramesReady}
+            isReady={isContentReady}
           />
         )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && (
+        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && !isInitializing && (
           <>
             <Button 
               type="button" 
               className="w-full" 
               onClick={handleSubmitPayment}
-              disabled={isSubmitting || 
-                       paymentStatus === PaymentStatus.PROCESSING || 
-                       !isContentReady || 
-                       !isFramesReady ||
-                       !lowProfileCode}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !isContentReady}
             >
               {getButtonText()}
             </Button>

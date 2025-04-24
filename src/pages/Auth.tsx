@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,9 +14,6 @@ const Auth = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { from?: Location, redirectToSubscription?: boolean };
-  
-  // Extract the selected plan from session storage if it exists
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -25,17 +21,6 @@ const Auth = () => {
     const tab = params.get('tab');
     if (tab === 'signup') {
       setActiveTab('signup');
-    }
-
-    // Check if there's a selected plan stored in session storage
-    try {
-      const storedPlan = sessionStorage.getItem('selected_plan');
-      if (storedPlan) {
-        console.log('Found selected plan in session storage:', storedPlan);
-        setSelectedPlan(storedPlan);
-      }
-    } catch (e) {
-      console.error('Error checking session storage for plan:', e);
     }
   }, [location]);
 
@@ -45,22 +30,6 @@ const Auth = () => {
       setActiveTab('signup');
     }
   }, [state]);
-
-  // Handle successful authentication
-  const handleAuthSuccess = () => {
-    console.log('Authentication successful');
-    
-    // If there's a selected plan, redirect to subscription with that plan
-    if (selectedPlan) {
-      console.log('Redirecting to subscription with selected plan:', selectedPlan);
-      sessionStorage.removeItem('selected_plan'); // Clear it after use
-      navigate(`/subscription/${selectedPlan}`, { replace: true });
-    } else if (state?.redirectToSubscription) {
-      navigate('/subscription', { replace: true });
-    } else {
-      navigate('/dashboard', { replace: true });
-    }
-  };
 
   // Check if there's valid registration data in session storage
   useEffect(() => {
@@ -120,11 +89,7 @@ const Auth = () => {
   // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
     console.log("Auth page: User is authenticated, redirecting to appropriate page");
-    if (selectedPlan) {
-      console.log('Redirecting to subscription with selected plan:', selectedPlan);
-      sessionStorage.removeItem('selected_plan'); // Clear it after use
-      return <Navigate to={`/subscription/${selectedPlan}`} replace />;
-    } else if (state?.redirectToSubscription) {
+    if (state?.redirectToSubscription) {
       return <Navigate to="/subscription" replace />;
     }
     return <Navigate to="/dashboard" replace />;
@@ -142,19 +107,13 @@ const Auth = () => {
           </TabsList>
           
           <TabsContent value="login">
-            <LoginForm onLoginSuccess={handleAuthSuccess} />
+            <LoginForm />
           </TabsContent>
           
           <TabsContent value="signup">
             <SignupForm />
           </TabsContent>
         </Tabs>
-        
-        {selectedPlan && (
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            לאחר ההתחברות תועבר/י לדף התשלום עבור תוכנית {selectedPlan === 'monthly' ? 'חודשית' : selectedPlan === 'annual' ? 'שנתית' : 'VIP'}
-          </div>
-        )}
       </div>
     </div>
   );

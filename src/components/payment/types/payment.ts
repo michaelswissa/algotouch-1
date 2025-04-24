@@ -21,7 +21,7 @@ export interface PaymentResponse {
 }
 
 export interface CardComMessage {
-  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted' | 'initCompleted';
+  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted';
   data?: any;
   message?: string;
   field?: string;
@@ -41,7 +41,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
 }
 
 export interface PaymentState {
