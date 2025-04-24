@@ -40,13 +40,47 @@ export const useCardcomInitializer = () => {
           iframe.addEventListener('load', onLoad);
         });
 
-        // 3. Send initialization message
+        // 3. Send initialization message with proper styling
         whenLoaded.then(() => {
           const payload = {
             action: 'init',
             lowProfileCode,
             terminalNumber: Number(terminalNumber),
             operation: operation === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly',
+            cardFieldCSS: `
+              body { margin: 0; padding: 0; box-sizing: border-box; }
+              .cardNumberField {
+                width: 100%;
+                height: 100%;
+                border: none;
+                padding: 0 16px;
+                font-size: 16px;
+                direction: ltr;
+                background: transparent;
+              }
+              .cardNumberField:focus {
+                outline: none;
+              }
+            `,
+            cvvFieldCSS: `
+              body { margin: 0; padding: 0; box-sizing: border-box; }
+              .cvvField {
+                width: 100%;
+                height: 100%;
+                border: none;
+                padding: 0 16px;
+                font-size: 16px;
+                direction: ltr;
+                background: transparent;
+              }
+              .cvvField:focus {
+                outline: none;
+              }
+            `,
+            reCaptchaFieldCSS: 'body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; }',
+            placeholder: '1111-2222-3333-4444',
+            cvvPlaceholder: '123',
+            language: 'he'
           };
 
           console.debug('📤 Sending init message to CardCom master frame:', payload);
