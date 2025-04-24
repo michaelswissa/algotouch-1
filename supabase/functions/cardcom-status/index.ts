@@ -2,9 +2,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Define types
+interface StatusRequest {
+  lowProfileCode: string;
+  sessionId: string;
+  terminalNumber: string;
+  timestamp?: string;
+  attempt?: number;
+  operationType?: 'payment' | 'token_only';
+}
+
+interface StatusResponse {
+  success: boolean;
+  processing?: boolean;
+  failed?: boolean;
+  message?: string;
+  data?: any;
+}
+
+// Helper logging function
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CARDCOM-STATUS] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -14,221 +39,183 @@ serve(async (req) => {
   }
 
   try {
-    const { lowProfileCode, sessionId, terminalNumber, timestamp, attempt, operationType } = await req.json();
+    // Parse request
+    const requestBody: StatusRequest = await req.json();
+    const { lowProfileCode, sessionId, attempt, operationType } = requestBody;
     
-    console.log('Payment status check request:', { 
+    logStep("Request received", {
       lowProfileCode, 
-      sessionId, 
+      sessionId,
       attempt, 
       operationType
     });
 
+    // Validate input
     if (!lowProfileCode || !sessionId) {
       return new Response(
         JSON.stringify({
-          success: false,
-          message: "Missing required parameters",
-          processing: false,
-          failed: true
+          success: false, 
+          failed: true,
+          message: 'Missing required parameters: lowProfileCode or sessionId'
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
 
     // Create Supabase client
-    const supabaseAdmin = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // First check: Look for a completed payment session
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
+    // First, fetch the payment session
+    const { data: paymentSession, error: sessionError } = await supabase
       .from('payment_sessions')
       .select('*')
       .eq('low_profile_code', lowProfileCode)
-      .eq('id', sessionId)
-      .single();
+      .maybeSingle();
 
     if (sessionError) {
-      console.error('Error fetching payment session:', sessionError);
+      logStep("Failed to fetch session data", sessionError);
+      
       return new Response(
         JSON.stringify({
-          success: false, 
-          message: "Payment session not found",
-          processing: true,
-          error: sessionError.message
+          success: false,
+          failed: true,
+          message: 'Error checking payment status'
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
 
-    console.log('Session data found:', {
-      status: sessionData.status,
-      hasTransactionId: !!sessionData.transaction_id
+    if (!paymentSession) {
+      logStep("Payment session not found", { lowProfileCode, sessionId });
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          failed: true,
+          message: 'Payment session not found'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    logStep("Retrieved payment session", {
+      id: paymentSession.id,
+      status: paymentSession.status,
+      transaction_id: paymentSession.transaction_id,
     });
 
-    // Check if session is completed
-    if (sessionData.status === 'completed' && sessionData.transaction_id) {
-      const tokenOperation = operationType === 'token_only';
+    // Check if the session has completed transaction
+    if (paymentSession.status === 'completed' && paymentSession.transaction_id) {
+      logStep("Payment session already completed", {
+        id: paymentSession.id,
+        transaction_id: paymentSession.transaction_id,
+      });
       
-      // Success response for completed session
       return new Response(
         JSON.stringify({
           success: true,
-          message: tokenOperation ? "Token created successfully" : "Payment completed successfully",
-          processing: false,
           data: {
-            transactionId: sessionData.transaction_id,
-            isTokenOperation: tokenOperation,
-            token: tokenOperation ? sessionData.transaction_id : null
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if payment session has failed
-    if (sessionData.status === 'failed') {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Payment failed",
-          processing: false,
-          failed: true
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Second check: Check payment logs for transaction with this LowProfileId
-    const { data: paymentLogs } = await supabaseAdmin
-      .from('payment_logs')
-      .select('*')
-      .eq('transaction_id', lowProfileCode)
-      .single();
-
-    if (paymentLogs) {
-      console.log('Found completed payment in logs:', paymentLogs);
-      
-      // Update the session as completed
-      await supabaseAdmin
-        .from('payment_sessions')
-        .update({
-          status: 'completed',
-          transaction_id: paymentLogs.transaction_id
-        })
-        .eq('id', sessionId);
-        
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Payment completed (found in logs)",
-          processing: false,
-          data: {
-            transactionId: paymentLogs.transaction_id,
-            isTokenOperation: operationType === 'token_only'
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Third check: For token operations specifically, check for token in payment_method
-    if (operationType === 'token_only' && sessionData.payment_method?.token) {
-      // Update session as completed with token ID
-      await supabaseAdmin
-        .from('payment_sessions')
-        .update({
-          status: 'completed',
-          transaction_id: sessionData.payment_method.token
-        })
-        .eq('id', sessionId);
-        
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Token created successfully",
-          processing: false,
-          data: {
-            isTokenOperation: true,
-            token: sessionData.payment_method.token
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Fourth check: Look for a matching subscription with active status
-    if (sessionData.user_id) {
-      const { data: subscription } = await supabaseAdmin
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', sessionData.user_id)
-        .eq('plan_type', sessionData.plan_id)
-        .eq('status', 'active')
-        .maybeSingle();
-        
-      if (subscription) {
-        console.log('Found active subscription:', subscription);
-        
-        // Update session as completed
-        await supabaseAdmin
-          .from('payment_sessions')
-          .update({
+            sessionId: paymentSession.id,
             status: 'completed',
-            transaction_id: subscription.id
-          })
-          .eq('id', sessionId);
-          
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "Subscription is active",
-            processing: false,
-            data: {
-              transactionId: subscription.id,
-              isTokenOperation: operationType === 'token_only'
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+            transactionId: paymentSession.transaction_id
+          }
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // If we've reached here, payment is still processing
-    // For very high attempt counts, consider timing out
-    if (attempt > 30) {
+    // Check if the session has failed explicitly
+    if (paymentSession.status === 'failed') {
+      logStep("Payment session marked as failed", { id: paymentSession.id });
+      
+      const errorMessage = paymentSession.transaction_data?.Description || 
+                          paymentSession.transaction_data?.description || 
+                          'The payment could not be processed';
+      
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Payment processing timeout",
-          processing: false,
-          timeout: true
+          failed: true,
+          message: errorMessage
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
+    }
+
+    // Now check for token creation if that was the operation
+    if (operationType === 'token_only' && paymentSession.payment_method?.token) {
+      logStep("Token created successfully", { 
+        token: paymentSession.payment_method.token 
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            sessionId: paymentSession.id,
+            status: 'token_created',
+            token: paymentSession.payment_method.token
+          }
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // At this point, we're still processing
+    logStep("Payment still processing", { 
+      id: paymentSession.id, 
+      status: paymentSession.status,
+      attempt 
+    });
+    
+    // Provide a response indicating processing
+    const response: StatusResponse = {
+      success: false,
+      processing: true,
+      message: 'Payment still processing'
+    };
+
+    // For early checks, we don't want to show failure yet
+    if (Number(attempt) <= 3) {
+      response.failed = false;
     }
 
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: "Payment is still processing",
-        processing: true,
-        attempt
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(response),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   } catch (error) {
-    console.error('Error checking payment status:', error);
+    logStep("Error processing request", error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        message: error instanceof Error ? error.message : "Unknown error occurred",
-        processing: false,
-        error: true
+        failed: true,
+        message: 'Error checking payment status',
+        error: error instanceof Error ? error.message : 'Unknown error'
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
     );
   }
 });

@@ -8,6 +8,74 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Define CardCom webhook response types
+interface TokenInfo {
+  Token: string;
+  TokenExDate: string;
+  CardYear: number;
+  CardMonth: number;
+  TokenApprovalNumber: string;
+  CardOwnerIdentityNumber?: string;
+}
+
+interface UIValues {
+  CardOwnerEmail?: string;
+  CardOwnerName?: string;
+  CardOwnerPhone?: string;
+  CardOwnerIdentityNumber?: string;
+  NumOfPayments: number;
+  CardYear: number;
+  CardMonth: number;
+  CustomFields?: Array<{ Id: number; Value: string }>;
+  IsAbroadCard: boolean;
+}
+
+interface TransactionInfo {
+  ResponseCode: number;
+  Description?: string;
+  TranzactionId: number;
+  TerminalNumber: number;
+  Amount: number;
+  CoinId: number;
+  Last4CardDigits?: number;
+  Last4CardDigitsString?: string;
+  CardMonth?: number;
+  CardYear?: number;
+  ApprovalNumber?: string;
+  Token?: string;
+  DocumentUrl?: string;
+  IsAbroadCard?: boolean;
+  [key: string]: any; // For other possible fields
+}
+
+interface DocumentInfo {
+  ResponseCode: number;
+  Description: string;
+  DocumentType: string;
+  DocumentNumber: number;
+  DocumentUrl?: string;
+  [key: string]: any; // For other possible fields
+}
+
+interface WebhookPayload {
+  ResponseCode: number;
+  Description?: string;
+  TerminalNumber: number;
+  LowProfileId: string;
+  TranzactionId?: number;
+  ReturnValue?: string;
+  Operation: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly" | "SuspendedDeal" | "Do3DSAndSubmit";
+  UIValues?: UIValues;
+  DocumentInfo?: DocumentInfo;
+  TokenInfo?: TokenInfo;
+  SuspendedInfo?: { SuspendedDealId: number };
+  TranzactionInfo?: TransactionInfo;
+  ExternalPaymentVector?: string;
+  Country?: string;
+  UTM?: { Source?: string; Medium?: string; Campaign?: string; Content?: string; Term?: string };
+  IssuerAuthCodeDescription?: string;
+}
+
 // Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -30,7 +98,7 @@ serve(async (req) => {
     );
 
     // Get webhook data - CardCom sends data in request body
-    let webhookData;
+    let webhookData: WebhookPayload | null = null;
 
     const contentType = req.headers.get('content-type') || '';
     logStep("Content-Type", { contentType });
@@ -41,7 +109,10 @@ serve(async (req) => {
     } else if (contentType.includes('application/x-www-form-urlencoded')) {
       try {
         const formData = await req.formData();
-        webhookData = Object.fromEntries(formData.entries());
+        const rawData: Record<string, any> = Object.fromEntries(formData.entries());
+        
+        // Process form data to convert string values to appropriate types
+        webhookData = processFormData(rawData);
         logStep("Parsed form data webhook");
       } catch (formError) {
         // Handle raw form data if formData() fails
@@ -51,7 +122,10 @@ serve(async (req) => {
         try {
           // Try to parse URL-encoded form data manually
           const params = new URLSearchParams(text);
-          webhookData = Object.fromEntries(params.entries());
+          const rawData: Record<string, any> = Object.fromEntries(params.entries());
+          
+          // Process form data to convert string values to appropriate types
+          webhookData = processFormData(rawData);
           logStep("Manually parsed form data");
         } catch (textParseError) {
           throw new Error(`Failed to parse form data: ${textParseError.message}, Raw content: ${text}`);
@@ -63,15 +137,18 @@ serve(async (req) => {
       logStep("Unexpected content type, raw content", { text });
       
       try {
-        // Try to parse as URL-encoded
-        const params = new URLSearchParams(text);
-        webhookData = Object.fromEntries(params.entries());
-        logStep("Parsed as URL-encoded despite content type");
+        // First try to parse as JSON
+        webhookData = JSON.parse(text);
+        logStep("Parsed as JSON despite content type");
       } catch (e) {
         try {
-          // Try to parse as JSON
-          webhookData = JSON.parse(text);
-          logStep("Parsed as JSON despite content type");
+          // Try to parse as URL-encoded
+          const params = new URLSearchParams(text);
+          const rawData: Record<string, any> = Object.fromEntries(params.entries());
+          
+          // Process form data to convert string values to appropriate types
+          webhookData = processFormData(rawData);
+          logStep("Parsed as URL-encoded despite content type");
         } catch (jsonError) {
           throw new Error(`Unsupported content type: ${contentType}, Raw content: ${text}`);
         }
@@ -80,30 +157,36 @@ serve(async (req) => {
 
     logStep("Received webhook data", webhookData);
 
+    // Check if we received valid data
+    if (!webhookData) {
+      throw new Error("No valid data received from webhook");
+    }
+
     // Extract required fields from webhook data
     const {
       LowProfileId: lowProfileCode,
-      OperationResponse: operationResponse,
+      Operation: operation,
+      ResponseCode: responseCode,
+      Description: description,
       ReturnValue: returnValue,
-      InternalDealNumber: transactionId,
-      TranzactionInfo: transactionInfo,
+      TranzactionId: directTransactionId,
+      UIValues: uiValues,
       TokenInfo: tokenInfo,
-      CardNumber5: cardNumber5,
-      ResponseCode: responseCode
+      TranzactionInfo: transactionInfo,
+      DocumentInfo: documentInfo
     } = webhookData;
 
     // Check all possible response code fields
-    const isSuccessful = 
-      operationResponse === "0" || operationResponse === 0 || 
-      responseCode === "0" || responseCode === 0 ||
-      (webhookData.ResponseCode === "0" || webhookData.ResponseCode === 0) ||
-      (transactionInfo && (transactionInfo.ResponseCode === "0" || transactionInfo.ResponseCode === 0));
+    // Valid response codes are 0 (success), 700 and 701 (for validation/authorization)
+    const validResponseCodes = [0, "0", 700, "700", 701, "701"];
+    const hasValidResponseCode = 
+      validResponseCodes.includes(responseCode) || 
+      (transactionInfo && validResponseCodes.includes(transactionInfo.ResponseCode));
 
     logStep("Payment success check", { 
-      isSuccessful,
-      operationResponse,
+      hasValidResponseCode,
       responseCode,
-      webhookResponseCode: webhookData.ResponseCode,
+      operationType: operation,
       transactionInfoResponseCode: transactionInfo?.ResponseCode
     });
 
@@ -138,7 +221,10 @@ serve(async (req) => {
         }
       });
     }
-    if (!sessionData) {
+    
+    let session = sessionData;
+    
+    if (!session) {
       logStep("Payment session missing for LowProfileId", { lowProfileCode });
       
       // Try to check by ReturnValue as fallback
@@ -156,10 +242,10 @@ serve(async (req) => {
           });
           
           // Continue with this session
-          sessionData = sessionByReturnValue;
+          session = sessionByReturnValue;
         } else {
           // Don't fail
-          return new Response("OK - Session not found", {
+          return new Response("OK - Session not found and ReturnValue didn't match", {
             status: 200,
             headers: {
               ...corsHeaders,
@@ -180,17 +266,17 @@ serve(async (req) => {
     }
 
     logStep("Found payment session", {
-      sessionId: sessionData.id,
-      userId: sessionData.user_id,
-      planId: sessionData.plan_id,
-      currentStatus: sessionData.status
+      sessionId: session.id,
+      userId: session.user_id,
+      planId: session.plan_id,
+      currentStatus: session.status
     });
 
     // Check if this session is already processed (idempotency)
-    if (sessionData.status === 'completed' && sessionData.transaction_id) {
+    if (session.status === 'completed' && session.transaction_id) {
       logStep("Session already completed", { 
-        transactionId: sessionData.transaction_id,
-        sessionId: sessionData.id 
+        transactionId: session.transaction_id,
+        sessionId: session.id 
       });
       return new Response("OK - Session already processed", {
         status: 200,
@@ -201,51 +287,72 @@ serve(async (req) => {
       });
     }
 
-    // Extract token information if available
+    // Extract token information if available - based on Operation type
     let paymentMethod = null;
-    if (tokenInfo) {
+    
+    // Handle token data extraction based on Operation type
+    if (operation === "ChargeAndCreateToken" || operation === "CreateTokenOnly") {
+      if (tokenInfo) {
+        paymentMethod = {
+          token: tokenInfo.Token,
+          tokenExpiryDate: tokenInfo.TokenExDate,
+          lastFourDigits: extractCardLastFourDigits(webhookData),
+          expiryMonth: tokenInfo.CardMonth,
+          expiryYear: tokenInfo.CardYear
+        };
+        logStep("Extracted token from TokenInfo", { 
+          token: tokenInfo.Token, 
+          expiry: tokenInfo.TokenExDate 
+        });
+      } else if (transactionInfo?.Token) {
+        // Fallback to transaction info if token info not available
+        paymentMethod = {
+          token: transactionInfo.Token,
+          lastFourDigits: extractCardLastFourDigits(webhookData),
+          expiryMonth: transactionInfo.CardMonth,
+          expiryYear: transactionInfo.CardYear
+        };
+        logStep("Extracted token from TransactionInfo", { token: transactionInfo.Token });
+      } else {
+        logStep("No token found for token operation", { operation });
+      }
+    } else if (operation === "ChargeOnly" && transactionInfo?.Token) {
+      // Some operations might still return token data
       paymentMethod = {
-        token: tokenInfo.Token,
-        tokenExpiryDate: tokenInfo.TokenExDate,
-        lastFourDigits: cardNumber5 || webhookData.Last4CardDigits || "0000",
-        expiryMonth: tokenInfo.CardMonth || tokenInfo.CardValidityMonth,
-        expiryYear: tokenInfo.CardYear || tokenInfo.CardValidityYear
+        token: transactionInfo.Token,
+        lastFourDigits: extractCardLastFourDigits(webhookData),
+        expiryMonth: transactionInfo.CardMonth,
+        expiryYear: transactionInfo.CardYear
       };
-    } else if (transactionInfo) {
-      // Try to extract from transaction info if available
-      paymentMethod = {
-        token: transactionInfo.Token || null,
-        lastFourDigits: transactionInfo.Last4CardDigitsString || cardNumber5 || "0000",
-        expiryMonth: transactionInfo.CardMonth || null,
-        expiryYear: transactionInfo.CardYear || null
-      };
+      logStep("Extracted token from ChargeOnly operation", { token: transactionInfo.Token });
     }
 
-    // Determine payment status
-    const status = isSuccessful ? 'completed' : 'failed';
-    
-    // Get actual transaction ID from various possible fields
+    // Get transaction ID from various possible fields
     const finalTransactionId = 
-      transactionId || 
+      directTransactionId || 
       (transactionInfo && transactionInfo.TranzactionId) || 
-      webhookData.TransactionId || 
-      webhookData.TranzactionId || 
       null;
-
+      
+    // Determine payment status
+    const status = hasValidResponseCode ? 'completed' : 'failed';
+    
     logStep("Determined payment status", { 
-      isSuccessful, 
+      hasValidResponseCode, 
       status, 
-      operationResponse, 
+      responseCode, 
       finalTransactionId,
       hasPaymentMethod: !!paymentMethod
     });
 
-    const updateData: any = {
+    const updateData: Record<string, any> = {
       status,
-      transaction_id: finalTransactionId,
       transaction_data: webhookData,
       updated_at: new Date().toISOString()
     };
+
+    if (finalTransactionId) {
+      updateData.transaction_id = String(finalTransactionId);
+    }
 
     if (paymentMethod) {
       updateData.payment_method = paymentMethod;
@@ -255,7 +362,7 @@ serve(async (req) => {
     const { error: updateError } = await supabaseAdmin
       .from('payment_sessions')
       .update(updateData)
-      .eq('id', sessionData.id);
+      .eq('id', session.id);
 
     if (updateError) {
       logStep("Failed to update payment session", updateError);
@@ -269,25 +376,25 @@ serve(async (req) => {
       });
     }
 
-    logStep("Updated payment session status", { status, sessionId: sessionData.id });
+    logStep("Updated payment session status", { status, sessionId: session.id });
 
     // Log transaction in either 'payment_logs' or 'payment_errors'
-    const logTable = isSuccessful ? 'payment_logs' : 'payment_errors';
+    const logTable = hasValidResponseCode ? 'payment_logs' : 'payment_errors';
 
-    const logData = isSuccessful
+    const logData = hasValidResponseCode
       ? {
-        user_id: sessionData.user_id,
-        transaction_id: finalTransactionId,
-        amount: sessionData.amount,
-        currency: sessionData.currency,
-        plan_id: sessionData.plan_id,
+        user_id: session.user_id,
+        transaction_id: String(finalTransactionId),
+        amount: session.amount,
+        currency: session.currency,
+        plan_id: session.plan_id,
         payment_status: 'succeeded',
         payment_data: webhookData
       }
       : {
-        user_id: sessionData.user_id,
-        error_code: operationResponse || webhookData.ResponseCode,
-        error_message: webhookData.Description || 'Payment failed',
+        user_id: session.user_id,
+        error_code: String(responseCode || webhookData.ResponseCode || "unknown"),
+        error_message: description || webhookData.Description || 'Payment failed',
         request_data: { low_profile_code: lowProfileCode, return_value: returnValue },
         response_data: webhookData
       };
@@ -302,18 +409,18 @@ serve(async (req) => {
     }
 
     // If payment successful, update subscription record
-    if (isSuccessful) {
+    if (hasValidResponseCode) {
       try {
         // Calculate trial/subscription periods
         const now = new Date();
-        const planId = sessionData.plan_id;
+        const planId = session.plan_id;
         let trialEndsAt = null;
         let nextChargeDate = null;
         let currentPeriodEndsAt = null;
         let status = 'active';
 
         if (planId === 'monthly') {
-          if (sessionData.amount === 0) {
+          if (session.amount === 0) {
             // This is a trial
             status = 'trial';
             trialEndsAt = new Date(now);
@@ -328,7 +435,7 @@ serve(async (req) => {
             nextChargeDate = new Date(currentPeriodEndsAt);
           }
         } else if (planId === 'annual') {
-          if (sessionData.amount === 0) {
+          if (session.amount === 0) {
             // This is a trial
             status = 'trial';
             trialEndsAt = new Date(now);
@@ -352,7 +459,7 @@ serve(async (req) => {
         const { data: existingSubscription } = await supabaseAdmin
           .from('subscriptions')
           .select('id')
-          .eq('user_id', sessionData.user_id)
+          .eq('user_id', session.user_id)
           .maybeSingle();
 
         if (existingSubscription) {
@@ -372,7 +479,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from('subscriptions')
             .insert({
-              user_id: sessionData.user_id,
+              user_id: session.user_id,
               plan_type: planId,
               status: planId === 'vip' ? 'active' : status,
               next_charge_date: nextChargeDate,
@@ -381,7 +488,55 @@ serve(async (req) => {
               payment_method: paymentMethod
             });
         }
-        logStep("Updated subscription record", { planId, userId: sessionData.user_id });
+        logStep("Updated subscription record", { planId, userId: session.user_id });
+        
+        // Save token for recurring payments if this was a token operation
+        if (operation === "ChargeAndCreateToken" || operation === "CreateTokenOnly") {
+          if (paymentMethod?.token) {
+            const recurringPaymentData = {
+              user_id: session.user_id,
+              token: paymentMethod.token,
+              token_expiry: paymentMethod.tokenExpiryDate || formatExpiryDate(paymentMethod.expiryMonth, paymentMethod.expiryYear),
+              last_4_digits: paymentMethod.lastFourDigits || '',
+              status: 'active'
+            };
+            
+            // Check if a recurring payment record already exists
+            const { data: existingToken } = await supabaseAdmin
+              .from('recurring_payments')
+              .select('id')
+              .eq('user_id', session.user_id)
+              .maybeSingle();
+              
+            if (existingToken) {
+              await supabaseAdmin
+                .from('recurring_payments')
+                .update(recurringPaymentData)
+                .eq('id', existingToken.id);
+              
+              logStep("Updated recurring payment token", { 
+                userId: session.user_id, 
+                tokenId: existingToken.id 
+              });
+            } else {
+              const { data: newToken } = await supabaseAdmin
+                .from('recurring_payments')
+                .insert(recurringPaymentData)
+                .select('id')
+                .single();
+              
+              logStep("Created new recurring payment token", { 
+                userId: session.user_id, 
+                tokenId: newToken?.id 
+              });
+            }
+          } else {
+            logStep("No token available for recurring payments", { 
+              operation, 
+              hasPaymentMethod: !!paymentMethod 
+            });
+          }
+        }
       } catch (error: any) {
         logStep("Failed to update subscription", { error: error.message });
       }
@@ -412,3 +567,54 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to process form data or URL-encoded data to proper types
+function processFormData(data: Record<string, any>): WebhookPayload {
+  // Attempt to convert string fields to proper types
+  const processed: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'ResponseCode' || key === 'TerminalNumber' || key === 'TranzactionId') {
+      processed[key] = parseInt(value as string, 10);
+    } else if (key === 'TokenInfo' || key === 'UIValues' || key === 'TranzactionInfo' || key === 'DocumentInfo' || key === 'UTM') {
+      try {
+        processed[key] = typeof value === 'string' ? JSON.parse(value) : value;
+      } catch (e) {
+        processed[key] = value;
+      }
+    } else {
+      processed[key] = value;
+    }
+  }
+  
+  return processed as WebhookPayload;
+}
+
+// Helper to extract last 4 digits of card from various fields
+function extractCardLastFourDigits(data: WebhookPayload): string {
+  // Try to get it from different possible locations
+  let last4 = "";
+  
+  if (data.TranzactionInfo?.Last4CardDigitsString) {
+    last4 = data.TranzactionInfo.Last4CardDigitsString;
+  } else if (data.TranzactionInfo?.Last4CardDigits) {
+    last4 = String(data.TranzactionInfo.Last4CardDigits).padStart(4, '0');
+  } else if (data.UIValues?.CardOwnerIdentityNumber) {
+    // This is not actually the card number, but just a fallback to show something
+    const idNumber = data.UIValues.CardOwnerIdentityNumber;
+    last4 = idNumber.length >= 4 ? idNumber.slice(-4) : idNumber;
+  }
+  
+  return last4;
+}
+
+// Helper to format expiry date from month and year
+function formatExpiryDate(month?: number, year?: number): string {
+  if (!month || !year) return '';
+  
+  const currentYear = new Date().getFullYear();
+  const fullYear = year < 100 ? 2000 + year : year;
+  
+  // Format as YYYY-MM-DD
+  return `${fullYear}-${String(month).padStart(2, '0')}-01`;
+}

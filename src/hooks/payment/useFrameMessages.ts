@@ -59,6 +59,22 @@ export const useFrameMessages = ({
           }
           return;
         }
+        
+        // Handle token creation events - specific for monthly subscriptions
+        if (message.action === 'tokenCreationStarted' || message.action === 'TokenCreationStarted') {
+          console.log('Token creation process started');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+          return;
+        }
+
+        if (message.action === 'tokenCreationCompleted' || message.action === 'TokenCreationCompleted') {
+          console.log('Token creation process completed');
+          // Check final status
+          if (lowProfileCode && sessionId) {
+            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+          }
+          return;
+        }
 
         // Handle errors
         if (message.action === 'HandleError' || message.action === 'HandleEror') {
@@ -86,16 +102,25 @@ export const useFrameMessages = ({
 
         if (message.action === '3DSProcessCompleted') {
           console.log('3DS process completed');
-          // Check final status
-          if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-          }
+          // Wait a short time for the server to process the 3DS result
+          setTimeout(() => {
+            // Check final status
+            if (lowProfileCode && sessionId) {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }
+          }, 3000);
           return;
         }
 
         // Handle field validations
         if (message.action === 'handleValidations') {
           console.log('Validation message for field:', message.field);
+          return;
+        }
+        
+        // Handle card type detection
+        if (message.action === 'cardTypeDetected') {
+          console.log('Card type detected:', message.cardType);
           return;
         }
       } catch (error) {
