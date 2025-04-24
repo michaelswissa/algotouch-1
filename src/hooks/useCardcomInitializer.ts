@@ -2,10 +2,8 @@
 import { toast } from 'sonner';
 
 /**
- * Initialise CardCom open-fields:
- *   1. wait for master iframe to be ready
- *   2. post the 'init' message with the minimum payload
- * Returns true on success.
+ * Initialise CardCom open-fields.
+ * Returns true if the init message was posted.
  */
 export const initializeCardcomFields = async (
   masterRef: React.RefObject<HTMLIFrameElement>,
@@ -20,23 +18,25 @@ export const initializeCardcomFields = async (
     return false;
   }
 
-  /* 1 ─ wait for the iframe to finish loading */
+  /* wait for iframe to finish loading */
   if (!iframe.contentWindow) {
-    await new Promise<void>((res) =>
-      iframe.addEventListener('load', () => res(), { once: true })
+    await new Promise<void>((r) =>
+      iframe.addEventListener('load', () => r(), { once: true })
     );
   }
 
-  /* 2 ─ post the init message */
+  /* build minimal payload exactly like CardCom sample */
   const msg = {
     action: 'init',
     lowProfileCode,
     terminalNumber: Number(terminalNumber),
     operation: op === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly',
+    cardFieldCSS: '',
+    cvvFieldCSS: '',
+    reCaptchaFieldCSS: '',
   };
   iframe.contentWindow!.postMessage(msg, '*');
   console.debug('📤 init posted to master frame', msg);
 
-  /* 3 ─ assume success (CardCom populates child iframes asynchronously) */
   return true;
 };

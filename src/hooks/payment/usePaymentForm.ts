@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { usePayment } from '@/hooks/usePayment';
 import { toast } from 'sonner';
 import { getSubscriptionPlans } from '@/components/payment/utils/paymentHelpers';
 import { PaymentStatus } from '@/components/payment/types/payment';
+import { initializeCardcomFields } from '@/hooks/useCardcomInitializer';
 
 interface UsePaymentFormProps {
   planId: string;
@@ -39,19 +39,17 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     setIsMasterFrameLoaded(true);
   };
 
-  // Initialize CardCom fields when master frame and required data are ready
   useEffect(() => {
     if (!isMasterFrameLoaded || !lowProfileCode || !terminalNumber) return;
 
-    initializePayment(
+    initializeCardcomFields(
       masterFrameRef,
       lowProfileCode,
       terminalNumber.toString(),
       operationType
     ).catch(() => toast.error('CardCom init failed'));
-  }, [isMasterFrameLoaded, lowProfileCode, terminalNumber, masterFrameRef, operationType, initializePayment]);
+  }, [isMasterFrameLoaded, lowProfileCode, terminalNumber, masterFrameRef, operationType]);
 
-  // Fallback timeout for master frame load
   useEffect(() => {
     const t = setTimeout(() => {
       if (!isMasterFrameLoaded && masterFrameRef.current) {

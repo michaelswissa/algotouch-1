@@ -1,7 +1,6 @@
-
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from '../useCardcomInitializer';
+import { initializeCardcomFields } from '../useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
@@ -13,14 +12,8 @@ interface UsePaymentInitializationProps {
   operationType?: 'payment' | 'token_only';
 }
 
-export const usePaymentInitialization = ({
-  planId,
-  setState,
-  masterFrameRef,
-  operationType = 'payment'
-}: UsePaymentInitializationProps) => {
+export const usePaymentInitialization = ({ planId, setState, masterFrameRef, operationType = 'payment' }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
-  const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
