@@ -13,9 +13,6 @@ const CARDCOM_CONFIG = {
   apiName: "bLaocQRMSnwphQRUVG3b",
   apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
-    master: "https://secure.cardcom.solutions/api/openfields/master",
-    cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
-    cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
     createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
   }
 };
@@ -35,7 +32,6 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -76,8 +72,8 @@ serve(async (req) => {
     }
 
     // Get user information and prepare transaction reference
-    let userEmail = invoiceInfo?.email || registrationData?.email;
-    let fullName = invoiceInfo?.fullName || 
+    const userEmail = invoiceInfo?.email || registrationData?.email;
+    const fullName = invoiceInfo?.fullName || 
                   (registrationData?.userData ? 
                     `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                     undefined);
@@ -96,11 +92,12 @@ serve(async (req) => {
       fullName
     });
 
-    // Create CardCom API request body for payment initialization
+    // Create CardCom API request body
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-      ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
+      UserName: CARDCOM_CONFIG.apiName,
+      Password: CARDCOM_CONFIG.apiPassword,
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken',
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
@@ -109,32 +106,13 @@ serve(async (req) => {
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1, // No installments allowed
-      UIDefinition: {
-        IsHideCardOwnerName: false,
-        IsHideCardOwnerEmail: false,
-        IsHideCardOwnerPhone: false,
-        CardOwnerEmailValue: userEmail,
-        CardOwnerNameValue: fullName,
-        IsCardOwnerEmailRequired: true,
-        reCaptchaFieldCSS: "body { margin: 0; padding:0; display: flex; }",
-        placeholder: "1111-2222-3333-4444",
-        cvvPlaceholder: "123"
-      },
-      Document: invoiceInfo ? {
-        Name: fullName || userEmail,
-        Email: userEmail,
-        Products: [{
-          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: amount,
-          Quantity: 1
-        }]
-      } : undefined
+      MaxNumOfPayments: 1,
+      Email: userEmail,
+      InvoiceName: fullName || userEmail
     };
     
     logStep("Sending request to CardCom");
     
-    // Initialize payment session with CardCom
     const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
       method: "POST",
       headers: {
@@ -145,13 +123,14 @@ serve(async (req) => {
     
     const responseData = await response.json();
     
-    logStep("CardCom response", responseData);
+    logStep("CardCom raw response", responseData);
     
-    if (responseData.ResponseCode !== 0) {
+    if (!responseData.LowProfileCode) {
+      logStep("ERROR: Missing LowProfileCode in response", responseData);
       return new Response(
         JSON.stringify({
           success: false,
-          message: responseData.Description || "CardCom initialization failed",
+          message: responseData.Description || "CardCom initialization failed - missing LowProfileCode",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -162,7 +141,7 @@ serve(async (req) => {
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: responseData.LowProfileId,
+      low_profile_code: responseData.LowProfileCode,
       reference: transactionRef,
       plan_id: planId,
       amount: amount,
@@ -199,7 +178,7 @@ serve(async (req) => {
         message: "Payment session created",
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
-          lowProfileCode: responseData.LowProfileId,
+          lowProfileCode: responseData.LowProfileCode,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
         }

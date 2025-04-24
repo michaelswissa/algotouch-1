@@ -1,7 +1,7 @@
 
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from '../useCardcomInitializer';
+import { useCardcomInitializer } from './useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
@@ -49,7 +49,7 @@ export const usePaymentInitialization = ({
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
 
-      // Step 3: Initialize payment session to get lowProfileCode
+      // Step 3: Initialize payment session with proper error handling
       console.log('Initializing payment session with plan:', planId);
       const paymentData = await initializePaymentSession(
         planId,
@@ -58,47 +58,48 @@ export const usePaymentInitialization = ({
         operationType
       );
       
-      if (!paymentData || !paymentData.lowProfileCode) {
-        console.error("Failed to initialize payment session or missing lowProfileCode", paymentData);
+      if (!paymentData?.lowProfileCode) {
+        console.error("Missing lowProfileCode in payment data:", paymentData);
         throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
       }
       
-      console.log('Payment session initialized with lowProfileCode:', paymentData.lowProfileCode);
+      console.log('Payment session initialized:', {
+        lowProfileCode: paymentData.lowProfileCode,
+        sessionId: paymentData.sessionId,
+        terminalNumber: paymentData.terminalNumber
+      });
 
-      // Step 4: Master frame should be loaded by the parent component
-      // We must ensure the iframes are ready before initialization
-      
-      // Set initial payment state
+      // Set initial payment state before iframe initialization
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE
+        paymentStatus: PaymentStatus.IDLE,
+        lowProfileCode: paymentData.lowProfileCode,
+        sessionId: paymentData.sessionId,
+        terminalNumber: paymentData.terminalNumber,
+        cardcomUrl: paymentData.cardcomUrl || 'https://secure.cardcom.solutions'
       }));
       
-      // Step 5: Initialize CardCom fields with the lowProfileCode
-      console.log('Setting up to initialize CardCom fields');
+      // Wait for master frame to be available
       setTimeout(async () => {
-        console.log('Starting CardCom fields initialization');
-        try {
-          const initialized = await initializeCardcomFields(
-            masterFrameRef, 
-            paymentData.lowProfileCode, 
-            paymentData.sessionId,
-            paymentData.terminalNumber,
-            operationType
-          );
-          
-          if (!initialized) {
-            console.error("Failed to initialize CardCom fields");
-            throw new Error('שגיאה באתחול שדות התשלום');
-          }
-          
-          console.log('CardCom fields initialized successfully');
-        } catch (error) {
-          console.error('Error during CardCom field initialization:', error);
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(error.message || 'שגיאה באתחול שדות התשלום');
+        if (!masterFrameRef.current) {
+          throw new Error('מסגרת התשלום אינה זמינה');
         }
-      }, 500); // Short delay to ensure master frame is loaded
+        
+        console.log('Initializing CardCom fields');
+        const initialized = await initializeCardcomFields(
+          masterFrameRef,
+          paymentData.lowProfileCode,
+          paymentData.sessionId,
+          paymentData.terminalNumber,
+          operationType
+        );
+        
+        if (!initialized) {
+          throw new Error('שגיאה באתחול שדות התשלום');
+        }
+        
+        console.log('CardCom fields initialized successfully');
+      }, 500);
       
       return paymentData;
     } catch (error) {
