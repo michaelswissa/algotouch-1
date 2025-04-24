@@ -100,13 +100,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      if (!cardholderName || !cardOwnerId || !email || !phone) {
-        toast.error('נא למלא את כל שדות החובה');
-        setPaymentInProgress(false);
-        return;
-      }
-      
-      // CardCom requires both "lowProfileCode" and "LowProfileCode" for consistency
+      // CardCom requires "lowProfileCode" param for each doTransaction
       const formData: any = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
@@ -119,8 +113,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
-        lowProfileCode: state.lowProfileCode, // Include both for compatibility
-        LowProfileCode: state.lowProfileCode  
+        lowProfileCode: state.lowProfileCode, // Ensure always present
+        LowProfileCode: state.lowProfileCode  // For extra compatibility
       };
 
       console.log('Sending transaction data to CardCom:', formData);
@@ -131,10 +125,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         paymentStatus: PaymentStatus.PROCESSING
       }));
       
-      // Start status check with required params, wait a bit longer for initial check
-      setTimeout(() => {
-        startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
-      }, 10000); // increased initial delay
+      // Start status check with required params
+      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
       
       setTimeout(() => {
         setPaymentInProgress(false);

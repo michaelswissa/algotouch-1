@@ -393,54 +393,48 @@ export type Database = {
       payment_sessions: {
         Row: {
           amount: number
-          anonymous_data: Json | null
           created_at: string
           currency: string
           expires_at: string
           id: string
           low_profile_code: string
-          payment_details: Json | null
           plan_id: string
           reference: string
           status: string
           transaction_data: Json | null
           transaction_id: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           amount: number
-          anonymous_data?: Json | null
           created_at?: string
           currency?: string
           expires_at: string
           id?: string
           low_profile_code: string
-          payment_details?: Json | null
           plan_id: string
           reference: string
           status?: string
           transaction_data?: Json | null
           transaction_id?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           amount?: number
-          anonymous_data?: Json | null
           created_at?: string
           currency?: string
           expires_at?: string
           id?: string
           low_profile_code?: string
-          payment_details?: Json | null
           plan_id?: string
           reference?: string
           status?: string
           transaction_data?: Json | null
           transaction_id?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -745,17 +739,9 @@ export type Database = {
         Args: { low_profile_id: string }
         Returns: boolean
       }
-      check_duplicate_payment_extended: {
-        Args: { low_profile_id: string }
-        Returns: Json
-      }
       check_row_exists: {
         Args: { p_table_name: string; p_column_name: string; p_value: string }
         Returns: boolean
-      }
-      cleanup_expired_payment_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
       }
       cleanup_user_payment_sessions: {
         Args: { user_id_param: string }
@@ -776,10 +762,6 @@ export type Database = {
       }
       is_admin: {
         Args: { user_id: string }
-        Returns: boolean
-      }
-      validate_payment_session: {
-        Args: { session_id: string }
         Returns: boolean
       }
     }

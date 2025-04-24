@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -26,7 +27,7 @@ export const useFrameMessages = ({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        // Strict origin checking
+        // Safety check for message origin
         if (!event.origin.includes('cardcom.solutions') && 
             !event.origin.includes('localhost') && 
             !event.origin.includes(window.location.origin)) {
@@ -42,27 +43,17 @@ export const useFrameMessages = ({
 
         // Handle HandleSubmit (success case)
         if (message.action === 'HandleSubmit' || message.action === 'handleSubmit') {
-          console.log('HandleSubmit received, updating status to PROCESSING');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+          console.log('HandleSubmit message received:', message);
           
-          // Start checking status with increased initial delay
-          if (lowProfileCode && sessionId) {
-            setTimeout(() => {
-              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-            }, 8000); // Increased initial delay
+          if (message.data?.IsSuccess) {
+            console.log('Payment submission successful');
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+            handlePaymentSuccess();
+          } else {
+            console.error('Payment submission failed:', message.data?.Description);
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+            toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
           }
-          return;
-        }
-
-        // Handle explicit success messages
-        if (message.action === 'Success' || 
-            (message.data && message.data.IsSuccess === true) || 
-            (message.IsSuccess === true) ||
-            (message.ResponseCode === 0) ||
-            (message.data && message.data.ResponseCode === 0)) {
-          console.log('Success message received');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-          handlePaymentSuccess();
           return;
         }
 
@@ -71,27 +62,16 @@ export const useFrameMessages = ({
           console.error('Payment error:', message.message || 'Unknown error');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           
-          // Improved error messages in Hebrew
-          const errorMessage = message.message || '';
-          if (errorMessage.includes('lowProfileCode')) {
-            toast.error('חסר מזהה עסקה');
-          } else if (errorMessage.includes('תאריך תוקף שגוי')) {
-            toast.error('תאריך תוקף הכרטיס שגוי');
-          } else if (errorMessage.includes('CardComCardNumber')) {
-            toast.error('שגיאה בפרטי כרטיס האשראי');
+          // Show more specific error messages
+          if (message.message && message.message.includes('lowProfileCode')) {
+            toast.error('פרמטר lowProfileCode חובה');
+          } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
+            toast.error('תאריך תוקף שגוי');
+          } else if (message.message && message.message.includes('CardComCardNumber')) {
+            toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
           } else {
             toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
           }
-          return;
-        }
-
-        // Handle explicit failure messages
-        if (message.action === 'Failure' || 
-            (message.data && message.data.IsSuccess === false) ||
-            (message.IsSuccess === false)) {
-          console.error('Explicit failure message received');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(message.message || message.data?.Description || 'התשלום נכשל');
           return;
         }
 
@@ -111,22 +91,10 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle validation messages
+        // Handle validations
         if (message.action === 'handleValidations') {
           console.log('Validation message for field:', message.field);
           // Field validation is handled separately in usePaymentValidation
-          return;
-        }
-        
-        // Handle redirect URLs
-        if (message.action === 'redirect' && message.url) {
-          console.log('Redirect message received:', message.url);
-          // Don't redirect automatically, instead mark as processing and wait for status check
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-          
-          if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-          }
           return;
         }
       } catch (error) {
@@ -134,7 +102,12 @@ export const useFrameMessages = ({
       }
     };
 
+    console.log('Setting up message event listener for CardCom iframe');
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    
+    return () => {
+      console.log('Removing message event listener for CardCom iframe');
+      window.removeEventListener('message', handleMessage);
+    };
   }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
 };

@@ -16,7 +16,6 @@ export interface PaymentResponse {
     lowProfileCode: string;
     terminalNumber: string;
     cardcomUrl?: string;
-    url?: string; // The redirect URL from CardCom
   };
   message?: string;
 }
@@ -33,7 +32,6 @@ export interface CardComMessage {
 export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
-  LowProfileCode?: string; // Added for extra compatibility
   sessionId?: string;
   terminalNumber: string;
   cardFieldCSS: string;
@@ -55,5 +53,4 @@ export interface PaymentState {
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
   isFramesReady: boolean;
-  paymentUrl?: string; // The redirect URL from CardCom
 }

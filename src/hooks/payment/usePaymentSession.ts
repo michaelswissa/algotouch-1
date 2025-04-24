@@ -18,83 +18,62 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       planId,
       email: paymentUser.email,
       fullName: paymentUser.fullName,
-      operationType,
-      isAuthenticated: !!userId
+      operationType
     });
 
-    // Create the payload once before sending
-    const payload = {
-      planId,
-      amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
-      invoiceInfo: {
-        fullName: paymentUser.fullName || paymentUser.email,
-        email: paymentUser.email,
-      },
-      currency: "ILS",
-      operation: operationType === 'token_only' || planId === 'monthly' ? "ChargeAndCreateToken" : "ChargeOnly",
-      redirectUrls: {
-        success: `${window.location.origin}/subscription/success`,
-        failed: `${window.location.origin}/subscription/failed`
-      },
-      userId: userId,
-      operationType,
-      anonymousData: !userId ? { 
-        email: paymentUser.email,
-        fullName: paymentUser.fullName 
-      } : null
-    };
-
-    try {
-      // Call CardCom payment initialization Edge Function
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-        body: payload
-      });
-    
-      if (error) {
-        console.error("Payment initialization error:", error);
-        throw new Error(error?.message || 'אירעה שגיאה באתחול התשלום');
-      }
-    
-      if (!data?.success) {
-        console.error("Payment initialization failed:", data?.message);
-        throw new Error(data?.message || 'אירעה שגיאה באתחול התשלום');
-      }
-      
-      console.log("Payment session created:", data.data);
-      
-      if (!data.data.lowProfileCode) {
-        console.error("Missing lowProfileCode in response:", data.data);
-        throw new Error('חסר מזהה לעסקה, אנא נסה שנית');
-      }
-      
-      if (!data.data.sessionId) {
-        console.error("Missing sessionId in response:", data.data);
-        throw new Error('חסר מזהה מעקב לעסקה, אנא נסה שנית');
-      }
-      
-      // Always use the returned terminal number
-      const terminalNumber = data.data.terminalNumber || '160138';
-      
-      setState(prev => ({
-        ...prev,
-        sessionId: data.data.sessionId,
-        lowProfileCode: data.data.lowProfileCode,
-        terminalNumber: terminalNumber,
-        cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
-        paymentStatus: PaymentStatus.IDLE,
-        paymentUrl: data.data.url
-      }));
-      
-      return { 
-        lowProfileCode: data.data.lowProfileCode, 
-        sessionId: data.data.sessionId,
-        terminalNumber: terminalNumber
-      };
-    } catch (error) {
-      console.error("Payment session initialization error:", error);
-      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
-      throw error;
+    // Determine operation based on plan and operationType
+    let operation = "ChargeOnly";
+    if (operationType === 'token_only' || planId === 'monthly') {
+      operation = "ChargeAndCreateToken";
     }
+
+    // Call CardCom payment initialization Edge Function
+    const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      body: {
+        planId,
+        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        invoiceInfo: {
+          fullName: paymentUser.fullName || paymentUser.email,
+          email: paymentUser.email,
+        },
+        currency: "ILS",
+        operation: operation,
+        redirectUrls: {
+          success: `${window.location.origin}/subscription/success`,
+          failed: `${window.location.origin}/subscription/failed`
+        },
+        userId: userId,
+        operationType,
+        registrationData: sessionStorage.getItem('registration_data') 
+          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+          : null
+      }
+    });
+    
+    if (error || !data?.success) {
+      console.error("Payment initialization error:", error || data?.message);
+      throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
+    }
+    
+    console.log("Payment session created:", data.data);
+    
+    // Always use the fixed terminal number for CardCom
+    const terminalNumber = '160138';
+    
+    setState(prev => ({
+      ...prev,
+      sessionId: data.data.sessionId,
+      lowProfileCode: data.data.lowProfileCode,
+      terminalNumber: terminalNumber,
+      cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+      paymentStatus: PaymentStatus.IDLE
+    }));
+    
+    return { 
+      lowProfileCode: data.data.lowProfileCode, 
+      sessionId: data.data.sessionId,
+      terminalNumber: terminalNumber
+    };
   };
 
   return { initializePaymentSession };
