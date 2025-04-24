@@ -35,11 +35,12 @@ export const useCardcomInitializer = (
     });
 
     try {
+      // Fix: Convert terminalNumber to string for type compatibility in config
       const config: InitConfig = {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: Number(terminalNumber), // Converting to number as required by CardCom's API
+        terminalNumber: terminalNumber, // Keep as string, no conversion to number
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {

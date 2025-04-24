@@ -28,11 +28,12 @@ export const useCardcomInitializer = () => {
     });
 
     try {
+      // Fix: Make sure terminalNumber stays as string and operation type maps correctly
       const config: InitConfig = {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: Number(terminalNumber), // Convert to number as required by CardCom
+        terminalNumber: terminalNumber, // Keep as string
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
@@ -75,7 +76,8 @@ export const useCardcomInitializer = () => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
         language: 'he',
-        operation: operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
+        // Fix: Map operationType to allowed CardCom operation values
+        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
       };
 
       console.log('Sending initialization config to CardCom iframe');

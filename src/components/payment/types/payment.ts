@@ -1,56 +1,40 @@
 
+// Payment status types
 export const PaymentStatus = {
-  IDLE: 'idle' as const,
-  INITIALIZING: 'initializing' as const,
-  PROCESSING: 'processing' as const,
-  SUCCESS: 'success' as const,
-  FAILED: 'failed' as const
+  IDLE: 'idle',
+  INITIALIZING: 'initializing',
+  PROCESSING: 'processing',
+  SUCCESS: 'success',
+  FAILED: 'failed'
 } as const;
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
-export interface PaymentResponse {
-  success: boolean;
-  data: {
-    sessionId: string;
-    lowProfileCode: string;
-    terminalNumber: string;
-    cardcomUrl?: string;
-  };
-  message?: string;
-}
+// CardCom operation types
+export type CardComOperationType = 'ChargeOnly' | 'ChargeAndCreateToken';
 
-export interface CardComMessage {
-  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted';
-  data?: any;
-  message?: string;
-  field?: string;
-  isValid?: boolean;
-  cardType?: string;
-}
-
+// CardCom initialization config type with string terminalNumber
 export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
-  sessionId?: string;
-  terminalNumber: string;
+  sessionId: string;
+  terminalNumber: string; // Changed from number to string for consistency
   cardFieldCSS: string;
   cvvFieldCSS: string;
   reCaptchaFieldCSS: string;
+  placeholder: string;
+  cvvPlaceholder: string;
   language: string;
-  operationType?: 'payment' | 'token_only';
-  placeholder?: string;
-  cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
+  operation: CardComOperationType;
 }
 
+// Payment state type definition
 export interface PaymentState {
+  paymentStatus: PaymentStatusType;
+  lowProfileCode: string;
+  sessionId: string;
   terminalNumber: string;
   cardcomUrl: string;
-  paymentStatus: PaymentStatusType;
-  sessionId: string;
-  lowProfileCode: string;
-  operationType?: 'payment' | 'token_only';
-  transactionId?: string;
-  isFramesReady: boolean;
+  isReady: boolean;
+  is3DSInProgress: boolean;
 }

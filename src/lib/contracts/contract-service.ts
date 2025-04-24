@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { callIzidocSignFunction, ContractData } from './izidoc-service';
 import { saveContractToDatabase, updateSubscriptionStatus } from './storage-service';

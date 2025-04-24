@@ -1,6 +1,6 @@
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from '@/hooks/useCardcomInitializer';
+import { useCardcomInitializer } from '@/hooks/payment/useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
