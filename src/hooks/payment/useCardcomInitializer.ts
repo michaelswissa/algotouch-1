@@ -5,15 +5,15 @@ import { InitConfig } from '@/components/payment/types/payment';
 export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
-    lowProfileCode: string, 
-    sessionId: string,
+    lowProfileId: string, 
+    url: string,
     terminalNumber: string = '160138',
     operationType: 'payment' | 'token_only' = 'payment'
   ) => {
-    if (!lowProfileCode || !sessionId) {
+    if (!lowProfileId || !url) {
       console.error("Missing required parameters for CardCom initialization:", { 
-        hasLowProfileCode: Boolean(lowProfileCode), 
-        hasSessionId: Boolean(sessionId) 
+        hasLowProfileId: Boolean(lowProfileId), 
+        hasUrl: Boolean(url) 
       });
       return false;
     }
@@ -24,8 +24,8 @@ export const useCardcomInitializer = () => {
     }
 
     console.log('Starting CardCom fields initialization with:', { 
-      lowProfileCode, 
-      sessionId,
+      lowProfileId, 
+      url,
       terminalNumber,
       operationType,
       hasMasterFrame: Boolean(masterFrameRef.current)
@@ -55,9 +55,9 @@ export const useCardcomInitializer = () => {
         try {
           const config: InitConfig = {
             action: 'init',
-            lowProfileCode,
-            sessionId,
-            terminalNumber,
+            lowProfileId,
+            url,
+            terminalNumber: Number(terminalNumber),
             cardFieldCSS: `
               body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
               .cardNumberField {
@@ -102,7 +102,7 @@ export const useCardcomInitializer = () => {
           };
 
           console.log('Sending initialization config to CardCom iframe');
-          masterFrame.contentWindow.postMessage(config, '*');
+          masterFrame.contentWindow.postMessage(config, 'https://secure.cardcom.solutions');
           
           // Load 3DS script after initializing fields
           setTimeout(() => {

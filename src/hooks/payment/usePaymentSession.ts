@@ -22,7 +22,6 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     });
 
     try {
-      // Call CardCom payment initialization Edge Function
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
@@ -44,13 +43,12 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         }
       });
       
-      if (error || !data?.success || !data.data?.lowProfileCode) {
+      if (error || !data?.success || !data.data?.lowProfileId) {
         console.error("Payment initialization error:", error || data?.message);
         throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
       }
       
       console.log("Payment session created:", data.data);
-      
       return data.data;
     } catch (error) {
       console.error("Payment initialization error:", error);

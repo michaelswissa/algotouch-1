@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// CardCom Configuration
 const CARDCOM_CONFIG = {
   terminalNumber: "160138",
   apiName: "bLaocQRMSnwphQRUVG3b",
@@ -17,14 +16,12 @@ const CARDCOM_CONFIG = {
   }
 };
 
-// Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-PAYMENT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -71,7 +68,6 @@ serve(async (req) => {
       );
     }
 
-    // Get user information and prepare transaction reference
     const userEmail = invoiceInfo?.email || registrationData?.email;
     const fullName = invoiceInfo?.fullName || 
                   (registrationData?.userData ? 
@@ -81,8 +77,7 @@ serve(async (req) => {
     const transactionRef = userId 
       ? `${userId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
-    
-    // Prepare webhook URL with full domain
+
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
     logStep("Preparing CardCom API request", { 
@@ -92,7 +87,6 @@ serve(async (req) => {
       fullName
     });
 
-    // Create CardCom API request body
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       UserName: CARDCOM_CONFIG.apiName,
@@ -125,23 +119,22 @@ serve(async (req) => {
     
     logStep("CardCom raw response", responseData);
     
-    if (!responseData.LowProfileCode) {
-      logStep("ERROR: Missing LowProfileCode in response", responseData);
+    if (!responseData.LowProfileId) {
+      logStep("ERROR: Missing LowProfileId in response", responseData);
       return new Response(
         JSON.stringify({
           success: false,
-          message: responseData.Description || "CardCom initialization failed - missing LowProfileCode",
+          message: responseData.Description || "CardCom initialization failed - missing LowProfileId",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
-    
-    // Store payment session in database 
+
     const sessionData = {
       user_id: userId,
-      low_profile_code: responseData.LowProfileCode,
+      low_profile_id: responseData.LowProfileId,
       reference: transactionRef,
       plan_id: planId,
       amount: amount,
@@ -169,7 +162,6 @@ serve(async (req) => {
       }
     } catch (dbError) {
       logStep("Error storing payment session", { error: dbError.message });
-      // Don't fail the request if DB storage fails
     }
     
     return new Response(
@@ -178,7 +170,8 @@ serve(async (req) => {
         message: "Payment session created",
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
-          lowProfileCode: responseData.LowProfileCode,
+          lowProfileId: responseData.LowProfileId,
+          url: responseData.Url,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
         }

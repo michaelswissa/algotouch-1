@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,7 +33,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     initializePayment,
     handleRetry,
     submitPayment,
-    lowProfileCode,
+    lowProfileId,
+    url,
     sessionId
   } = usePayment({
     planId,
@@ -44,7 +44,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
-  // Monitor when master frame is loaded
   useEffect(() => {
     const masterFrame = masterFrameRef.current;
     if (!masterFrame) return;
@@ -120,11 +119,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     }
   };
 
-  // Determine if the iframe content is ready to be shown
   const isContentReady = !isInitializing && 
     terminalNumber && 
     cardcomUrl && 
-    lowProfileCode && 
+    lowProfileId && 
+    url && 
     sessionId && 
     isMasterFrameLoaded && 
     paymentStatus !== PaymentStatus.INITIALIZING;
@@ -146,7 +145,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master iframe is always loaded but hidden */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
