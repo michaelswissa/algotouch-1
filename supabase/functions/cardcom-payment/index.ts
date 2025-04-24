@@ -422,7 +422,7 @@ serve(async (req) => {
       ? `${userId}-${Date.now()}`
       : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
     
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
+    const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
     
     logStep("Creating Cardcom request", { webhookUrl, transactionRef });
 
@@ -442,8 +442,11 @@ serve(async (req) => {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
         IsHideCardOwnerPhone: false,
-        CardOwnerEmailValue: userEmail,
-        CardOwnerNameValue: fullName,
+        CardOwnerEmailValue: invoiceInfo?.email || registrationData?.email,
+        CardOwnerNameValue: invoiceInfo?.fullName || 
+          (registrationData?.userData ? 
+            `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
+            undefined),
         IsCardOwnerEmailRequired: true,
         IsCardOwnerPhoneRequired: true
       },
