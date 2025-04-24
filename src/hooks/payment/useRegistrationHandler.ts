@@ -1,14 +1,17 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 interface RegistrationResult {
-  userId: string | null;
-  userEmail: string | null;
+  userId: string;
+  userEmail: string;
   fullName: string;
 }
 
 export const useRegistrationHandler = () => {
   const handleRegistrationData = async (): Promise<RegistrationResult> => {
+    console.log('Getting registration data');
+    
     // Get registration data if available
     const registrationData = sessionStorage.getItem('registration_data');
     let userData = null;
@@ -28,49 +31,36 @@ export const useRegistrationHandler = () => {
       console.log("Using authenticated user for payment:", { userId, userEmail });
     } else if (registrationData) {
       // Handle registration data if user is not authenticated
-      userData = JSON.parse(registrationData);
-      userEmail = userData.email;
-      fullName = userData.userData?.firstName && userData.userData?.lastName ? 
-        `${userData.userData.firstName} ${userData.userData.lastName}` : userEmail;
-      
-      // Try to create user if not created already
-      if (!userData.userCreated && userData.email && userData.password) {
-        console.log("Creating new user account from registration data");
-        try {
-          const { data: authData, error: signUpError } = await supabase.auth.signUp({
-            email: userData.email,
-            password: userData.password,
-            options: {
-              data: {
-                first_name: userData.userData?.firstName,
-                last_name: userData.userData?.lastName,
-                phone: userData.userData?.phone,
-                full_name: `${userData.userData?.firstName || ''} ${userData.userData?.lastName || ''}`.trim()
-              }
-            }
-          });
-          
-          if (!signUpError && authData.user) {
-            userData.userCreated = true;
-            sessionStorage.setItem('registration_data', JSON.stringify(userData));
-            userId = authData.user.id;
-            console.log("User created successfully:", userId);
-            
-            // Sign in the user immediately
-            await supabase.auth.signInWithPassword({
-              email: userData.email,
-              password: userData.password
-            });
-          } else {
-            console.error("Error creating user account:", signUpError);
-          }
-        } catch (createError) {
-          console.error("Error during account creation:", createError);
+      try {
+        userData = JSON.parse(registrationData);
+        userEmail = userData.email;
+        fullName = userData.userData?.firstName && userData.userData?.lastName ? 
+          `${userData.userData.firstName} ${userData.userData.lastName}` : userEmail;
+        
+        // Use stored ID or generate a temporary one
+        userId = userData.userId || uuidv4();
+        
+        // Store the userId in the registration data for future reference
+        if (!userData.userId) {
+          userData.userId = userId;
+          sessionStorage.setItem('registration_data', JSON.stringify(userData));
         }
+        
+        console.log("Using registration data for payment:", { userId, userEmail });
+      } catch (error) {
+        console.error("Error parsing registration data:", error);
       }
+    } else {
+      console.error("No user or registration data available");
+      throw new Error('יש להתחבר או להירשם לפני ביצוע תשלום');
     }
 
-    return { userId, userEmail, fullName };
+    if (!userId || !userEmail) {
+      console.error("Failed to get user ID or email");
+      throw new Error('חסרים פרטי משתמש הכרחיים לביצוע התשלום');
+    }
+
+    return { userId, userEmail, fullName: fullName || userEmail };
   };
 
   return { handleRegistrationData };
