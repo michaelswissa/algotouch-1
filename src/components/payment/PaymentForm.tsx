@@ -24,7 +24,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     isSubmitting,
     isInitializing,
     isContentReady,
-    areFieldsInitialized,
+    isMasterFrameLoaded,
     terminalNumber,
     cardcomUrl,
     paymentStatus,
@@ -35,8 +35,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     handleMasterFrameLoad,
     plan
   } = usePaymentForm({ planId, onPaymentComplete });
-
-  const shouldShowFields = isContentReady && areFieldsInitialized;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -66,7 +64,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             onNavigateToDashboard={() => window.location.href = '/dashboard'}
             onRetry={handleRetry}
             operationType={operationType}
-            isReady={shouldShowFields}
+            isReady={isContentReady}
             onMasterFrameLoad={handleMasterFrameLoad}
           />
         )}
@@ -78,7 +76,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           operationType={operationType}
           isSubmitting={isSubmitting}
           isInitializing={isInitializing}
-          isContentReady={shouldShowFields}
+          isContentReady={isContentReady}
           onSubmit={handleSubmitPayment}
           onBack={onBack}
           plan={plan}
