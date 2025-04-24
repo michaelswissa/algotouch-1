@@ -79,7 +79,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
             state.lowProfileId,
             state.sessionId,
             state.terminalNumber,
-            operationType
+            operationType,
+            planId
           );
           
           if (initialized) {
@@ -97,7 +98,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     };
 
     initializeFields();
-  }, [state.lowProfileId, state.sessionId, state.terminalNumber, operationType, setState, handleError]);
+  }, [state.lowProfileId, state.sessionId, state.terminalNumber, operationType, setState, handleError, planId, initializeCardcomFields]);
 
   // Clean up on unmount
   useEffect(() => {

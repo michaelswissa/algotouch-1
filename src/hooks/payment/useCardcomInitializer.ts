@@ -1,5 +1,5 @@
 
-import { InitConfig } from '@/components/payment/types/payment';
+import { InitConfig, OperationType } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
@@ -7,7 +7,8 @@ export const useCardcomInitializer = () => {
     lowProfileId: string, 
     sessionId: string,
     terminalNumber: string,
-    operationType: 'payment' | 'token_only' = 'payment'
+    operationType: 'payment' | 'token_only' = 'payment',
+    planType?: string
   ) => {
     if (!lowProfileId) {
       console.error("Missing required parameter lowProfileId for CardCom initialization");
@@ -24,6 +25,7 @@ export const useCardcomInitializer = () => {
       sessionId,
       terminalNumber,
       operationType,
+      planType,
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
@@ -106,7 +108,7 @@ export const useCardcomInitializer = () => {
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
-            operation: getOperationType(operationType, planId)
+            operation: getOperationType(operationType, planType)
           };
 
           console.log('📤 Sending initialization config to CardCom iframe:', {
@@ -166,10 +168,10 @@ export const useCardcomInitializer = () => {
   };
 
   // Helper to determine the correct operation type based on plan and payment type
-  const getOperationType = (operationType: 'payment' | 'token_only', planId?: string): string => {
+  const getOperationType = (operationType: 'payment' | 'token_only', planType?: string): OperationType => {
     if (operationType === 'token_only') {
       return 'CreateTokenOnly';
-    } else if (planId === 'annual') {
+    } else if (planType === 'annual') {
       return 'ChargeAndCreateToken';
     } else {
       return 'ChargeOnly';
