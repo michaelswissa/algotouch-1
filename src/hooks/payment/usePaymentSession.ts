@@ -73,12 +73,12 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     };
 
     try {
-      console.log("Calling CardCom payment API with payload:", {
+      console.log("Calling CardCom API with payload:", {
         ...payload,
         Document: { ...payload.Document, Products: '[Products array]' }
       });
 
-      // Improved error handling for Edge Function calls
+      // Use cardcom-payment function, make sure it exists in Supabase
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
