@@ -46,23 +46,23 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         title="CardCom Master"
       />
 
-      {/* CARD NUMBER - exact URL path, no query params */}
+      {/* CARD NUMBER - with terminalNumber query param */}
       <div className="w-full h-[57px] border border-input bg-background rounded-md overflow-hidden">
         <iframe
           id="CardComCardNumber"
           name="CardComCardNumber"
-          src={`${cardcomUrl}/api/openfields/cardNumber`}
+          src={`${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}`}
           className="w-full h-full"
           title="מספר כרטיס"
         />
       </div>
 
-      {/* CVV - exact URL path, no query params */}
+      {/* CVV - with terminalNumber query param */}
       <div className="w-[188px] h-[57px] border border-input bg-background rounded-md overflow-hidden">
         <iframe
           id="CardComCvv"
           name="CardComCvv"
-          src={`${cardcomUrl}/api/openfields/CVV`}
+          src={`${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}`}
           className="w-full h-full"
           title="CVV"
         />

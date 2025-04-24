@@ -57,6 +57,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     planType: planId
   });
 
+  // Initialize payment when component mounts
+  useEffect(() => {
+    if (!state.lowProfileCode && paymentStatus !== PaymentStatus.INITIALIZING) {
+      console.log('Auto-initializing payment');
+      initializePayment();
+    }
+  }, []);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
@@ -91,7 +99,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     console.log('Submitting payment transaction', { 
       operationType, 
       planId,
-      lowProfileCode: state.lowProfileCode 
+      lowProfileCode: state.lowProfileCode,
+      sessionId: state.sessionId
     });
 
     if (!masterFrameRef.current?.contentWindow) {
@@ -137,6 +146,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         Operation: operation, 
         lowProfileCode: state.lowProfileCode,
         LowProfileCode: state.lowProfileCode,  // For extra compatibility
+        sessionId: state.sessionId,
         ApiName: CARDCOM.API_NAME
       };
 
@@ -180,6 +190,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     startStatusCheck, 
     planId
   ]);
+
+  const { paymentStatus } = state;
 
   return {
     ...state,
