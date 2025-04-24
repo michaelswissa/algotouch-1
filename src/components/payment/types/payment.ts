@@ -1,3 +1,4 @@
+
 export const PaymentStatus = {
   IDLE: 'idle' as const,
   INITIALIZING: 'initializing' as const,
@@ -62,4 +63,5 @@ export interface PaymentState {
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
   isFramesReady: boolean;
+  is3DSInProgress?: boolean;
 }

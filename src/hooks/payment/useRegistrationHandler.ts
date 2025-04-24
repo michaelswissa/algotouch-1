@@ -10,6 +10,8 @@ interface RegistrationResult {
 
 export const useRegistrationHandler = () => {
   const handleRegistrationData = async (): Promise<RegistrationResult> => {
+    console.log("Starting registration data handling");
+    
     // Get registration data if available
     const registrationDataString = sessionStorage.getItem('registration_data');
     let userData = null;
@@ -26,10 +28,11 @@ export const useRegistrationHandler = () => {
       userEmail = user.email;
       fullName = user.user_metadata?.full_name || 
                `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim();
-      console.log("Using authenticated user for payment:", { userId, userEmail });
+      console.log("Using authenticated user for payment:", { userId, userEmail, fullName });
     } else if (registrationDataString) {
       // Handle registration data if user is not authenticated
       try {
+        console.log("Found registration data in session storage");
         const registrationData = JSON.parse(registrationDataString);
         userData = registrationData;
         userEmail = userData.email;
@@ -45,9 +48,8 @@ export const useRegistrationHandler = () => {
           // Store it back in registration data
           userData.id = userId;
           sessionStorage.setItem('registration_data', JSON.stringify(userData));
+          console.log("Generated and stored new anonymous user ID:", userId);
         }
-        
-        console.log("Using registration data for payment:", { userId, userEmail });
       } catch (parseError) {
         console.error("Error parsing registration data:", parseError);
       }
@@ -100,7 +102,14 @@ export const useRegistrationHandler = () => {
       console.log("Generated fallback userEmail:", userEmail);
     }
 
-    return { userId, userEmail, fullName };
+    if (!fullName) {
+      fullName = `Guest User`;
+      console.log("Using default fullName:", fullName);
+    }
+
+    const result = { userId, userEmail, fullName };
+    console.log("Registration data handling completed:", result);
+    return result;
   };
 
   return { handleRegistrationData };

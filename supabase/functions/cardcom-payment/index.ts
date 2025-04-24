@@ -38,6 +38,15 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      logStep("Parsed request body", requestBody);
+    } catch (jsonError) {
+      logStep("ERROR: Failed to parse request body", { error: jsonError.message });
+      throw new Error("Invalid JSON in request body");
+    }
+    
     const { 
       planId, 
       amount, 
@@ -45,22 +54,24 @@ serve(async (req) => {
       invoiceInfo, 
       userId,
       registrationData,
-      redirectUrls
-    } = await req.json();
+      redirectUrls,
+      operationType = 'payment'
+    } = requestBody;
     
     logStep("Received request data", { 
       planId, 
       amount, 
       currency,
+      operationType,
       hasUserId: !!userId,
       hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !amount || !redirectUrls) {
+    if (!planId || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Missing required parameters",
+          message: "Missing required parameters (planId, redirectUrls)",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,20 +91,29 @@ serve(async (req) => {
 
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
     
+    // Determine operation type based on plan and operation
+    let cardcomOperation = "ChargeOnly";
+    if (operationType === 'token_only') {
+      cardcomOperation = "CreateTokenOnly";
+    } else if (planId === 'annual') {
+      cardcomOperation = "ChargeAndCreateToken";
+    }
+    
     logStep("Preparing CardCom API request", { 
       webhookUrl,
       transactionRef,
       userEmail,
-      fullName
+      fullName,
+      operation: cardcomOperation
     });
 
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       UserName: CARDCOM_CONFIG.apiName,
       Password: CARDCOM_CONFIG.apiPassword,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken',
+      Operation: cardcomOperation,
       ReturnValue: transactionRef,
-      Amount: amount,
+      Amount: amount || "0", // In case of token_only, amount can be 0
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
@@ -105,16 +125,22 @@ serve(async (req) => {
       InvoiceName: fullName || userEmail
     };
     
-    logStep("Sending request to CardCom");
+    logStep("Sending request to CardCom", cardcomPayload);
     
     // Perform the API call with proper error handling
-    const res = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(cardcomPayload),
-    });
+    let res;
+    try {
+      res = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(cardcomPayload),
+      });
+    } catch (fetchError) {
+      logStep("ERROR: Network error calling CardCom API", { error: fetchError.message });
+      throw new Error(`CardCom API network error: ${fetchError.message}`);
+    }
 
     if (!res.ok) {
       logStep("ERROR: CardCom Create returned HTTP", { 
@@ -134,8 +160,14 @@ serve(async (req) => {
     }
     
     // Get the response as text first to log it
-    const responseText = await res.text();
-    logStep("CardCom raw text response", { responseText });
+    let responseText;
+    try {
+      responseText = await res.text();
+      logStep("CardCom raw text response", { responseText });
+    } catch (textError) {
+      logStep("ERROR: Failed to read response text", { error: textError.message });
+      throw new Error("Failed to read CardCom response");
+    }
     
     // Parse as JSON
     let response;
@@ -143,7 +175,7 @@ serve(async (req) => {
       response = JSON.parse(responseText);
       logStep("CardCom parsed response", response);
     } catch (parseError) {
-      logStep("ERROR: Failed to parse CardCom response as JSON", { error: parseError.message });
+      logStep("ERROR: Failed to parse CardCom response as JSON", { error: parseError.message, text: responseText });
       throw new Error("Invalid JSON response from CardCom");
     }
     
@@ -168,9 +200,10 @@ serve(async (req) => {
       low_profile_id: response.LowProfileId,
       reference: transactionRef,
       plan_id: planId,
-      amount: amount,
+      amount: amount || 0,
       currency: currency,
       status: 'initiated',
+      operation_type: operationType,
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
@@ -189,10 +222,15 @@ serve(async (req) => {
         if (!sessionError && dbSession) {
           dbSessionId = dbSession.id;
           logStep("Payment session stored in DB", { sessionId: dbSessionId });
+        } else {
+          logStep("Error storing payment session", { error: sessionError?.message });
         }
+      } else {
+        logStep("No userId provided, skipping DB storage");
       }
     } catch (dbError) {
-      logStep("Error storing payment session", { error: dbError.message });
+      logStep("Error during DB operation", { error: dbError.message });
+      // Continue even if DB storage fails
     }
     
     // Construct the success response with consistent field names
@@ -205,7 +243,6 @@ serve(async (req) => {
           lowProfileId: response.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions",
-          url: response.Url || "" // Include url field consistently
         }
       }),
       {

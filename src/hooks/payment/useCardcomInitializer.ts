@@ -1,19 +1,16 @@
-import { useEffect } from 'react';
+
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileId: string, 
-    url: string,
-    terminalNumber: string = '160138',
+    sessionId: string,
+    terminalNumber: string,
     operationType: 'payment' | 'token_only' = 'payment'
   ) => {
-    if (!lowProfileId || !url) {
-      console.error("Missing required parameters for CardCom initialization:", { 
-        hasLowProfileId: Boolean(lowProfileId), 
-        hasUrl: Boolean(url) 
-      });
+    if (!lowProfileId) {
+      console.error("Missing required parameter lowProfileId for CardCom initialization");
       return false;
     }
     
@@ -24,39 +21,51 @@ export const useCardcomInitializer = () => {
 
     console.log('Starting CardCom fields initialization with:', { 
       lowProfileId, 
-      url,
+      sessionId,
       terminalNumber,
       operationType,
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
-    let attempts = 0;
-    const maxAttempts = 5;
-    
-    return new Promise<boolean>((resolve) => {
-      const checkFramesAndInitialize = () => {
-        attempts++;
-        
-        if (attempts > maxAttempts) {
-          console.error(`Failed to initialize CardCom after ${maxAttempts} attempts`);
-          resolve(false);
+    return new Promise<boolean>((resolve, reject) => {
+      // Wait for master frame to be fully loaded
+      const waitForMasterFrame = async () => {
+        const frame = masterFrameRef.current;
+        if (!frame) {
+          console.error("Master frame is not available");
+          reject(new Error("Master frame not available"));
           return;
         }
 
-        const masterFrame = masterFrameRef.current;
-        
-        if (!masterFrame?.contentWindow) {
-          console.log(`Master frame not ready (attempt ${attempts}/${maxAttempts}), retrying in 500ms`);
-          setTimeout(checkFramesAndInitialize, 500);
-          return;
+        // Check if frame is already loaded
+        if (frame.contentWindow?.document.readyState === 'complete') {
+          console.log("Master frame already loaded");
+          setTimeout(() => initializeFields(), 300);
+        } else {
+          // Wait for frame to load
+          console.log("Waiting for master frame to load");
+          frame.addEventListener('load', () => {
+            console.log("Master frame load event triggered");
+            setTimeout(() => initializeFields(), 300);
+          }, { once: true });
         }
+      };
 
+      // Initialize fields once frame is loaded
+      const initializeFields = () => {
         try {
+          const frame = masterFrameRef.current;
+          if (!frame?.contentWindow) {
+            console.error("Master frame content window not available");
+            reject(new Error("Frame content window not available"));
+            return;
+          }
+
           const config: InitConfig = {
             action: 'init',
             lowProfileId,
-            url,
-            terminalNumber: terminalNumber.toString(),
+            sessionId,
+            terminalNumber,
             cardFieldCSS: `
               body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
               .cardNumberField {
@@ -97,24 +106,50 @@ export const useCardcomInitializer = () => {
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
-            operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+            operation: getOperationType(operationType, planId)
           };
 
-          console.log('Sending initialization config to CardCom iframe');
-          masterFrame.contentWindow.postMessage(config, 'https://secure.cardcom.solutions');
+          console.log('📤 Sending initialization config to CardCom iframe:', {
+            action: config.action,
+            lowProfileId: config.lowProfileId,
+            terminalNumber: config.terminalNumber,
+            operation: config.operation
+          });
           
-          // Load 3DS script after initializing fields
+          // Send the config to the iframe with proper origin
+          frame.contentWindow.postMessage(config, 'https://secure.cardcom.solutions');
+          
+          // Set up event listener for initialization completion
+          const messageListener = (event: MessageEvent) => {
+            // Verify origin for security
+            if (event.origin !== 'https://secure.cardcom.solutions') {
+              return;
+            }
+            
+            const message = event.data;
+            console.log('📬 Received response from CardCom iframe:', message);
+            
+            if (message?.action === 'initCompleted') {
+              console.log('✅ CardCom initialization completed successfully');
+              window.removeEventListener('message', messageListener);
+              loadScript();
+              resolve(true);
+            }
+          };
+          
+          // Add message listener with timeout
+          window.addEventListener('message', messageListener);
+          
+          // Set timeout to avoid hanging
           setTimeout(() => {
+            window.removeEventListener('message', messageListener);
+            console.log('⚠️ CardCom initialization timed out, continuing anyway');
             loadScript();
             resolve(true);
-          }, 1000);
+          }, 5000);
         } catch (error) {
           console.error('Error initializing CardCom fields:', error);
-          if (attempts < maxAttempts) {
-            setTimeout(checkFramesAndInitialize, 500);
-          } else {
-            resolve(false);
-          }
+          reject(error);
         }
       };
 
@@ -126,8 +161,19 @@ export const useCardcomInitializer = () => {
         console.log('3DS script loaded');
       };
 
-      setTimeout(checkFramesAndInitialize, 300);
+      waitForMasterFrame();
     });
+  };
+
+  // Helper to determine the correct operation type based on plan and payment type
+  const getOperationType = (operationType: 'payment' | 'token_only', planId?: string): string => {
+    if (operationType === 'token_only') {
+      return 'CreateTokenOnly';
+    } else if (planId === 'annual') {
+      return 'ChargeAndCreateToken';
+    } else {
+      return 'ChargeOnly';
+    }
   };
 
   return { initializeCardcomFields };

@@ -1,7 +1,6 @@
 
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from './useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
@@ -20,7 +19,6 @@ export const usePaymentInitialization = ({
   operationType = 'payment'
 }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
-  const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
@@ -34,7 +32,7 @@ export const usePaymentInitialization = ({
     try {
       // Step 1: Get and validate registration data
       const { userId, userEmail, fullName } = await handleRegistrationData();
-      console.log('Registration data loaded:', { userId, userEmail });
+      console.log('Registration data loaded:', { userId, userEmail, fullName });
       
       if (!userEmail) {
         console.error("No user email found for payment");
@@ -58,53 +56,33 @@ export const usePaymentInitialization = ({
         operationType
       );
       
-      if (!paymentData?.lowProfileCode) {
-        console.error("Missing lowProfileCode in payment data:", paymentData);
+      if (!paymentData?.lowProfileId) {
+        console.error("Missing lowProfileId in payment data:", paymentData);
         throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
       }
       
       console.log('Payment session initialized:', {
-        lowProfileCode: paymentData.lowProfileCode,
+        lowProfileId: paymentData.lowProfileId,
         sessionId: paymentData.sessionId,
-        terminalNumber: paymentData.terminalNumber
+        terminalNumber: paymentData.terminalNumber,
+        cardcomUrl: paymentData.cardcomUrl
       });
 
-      // Set initial payment state before iframe initialization
+      // Set initial payment state after payment session initialization
       setState(prev => ({ 
         ...prev, 
         paymentStatus: PaymentStatus.IDLE,
-        lowProfileCode: paymentData.lowProfileCode,
+        lowProfileId: paymentData.lowProfileId,
         sessionId: paymentData.sessionId,
         terminalNumber: paymentData.terminalNumber,
-        cardcomUrl: paymentData.cardcomUrl || 'https://secure.cardcom.solutions'
+        cardcomUrl: paymentData.cardcomUrl || 'https://secure.cardcom.solutions',
+        isReady: true,
       }));
-      
-      // Wait for master frame to be available
-      setTimeout(async () => {
-        if (!masterFrameRef.current) {
-          throw new Error('מסגרת התשלום אינה זמינה');
-        }
-        
-        console.log('Initializing CardCom fields');
-        const initialized = await initializeCardcomFields(
-          masterFrameRef,
-          paymentData.lowProfileCode,
-          paymentData.sessionId,
-          paymentData.terminalNumber,
-          operationType
-        );
-        
-        if (!initialized) {
-          throw new Error('שגיאה באתחול שדות התשלום');
-        }
-        
-        console.log('CardCom fields initialized successfully');
-      }, 500);
-      
+
       return paymentData;
     } catch (error) {
       console.error('Payment initialization error:', error);
-      toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
+      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
     }

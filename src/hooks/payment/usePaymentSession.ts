@@ -22,25 +22,35 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     });
 
     try {
+      // Determine amount based on plan and operation type
+      let amount = 0;
+      if (operationType === 'payment') {
+        amount = planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121;
+      }
+
+      const payload = {
+        planId,
+        amount: amount.toString(),
+        invoiceInfo: {
+          fullName: paymentUser.fullName || paymentUser.email,
+          email: paymentUser.email,
+        },
+        currency: "ILS",
+        operationType,
+        redirectUrls: {
+          success: `${window.location.origin}/subscription/success`,
+          failed: `${window.location.origin}/subscription/failed`
+        },
+        userId: userId,
+        registrationData: sessionStorage.getItem('registration_data') 
+          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+          : null
+      };
+
+      console.log("Sending payment initialization request with payload:", payload);
+      
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-        body: {
-          planId,
-          amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
-          invoiceInfo: {
-            fullName: paymentUser.fullName || paymentUser.email,
-            email: paymentUser.email,
-          },
-          currency: "ILS",
-          operationType,
-          redirectUrls: {
-            success: `${window.location.origin}/subscription/success`,
-            failed: `${window.location.origin}/subscription/failed`
-          },
-          userId: userId,
-          registrationData: sessionStorage.getItem('registration_data') 
-            ? JSON.parse(sessionStorage.getItem('registration_data')!) 
-            : null
-        }
+        body: payload
       });
       
       console.log("Payment initialization response:", data);
@@ -60,7 +70,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
       }
       
-      console.log("Payment session created:", data.data);
+      console.log("Payment session created successfully:", data.data);
       return data.data;
     } catch (error) {
       console.error("Payment initialization error:", error);
