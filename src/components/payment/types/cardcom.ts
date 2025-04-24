@@ -1,3 +1,4 @@
+
 export type CardcomOperation = 
   | "ChargeOnly" 
   | "ChargeAndCreateToken" 
@@ -77,23 +78,10 @@ export interface TransactionInfo {
   CardOwnerIdentityNumber?: string;
 }
 
-export interface GetLowProfileResult {
-  ResponseCode: number;
-  Description?: string;
-  TerminalNumber: number;
-  LowProfileId: string;
-  TranzactionId: number;
-  ReturnValue?: string;
-  Operation?: CardcomOperation;
-  UIValues: LowProfileUIValues;
-  DocumentInfo?: DocumentInfo;
-  TokenInfo?: TokenInfo;
-  SuspendedInfo?: SuspendedInfo;
-  TranzactionInfo?: TransactionInfo;
-  ExternalPaymentVector?: string;
-  Country?: string;
-  UTM?: LPUtmData;
-  IssuerAuthCodeDescription?: string;
+// Add missing CustomField interface
+export interface CustomField {
+  Id: number;
+  Value: string;
 }
 
 export interface LowProfileUIValues {
@@ -116,8 +104,44 @@ export interface LPUtmData {
   Term?: string;
 }
 
+// Add missing DocumentInfo interface
+export interface DocumentInfo {
+  ResponseCode: number;
+  Description: string;
+  DocumentType: string;
+  DocumentNumber: number;
+  AccountId: number;
+  ForeignAccountNumber?: string;
+  SiteUniqueId?: string;
+  DocumentUrl?: string;
+}
+
+// Add missing SuspendedInfo interface
+export interface SuspendedInfo {
+  SuspendedDealId: number;
+}
+
 export interface GetLowProfileRequest {
   TerminalNumber: number;
   ApiName: string;
   LowProfileId: string;
+}
+
+export interface GetLowProfileResult {
+  ResponseCode: number;
+  Description?: string;
+  TerminalNumber: number;
+  LowProfileId: string;
+  TranzactionId: number;
+  ReturnValue?: string;
+  Operation?: CardcomOperation;
+  UIValues: LowProfileUIValues;
+  DocumentInfo?: DocumentInfo;
+  TokenInfo?: TokenInfo;
+  SuspendedInfo?: SuspendedInfo;
+  TranzactionInfo?: TransactionInfo;
+  ExternalPaymentVector?: string;
+  Country?: string;
+  UTM?: LPUtmData;
+  IssuerAuthCodeDescription?: string;
 }
