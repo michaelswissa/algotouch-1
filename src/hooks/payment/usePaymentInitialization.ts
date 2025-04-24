@@ -1,6 +1,7 @@
+
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from '@/hooks/payment/useCardcomInitializer';
+import { useCardcomInitializer } from '../useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
 import { toast } from 'sonner';
@@ -70,11 +71,7 @@ export const usePaymentInitialization = ({
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        paymentStatus: PaymentStatus.IDLE,
-        sessionId: paymentData.sessionId,
-        lowProfileCode: paymentData.lowProfileCode,
-        terminalNumber: paymentData.terminalNumber,
-        isReady: true // Set isReady flag to true to enable iframe initialization
+        paymentStatus: PaymentStatus.IDLE
       }));
       
       // Step 5: Initialize CardCom fields with the lowProfileCode

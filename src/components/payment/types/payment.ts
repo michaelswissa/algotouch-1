@@ -1,40 +1,56 @@
 
-// Payment status types
 export const PaymentStatus = {
-  IDLE: 'idle',
-  INITIALIZING: 'initializing',
-  PROCESSING: 'processing',
-  SUCCESS: 'success',
-  FAILED: 'failed'
+  IDLE: 'idle' as const,
+  INITIALIZING: 'initializing' as const,
+  PROCESSING: 'processing' as const,
+  SUCCESS: 'success' as const,
+  FAILED: 'failed' as const
 } as const;
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
-// CardCom operation types
-export type CardComOperationType = 'payment' | 'token_only';
+export interface PaymentResponse {
+  success: boolean;
+  data: {
+    sessionId: string;
+    lowProfileCode: string;
+    terminalNumber: string;
+    cardcomUrl?: string;
+  };
+  message?: string;
+}
 
-// CardCom initialization config type
+export interface CardComMessage {
+  action: 'HandleSubmit' | '3DSProcessStarted' | '3DSProcessCompleted' | 'HandleError' | 'handleValidations' | 'tokenCreationStarted' | 'tokenCreationCompleted';
+  data?: any;
+  message?: string;
+  field?: string;
+  isValid?: boolean;
+  cardType?: string;
+}
+
 export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
-  sessionId: string;
+  sessionId?: string;
   terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
   reCaptchaFieldCSS: string;
-  placeholder: string;
-  cvvPlaceholder: string;
   language: string;
-  operation: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
+  operationType?: 'payment' | 'token_only';
+  placeholder?: string;
+  cvvPlaceholder?: string;
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
 }
 
-// Payment state type definition
 export interface PaymentState {
-  paymentStatus: PaymentStatusType;
-  lowProfileCode: string;
-  sessionId: string;
   terminalNumber: string;
   cardcomUrl: string;
-  isReady: boolean;
-  is3DSInProgress: boolean;
+  paymentStatus: PaymentStatusType;
+  sessionId: string;
+  lowProfileCode: string;
+  operationType?: 'payment' | 'token_only';
+  transactionId?: string;
+  isFramesReady: boolean;
 }

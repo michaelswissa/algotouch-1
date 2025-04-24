@@ -1,13 +1,12 @@
 
 import React from 'react';
 import { Label } from '@/components/ui/label';
-import { FormMessage } from '@/components/ui/form';
 
 interface CardExpiryInputsProps {
   expiryMonth: string;
   expiryYear: string;
-  onMonthChange: (month: string) => void;
-  onYearChange: (year: string) => void;
+  onMonthChange: (value: string) => void;
+  onYearChange: (value: string) => void;
   error?: string;
 }
 
@@ -18,54 +17,60 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
   onYearChange,
   error
 }) => {
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 12 }, (_, i) => currentYear + i);
-
   return (
     <div className="space-y-2">
-      <Label>תוקף הכרטיס</Label>
-      <div className="flex gap-2">
-        <div className="w-1/2">
-          <Label htmlFor="expirationMonth" className="text-xs">חודש</Label>
-          <select 
-            id="expirationMonth"
-            name="expirationMonth"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="expiry-month">חודש תפוגה</Label>
+          <select
+            id="expiry-month"
+            name="expirationMonth" // Match the name in the GitHub example
+            className={`w-full h-10 rounded-md border bg-background px-3 py-2 ${
+              error ? 'border-red-500' : 'border-input'
+            }`}
             value={expiryMonth}
             onChange={(e) => onMonthChange(e.target.value)}
             required
           >
-            <option value="">חודש</option>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-              <option key={month} value={String(month).padStart(2, '0')}>
-                {String(month).padStart(2, '0')}
-              </option>
-            ))}
+            <option value="" disabled>חודש</option>
+            {Array.from({ length: 12 }, (_, i) => {
+              // Format with leading zero to match MM format
+              const month = (i + 1).toString().padStart(2, '0');
+              return (
+                <option key={month} value={month}>
+                  {month}
+                </option>
+              );
+            })}
           </select>
         </div>
-        
-        <div className="w-1/2">
-          <Label htmlFor="expirationYear" className="text-xs">שנה</Label>
-          <select 
-            id="expirationYear"
-            name="expirationYear"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        <div className="space-y-2">
+          <Label htmlFor="expiry-year">שנת תפוגה</Label>
+          <select
+            id="expiry-year"
+            name="expirationYear" // Match the name in the GitHub example
+            className={`w-full h-10 rounded-md border bg-background px-3 py-2 ${
+              error ? 'border-red-500' : 'border-input'
+            }`}
             value={expiryYear}
             onChange={(e) => onYearChange(e.target.value)}
             required
           >
-            <option value="">שנה</option>
-            {years.map(year => (
-              <option key={year} value={String(year).slice(-2)}>
-                {year}
-              </option>
-            ))}
+            <option value="" disabled>שנה</option>
+            {Array.from({ length: 10 }, (_, i) => {
+              // Format as YY only (2 digits) to match the expected format
+              const year = (new Date().getFullYear() + i).toString().slice(2);
+              return (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
-      
       {error && (
-        <FormMessage>{error}</FormMessage>
+        <p className="text-sm text-red-500">{error}</p>
       )}
     </div>
   );

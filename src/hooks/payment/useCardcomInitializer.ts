@@ -1,20 +1,13 @@
 
-import { InitConfig, CardComOperationType } from '@/components/payment/types/payment';
+import { InitConfig } from '@/components/payment/types/payment';
 
-interface CardcomInitializerProps {
-  terminalNumber?: string;
-  cardcomUrl?: string;
-}
-
-export const useCardcomInitializer = (
-  {terminalNumber = '160138', cardcomUrl = 'https://secure.cardcom.solutions'}: CardcomInitializerProps = {}
-) => {
+export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
-    operationType: CardComOperationType = 'payment'
+    operationType: 'payment' | 'token_only' = 'payment'
   ) => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization");
@@ -82,7 +75,7 @@ export const useCardcomInitializer = (
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
         language: 'he',
-        operation: operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
+        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
       };
 
       console.log('Sending initialization config to CardCom iframe');

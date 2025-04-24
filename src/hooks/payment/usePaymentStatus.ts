@@ -9,15 +9,15 @@ interface UsePaymentStatusProps {
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) => {
   const [state, setState] = useState<PaymentState>({
-    paymentStatus: PaymentStatus.IDLE,
-    lowProfileCode: '',
-    sessionId: '',
     terminalNumber: '',
     cardcomUrl: '',
-    isReady: false,
-    is3DSInProgress: false
+    paymentStatus: PaymentStatus.IDLE,
+    sessionId: '',
+    lowProfileCode: '',
+    isFramesReady: false, // Added the missing property
   });
 
+  // Changed to match the expected signature (no parameters)
   const handlePaymentSuccess = () => {
     console.log('Payment successful');
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
