@@ -1,140 +1,88 @@
 
-import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-/**
- * Hook for initializing CardCom OpenFields with proper lowProfileCode and terminalNumber
- */
+type Operation = 'payment' | 'token_only';
+
 export const useCardcomInitializer = () => {
-  const [initialized, setInitialized] = useState(false);
+  /** one promise per page-life so we don't init twice */
+  let inFlight: Promise<boolean> | null = null;
 
-  const initializeCardcomFields = async (
-    masterFrameRef: React.RefObject<HTMLIFrameElement>,
-    lowProfileCode: string,
-    terminalNumber: string,
-    operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<boolean> => {
-    try {
-      if (!masterFrameRef.current || !lowProfileCode) {
-        console.error('Missing required references for CardCom initialization', { 
-          hasMasterFrame: Boolean(masterFrameRef.current), 
-          lowProfileCode
+  return {
+    initializeCardcomFields: async (
+      masterFrameRef: React.RefObject<HTMLIFrameElement>,
+      lowProfileCode: string,
+      terminalNumber: string,
+      operation: Operation = 'payment'
+    ): Promise<boolean> => {
+      if (inFlight) return inFlight;
+
+      inFlight = new Promise<boolean>((resolve) => {
+        // 1. Verify iframe exists and is accessible
+        const iframe = masterFrameRef.current;
+        if (!iframe) {
+          console.error('🛑 masterFrameRef empty');
+          toast.error('שגיאה בטעינת שדות האשראי (מסגרת חסרה)');
+          return resolve(false);
+        }
+
+        // 2. Wait for iframe to fully load
+        const whenLoaded = new Promise<void>((ok) => {
+          if (
+            iframe.contentDocument?.readyState === 'complete' ||
+            iframe.contentDocument?.readyState === 'interactive'
+          ) {
+            return ok();
+          }
+          const onLoad = () => {
+            iframe.removeEventListener('load', onLoad);
+            ok();
+          };
+          iframe.addEventListener('load', onLoad);
         });
-        return false;
-      }
 
-      console.log('Initializing CardCom fields with:', {
-        lowProfileCode,
-        terminalNumber,
-        operationType
-      });
-      
-      // Make sure master frame is loaded
-      const frameWindow = masterFrameRef.current.contentWindow;
-      if (!frameWindow) {
-        console.error('Master frame window not available');
-        return false;
-      }
+        // 3. Send initialization message
+        whenLoaded.then(() => {
+          const payload = {
+            action: 'init',
+            lowProfileCode,
+            terminalNumber: Number(terminalNumber),
+            operation: operation === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly',
+            // Using empty CSS - inject real CSS here if needed
+            cardFieldCSS: '',
+            cvvFieldCSS: '',
+            reCaptchaFieldCSS: '',
+            placeholder: '1111-2222-3333-4444',
+            cvvPlaceholder: '123',
+            language: 'he'
+          };
 
-      // After frame load, initialize the OpenFields
-      return new Promise((resolve) => {
-        // Set up a listener for the initialization response
-        const handleInitMessage = (event: MessageEvent) => {
-          // Verify origin
-          if (event.origin !== 'https://secure.cardcom.solutions') {
-            return;
-          }
+          console.debug('📤 Sending init message to CardCom master frame:', payload);
+          iframe.contentWindow?.postMessage(payload, '*');
+        });
 
-          try {
-            const data = event.data;
-            if (!data) return;
+        // 4. Wait for initialization completion or timeout
+        const timeout = setTimeout(() => {
+          console.warn('⌛️ CardCom initialization timed out after 6s');
+          toast.error('שגיאה באתחול שדות האשראי');
+          window.removeEventListener('message', handler);
+          resolve(false);
+        }, 6000);
 
-            console.log('Received message from CardCom:', data);
-
-            if (data.action === 'InitCompleted') {
-              console.log('CardCom fields initialized successfully');
-              setInitialized(true);
-              window.removeEventListener('message', handleInitMessage);
-              resolve(true);
-            } else if (data.action === 'InitError') {
-              console.error('Error initializing CardCom fields:', data.message);
-              toast.error('שגיאה באתחול שדות התשלום');
-              window.removeEventListener('message', handleInitMessage);
-              resolve(false);
-            }
-          } catch (error) {
-            console.error('Error handling init message:', error);
-            resolve(false);
-          }
+        const handler = (ev: MessageEvent) => {
+          if (typeof ev.data !== 'object' || !ev.data) return;
+          if (ev.data.action !== 'initCompleted') return;
+          
+          console.debug('✅ CardCom initialization completed successfully');
+          clearTimeout(timeout);
+          window.removeEventListener('message', handler);
+          resolve(true);
         };
 
-        // Add the message listener
-        window.addEventListener('message', handleInitMessage);
-
-        // CSS specifically targeting iframe elements without affecting the main page
-        const cardFieldCSS = `
-          #CardComCardNumber input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-            height: 40px;
-            box-sizing: border-box;
-            direction: ltr;
-            font-family: 'Rubik', sans-serif;
-          }
-          #CardComCardNumber input:focus {
-            border-color: #7c3aed;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
-          }
-        `;
-
-        const cvvFieldCSS = `
-          #CardComCvv input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-            height: 40px;
-            box-sizing: border-box;
-            direction: ltr;
-            font-family: 'Rubik', sans-serif;
-          }
-          #CardComCvv input:focus {
-            border-color: #7c3aed;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
-          }
-        `;
-
-        // Send init message to CardCom with correct lowProfileCode
-        console.log('Sending init message to CardCom iframe');
-        frameWindow.postMessage({
-          action: 'init',
-          terminalNumber: terminalNumber,
-          lowProfileCode: lowProfileCode,
-          cardFieldCSS: cardFieldCSS,
-          cvvFieldCSS: cvvFieldCSS,
-          placeholder: '1111-2222-3333-4444',
-          cvvPlaceholder: '123',
-        }, 'https://secure.cardcom.solutions');
-
-        // Set timeout in case we don't get a response
-        setTimeout(() => {
-          if (!initialized) {
-            console.log('CardCom initialization timed out, resolving anyway');
-            resolve(true);
-          }
-        }, 5000);
+        window.addEventListener('message', handler);
       });
-    } catch (error) {
-      console.error('Error during CardCom initialization:', error);
-      return false;
-    }
-  };
 
-  return { initialized, initializeCardcomFields };
+      return inFlight;
+    },
+  };
 };
+
