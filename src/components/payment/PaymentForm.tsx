@@ -5,7 +5,6 @@ import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
 import InitializingPayment from './states/InitializingPayment';
 import PaymentHeader from './PaymentHeader';
 import PaymentFooter from './PaymentFooter';
-import PaymentIframe from './PaymentIframe';
 import LoadingPaymentState from './states/LoadingPaymentState';
 import { PaymentStatus } from './types/payment';
 
@@ -47,12 +46,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <PaymentIframe
-          masterFrameRef={masterFrameRef}
-          cardcomUrl={cardcomUrl}
-          terminalNumber={terminalNumber}
-        />
-        
         {isInitializing ? (
           <InitializingPayment />
         ) : paymentStatus === PaymentStatus.PROCESSING ? (

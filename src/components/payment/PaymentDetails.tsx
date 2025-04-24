@@ -7,6 +7,7 @@ import CVVFrame from './iframes/CVVFrame';
 import ReCaptchaFrame from './iframes/ReCaptchaFrame';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
+import PaymentIframe from './PaymentIframe';
 import { usePaymentValidation } from '@/hooks/payment/usePaymentValidation';
 
 interface PaymentDetailsProps {
@@ -78,6 +79,15 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
   return (
     <div className="space-y-4" dir="rtl">
+      {/* Only show iframes once everything's ready */}
+      {isReady && (
+        <PaymentIframe
+          masterFrameRef={masterFrameRef}
+          cardcomUrl={cardcomUrl}
+          terminalNumber={terminalNumber}
+        />
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="cardOwnerName">שם בעל הכרטיס</Label>
         <Input
