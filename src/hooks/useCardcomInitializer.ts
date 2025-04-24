@@ -1,6 +1,24 @@
-import { InitConfig } from '@/components/payment/types/payment';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 
-export const useCardcomInitializer = () => {
+export const useCardcomInitializer = (config: {
+  terminalNumber: number | string; // Allow both number and string
+  cardcomUrl: string;
+  lowProfileCode?: string;
+  sessionId?: string;
+}) => {
+  const { 
+    terminalNumber, 
+    cardcomUrl, 
+    lowProfileCode, 
+    sessionId 
+  } = config;
+
+  // Convert terminalNumber to number if it's a string
+  const normalizedTerminalNumber = typeof terminalNumber === 'string' 
+    ? parseInt(terminalNumber, 10) 
+    : terminalNumber;
+
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
@@ -131,5 +149,8 @@ export const useCardcomInitializer = () => {
     });
   };
 
-  return { initializeCardcomFields };
+  return {
+    terminalNumber: normalizedTerminalNumber,
+    initializeCardcomFields
+  };
 };
