@@ -1,48 +1,42 @@
 
-type Operation = 'payment' | 'token_only';
+import { toast } from 'sonner';
 
-export const useCardcomInitializer = () => {
-  /** one promise per page-life so we don't init twice */
-  let inFlight: Promise<boolean> | null = null;
+/**
+ * Initialise CardCom open-fields:
+ *   1. wait for master iframe to be ready
+ *   2. post the 'init' message with the minimum payload
+ * Returns true on success.
+ */
+export const initializeCardcomFields = async (
+  masterRef: React.RefObject<HTMLIFrameElement>,
+  lowProfileCode: string,
+  terminalNumber: string,
+  op: 'payment' | 'token_only' = 'payment'
+): Promise<boolean> => {
+  const iframe = masterRef.current;
+  if (!iframe) {
+    console.error('🛑 masterFrameRef empty');
+    toast.error('שגיאה בטעינת שדות האשראי');
+    return false;
+  }
 
-  return {
-    initializeCardcomFields: async (
-      masterFrameRef: React.RefObject<HTMLIFrameElement>,
-      lowProfileCode: string,
-      terminalNumber: string,
-      operation: Operation = 'payment'
-    ): Promise<boolean> => {
-      if (inFlight) return inFlight;
+  /* 1 ─ wait for the iframe to finish loading */
+  if (!iframe.contentWindow) {
+    await new Promise<void>((res) =>
+      iframe.addEventListener('load', () => res(), { once: true })
+    );
+  }
 
-      inFlight = new Promise<boolean>((resolve) => {
-        const frame = masterFrameRef.current;
-        if (!frame) {
-          console.error('🛑 masterFrameRef empty');
-          return resolve(false);
-        }
-
-        // Guarantee frame is ready
-        const whenLoaded = new Promise<void>((ok) => {
-          if (frame.contentWindow) return ok();
-          frame.addEventListener('load', () => ok(), { once: true });
-        });
-
-        // Send minimal initialization message
-        whenLoaded.then(() => {
-          const payload = {
-            action: 'init',
-            lowProfileCode,
-            terminalNumber: Number(terminalNumber),
-            operation: operation === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly'
-          };
-
-          console.debug('📤 Sending init message to CardCom master frame:', payload);
-          frame.contentWindow?.postMessage(payload, '*');
-          resolve(true);
-        });
-      });
-
-      return inFlight;
-    }
+  /* 2 ─ post the init message */
+  const msg = {
+    action: 'init',
+    lowProfileCode,
+    terminalNumber: Number(terminalNumber),
+    operation: op === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly',
   };
+  iframe.contentWindow!.postMessage(msg, '*');
+  console.debug('📤 init posted to master frame', msg);
+
+  /* 3 ─ assume success (CardCom populates child iframes asynchronously) */
+  return true;
 };
