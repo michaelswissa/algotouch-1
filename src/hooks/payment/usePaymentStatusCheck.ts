@@ -11,8 +11,9 @@ interface UsePaymentStatusCheckProps {
 export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) => {
   const statusCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusCheckCountRef = useRef<number>(0);
-  const maxStatusCheckAttempts = 20;
+  const maxStatusCheckAttempts = 25; // Increased from 20
   const statusCheckIntervalMs = 3000;
+  const initialCheckDelayMs = 5000; // Increased from previous value to give webhook time to process
   const statusCheckTimeoutMs = 120000;
   
   const checkPaymentStatus = useCallback(async (
@@ -45,7 +46,10 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
         body: {
           action: 'check-status',
           lowProfileCode,
-          sessionId
+          sessionId,
+          timestamp,
+          attempt: statusCheckCountRef.current,
+          operationType
         }
       });
       
@@ -99,10 +103,14 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
           return;
         }
         
-        // Schedule next check
+        // Schedule next check with increasing interval for later attempts
+        const nextInterval = statusCheckCountRef.current > 10 
+          ? statusCheckIntervalMs * 1.5  // Increase interval for later attempts
+          : statusCheckIntervalMs;
+
         statusCheckTimerRef.current = setTimeout(() => {
           checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-        }, statusCheckIntervalMs);
+        }, nextInterval);
       }
     } catch (error) {
       console.error('Exception checking payment status:', error);
@@ -138,11 +146,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
     // Set initial state
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
     
-    // Start checking after a short delay
+    // Start checking after a longer initial delay to allow webhook to process first
     statusCheckTimerRef.current = setTimeout(() => {
       checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
-    }, 2000);
-  }, [setState, checkPaymentStatus]);
+    }, initialCheckDelayMs);
+  }, [setState, checkPaymentStatus, initialCheckDelayMs]);
   
   const clearStatusCheckTimer = useCallback(() => {
     if (statusCheckTimerRef.current) {

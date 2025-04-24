@@ -45,15 +45,24 @@ export const useFrameMessages = ({
         if (message.action === 'HandleSubmit' || message.action === 'handleSubmit') {
           console.log('HandleSubmit message received:', message);
           
-          if (message.data?.IsSuccess) {
-            console.log('Payment submission successful');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-            handlePaymentSuccess();
-          } else {
-            console.error('Payment submission failed:', message.data?.Description);
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-            toast.error(message.data?.Description || 'שגיאה בביצוע התשלום');
+          // When the form has been submitted, we wait for the status check to confirm success
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+          
+          // Start checking status right away to detect success/failure
+          if (lowProfileCode && sessionId) {
+            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
           }
+          
+          return;
+        }
+
+        // Handle explicit success messages
+        if (message.action === 'Success' || 
+            (message.data && message.data.IsSuccess === true) || 
+            (message.IsSuccess === true)) {
+          console.log('Explicit success message received');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+          handlePaymentSuccess();
           return;
         }
 
@@ -63,15 +72,29 @@ export const useFrameMessages = ({
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           
           // Show more specific error messages
-          if (message.message && message.message.includes('lowProfileCode')) {
-            toast.error('פרמטר lowProfileCode חובה');
-          } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
-            toast.error('תאריך תוקף שגוי');
-          } else if (message.message && message.message.includes('CardComCardNumber')) {
-            toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
+          if (message.message) {
+            if (message.message.includes('lowProfileCode')) {
+              toast.error('פרמטר lowProfileCode חובה');
+            } else if (message.message.includes('תאריך תוקף שגוי')) {
+              toast.error('תאריך תוקף שגוי');
+            } else if (message.message.includes('CardComCardNumber')) {
+              toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
+            } else {
+              toast.error(message.message);
+            }
           } else {
-            toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
+            toast.error('אירעה שגיאה בביצוע התשלום');
           }
+          return;
+        }
+
+        // Handle explicit failure messages
+        if (message.action === 'Failure' || 
+            (message.data && message.data.IsSuccess === false) ||
+            (message.IsSuccess === false)) {
+          console.error('Explicit failure message received');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          toast.error(message.message || message.data?.Description || 'התשלום נכשל');
           return;
         }
 
@@ -91,10 +114,22 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle validations
+        // Handle validation messages
         if (message.action === 'handleValidations') {
           console.log('Validation message for field:', message.field);
           // Field validation is handled separately in usePaymentValidation
+          return;
+        }
+        
+        // Handle redirect URLs
+        if (message.action === 'redirect' && message.url) {
+          console.log('Redirect message received:', message.url);
+          // Don't redirect automatically, instead mark as processing and wait for status check
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+          
+          if (lowProfileCode && sessionId) {
+            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+          }
           return;
         }
       } catch (error) {
