@@ -93,6 +93,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       return;
     }
     
+    // Check if the master frame is available
+    if (!masterFrameRef.current?.contentWindow) {
+      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
+      return;
+    }
+
     setIsSubmitting(true);
     setState(prev => ({ ...prev, isSubmitting: true }));
     
@@ -102,13 +108,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       lowProfileCode: state.lowProfileCode,
       sessionId: state.sessionId
     });
-
-    if (!masterFrameRef.current?.contentWindow) {
-      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
-      setIsSubmitting(false);
-      setState(prev => ({ ...prev, isSubmitting: false }));
-      return;
-    }
     
     try {
       const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
@@ -117,6 +116,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
+      
+      // Basic validation
+      if (!cardholderName || !cardOwnerId || !email || !phone || !expirationMonth || !expirationYear) {
+        handleError("יש למלא את כל השדות הנדרשים");
+        setIsSubmitting(false);
+        setState(prev => ({ ...prev, isSubmitting: false }));
+        return;
+      }
       
       // Determine operation based on plan type
       let operation: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly" = "ChargeOnly";
@@ -151,7 +158,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       };
 
       console.log('Sending transaction data to CardCom:', formData);
-      masterFrameRef.current.contentWindow.postMessage(formData, '*');
+      
+      // Specific target origin for security
+      masterFrameRef.current.contentWindow.postMessage(formData, 'https://secure.cardcom.solutions');
       
       setState(prev => ({
         ...prev,

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -17,7 +16,7 @@ const CARDCOM_CONFIG = {
     cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
     cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
     createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create",
-    getLpResult: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult"
+    getLpResult: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLowProfileResult"
   },
   domain: "https://algotouch.lovable.app",
   successUrl: "https://algotouch.lovable.app/payment/success",
@@ -103,7 +102,7 @@ serve(async (req) => {
     
     const transactionRef = userId 
       ? `${userId}-${planId}-${Date.now()}`
-      : `anon-${planId}-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+      : `${planId}-guest-${Date.now()}`;
     
     // Use custom payload if provided or build the default one
     const cardcomPayload = payload || {
@@ -176,13 +175,20 @@ serve(async (req) => {
       currency: currency,
       status: 'initiated',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      anonymous_data: !userId && userEmail ? { email: userEmail, fullName } : null,
-      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber,
       payment_details: {
         operationType: operationType,
         planId: planId
       }
     };
+    
+    // If we don't have a user_id, store the anonymous data
+    if (!userId && (userEmail || fullName)) {
+      // @ts-ignore - We know the structure is correct
+      sessionData.payment_details = {
+        ...sessionData.payment_details,
+        anonymousData: { email: userEmail, fullName }
+      };
+    }
     
     let dbSessionId = null;
     
@@ -211,7 +217,8 @@ serve(async (req) => {
           sessionId: dbSessionId || `temp-${Date.now()}`,
           lowProfileCode: responseData.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
-          cardcomUrl: "https://secure.cardcom.solutions"
+          cardcomUrl: "https://secure.cardcom.solutions",
+          operation: cardcomPayload.Operation  // Send the operation back to frontend
         }
       }),
       {

@@ -91,12 +91,12 @@ export const useCardcomInitializer = () => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
         language: 'he',
-        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+        // Let the LowProfile's operation value take precedence by not specifying it here
       };
 
       // 3. Send the init message to the master frame
       console.log('📤 postMessage → master', config);
-      masterFrameRef.current.contentWindow?.postMessage(config, '*');
+      masterFrameRef.current.contentWindow?.postMessage(config, 'https://secure.cardcom.solutions');
 
       // 4. Wait for initCompleted response
       return new Promise<boolean>((resolve) => {
@@ -108,6 +108,10 @@ export const useCardcomInitializer = () => {
 
         // Listen for the initCompleted message
         const messageHandler = (event: MessageEvent) => {
+          if (event.origin !== 'https://secure.cardcom.solutions') {
+            return;
+          }
+          
           if (event.data?.action === 'initCompleted') {
             console.log('✅ initCompleted received');
             clearTimeout(timeout);

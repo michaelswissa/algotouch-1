@@ -15,7 +15,9 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
   const [isContentReady, setIsContentReady] = useState(false);
   const [initSent, setInitSent] = useState(false);
+  const [initFailed, setInitFailed] = useState(false);
   const initAttemptedRef = useRef(false);
+  const initAttemptCount = useRef(0);
   const { initializeCardcomFields } = useCardcomInitializer();
 
   const planDetails = getSubscriptionPlans();
@@ -54,40 +56,67 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     !initSent && 
     !initAttemptedRef.current;
 
+  // Handle field initialization when all dependencies are ready
   useEffect(() => {
     if (!canInitialize) return;
     
-    // Prevent multiple initialization attempts
+    // Prevent multiple initialization attempts in the same cycle
     initAttemptedRef.current = true;
     setInitSent(true);
+    initAttemptCount.current += 1;
     
-    console.log('Initializing CardCom fields with lowProfileCode:', lowProfileCode);
+    console.log(`Initializing CardCom fields (attempt ${initAttemptCount.current}) with lowProfileCode:`, lowProfileCode);
     
-    // Wait a short tick to ensure the master frame's JS is ready
-    setTimeout(() => {
-      initializeCardcomFields(
-        masterFrameRef,
-        lowProfileCode!,
-        sessionId!,
-        terminalNumber!.toString(),
-        operationType,
-      ).then((success) => {
+    // Initialize the fields with a short delay to ensure the master frame is ready
+    const initTimer = setTimeout(async () => {
+      try {
+        const success = await initializeCardcomFields(
+          masterFrameRef,
+          lowProfileCode!,
+          sessionId!,
+          terminalNumber!.toString(),
+          operationType,
+        );
+        
         if (success) {
           console.log('CardCom initialization completed successfully');
           setIsContentReady(true);
+          setInitFailed(false);
         } else {
-          toast.error('שגיאה באתחול שדות התשלום');
           console.error('CardCom initialization failed');
+          toast.error('שגיאה באתחול שדות התשלום. מנסה שוב...');
+          setInitFailed(true);
           
-          // Reset for retry
-          setInitSent(false);
+          // Reset for retry after a delay
           setTimeout(() => {
+            setInitSent(false);
             initAttemptedRef.current = false;
-          }, 1000);
+          }, 2000);
         }
-      });
+      } catch (error) {
+        console.error('Error during CardCom initialization:', error);
+        toast.error('שגיאה באתחול שדות התשלום');
+        
+        // Reset for retry after a delay
+        setInitFailed(true);
+        setTimeout(() => {
+          setInitSent(false);
+          initAttemptedRef.current = false;
+        }, 2000);
+      }
     }, 100);
+    
+    return () => clearTimeout(initTimer);
   }, [canInitialize, masterFrameRef, lowProfileCode, sessionId, terminalNumber, operationType, initializeCardcomFields]);
+
+  // Monitor init success/failure
+  useEffect(() => {
+    if (initFailed && initAttemptCount.current < 3) {
+      console.log('Scheduling retry for CardCom initialization');
+    } else if (initFailed) {
+      toast.error('לא ניתן לאתחל את שדות התשלום. אנא רענן את הדף ונסה שוב');
+    }
+  }, [initFailed]);
 
   // Fallback in case master frame doesn't trigger onLoad
   useEffect(() => {
