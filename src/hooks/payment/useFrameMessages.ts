@@ -31,7 +31,8 @@ export const useFrameMessages = ({
     console.log('Setting up CardCom message handler with:', { 
       lowProfileCode: lowProfileCode.substring(0, 8) + '...',  // Log partial for security 
       sessionId: sessionId.substring(0, 8) + '...',            // Log partial for security
-      operationType
+      operationType,
+      planType
     });
 
     // Set a 30-second timeout to prevent infinite loading
@@ -48,7 +49,6 @@ export const useFrameMessages = ({
       try {
         // Verify origin - strict check for CardCom's domain
         if (event.origin !== 'https://secure.cardcom.solutions') {
-          console.log('Ignored message from unauthorized origin:', event.origin);
           return;
         }
         
@@ -78,9 +78,11 @@ export const useFrameMessages = ({
           console.log('3DS authentication process completed');
           setState((prev: any) => ({
             ...prev,
-            is3DSInProgress: false,
-            isSubmitting: false
+            is3DSInProgress: false
           }));
+          
+          // After 3DS completion, check payment status
+          clearTimeout(timeoutId);
           await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
         }
 
@@ -96,14 +98,18 @@ export const useFrameMessages = ({
         else if (data.action === 'HandleSubmit') {
           console.log('Payment form submitted successfully:', data.data);
           clearTimeout(timeoutId);
-          await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+          
           setState((prev: any) => ({
             ...prev,
-            isSubmitting: false
+            isSubmitting: true,
+            paymentStatus: PaymentStatus.PROCESSING
           }));
+          
+          // Check payment status after submission
+          await checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
         }
 
-        // Handle errors - fixed typo from 'HandleEror' to 'HandleError'
+        // Handle errors
         else if (data.action === 'HandleError') {
           console.error('Payment error received:', data.message);
           clearTimeout(timeoutId);

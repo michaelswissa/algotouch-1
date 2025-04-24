@@ -9,7 +9,8 @@ export const useCardcomInitializer = () => {
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
-    operationType: 'payment' | 'token_only' = 'payment'
+    operationType: 'payment' | 'token_only' = 'payment',
+    planId?: string
   ): Promise<boolean> => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization");
@@ -26,6 +27,7 @@ export const useCardcomInitializer = () => {
       sessionId,
       terminalNumber,
       operationType,
+      planId,
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
@@ -36,22 +38,38 @@ export const useCardcomInitializer = () => {
         
         // If frame is already loaded, continue after a short delay to ensure JS is ready
         if (frame?.contentWindow?.document?.readyState === 'complete') {
+          console.log('Master frame already loaded, continuing');
           setTimeout(resolve, 0);
           return;
         }
         
         // Wait for frame load then give its JS a tick to initialize
-        frame?.addEventListener('load', () => setTimeout(resolve, 0), { once: true });
+        console.log('Waiting for master frame to load');
+        frame?.addEventListener('load', () => {
+          console.log('Master frame load event fired');
+          setTimeout(resolve, 0);
+        }, { once: true });
       });
       
-      console.log('Master frame is fully loaded, sending init message');
+      console.log('Master frame is fully loaded, preparing init message');
       
-      // 2. Prepare the initialization configuration
+      // 2. Determine correct operation type based on plan and operationType
+      let operation: string;
+      if (operationType === 'token_only') {
+        operation = 'CreateTokenOnly';
+      } else if (planId === 'annual') {
+        operation = 'ChargeAndCreateToken';
+      } else {
+        operation = 'ChargeOnly';
+      }
+      
+      // 3. Prepare the initialization configuration
       const config: InitConfig = {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: String(terminalNumber), // Convert to string here
+        terminalNumber: String(terminalNumber), // Convert to string to be safe
+        operation, // Set correct operation type
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
@@ -90,15 +108,19 @@ export const useCardcomInitializer = () => {
         reCaptchaFieldCSS: 'body { margin: 0; padding:0; display: flex; justify-content: center; }',
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
-        language: 'he',
-        // Let the LowProfile's operation value take precedence by not specifying it here
+        language: 'he'
       };
 
-      // 3. Send the init message to the master frame
-      console.log('📤 postMessage → master', config);
+      // 4. Send the init message to the master frame with exact origin
+      console.log('📤 postMessage → master', { 
+        ...config, 
+        operation,
+        lowProfileCode: `${lowProfileCode.substring(0, 8)}...`  // Truncate for security in logs
+      });
+      
       masterFrameRef.current.contentWindow?.postMessage(config, 'https://secure.cardcom.solutions');
 
-      // 4. Wait for initCompleted response
+      // 5. Wait for initCompleted response with timeout
       return new Promise<boolean>((resolve) => {
         // Set timeout to prevent hanging if no response
         const timeout = setTimeout(() => {
@@ -108,6 +130,7 @@ export const useCardcomInitializer = () => {
 
         // Listen for the initCompleted message
         const messageHandler = (event: MessageEvent) => {
+          // Verify origin strictly - security check
           if (event.origin !== 'https://secure.cardcom.solutions') {
             return;
           }

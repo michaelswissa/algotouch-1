@@ -21,10 +21,10 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="expiry-month">חודש תפוגה</Label>
+          <Label htmlFor="expirationMonth">חודש תפוגה</Label>
           <select
-            id="expiry-month"
-            name="expirationMonth" // Match the name in the GitHub example
+            id="expirationMonth"
+            name="expirationMonth"
             className={`w-full h-10 rounded-md border bg-background px-3 py-2 ${
               error ? 'border-red-500' : 'border-input'
             }`}
@@ -45,10 +45,10 @@ const CardExpiryInputs: React.FC<CardExpiryInputsProps> = ({
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="expiry-year">שנת תפוגה</Label>
+          <Label htmlFor="expirationYear">שנת תפוגה</Label>
           <select
-            id="expiry-year"
-            name="expirationYear" // Match the name in the GitHub example
+            id="expirationYear"
+            name="expirationYear"
             className={`w-full h-10 rounded-md border bg-background px-3 py-2 ${
               error ? 'border-red-500' : 'border-input'
             }`}

@@ -18,6 +18,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
   ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: number }> => {
     console.log("Initializing payment for:", {
       planId,
+      userId,
       email: paymentUser.email,
       fullName: paymentUser.fullName,
       operationType
@@ -30,15 +31,16 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     let amount = 0;
     let operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken" = "ChargeOnly";
     
+    // Determine amount and operation based on plan
     if (planId === 'monthly') {
       amount = 0;
-      operation = "CreateTokenOnly";
+      operation = "CreateTokenOnly"; // Free trial token
     } else if (planId === 'annual') {
       amount = 3371;
-      operation = "ChargeAndCreateToken";
+      operation = "ChargeAndCreateToken"; // Charge and create token for renewal
     } else if (planId === 'vip') {
       amount = 13121;
-      operation = "ChargeOnly";
+      operation = "ChargeOnly"; // One-time charge
     }
 
     const planNames = {
@@ -49,6 +51,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
 
     const returnValue = `${planId}-${userId || 'guest'}-${Date.now()}`;
 
+    // Prepare CardCom payload
     const payload: CreateLowProfilePayload = {
       TerminalNumber: CARDCOM.TERMINAL_NUMBER,
       ApiName: CARDCOM.API_NAME,
@@ -73,12 +76,16 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     };
 
     try {
+      // Log the payload for debugging (excluding sensitive data)
       console.log("Calling CardCom API with payload:", {
-        ...payload,
-        Document: { ...payload.Document, Products: '[Products array]' }
+        planId,
+        amount,
+        operation,
+        email: paymentUser.email,
+        fullName: paymentUser.fullName
       });
 
-      // Use cardcom-payment function, make sure it exists in Supabase
+      // Call the cardcom-payment edge function
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
@@ -88,13 +95,13 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
             email: paymentUser.email,
           },
           currency: "ILS",
-          operation: operation,
+          operationType,
+          operation, // Pass the determined operation type
           redirectUrls: {
             success: CARDCOM.SUCCESS_URL,
             failed: CARDCOM.FAILED_URL
           },
-          userId: userId,
-          operationType,
+          userId,
           registrationData: sessionStorage.getItem('registration_data') 
             ? JSON.parse(sessionStorage.getItem('registration_data')!) 
             : null,
@@ -113,21 +120,23 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         throw new Error(data?.message || 'פונקציית הקצה החזירה קוד שגיאה');
       }
       
-      console.log("Payment session created:", data.data);
+      console.log("Payment session created successfully:", data.data);
       
+      // Store payment session data in state
       setState(prev => ({
         ...prev,
+        isReady: true, // Add isReady flag to signal UI components
         sessionId: data.data.sessionId,
         lowProfileCode: data.data.lowProfileCode,
-        terminalNumber: CARDCOM.TERMINAL_NUMBER,
-        cardcomUrl: "https://secure.cardcom.solutions",
+        terminalNumber: data.data.terminalNumber || CARDCOM.TERMINAL_NUMBER,
+        cardcomUrl: data.data.cardcomUrl || "https://secure.cardcom.solutions",
         paymentStatus: PaymentStatus.IDLE
       }));
       
       return { 
         lowProfileCode: data.data.lowProfileCode, 
         sessionId: data.data.sessionId,
-        terminalNumber: CARDCOM.TERMINAL_NUMBER
+        terminalNumber: data.data.terminalNumber || CARDCOM.TERMINAL_NUMBER
       };
     } catch (error) {
       console.error('Error during payment initialization:', error);
