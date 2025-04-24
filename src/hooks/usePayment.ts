@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -17,7 +16,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
   
-  // Determine operation type based on plan ID
   useEffect(() => {
     if (planId === 'monthly') {
       setOperationType('token_only');
@@ -56,7 +54,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     planType: planId
   });
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       cleanupStatusCheck();
@@ -100,8 +97,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      // CardCom requires "lowProfileCode" param for each doTransaction
-      const formData: any = {
+      const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
+      const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
         cardOwnerId,
@@ -110,11 +108,18 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
-        ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        ExternalUniqTranId: externalUniqTranId,
         TerminalNumber: state.terminalNumber,
         Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
-        lowProfileCode: state.lowProfileCode, // Ensure always present
-        LowProfileCode: state.lowProfileCode  // For extra compatibility
+        lowProfileCode: state.lowProfileCode,
+        LowProfileCode: state.lowProfileCode,
+        Document: {
+          Name: cardholderName || email,
+          Email: email,
+          TaxId: cardOwnerId,
+          Phone: phone,
+          DocumentTypeToCreate: "Receipt"
+        }
       };
 
       console.log('Sending transaction data to CardCom:', formData);
@@ -125,7 +130,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         paymentStatus: PaymentStatus.PROCESSING
       }));
       
-      // Start status check with required params
       startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
       
       setTimeout(() => {
@@ -136,7 +140,10 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
     }
-  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
+  }, [
+    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, 
+    handleError, operationType, paymentInProgress, setState, startStatusCheck, planId
+  ]);
 
   return {
     ...state,

@@ -27,7 +27,7 @@ export const useFrameMessages = ({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        // Safety check for message origin
+        // Validate message origin
         if (!event.origin.includes('cardcom.solutions') && 
             !event.origin.includes('localhost') && 
             !event.origin.includes(window.location.origin)) {
@@ -41,14 +41,17 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle HandleSubmit (success case)
+        // Handle successful submission
         if (message.action === 'HandleSubmit' || message.action === 'handleSubmit') {
           console.log('HandleSubmit message received:', message);
           
           if (message.data?.IsSuccess) {
             console.log('Payment submission successful');
-            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-            handlePaymentSuccess();
+            // Start status check instead of immediate success
+            setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
+            if (lowProfileCode && sessionId) {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }
           } else {
             console.error('Payment submission failed:', message.data?.Description);
             setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
@@ -57,17 +60,16 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle HandleError (error case)
+        // Handle errors
         if (message.action === 'HandleError' || message.action === 'HandleEror') {
-          console.error('Payment error:', message.message || 'Unknown error');
+          console.error('Payment error:', message);
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           
-          // Show more specific error messages
-          if (message.message && message.message.includes('lowProfileCode')) {
+          if (message.message?.includes('lowProfileCode')) {
             toast.error('פרמטר lowProfileCode חובה');
-          } else if (message.message && message.message.includes('תאריך תוקף שגוי')) {
+          } else if (message.message?.includes('תאריך תוקף שגוי')) {
             toast.error('תאריך תוקף שגוי');
-          } else if (message.message && message.message.includes('CardComCardNumber')) {
+          } else if (message.message?.includes('CardComCardNumber')) {
             toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
           } else {
             toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
@@ -75,7 +77,7 @@ export const useFrameMessages = ({
           return;
         }
 
-        // Handle processing start/complete
+        // Handle 3DS process
         if (message.action === '3DSProcessStarted') {
           console.log('3DS process started');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
@@ -84,17 +86,16 @@ export const useFrameMessages = ({
 
         if (message.action === '3DSProcessCompleted') {
           console.log('3DS process completed');
-          // Start status check to verify final result
+          // Check final status
           if (lowProfileCode && sessionId) {
             checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
           }
           return;
         }
 
-        // Handle validations
+        // Handle field validations
         if (message.action === 'handleValidations') {
           console.log('Validation message for field:', message.field);
-          // Field validation is handled separately in usePaymentValidation
           return;
         }
       } catch (error) {
