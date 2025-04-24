@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -27,7 +26,7 @@ export const useFrameMessages = ({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        // Safety check for message origin
+        // Strict origin checking
         if (!event.origin.includes('cardcom.solutions') && 
             !event.origin.includes('localhost') && 
             !event.origin.includes(window.location.origin)) {
@@ -43,24 +42,25 @@ export const useFrameMessages = ({
 
         // Handle HandleSubmit (success case)
         if (message.action === 'HandleSubmit' || message.action === 'handleSubmit') {
-          console.log('HandleSubmit message received:', message);
-          
-          // When the form has been submitted, we wait for the status check to confirm success
+          console.log('HandleSubmit received, updating status to PROCESSING');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
           
-          // Start checking status right away to detect success/failure
+          // Start checking status with increased initial delay
           if (lowProfileCode && sessionId) {
-            checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            setTimeout(() => {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }, 8000); // Increased initial delay
           }
-          
           return;
         }
 
         // Handle explicit success messages
         if (message.action === 'Success' || 
             (message.data && message.data.IsSuccess === true) || 
-            (message.IsSuccess === true)) {
-          console.log('Explicit success message received');
+            (message.IsSuccess === true) ||
+            (message.ResponseCode === 0) ||
+            (message.data && message.data.ResponseCode === 0)) {
+          console.log('Success message received');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
           handlePaymentSuccess();
           return;
@@ -71,19 +71,16 @@ export const useFrameMessages = ({
           console.error('Payment error:', message.message || 'Unknown error');
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           
-          // Show more specific error messages
-          if (message.message) {
-            if (message.message.includes('lowProfileCode')) {
-              toast.error('פרמטר lowProfileCode חובה');
-            } else if (message.message.includes('תאריך תוקף שגוי')) {
-              toast.error('תאריך תוקף שגוי');
-            } else if (message.message.includes('CardComCardNumber')) {
-              toast.error('שגיאת מפתח: נא לוודא הימצאות iframes בשם \'CardComCardNumber\' ו- \'CardComCvv\'');
-            } else {
-              toast.error(message.message);
-            }
+          // Improved error messages in Hebrew
+          const errorMessage = message.message || '';
+          if (errorMessage.includes('lowProfileCode')) {
+            toast.error('חסר מזהה עסקה');
+          } else if (errorMessage.includes('תאריך תוקף שגוי')) {
+            toast.error('תאריך תוקף הכרטיס שגוי');
+          } else if (errorMessage.includes('CardComCardNumber')) {
+            toast.error('שגיאה בפרטי כרטיס האשראי');
           } else {
-            toast.error('אירעה שגיאה בביצוע התשלום');
+            toast.error(message.message || 'אירעה שגיאה בביצוע התשלום');
           }
           return;
         }
@@ -137,12 +134,7 @@ export const useFrameMessages = ({
       }
     };
 
-    console.log('Setting up message event listener for CardCom iframe');
     window.addEventListener('message', handleMessage);
-    
-    return () => {
-      console.log('Removing message event listener for CardCom iframe');
-      window.removeEventListener('message', handleMessage);
-    };
+    return () => window.removeEventListener('message', handleMessage);
   }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
 };
