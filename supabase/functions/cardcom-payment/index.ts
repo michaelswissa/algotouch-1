@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -106,27 +107,60 @@ serve(async (req) => {
     
     logStep("Sending request to CardCom");
     
-    const { data: response } = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
+    // Perform the API call with proper error handling
+    const res = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(cardcomPayload),
-    }).then(res => res.json());
+    });
+
+    if (!res.ok) {
+      logStep("ERROR: CardCom Create returned HTTP", { 
+        status: res.status, 
+        statusText: res.statusText 
+      });
+      
+      // Try to get error details from response
+      try {
+        const errorText = await res.text();
+        logStep("CardCom error response", { errorText });
+      } catch (e) {
+        // Ignore error reading response
+      }
+      
+      throw new Error(`CardCom Create failed with status ${res.status}`);
+    }
     
-    logStep("CardCom raw response", response);
+    // Get the response as text first to log it
+    const responseText = await res.text();
+    logStep("CardCom raw text response", { responseText });
     
+    // Parse as JSON
+    let response;
+    try {
+      response = JSON.parse(responseText);
+      logStep("CardCom parsed response", response);
+    } catch (parseError) {
+      logStep("ERROR: Failed to parse CardCom response as JSON", { error: parseError.message });
+      throw new Error("Invalid JSON response from CardCom");
+    }
+    
+    // Validate the response structure
+    if (!response) {
+      logStep("ERROR: Empty response from CardCom");
+      throw new Error("Empty response from CardCom");
+    }
+    
+    // Check for LowProfileId
     if (!response.LowProfileId) {
       logStep("ERROR: Missing LowProfileId in response", response);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: response.Description || "CardCom initialization failed - missing LowProfileId",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      // Check if there's an error message in the response
+      if (response.Description) {
+        throw new Error(`CardCom error: ${response.Description}`);
+      }
+      throw new Error("CardCom initialization failed - missing LowProfileId");
     }
 
     const sessionData = {
@@ -161,6 +195,7 @@ serve(async (req) => {
       logStep("Error storing payment session", { error: dbError.message });
     }
     
+    // Construct the success response with consistent field names
     return new Response(
       JSON.stringify({
         success: true,
@@ -168,9 +203,9 @@ serve(async (req) => {
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
           lowProfileId: response.LowProfileId,
-          url: response.Url,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
-          cardcomUrl: "https://secure.cardcom.solutions"
+          cardcomUrl: "https://secure.cardcom.solutions",
+          url: response.Url || "" // Include url field consistently
         }
       }),
       {

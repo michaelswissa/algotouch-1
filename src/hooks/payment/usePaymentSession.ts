@@ -43,9 +43,21 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         }
       });
       
-      if (error || !data?.success || !data.data?.lowProfileId) {
-        console.error("Payment initialization error:", error || data?.message);
-        throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
+      console.log("Payment initialization response:", data);
+      
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw new Error(error.message || 'אירעה שגיאה באתחול התשלום');
+      }
+      
+      if (!data?.success) {
+        console.error("Payment initialization failed:", data?.message);
+        throw new Error(data?.message || 'אירעה שגיאה באתחול התשלום');
+      }
+      
+      if (!data.data?.lowProfileId) {
+        console.error("Missing lowProfileId in response:", data.data);
+        throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
       }
       
       console.log("Payment session created:", data.data);
@@ -53,7 +65,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     } catch (error) {
       console.error("Payment initialization error:", error);
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-      toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
+      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
       throw error;
     }
   };
