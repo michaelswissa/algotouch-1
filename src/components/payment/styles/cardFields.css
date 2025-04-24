@@ -29,8 +29,7 @@
 #CardComCvv {
   height: 57px !important;
   width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: none;
   transition: border-color 0.2s ease;
   position: absolute;
   top: 0;

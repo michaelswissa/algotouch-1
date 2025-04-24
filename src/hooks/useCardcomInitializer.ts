@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 /**
- * Hook for initializing CardCom OpenFields with proper lowProfileCode and sessionId
+ * Hook for initializing CardCom OpenFields with proper lowProfileCode and terminalNumber
  */
 export const useCardcomInitializer = () => {
   const [initialized, setInitialized] = useState(false);
@@ -11,27 +11,22 @@ export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>,
     lowProfileCode: string,
-    sessionId: string,
     terminalNumber: string,
-    operationType: 'payment' | 'token_only' = 'payment',
-    planType?: string
+    operationType: 'payment' | 'token_only' = 'payment'
   ): Promise<boolean> => {
     try {
-      if (!masterFrameRef.current || !lowProfileCode || !sessionId) {
+      if (!masterFrameRef.current || !lowProfileCode) {
         console.error('Missing required references for CardCom initialization', { 
           hasMasterFrame: Boolean(masterFrameRef.current), 
-          lowProfileCode, 
-          sessionId 
+          lowProfileCode
         });
         return false;
       }
 
       console.log('Initializing CardCom fields with:', {
         lowProfileCode,
-        sessionId: sessionId.substring(0, 8) + '...',
         terminalNumber,
-        operationType,
-        planType,
+        operationType
       });
       
       // Make sure master frame is loaded
@@ -54,6 +49,8 @@ export const useCardcomInitializer = () => {
             const data = event.data;
             if (!data) return;
 
+            console.log('Received message from CardCom:', data);
+
             if (data.action === 'InitCompleted') {
               console.log('CardCom fields initialized successfully');
               setInitialized(true);
@@ -74,7 +71,7 @@ export const useCardcomInitializer = () => {
         // Add the message listener
         window.addEventListener('message', handleInitMessage);
 
-        // Improved CSS that targets specific elements instead of global styles
+        // CSS specifically targeting iframe elements without affecting the main page
         const cardFieldCSS = `
           #CardComCardNumber input {
             width: 100%;
@@ -113,12 +110,12 @@ export const useCardcomInitializer = () => {
           }
         `;
 
-        // Send init message to CardCom with correct lowProfileCode and sessionId
+        // Send init message to CardCom with correct lowProfileCode
+        console.log('Sending init message to CardCom iframe');
         frameWindow.postMessage({
           action: 'init',
           terminalNumber: terminalNumber,
           lowProfileCode: lowProfileCode,
-          sessionId: sessionId,
           cardFieldCSS: cardFieldCSS,
           cvvFieldCSS: cvvFieldCSS,
           placeholder: '1111-2222-3333-4444',

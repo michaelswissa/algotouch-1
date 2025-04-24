@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import PaymentContent from './PaymentContent';
@@ -25,6 +24,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     isSubmitting,
     isInitializing,
     isContentReady,
+    areFieldsInitialized,
     terminalNumber,
     cardcomUrl,
     paymentStatus,
@@ -34,6 +34,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     handleSubmitPayment,
     plan
   } = usePaymentForm({ planId, onPaymentComplete });
+
+  const shouldShowFields = isContentReady && areFieldsInitialized;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -69,7 +71,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             onNavigateToDashboard={() => window.location.href = '/dashboard'}
             onRetry={handleRetry}
             operationType={operationType}
-            isReady={isContentReady}
+            isReady={shouldShowFields}
           />
         )}
       </CardContent>
@@ -80,7 +82,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           operationType={operationType}
           isSubmitting={isSubmitting}
           isInitializing={isInitializing}
-          isContentReady={isContentReady}
+          isContentReady={shouldShowFields}
           onSubmit={handleSubmitPayment}
           onBack={onBack}
           plan={plan}
