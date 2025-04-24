@@ -25,7 +25,7 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
             id="CardComCardNumber"
             name="CardComCardNumber"
             src={iframeSrc}
-            className="w-full h-full"
+            className="w-full"
             onLoad={onLoad}
             title="מספר כרטיס"
           />

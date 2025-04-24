@@ -1,17 +1,14 @@
 
-import { useCallback } from 'react';
 import { InitConfig } from '@/components/payment/types/payment';
-import { toast } from 'sonner';
 
 export const useCardcomInitializer = () => {
-  const initializeCardcomFields = useCallback(async (
+  const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
-    operationType: 'payment' | 'token_only' = 'payment',
-    planId?: string
-  ): Promise<boolean> => {
+    operationType: 'payment' | 'token_only' = 'payment'
+  ) => {
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization");
       return false;
@@ -27,53 +24,20 @@ export const useCardcomInitializer = () => {
       sessionId,
       terminalNumber,
       operationType,
-      planId,
       hasMasterFrame: Boolean(masterFrameRef.current)
     });
 
     try {
-      // 1. Wait for the master frame to fully load before sending init message
-      await new Promise<void>((resolve) => {
-        const frame = masterFrameRef.current;
-        
-        // If frame is already loaded, continue after a short delay to ensure JS is ready
-        if (frame?.contentWindow?.document?.readyState === 'complete') {
-          console.log('Master frame already loaded, continuing');
-          setTimeout(resolve, 0);
-          return;
-        }
-        
-        // Wait for frame load then give its JS a tick to initialize
-        console.log('Waiting for master frame to load');
-        frame?.addEventListener('load', () => {
-          console.log('Master frame load event fired');
-          setTimeout(resolve, 0);
-        }, { once: true });
-      });
-      
-      console.log('Master frame is fully loaded, preparing init message');
-      
-      // 2. Determine correct operation type based on plan and operationType
-      let operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
-      if (operationType === 'token_only') {
-        operation = 'CreateTokenOnly';
-      } else if (planId === 'annual') {
-        operation = 'ChargeAndCreateToken';
-      } else {
-        operation = 'ChargeOnly';
-      }
-      
-      // 3. Prepare the initialization configuration
       const config: InitConfig = {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: Number(terminalNumber), // Convert to number as CardCom expects
-        operation, // Set correct operation type with proper type
+        terminalNumber,
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
-            border: none;
+            border: 1px solid #ccc;
+            border-radius: 4px;
             height: 40px;
             width: 100%;
             padding: 0 10px;
@@ -82,6 +46,7 @@ export const useCardcomInitializer = () => {
             direction: ltr;
           }
           .cardNumberField:focus {
+            border-color: #3498db;
             outline: none;
           }
           .cardNumberField.invalid {
@@ -90,16 +55,17 @@ export const useCardcomInitializer = () => {
         cvvFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cvvField {
-            border: none;
-            height: 40px;
-            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            height: 39px;
+            margin: 0;
             padding: 0 10px;
-            font-size: 16px;
-            text-align: center;
+            width: 100%;
             box-sizing: border-box;
             direction: ltr;
           }
           .cvvField:focus {
+            border-color: #3498db;
             outline: none;
           }
           .cvvField.invalid {
@@ -108,52 +74,19 @@ export const useCardcomInitializer = () => {
         reCaptchaFieldCSS: 'body { margin: 0; padding:0; display: flex; justify-content: center; }',
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123",
-        language: 'he'
+        language: 'he',
+        operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
       };
 
-      // 4. Send the init message to the master frame with exact origin
-      console.log('📤 postMessage → master', { 
-        ...config, 
-        operation,
-        lowProfileCode: `${lowProfileCode.substring(0, 8)}...`  // Truncate for security in logs
-      });
-      
-      masterFrameRef.current.contentWindow?.postMessage(config, 'https://secure.cardcom.solutions');
+      console.log('Sending initialization config to CardCom iframe');
+      masterFrameRef.current.contentWindow.postMessage(config, '*');
 
-      // 5. Wait for initCompleted response with timeout
-      return new Promise<boolean>((resolve) => {
-        // Set timeout to prevent hanging if no response
-        const timeout = setTimeout(() => {
-          console.warn('initCompleted timeout');
-          resolve(false);
-        }, 8000);
-
-        // Listen for the initCompleted message
-        const messageHandler = (event: MessageEvent) => {
-          // Verify origin strictly - security check
-          if (event.origin !== 'https://secure.cardcom.solutions') {
-            return;
-          }
-          
-          if (event.data?.action === 'initCompleted') {
-            console.log('✅ initCompleted received');
-            clearTimeout(timeout);
-            resolve(true);
-            window.removeEventListener('message', messageHandler);
-          }
-        };
-        
-        window.addEventListener('message', messageHandler);
-      });
-      
+      return true;
     } catch (error) {
       console.error('Error initializing CardCom fields:', error);
-      toast.error('שגיאה באתחול שדות התשלום');
       return false;
     }
-  }, []);
+  };
 
   return { initializeCardcomFields };
 };
-
-export default useCardcomInitializer;

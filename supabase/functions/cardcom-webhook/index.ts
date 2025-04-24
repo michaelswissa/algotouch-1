@@ -2,12 +2,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper logging function
+// Helper logging function for enhanced debugging
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-WEBHOOK] ${step}${detailsStr}`);
@@ -20,218 +21,394 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Webhook received");
-    
-    // Create Supabase admin client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error("Missing Supabase configuration");
-    }
+    logStep("Function started", { method: req.method, url: req.url });
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Parse webhook data
-    const webhookData = await req.json();
-    logStep("Webhook data", webhookData);
-    
-    if (!webhookData || !webhookData.LowProfileId) {
-      return errorResponse("Invalid webhook data");
-    }
-    
-    const lowProfileId = webhookData.LowProfileId;
-    const transactionId = webhookData.TranzactionId;
-    const isSuccess = webhookData.ResponseCode === 0;
-    
-    // Find the payment session for this transaction
-    let sessionData;
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('payment_sessions')
-        .select('*')
-        .eq('low_profile_code', lowProfileId)
-        .maybeSingle();
-        
-      if (error) {
-        logStep("Error fetching payment session", { error: error.message });
-      } else if (data) {
-        sessionData = data;
-        logStep("Found payment session", { sessionId: data.id });
-      }
-    } catch (error) {
-      logStep("Exception fetching payment session", { error });
-    }
-    
-    // Process successful transaction
-    if (isSuccess) {
-      logStep("Processing successful transaction", { transactionId });
-      
-      // Handle token creation
-      if (webhookData.TokenInfo && webhookData.TokenInfo.Token) {
-        logStep("Token created", { token: webhookData.TokenInfo.Token });
+    // Create Supabase client with service role to bypass RLS
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Get webhook data - CardCom sends data in request body
+    let webhookData;
+
+    const contentType = req.headers.get('content-type') || '';
+    logStep("Content-Type", { contentType });
+
+    if (contentType.includes('application/json')) {
+      webhookData = await req.json();
+      logStep("Parsed JSON webhook data");
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      try {
+        const formData = await req.formData();
+        webhookData = Object.fromEntries(formData.entries());
+        logStep("Parsed form data webhook");
+      } catch (formError) {
+        // Handle raw form data if formData() fails
+        const text = await req.text();
+        logStep("FormData parsing failed, trying text parsing", { text });
         
         try {
-          // Update payment session with token info
-          if (sessionData) {
-            await supabaseAdmin
-              .from('payment_sessions')
-              .update({
-                status: 'completed',
-                transaction_id: transactionId,
-                payment_details: {
-                  ...sessionData.payment_details,
-                  token: webhookData.TokenInfo.Token,
-                  tokenExpiryDate: webhookData.TokenInfo.TokenExDate,
-                  lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigits,
-                  webhookReceived: true,
-                  webhookData: webhookData
-                }
-              })
-              .eq('id', sessionData.id);
-          }
-          
-          // Log the token creation
-          await supabaseAdmin
-            .from('user_payment_logs')
-            .insert({
-              user_id: sessionData?.user_id,
-              token: lowProfileId,
-              transaction_id: transactionId,
-              status: 'token_created',
-              payment_data: {
-                token: webhookData.TokenInfo.Token,
-                tokenExpiryDate: webhookData.TokenInfo.TokenExDate,
-                lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigits,
-                planId: sessionData?.plan_id,
-                webhookData: webhookData
-              }
-            });
-            
-          logStep("Token creation recorded");
-        } catch (error) {
-          logStep("Error recording token creation", { error });
+          // Try to parse URL-encoded form data manually
+          const params = new URLSearchParams(text);
+          webhookData = Object.fromEntries(params.entries());
+          logStep("Manually parsed form data");
+        } catch (textParseError) {
+          throw new Error(`Failed to parse form data: ${textParseError.message}, Raw content: ${text}`);
         }
       }
-      
-      // Handle payment success
-      if (webhookData.TranzactionInfo && webhookData.TranzactionInfo.ResponseCode === 0) {
-        logStep("Payment succeeded", { amount: webhookData.TranzactionInfo.Amount });
-        
-        try {
-          // Update payment session
-          if (sessionData) {
-            await supabaseAdmin
-              .from('payment_sessions')
-              .update({
-                status: 'completed',
-                transaction_id: transactionId,
-                payment_details: {
-                  ...sessionData.payment_details,
-                  webhookReceived: true,
-                  webhookData: webhookData,
-                  amount: webhookData.TranzactionInfo.Amount
-                }
-              })
-              .eq('id', sessionData.id);
-          }
-          
-          // Log the payment
-          await supabaseAdmin
-            .from('user_payment_logs')
-            .insert({
-              user_id: sessionData?.user_id,
-              token: lowProfileId,
-              transaction_id: transactionId,
-              status: 'payment_success',
-              amount: webhookData.TranzactionInfo.Amount,
-              payment_data: {
-                planId: sessionData?.plan_id,
-                webhookData: webhookData
-              }
-            });
-            
-          logStep("Payment success recorded");
-        } catch (error) {
-          logStep("Error recording payment success", { error });
-        }
-      }
-      
-      return successResponse("Webhook processed successfully");
-    }
-    // Process failed transaction
-    else {
-      logStep("Processing failed transaction", { responseCode: webhookData.ResponseCode });
+    } else {
+      // Try to handle any other format as text
+      const text = await req.text();
+      logStep("Unexpected content type, raw content", { text });
       
       try {
-        // Update payment session
-        if (sessionData) {
-          await supabaseAdmin
-            .from('payment_sessions')
-            .update({
-              status: 'failed',
-              payment_details: {
-                ...sessionData.payment_details,
-                webhookReceived: true,
-                webhookData: webhookData,
-                failureReason: webhookData.Description
-              }
-            })
-            .eq('id', sessionData.id);
+        // Try to parse as URL-encoded
+        const params = new URLSearchParams(text);
+        webhookData = Object.fromEntries(params.entries());
+        logStep("Parsed as URL-encoded despite content type");
+      } catch (e) {
+        try {
+          // Try to parse as JSON
+          webhookData = JSON.parse(text);
+          logStep("Parsed as JSON despite content type");
+        } catch (jsonError) {
+          throw new Error(`Unsupported content type: ${contentType}, Raw content: ${text}`);
         }
-        
-        // Log the failure
-        await supabaseAdmin
-          .from('user_payment_logs')
-          .insert({
-            user_id: sessionData?.user_id,
-            token: lowProfileId,
-            transaction_id: transactionId,
-            status: 'payment_failed',
-            payment_data: {
-              planId: sessionData?.plan_id,
-              failureReason: webhookData.Description,
-              webhookData: webhookData
-            }
+      }
+    }
+
+    logStep("Received webhook data", webhookData);
+
+    // Extract required fields from webhook data
+    const {
+      LowProfileId: lowProfileCode,
+      OperationResponse: operationResponse,
+      ReturnValue: returnValue,
+      InternalDealNumber: transactionId,
+      TranzactionInfo: transactionInfo,
+      TokenInfo: tokenInfo,
+      CardNumber5: cardNumber5,
+      ResponseCode: responseCode
+    } = webhookData;
+
+    // Check all possible response code fields
+    const isSuccessful = 
+      operationResponse === "0" || operationResponse === 0 || 
+      responseCode === "0" || responseCode === 0 ||
+      (webhookData.ResponseCode === "0" || webhookData.ResponseCode === 0) ||
+      (transactionInfo && (transactionInfo.ResponseCode === "0" || transactionInfo.ResponseCode === 0));
+
+    logStep("Payment success check", { 
+      isSuccessful,
+      operationResponse,
+      responseCode,
+      webhookResponseCode: webhookData.ResponseCode,
+      transactionInfoResponseCode: transactionInfo?.ResponseCode
+    });
+
+    // Basic data validation
+    if (!lowProfileCode) {
+      logStep("Missing LowProfileId", webhookData);
+      // Don't fail - return 200 so CardCom doesn't retry
+      return new Response("OK - Missing LowProfileId, but accepting request", {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+
+    // Find matching payment session
+    const { data: sessionData, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .select('*')
+      .eq('low_profile_code', lowProfileCode)
+      .maybeSingle();
+
+    if (sessionError) {
+      logStep("Payment session DB error", sessionError);
+      // Don't fail - allow webhook to be idempotent and return 200
+      return new Response("OK - Session not found (DB error)", {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+    if (!sessionData) {
+      logStep("Payment session missing for LowProfileId", { lowProfileCode });
+      
+      // Try to check by ReturnValue as fallback
+      if (returnValue) {
+        const { data: sessionByReturnValue } = await supabaseAdmin
+          .from('payment_sessions')
+          .select('*')
+          .eq('reference', returnValue)
+          .maybeSingle();
+          
+        if (sessionByReturnValue) {
+          logStep("Found payment session by ReturnValue", { 
+            sessionId: sessionByReturnValue.id,
+            reference: returnValue
           });
           
-        logStep("Payment failure recorded");
-      } catch (error) {
-        logStep("Error recording payment failure", { error });
+          // Continue with this session
+          sessionData = sessionByReturnValue;
+        } else {
+          // Don't fail
+          return new Response("OK - Session not found", {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'text/plain'
+            }
+          });
+        }
+      } else {
+        // Don't fail
+        return new Response("OK - Session not found and no ReturnValue", {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'text/plain'
+          }
+        });
       }
-      
-      return successResponse("Failed transaction recorded");
     }
+
+    logStep("Found payment session", {
+      sessionId: sessionData.id,
+      userId: sessionData.user_id,
+      planId: sessionData.plan_id,
+      currentStatus: sessionData.status
+    });
+
+    // Check if this session is already processed (idempotency)
+    if (sessionData.status === 'completed' && sessionData.transaction_id) {
+      logStep("Session already completed", { 
+        transactionId: sessionData.transaction_id,
+        sessionId: sessionData.id 
+      });
+      return new Response("OK - Session already processed", {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+
+    // Extract token information if available
+    let paymentMethod = null;
+    if (tokenInfo) {
+      paymentMethod = {
+        token: tokenInfo.Token,
+        tokenExpiryDate: tokenInfo.TokenExDate,
+        lastFourDigits: cardNumber5 || webhookData.Last4CardDigits || "0000",
+        expiryMonth: tokenInfo.CardMonth || tokenInfo.CardValidityMonth,
+        expiryYear: tokenInfo.CardYear || tokenInfo.CardValidityYear
+      };
+    } else if (transactionInfo) {
+      // Try to extract from transaction info if available
+      paymentMethod = {
+        token: transactionInfo.Token || null,
+        lastFourDigits: transactionInfo.Last4CardDigitsString || cardNumber5 || "0000",
+        expiryMonth: transactionInfo.CardMonth || null,
+        expiryYear: transactionInfo.CardYear || null
+      };
+    }
+
+    // Determine payment status
+    const status = isSuccessful ? 'completed' : 'failed';
     
-  } catch (error) {
+    // Get actual transaction ID from various possible fields
+    const finalTransactionId = 
+      transactionId || 
+      (transactionInfo && transactionInfo.TranzactionId) || 
+      webhookData.TransactionId || 
+      webhookData.TranzactionId || 
+      null;
+
+    logStep("Determined payment status", { 
+      isSuccessful, 
+      status, 
+      operationResponse, 
+      finalTransactionId,
+      hasPaymentMethod: !!paymentMethod
+    });
+
+    const updateData: any = {
+      status,
+      transaction_id: finalTransactionId,
+      transaction_data: webhookData,
+      updated_at: new Date().toISOString()
+    };
+
+    if (paymentMethod) {
+      updateData.payment_method = paymentMethod;
+    }
+
+    // Always update payment session, even if called multiple times!
+    const { error: updateError } = await supabaseAdmin
+      .from('payment_sessions')
+      .update(updateData)
+      .eq('id', sessionData.id);
+
+    if (updateError) {
+      logStep("Failed to update payment session", updateError);
+      // Return OK anyway for idempotency
+      return new Response("OK - Failed to update session", {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+
+    logStep("Updated payment session status", { status, sessionId: sessionData.id });
+
+    // Log transaction in either 'payment_logs' or 'payment_errors'
+    const logTable = isSuccessful ? 'payment_logs' : 'payment_errors';
+
+    const logData = isSuccessful
+      ? {
+        user_id: sessionData.user_id,
+        transaction_id: finalTransactionId,
+        amount: sessionData.amount,
+        currency: sessionData.currency,
+        plan_id: sessionData.plan_id,
+        payment_status: 'succeeded',
+        payment_data: webhookData
+      }
+      : {
+        user_id: sessionData.user_id,
+        error_code: operationResponse || webhookData.ResponseCode,
+        error_message: webhookData.Description || 'Payment failed',
+        request_data: { low_profile_code: lowProfileCode, return_value: returnValue },
+        response_data: webhookData
+      };
+
+    const { error: logError } = await supabaseAdmin
+      .from(logTable)
+      .insert(logData);
+
+    if (logError) {
+      logStep("Error logging transaction", { error: logError.message });
+      // Continue anyway
+    }
+
+    // If payment successful, update subscription record
+    if (isSuccessful) {
+      try {
+        // Calculate trial/subscription periods
+        const now = new Date();
+        const planId = sessionData.plan_id;
+        let trialEndsAt = null;
+        let nextChargeDate = null;
+        let currentPeriodEndsAt = null;
+        let status = 'active';
+
+        if (planId === 'monthly') {
+          if (sessionData.amount === 0) {
+            // This is a trial
+            status = 'trial';
+            trialEndsAt = new Date(now);
+            trialEndsAt.setDate(trialEndsAt.getDate() + 7); // 7-day trial
+            nextChargeDate = new Date(trialEndsAt);
+            currentPeriodEndsAt = new Date(nextChargeDate);
+            currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
+          } else {
+            // Regular monthly payment
+            currentPeriodEndsAt = new Date(now);
+            currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
+            nextChargeDate = new Date(currentPeriodEndsAt);
+          }
+        } else if (planId === 'annual') {
+          if (sessionData.amount === 0) {
+            // This is a trial
+            status = 'trial';
+            trialEndsAt = new Date(now);
+            trialEndsAt.setDate(trialEndsAt.getDate() + 14); // 14-day trial
+            nextChargeDate = new Date(trialEndsAt);
+            currentPeriodEndsAt = new Date(nextChargeDate);
+            currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+          } else {
+            // Regular annual payment
+            currentPeriodEndsAt = new Date(now);
+            currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
+            nextChargeDate = new Date(currentPeriodEndsAt);
+          }
+        } else if (planId === 'vip') {
+          // VIP plan has no expiry
+          currentPeriodEndsAt = null;
+          nextChargeDate = null;
+        }
+
+        // Create or update subscription record
+        const { data: existingSubscription } = await supabaseAdmin
+          .from('subscriptions')
+          .select('id')
+          .eq('user_id', sessionData.user_id)
+          .maybeSingle();
+
+        if (existingSubscription) {
+          await supabaseAdmin
+            .from('subscriptions')
+            .update({
+              plan_type: planId,
+              status: planId === 'vip' ? 'active' : status,
+              next_charge_date: nextChargeDate,
+              trial_ends_at: trialEndsAt,
+              current_period_ends_at: currentPeriodEndsAt,
+              payment_method: paymentMethod,
+              updated_at: now.toISOString()
+            })
+            .eq('id', existingSubscription.id);
+        } else {
+          await supabaseAdmin
+            .from('subscriptions')
+            .insert({
+              user_id: sessionData.user_id,
+              plan_type: planId,
+              status: planId === 'vip' ? 'active' : status,
+              next_charge_date: nextChargeDate,
+              trial_ends_at: trialEndsAt,
+              current_period_ends_at: currentPeriodEndsAt,
+              payment_method: paymentMethod
+            });
+        }
+        logStep("Updated subscription record", { planId, userId: sessionData.user_id });
+      } catch (error: any) {
+        logStep("Failed to update subscription", { error: error.message });
+      }
+    }
+
+    // Always return OK (idempotent), to let CardCom know it received the callback!
+    return new Response("OK", {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/plain'
+      }
+    });
+  } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
-    return errorResponse(errorMessage);
+
+    // Still return OK (idempotent) to let CardCom not retry forever
+    return new Response(
+      errorMessage || "Webhook processing failed",
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain'
+        },
+      }
+    );
   }
 });
-
-function successResponse(message: string) {
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message: message
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    }
-  );
-}
-
-function errorResponse(message: string) {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      message: message
-    }),
-    {
-      status: 200, // Use 200 for webhook to acknowledge receipt
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    }
-  );
-}

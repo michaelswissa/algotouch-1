@@ -32,9 +32,8 @@ export interface CardComMessage {
 export interface InitConfig {
   action: 'init';
   lowProfileCode: string;
-  LowProfileCode?: string;
   sessionId?: string;
-  terminalNumber: number;
+  terminalNumber: string;
   cardFieldCSS: string;
   cvvFieldCSS: string;
   reCaptchaFieldCSS: string;
@@ -42,7 +41,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
 }
 
 export interface PaymentState {
@@ -53,7 +52,5 @@ export interface PaymentState {
   lowProfileCode: string;
   operationType?: 'payment' | 'token_only';
   transactionId?: string;
-  tokenId?: string;
   isFramesReady: boolean;
-  isSubmitting?: boolean;
 }

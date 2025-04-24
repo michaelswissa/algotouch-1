@@ -1,4 +1,3 @@
-
 import React from 'react';
 import '../styles/cardFields.css';
 
@@ -25,7 +24,7 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
             id="CardComCvv"
             name="CardComCvv"
             src={iframeSrc}
-            className="w-full h-full"
+            className="w-full"
             onLoad={onLoad}
             title="קוד אבטחה"
           />

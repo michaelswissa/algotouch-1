@@ -1,3 +1,4 @@
+
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -5,7 +6,6 @@ import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
 import { toast } from 'sonner';
-import { CARDCOM } from '@/config/cardcom';
 
 interface UsePaymentProps {
   planId: string;
@@ -15,19 +15,15 @@ interface UsePaymentProps {
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
   
   // Determine operation type based on plan ID
   useEffect(() => {
     if (planId === 'monthly') {
       setOperationType('token_only');
-    } else if (planId === 'annual') {
-      setOperationType('payment');
     } else {
       setOperationType('payment');
     }
-    
-    console.log('Set operation type:', { planId, operationType: planId === 'monthly' ? 'token_only' : 'payment' });
   }, [planId]);
   
   const {
@@ -60,14 +56,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     planType: planId
   });
 
-  // Initialize payment when component mounts
-  useEffect(() => {
-    if (!state.lowProfileCode && paymentStatus !== PaymentStatus.INITIALIZING) {
-      console.log('Auto-initializing payment for plan:', planId);
-      initializePayment();
-    }
-  }, []);
-
   // Clean up on unmount
   useEffect(() => {
     return () => {
@@ -79,14 +67,13 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     console.log('Retrying payment initialization');
     setState(prev => ({
       ...prev,
-      paymentStatus: PaymentStatus.IDLE,
-      isSubmitting: false
+      paymentStatus: PaymentStatus.IDLE
     }));
     initializePayment();
   }, [initializePayment, setState]);
 
   const submitPayment = useCallback(() => {
-    if (isSubmitting) {
+    if (paymentInProgress) {
       console.log('Payment submission already in progress');
       return;
     }
@@ -96,21 +83,14 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       return;
     }
     
-    // Check if the master frame is available
+    setPaymentInProgress(true);
+    console.log('Submitting payment transaction');
+
     if (!masterFrameRef.current?.contentWindow) {
       handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
+      setPaymentInProgress(false);
       return;
     }
-
-    setIsSubmitting(true);
-    setState(prev => ({ ...prev, isSubmitting: true }));
-    
-    console.log('Submitting payment transaction', { 
-      operationType, 
-      planId,
-      lowProfileCode: state.lowProfileCode,
-      sessionId: state.sessionId
-    });
     
     try {
       const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
@@ -120,29 +100,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
       const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      // Basic validation
-      if (!cardholderName || !cardOwnerId || !email || !phone || !expirationMonth || !expirationYear) {
-        handleError("יש למלא את כל השדות הנדרשים");
-        setIsSubmitting(false);
-        setState(prev => ({ ...prev, isSubmitting: false }));
-        return;
-      }
-      
-      // Determine operation based on plan type
-      let operation: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly" = "ChargeOnly";
-      if (planId === 'monthly') {
-        operation = "CreateTokenOnly";
-      } else if (planId === 'annual') {
-        operation = "ChargeAndCreateToken";
-      } else if (planId === 'vip') {
-        operation = "ChargeOnly";
-      }
-      
-      // External unique transaction ID to prevent duplicate transactions
-      const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      
       // CardCom requires "lowProfileCode" param for each doTransaction
-      const formData = {
+      const formData: any = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
         cardOwnerId,
@@ -151,19 +110,15 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         expirationMonth,
         expirationYear,
         numberOfPayments: "1",
-        ExternalUniqTranId: externalUniqTranId,
-        TerminalNumber: CARDCOM.TERMINAL_NUMBER,
-        Operation: operation, 
-        lowProfileCode: state.lowProfileCode,
-        LowProfileCode: state.lowProfileCode,  // For extra compatibility
-        sessionId: state.sessionId,
-        ApiName: CARDCOM.API_NAME
+        ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        TerminalNumber: state.terminalNumber,
+        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        lowProfileCode: state.lowProfileCode, // Ensure always present
+        LowProfileCode: state.lowProfileCode  // For extra compatibility
       };
 
       console.log('Sending transaction data to CardCom:', formData);
-      
-      // Use specific target origin for security
-      masterFrameRef.current.contentWindow.postMessage(formData, 'https://secure.cardcom.solutions');
+      masterFrameRef.current.contentWindow.postMessage(formData, '*');
       
       setState(prev => ({
         ...prev,
@@ -173,37 +128,15 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       // Start status check with required params
       startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
       
-      // Add a fallback timeout to reset submitting state if no response
       setTimeout(() => {
-        // Only reset if still submitting - don't interfere with successful completions
-        setState(prev => {
-          if (prev.paymentStatus === PaymentStatus.PROCESSING) {
-            return prev; // Don't change state if we're still processing
-          }
-          return { ...prev, isSubmitting: false };
-        });
-        setIsSubmitting(false);
-      }, 30000); // 30 second timeout
-      
+        setPaymentInProgress(false);
+      }, 5000);
     } catch (error) {
       console.error("Error submitting payment:", error);
       handleError("שגיאה בשליחת פרטי התשלום");
-      setIsSubmitting(false);
-      setState(prev => ({ ...prev, isSubmitting: false }));
+      setPaymentInProgress(false);
     }
-  }, [
-    masterFrameRef, 
-    state.lowProfileCode, 
-    state.sessionId, 
-    handleError, 
-    operationType, 
-    isSubmitting, 
-    setState, 
-    startStatusCheck, 
-    planId
-  ]);
-
-  const { paymentStatus } = state;
+  }, [masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, handleError, operationType, paymentInProgress, setState, startStatusCheck, planId]);
 
   return {
     ...state,
@@ -211,7 +144,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     masterFrameRef,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
-    isSubmitting,
     initializePayment,
     handleRetry,
     submitPayment

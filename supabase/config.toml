@@ -4,5 +4,8 @@ project_id = "ndhakvhrrkczgylcmyoc"
 [functions.cardcom-payment]
 verify_jwt = false
 
-[functions.cardcom-recurring]
+[functions.cardcom-status]
+verify_jwt = false
+
+[functions.cardcom-webhook]
 verify_jwt = false
