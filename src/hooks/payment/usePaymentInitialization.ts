@@ -19,46 +19,13 @@ export const usePaymentInitialization = ({ planId, setState, masterFrameRef, ope
   const { initializePaymentSession } = usePaymentSession({ setState });
 
   const waitForMasterFrame = async (): Promise<void> => {
-    // Poll until the ref is filled
-    let pollAttempts = 0;
-    while (!masterFrameRef.current && pollAttempts < 100) {
-      await new Promise(r => setTimeout(r, 50));
-      pollAttempts++;
-    }
-    
+    // Check if masterFrameRef is available
     if (!masterFrameRef.current) {
-      console.warn('Master frame reference still not available after polling');
+      console.warn('Master frame reference not available');
       throw new Error('Master frame reference not available');
     }
-
-    const iframe = masterFrameRef.current;
     
-    // Now wait for the document to load
-    return new Promise<void>((resolve, reject) => {
-      // Check if already loaded
-      const docReady = iframe.contentDocument?.readyState === 'complete';
-      if (iframe.contentWindow && docReady) {
-        console.log('Master frame already loaded');
-        return resolve();
-      }
-
-      console.log('Waiting for master frame to load...');
-      
-      const onLoad = () => {
-        console.log('Master frame loaded successfully');
-        iframe.removeEventListener('load', onLoad);
-        resolve();
-      };
-
-      iframe.addEventListener('load', onLoad);
-
-      // Timeout to prevent infinite wait
-      setTimeout(() => {
-        console.warn('Master frame load timeout after 10s, proceeding anyway');
-        iframe.removeEventListener('load', onLoad);
-        resolve();
-      }, 10000);
-    });
+    return Promise.resolve();
   };
 
   const initializePayment = async () => {
@@ -102,26 +69,8 @@ export const usePaymentInitialization = ({ planId, setState, masterFrameRef, ope
       }
       
       console.log('Payment session initialized:', paymentData);
-
-      // Step 4: Wait for master frame to load
-      console.log('Waiting for master frame to load before initialization...');
-      await waitForMasterFrame();
       
-      // Step 5: Initialize CardCom fields
-      console.log('Initializing CardCom fields...');
-      const initialized = await initializeCardcomFields(
-        masterFrameRef,
-        paymentData.lowProfileCode,
-        paymentData.terminalNumber.toString(),
-        paymentOpType
-      );
-
-      if (!initialized) {
-        throw new Error('שגיאה באתחול שדות התשלום');
-      }
-
-      console.log('CardCom fields initialized successfully');
-      
+      // Set state with payment data
       setState(prev => ({ 
         ...prev, 
         paymentStatus: PaymentStatus.IDLE,

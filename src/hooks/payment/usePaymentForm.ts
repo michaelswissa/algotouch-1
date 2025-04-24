@@ -13,6 +13,7 @@ interface UsePaymentFormProps {
 
 export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProps) => {
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
+  const [isContentReady, setIsContentReady] = useState(false);
   const [initSent, setInitSent] = useState(false);
 
   const planDetails = getSubscriptionPlans();
@@ -41,22 +42,33 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
     setIsMasterFrameLoaded(true);
   };
 
+  // Only initialize once the master frame is loaded and we have the required data
   const readyToInit =
     isMasterFrameLoaded && lowProfileCode && terminalNumber && !initSent;
 
   useEffect(() => {
     if (!readyToInit) return;
+    
+    console.log('Initializing CardCom fields with lowProfileCode:', lowProfileCode);
     setInitSent(true);
+    
     initializeCardcomFields(
       masterFrameRef,
       lowProfileCode!,
       terminalNumber!.toString(),
       operationType,
-    ).then((ok) => {
-      if (!ok) toast.error('CardCom init failed');
+    ).then((success) => {
+      if (success) {
+        console.log('CardCom initialization completed successfully');
+        setIsContentReady(true);
+      } else {
+        toast.error('שגיאה באתחול שדות התשלום');
+        console.error('CardCom initialization failed');
+      }
     });
   }, [readyToInit, masterFrameRef, lowProfileCode, terminalNumber, operationType]);
 
+  // Fallback in case master frame doesn't trigger onLoad
   useEffect(() => {
     const t = setTimeout(() => {
       if (!isMasterFrameLoaded && masterFrameRef.current) {
@@ -70,7 +82,7 @@ export const usePaymentForm = ({ planId, onPaymentComplete }: UsePaymentFormProp
   return {
     isSubmitting,
     isInitializing: paymentStatus === PaymentStatus.INITIALIZING,
-    isContentReady: isMasterFrameLoaded,
+    isContentReady, // Using this flag to indicate when fields are ready to render
     isMasterFrameLoaded,
     plan,
     terminalNumber,

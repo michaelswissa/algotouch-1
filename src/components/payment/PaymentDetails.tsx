@@ -60,12 +60,13 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
       }
     };
     
-    console.log('Setting card owner details:', data);
+    console.log('Setting card owner details');
     masterFrameRef.current.contentWindow.postMessage(data, '*');
   }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isReady, masterFrameRef]);
 
   return (
     <div className="space-y-4" dir="rtl">
+      {/* Only render PaymentIframe after initialization */}
       {isReady && (
         <PaymentIframe
           masterFrameRef={masterFrameRef}

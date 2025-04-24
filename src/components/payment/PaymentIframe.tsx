@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 
 interface PaymentIframeProps {
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
@@ -14,12 +14,28 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   terminalNumber,
   onMasterFrameLoad,
 }) => {
-  const masterFrameUrl =
-    `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
+  // Add the 3DS.js script when the component mounts
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + Date.now();
+    document.head.appendChild(script);
+    
+    // Cleanup function to remove script when component unmounts
+    return () => {
+      try {
+        document.head.removeChild(script);
+      } catch (e) {
+        // Script might have already been removed
+      }
+    };
+  }, []);
+
+  // Master frame URL has terminal number as query param
+  const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
 
   return (
     <div className="relative space-y-4">
-      {/* hidden master frame */}
+      {/* Hidden master frame */}
       <iframe
         ref={masterFrameRef}
         id="CardComMasterFrame"
@@ -30,7 +46,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         title="CardCom Master"
       />
 
-      {/* CARD NUMBER  – exactly like demo */}
+      {/* CARD NUMBER - exact URL path, no query params */}
       <div className="w-full h-[57px] border border-input bg-background rounded-md overflow-hidden">
         <iframe
           id="CardComCardNumber"
@@ -41,7 +57,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         />
       </div>
 
-      {/* CVV */}
+      {/* CVV - exact URL path, no query params */}
       <div className="w-[188px] h-[57px] border border-input bg-background rounded-md overflow-hidden">
         <iframe
           id="CardComCvv"
@@ -52,16 +68,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         />
       </div>
 
-      {/* reCAPTCHA – CardCom requires it for 3-DS */}
-      <div className="w-full h-[80px] overflow-hidden">
-        <iframe
-          id="CardComReCaptcha"
-          name="CardComReCaptcha"
-          src={`${cardcomUrl}/api/openfields/recaptcha`}
-          className="w-full h-full"
-          title="reCAPTCHA"
-        />
-      </div>
+      {/* No manual reCAPTCHA frame - will be injected by 3DS.js when needed */}
     </div>
   );
 };
