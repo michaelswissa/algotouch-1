@@ -15,20 +15,26 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   const masterFrameUrl = `${cardcomUrl}/api/openfields/master?terminalNumber=${terminalNumber}`;
 
   return (
-    <div className="payment-frames-container">
-      {/* Master frame is hidden but needed for communication */}
+    <div className="payment-frames-container relative">
+      {/* חשוב: המיכל חייב להיות relative כדי שה-iframe הראשי יישאר בתוכו */}
       <iframe
         ref={masterFrameRef}
         id="CardComMasterFrame"
         name="CardComMasterFrame"
         src={masterFrameUrl}
-        style={{ width: 0, height: 0, border: 'none', position: 'absolute' }}
+        style={{ 
+          width: 0, 
+          height: 0, 
+          border: 'none', 
+          position: 'absolute',
+          top: 0,
+          left: 0
+        }}
         title="CardCom Master Frame"
       />
       
-      {/* Card fields container with proper styling */}
-      <div className="card-fields-wrapper space-y-4">
-        <div className="w-full h-[57px] border border-gray-300 rounded-md overflow-hidden">
+      <div className="space-y-4">
+        <div className="w-full h-[57px] border border-input bg-background rounded-md overflow-hidden">
           <iframe
             id="CardComCardNumber"
             name="CardComCardNumber"
@@ -37,7 +43,8 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
             title="מספר כרטיס"
           />
         </div>
-        <div className="w-[188px] h-[57px] border border-gray-300 rounded-md overflow-hidden">
+        
+        <div className="w-[188px] h-[57px] border border-input bg-background rounded-md overflow-hidden">
           <iframe
             id="CardComCvv"
             name="CardComCvv"
