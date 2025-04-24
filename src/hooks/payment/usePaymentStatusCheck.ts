@@ -1,3 +1,4 @@
+
 import { useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -10,9 +11,9 @@ interface UsePaymentStatusCheckProps {
 export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) => {
   const statusCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusCheckCountRef = useRef<number>(0);
-  const maxStatusCheckAttempts = 25;
-  const initialCheckDelayMs = 8000;
-  const statusCheckTimeoutMs = 120000;
+  const maxStatusCheckAttempts = 40; // Increased max attempts
+  const initialCheckDelayMs = 12000; // Increased initial delay
+  const statusCheckTimeoutMs = 240000; // Increased timeout to 4 minutes
   
   const checkPaymentStatus = useCallback(async (
     lowProfileCode: string, 

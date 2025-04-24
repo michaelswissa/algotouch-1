@@ -1,3 +1,4 @@
+
 import { InitConfig } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
@@ -53,8 +54,8 @@ export const useCardcomInitializer = () => {
         try {
           const config: any = {
             action: 'init',
-            lowProfileCode,
-            LowProfileCode: lowProfileCode,
+            lowProfileCode,              // Required by CardCom
+            LowProfileCode: lowProfileCode, // For extra compatibility
             sessionId,
             terminalNumber,
             cardFieldCSS: `

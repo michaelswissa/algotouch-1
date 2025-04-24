@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -70,7 +71,7 @@ serve(async (req) => {
       });
 
       const transactionPayload = {
-        TerminalNumber: terminalNumber || CARDCOM_CONFIG.terminalNumber,
+        TerminalNumber: terminalNumber || parseInt(CARDCOM_CONFIG.terminalNumber),
         ApiName: CARDCOM_CONFIG.apiName,
         Amount: amount,
         Token: token,
@@ -418,11 +419,19 @@ serve(async (req) => {
                       `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                       undefined);
     
+    if (!userEmail) {
+      throw new Error("Missing email address");
+    }
+    
     const transactionRef = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
+    
+    // Fix webhook URL to use proper domain with project ID
+    const projectId = "ndhakvhrrkczgylcmyoc";
+    const webhookUrl = `https://${projectId}.supabase.co/functions/v1/cardcom-webhook`;
     
     logStep("Creating Cardcom request", { webhookUrl, transactionRef });
 
+    // Prepare the CardCom payload according to API documentation
     const cardcomPayload = {
       TerminalNumber: parseInt(CARDCOM_CONFIG.terminalNumber),
       ApiName: CARDCOM_CONFIG.apiName,
@@ -439,8 +448,10 @@ serve(async (req) => {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
         IsHideCardOwnerPhone: false,
-        CardOwnerEmailValue: invoiceInfo?.email || registrationData?.email,
-        CardOwnerNameValue: fullName,
+        CardOwnerEmailValue: userEmail,
+        CardOwnerNameValue: fullName || '',
+        CardOwnerIdValue: registrationData?.userData?.idNumber || '',
+        CardOwnerPhoneValue: registrationData?.userData?.phone || '',
         IsCardOwnerEmailRequired: true,
         IsCardOwnerPhoneRequired: true,
         IsHideCardOwnerIdentityNumber: false
@@ -487,6 +498,7 @@ serve(async (req) => {
       );
     }
     
+    // Store the payment session in the database
     const sessionData = {
       user_id: userId,
       low_profile_code: responseData.LowProfileId,
@@ -527,6 +539,7 @@ serve(async (req) => {
       throw new Error("Failed to store payment session");
     }
     
+    // Return all required data for frontend
     return new Response(
       JSON.stringify({
         success: true,
@@ -535,7 +548,8 @@ serve(async (req) => {
           sessionId: dbSessionId,
           lowProfileCode: responseData.LowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
-          cardcomUrl: "https://secure.cardcom.solutions"
+          cardcomUrl: "https://secure.cardcom.solutions",
+          url: responseData.Url // Include original redirect URL from CardCom
         }
       }), {
         status: 200,
