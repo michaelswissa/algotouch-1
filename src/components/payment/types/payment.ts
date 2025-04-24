@@ -34,7 +34,7 @@ export interface InitConfig {
   lowProfileCode: string;
   LowProfileCode?: string;
   sessionId?: string;
-  terminalNumber: string;
+  terminalNumber: number;
   cardFieldCSS: string;
   cvvFieldCSS: string;
   reCaptchaFieldCSS: string;
@@ -42,7 +42,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
+  operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
 }
 
 export interface PaymentState {

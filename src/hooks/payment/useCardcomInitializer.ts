@@ -54,7 +54,7 @@ export const useCardcomInitializer = () => {
       console.log('Master frame is fully loaded, preparing init message');
       
       // 2. Determine correct operation type based on plan and operationType
-      let operation: string;
+      let operation: "ChargeOnly" | "CreateTokenOnly" | "ChargeAndCreateToken";
       if (operationType === 'token_only') {
         operation = 'CreateTokenOnly';
       } else if (planId === 'annual') {
@@ -68,8 +68,8 @@ export const useCardcomInitializer = () => {
         action: 'init',
         lowProfileCode,
         sessionId,
-        terminalNumber: String(terminalNumber), // Convert to string to be safe
-        operation, // Set correct operation type
+        terminalNumber: Number(terminalNumber), // Convert to number as CardCom expects
+        operation, // Set correct operation type with proper type
         cardFieldCSS: `
           body { margin: 0; padding: 0; box-sizing: border-box; }
           .cardNumberField {
