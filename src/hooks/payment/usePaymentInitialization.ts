@@ -20,7 +20,10 @@ export const usePaymentInitialization = ({
   operationType = 'payment'
 }: UsePaymentInitializationProps) => {
   const { handleRegistrationData } = useRegistrationHandler();
-  const { initializeCardcomFields } = useCardcomInitializer();
+  const { initializeCardcomFields } = useCardcomInitializer({
+    terminalNumber: '160138',  // Provide a default value
+    cardcomUrl: 'https://secure.cardcom.solutions'  // Provide a default value
+  });
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
 
