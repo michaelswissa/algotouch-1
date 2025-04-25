@@ -1,110 +1,11 @@
 
-# This is the project config file. 
-# DO NOT EDIT UNLESS YOU KNOW WHAT YOU'RE DOING!
 project_id = "ndhakvhrrkczgylcmyoc"
-[api]
-# Port to use for the API URL.
-port = 54321
-# Schemas to expose in your API.
-schemas = ["public", "storage", "graphql_public"]
-# Extra schemas to add to the search_path of every request. These are usually private, internal schemas.
-extra_search_path = ["extensions", "auth"]
-# Set to false to disable the GraphQL API.
-enable_graphql = true
-[db]
-# Port to use for the local database URL.
-port = 54322
-# Port used for DB Connection Pooler.
-pooler_port = 54329
-# The database major version to use. This has to be the same as your remote database's. Run `SHOW server_version;` on the remote database to check.
-major_version = 15
-
-[studio]
-# Port to use for Supabase Studio.
-port = 54323
-
-[inbucket]
-# Port to use for the email testing server web interface.
-port = 54324
-# Comma-separated list of SMTP authentication methods.
-smtp_auth_methods = "PLAIN,LOGIN"
-# SMTP port to use for the email testing server.
-smtp_port = 54325
-# POP3 port to use for the email testing server.
-pop3_port = 54326
-
-[auth]
-# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used in emails.
-site_url = "http://localhost:3000"
-# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://localhost:3000"]
-# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
-jwt_expiry = 3600
-# Allow/disallow new user signups to your project.
-enable_signup = true
-# If disabled, the refresh token will never expire.
-enable_refresh_token_rotation = true
-# Configure the refresh token's expiration time in seconds.
-refresh_token_reuse_interval = 10
-# Configure the refresh token's expiration time in seconds.
-refresh_token_expiry = 672000
-
-[functions]
-# Note: this section should match the values in the app's supabase config
-port = 54328
-
-[functions.ai-chatbot]
-verify_jwt = true
 
 [functions.cardcom-payment]
 verify_jwt = false
 
-[functions.cardcom-recurring]
-verify_jwt = true
+[functions.cardcom-status]
+verify_jwt = false
 
 [functions.cardcom-webhook]
 verify_jwt = false
-
-[functions.cardcom-token-validate]
-verify_jwt = true
-
-[functions.generate-insight]
-verify_jwt = true
-
-[functions.gmail-sender]
-verify_jwt = true
-
-[functions.increment-user-points]
-verify_jwt = true
-
-[functions.izidoc-sign]
-verify_jwt = true
-
-[functions.financial-news]
-verify_jwt = true
-
-[storage]
-# The maximum file size allowed (in bytes).
-file_size_limit = "50MiB"
-
-[storage.duplications]
-[storage.transformations]
-
-[auth.email]
-# Allow/disallow new user signups via email to your project.
-enable_signup = true
-# If enabled, a user will be required to confirm any email change on both the old, and new email addresses. If disabled, only the new email is required to confirm.
-double_confirm_changes = true
-# If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
-
-[auth.sms]
-# Allow/disallow new user signups via SMS to your project.
-enable_signup = true
-# If enabled, users need to confirm their phone number before signing in.
-enable_confirmations = false
-
-[analytics]
-enabled = false
-port = 54327
-vector_port = 54328

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -20,13 +19,13 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CARDCOM-RECURRING] ${step}${detailsStr}`);
 };
 
-// Validate token before charging
+// Add a function to validate token before charging
 async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
   try {
     // Check if token exists and is valid in recurring_payments table
     const { data, error } = await supabaseAdmin
       .from('recurring_payments')
-      .select('is_valid, payment_status, failed_attempts, token_approval_number')
+      .select('is_valid, payment_status, failed_attempts')
       .eq('token', token)
       .eq('status', 'active')
       .single();
@@ -40,12 +39,6 @@ async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
     if (!data.is_valid || data.failed_attempts >= 3) {
       return false;
     }
-    
-    // Verify token approval number exists
-    if (!data.token_approval_number) {
-      console.error('Missing token approval number, token cannot be charged');
-      return false;
-    }
 
     // Check subscription status
     const { data: subscription } = await supabaseAdmin
@@ -54,54 +47,13 @@ async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
       .eq('payment_method->token', token)
       .single();
 
-    if (!subscription || subscription.cancelled_at || 
-        ['cancelled', 'expired'].includes(subscription.status)) {
+    if (!subscription || subscription.cancelled_at || subscription.status === 'cancelled') {
       return false;
     }
     
     return true;
   } catch (error) {
     console.error('Token validation error:', error);
-    return false;
-  }
-}
-
-// Validate tokens using GetMuhlafimTokens endpoint
-async function validateTokensWithCardcom(token: string) {
-  try {
-    // Prepare URL-encoded form data for CardCom
-    const params = new URLSearchParams({
-      TerminalNumber: terminalNumber,
-      UserName: apiName,
-      Password: apiPassword,
-      CardToken: token,
-      APILevel: '10'
-    });
-    
-    // Call CardCom API to validate the token
-    const response = await fetch(`${cardcomUrl}/Interface/GetMuhlafimTokens.aspx`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString()
-    });
-    
-    // Parse response
-    const responseText = await response.text();
-    const responseData = new URLSearchParams(responseText);
-    
-    const responseCode = responseData.get('ResponseCode');
-    
-    logStep("CardCom token validation response", { 
-      responseCode,
-      responseText
-    });
-    
-    // If the token is valid, response code should be 0
-    return responseCode === '0';
-  } catch (error) {
-    console.error('Error validating token with CardCom:', error);
     return false;
   }
 }
@@ -182,23 +134,6 @@ serve(async (req) => {
           throw new Error('Token is invalid or subscription is cancelled');
         }
         
-        // Validate token with CardCom's GetMuhlafimTokens endpoint
-        const isCardcomTokenValid = await validateTokensWithCardcom(paymentMethod.token);
-        
-        if (!isCardcomTokenValid) {
-          // Update token status to invalid
-          await supabaseAdmin
-            .from('recurring_payments')
-            .update({
-              is_valid: false,
-              payment_status: 'failed',
-              failed_attempts: data => data.failed_attempts + 1
-            })
-            .eq('token', paymentMethod.token);
-            
-          throw new Error('Token validation with CardCom failed. Please update payment method.');
-        }
-        
         // Calculate charge amount based on plan type
         let chargeAmount = 0;
         if (subscription.plan_type === 'monthly') {
@@ -220,17 +155,6 @@ serve(async (req) => {
           planType: subscription.plan_type 
         });
         
-        // Get token approval number from recurring_payments table
-        const { data: tokenData } = await supabaseAdmin
-          .from('recurring_payments')
-          .select('token_approval_number')
-          .eq('token', paymentMethod.token)
-          .single();
-          
-        if (!tokenData?.token_approval_number) {
-          throw new Error('Missing token approval number required for charging');
-        }
-        
         // Prepare URL-encoded form data for CardCom
         const params = new URLSearchParams({
           TerminalNumber: terminalNumber,
@@ -244,8 +168,7 @@ serve(async (req) => {
           TokenToCharge_ProductName: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
           TokenToCharge_UserPassword: apiPassword,
           TokenToCharge_IsRecurringPayment: 'true',
-          TokenToCharge_J5: 'true',
-          TokenToCharge_ApprovalNumber: tokenData.token_approval_number
+          TokenToCharge_J5: 'true'
         });
         
         // Call CardCom API to charge the token
@@ -271,27 +194,28 @@ serve(async (req) => {
         });
         
         if (responseCode !== '0') {
-          // Update recurring_payments status based on failed charge
+          throw new Error(`Failed to charge subscription: ${responseData.get('Description') || 'Unknown error'}`);
+        }
+        
+        // Update recurring_payments status based on charge result
+        if (responseCode === '0') {
+          await supabaseAdmin
+            .from('recurring_payments')
+            .update({
+              payment_status: 'succeeded',
+              last_payment_date: new Date().toISOString(),
+              failed_attempts: 0
+            })
+            .eq('token', paymentMethod.token);
+        } else {
           await supabaseAdmin
             .from('recurring_payments')
             .update({
               payment_status: 'failed',
-              failed_attempts: data => data.failed_attempts + 1
+              failed_attempts: data.failed_attempts + 1
             })
             .eq('token', paymentMethod.token);
-            
-          throw new Error(`Failed to charge subscription: ${responseData.get('Description') || 'Unknown error'}`);
         }
-        
-        // Update recurring_payments status based on successful charge
-        await supabaseAdmin
-          .from('recurring_payments')
-          .update({
-            payment_status: 'succeeded',
-            last_payment_date: new Date().toISOString(),
-            failed_attempts: 0
-          })
-          .eq('token', paymentMethod.token);
         
         // Update subscription with new billing period
         const now = new Date();
@@ -380,17 +304,6 @@ serve(async (req) => {
             updated_at: now.toISOString()
           })
           .eq('id', subscriptionId);
-          
-        // Invalidate the associated token
-        if (subscription.payment_method?.token) {
-          await supabaseAdmin
-            .from('recurring_payments')
-            .update({
-              is_valid: false,
-              status: 'cancelled'
-            })
-            .eq('token', subscription.payment_method.token);
-        }
         
         return new Response(
           JSON.stringify({
@@ -419,73 +332,6 @@ serve(async (req) => {
           JSON.stringify({
             success: true,
             message: "To update payment method, please go through the payment process again",
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-      
-      case 'validate-token': {
-        // Validate token for a subscription
-        if (!subscriptionId) {
-          throw new Error("Missing required parameter: subscriptionId");
-        }
-        
-        // Get subscription data
-        const { data: subscription, error: subscriptionError } = await supabaseAdmin
-          .from('subscriptions')
-          .select('*')
-          .eq('id', subscriptionId)
-          .single();
-        
-        if (subscriptionError || !subscription) {
-          throw new Error("Subscription not found");
-        }
-        
-        if (subscription.user_id !== user.id) {
-          throw new Error("Unauthorized access to subscription");
-        }
-        
-        // Get payment method
-        const paymentMethod = subscription.payment_method as any;
-        if (!paymentMethod?.token) {
-          throw new Error("No payment method found for this subscription");
-        }
-        
-        // Validate token with CardCom's GetMuhlafimTokens endpoint
-        const isCardcomTokenValid = await validateTokensWithCardcom(paymentMethod.token);
-        
-        if (!isCardcomTokenValid) {
-          // Update token status to invalid
-          await supabaseAdmin
-            .from('recurring_payments')
-            .update({
-              is_valid: false
-            })
-            .eq('token', paymentMethod.token);
-            
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: "Token is no longer valid. Please update your payment method.",
-              data: {
-                tokenValid: false
-              }
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-          );
-        }
-        
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "Token is valid",
-            data: {
-              tokenValid: true
-            }
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
