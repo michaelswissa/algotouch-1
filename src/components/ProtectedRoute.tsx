@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
@@ -21,10 +21,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const { registrationData, isInitializing } = useRegistration();
+  const [isCheckingRoute, setIsCheckingRoute] = useState(true);
   const location = useLocation();
   
+  // Perform route check after auth and registration are initialized
+  useEffect(() => {
+    if (initialized && !loading && !isInitializing) {
+      setIsCheckingRoute(false);
+    }
+  }, [initialized, loading, isInitializing]);
+  
   // Show loading state while checking auth and registration data
-  if (!initialized || loading || isInitializing) {
+  if (isCheckingRoute) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner className="h-8 w-8" />
@@ -39,7 +47,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Special handling for subscription flow
   if (location.pathname.startsWith('/subscription') && allowRegistrationFlow) {
-    const hasValidRegistrationFlow = registrationData.isValid;
+    // Check registration data validity
+    const hasValidRegistrationFlow = registrationData && registrationData.isValid;
     
     if (isAuthenticated || hasValidRegistrationFlow) {
       return <>{children}</>;

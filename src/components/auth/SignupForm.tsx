@@ -10,13 +10,13 @@ import { useAuth } from '@/contexts/auth';
 import { useRegistration } from '@/contexts/registration/RegistrationContext';
 
 interface SignupFormProps {
-  onSignupSuccess?: () => void;
+  onAuthFailure?: () => void;
 }
 
-const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
+const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
-  const { updateRegistrationData } = useRegistration();
+  const { updateRegistrationData, registrationData } = useRegistration();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,17 +29,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
 
   // Load data from registration context if available
   useEffect(() => {
-    const loadSavedData = async () => {
-      const { registrationData } = useRegistration();
-      
+    if (registrationData && registrationData.isValid) {
       if (registrationData.email) setEmail(registrationData.email);
       if (registrationData.userData?.firstName) setFirstName(registrationData.userData.firstName);
       if (registrationData.userData?.lastName) setLastName(registrationData.userData.lastName);
       if (registrationData.userData?.phone) setPhone(registrationData.userData.phone);
-    };
-    
-    loadSavedData();
-  }, []);
+    }
+  }, [registrationData]);
 
   const validateInputs = () => {
     const newErrors: {[key: string]: string} = {};
@@ -87,8 +83,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
-      // Save registration data to context
-      await updateRegistrationData({
+      // Save registration data to context first
+      const saved = await updateRegistrationData({
         email,
         userData: {
           firstName,
@@ -97,16 +93,21 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         }
       });
       
-      // Navigate to subscription page to continue the flow
+      if (!saved) {
+        throw new Error('שגיאה בשמירת נתוני הרשמה');
+      }
+      
+      // For now just navigate to subscription without creating user account
       navigate('/subscription', { replace: true });
       toast.success('הפרטים נשמרו בהצלחה');
       
-      if (onSignupSuccess) {
-        onSignupSuccess();
-      }
     } catch (error: any) {
       console.error('Signup error:', error);
       toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');
+      
+      if (onAuthFailure) {
+        onAuthFailure();
+      }
     } finally {
       setSigningUp(false);
     }
@@ -129,6 +130,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className={errors.lastName ? "border-red-500" : ""}
+                disabled={signingUp}
                 required
               />
               {errors.lastName && <p className="text-xs text-red-500">{errors.lastName}</p>}
@@ -141,6 +143,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className={errors.firstName ? "border-red-500" : ""}
+                disabled={signingUp}
                 required
               />
               {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
@@ -155,6 +158,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={errors.email ? "border-red-500" : ""}
+              disabled={signingUp}
               required
             />
             {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
@@ -168,6 +172,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="05XXXXXXXX"
               className={errors.phone ? "border-red-500" : ""}
+              disabled={signingUp}
             />
             {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
           </div>
@@ -181,6 +186,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               required
               minLength={6}
               className={errors.password ? "border-red-500" : ""}
+              disabled={signingUp}
             />
             {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
           </div>
@@ -193,13 +199,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               onChange={(e) => setPasswordConfirm(e.target.value)}
               required
               className={errors.passwordConfirm ? "border-red-500" : ""}
+              disabled={signingUp}
             />
             {errors.passwordConfirm && <p className="text-xs text-red-500">{errors.passwordConfirm}</p>}
           </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={signingUp}>
-            {signingUp ? 'בודק פרטים...' : 'המשך לבחירת תכנית'}
+            {signingUp ? 'מעבד בקשה...' : 'המשך לבחירת תכנית'}
           </Button>
         </CardFooter>
       </form>
