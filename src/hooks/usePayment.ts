@@ -5,7 +5,7 @@ import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
 import { toast } from 'sonner';
-import { useAuth } from '@/components/auth/useAuth';
+import { useAuth } from '@/contexts/auth';
 
 interface UsePaymentProps {
   planId: string;
