@@ -12,42 +12,6 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CARDCOM-WEBHOOK] ${step}${detailsStr}`);
 };
 
-// Format and validate token expiry (limit to 12 months)
-const getValidTokenExpiryDate = (tokenExDate: string): string => {
-  // Parse the tokenExDate (format YYYYMMDD)
-  if (!tokenExDate || tokenExDate.length < 8) {
-    // Default to 12 months if no valid date
-    const date = new Date();
-    date.setMonth(date.getMonth() + 12);
-    return date.toISOString().split('T')[0];
-  }
-  
-  try {
-    const year = parseInt(tokenExDate.substring(0, 4));
-    const month = parseInt(tokenExDate.substring(4, 6)) - 1; // JS months are 0-based
-    const day = parseInt(tokenExDate.substring(6, 8));
-    
-    // Create expiry date from token data
-    const expiryDate = new Date(year, month, day);
-    
-    // Limit token validity to 12 months max
-    const maxExpiryDate = new Date();
-    maxExpiryDate.setMonth(maxExpiryDate.getMonth() + 12);
-    
-    // Use whichever is sooner
-    if (expiryDate > maxExpiryDate) {
-      return maxExpiryDate.toISOString().split('T')[0];
-    }
-    
-    return expiryDate.toISOString().split('T')[0];
-  } catch (e) {
-    // Default to 12 months if parsing fails
-    const date = new Date();
-    date.setMonth(date.getMonth() + 12);
-    return date.toISOString().split('T')[0];
-  }
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -128,19 +92,16 @@ serve(async (req) => {
         expiryYear: TokenInfo.CardYear?.toString(),
         tokenApprovalNumber: TokenInfo.TokenApprovalNumber,
         cardOwnerIdentityNumber: TokenInfo.CardOwnerIdentityNumber,
-        tokenExpiryDate: TokenInfo.TokenExDate,
+        tokenExDate: TokenInfo.TokenExDate,
         lastFourDigits: webhookData.TranzactionInfo?.Last4CardDigitsString || 
                        webhookData.TranzactionInfo?.Last4CardDigits?.toString(),
         cardType: webhookData.TranzactionInfo?.CardInfo || 'Unknown'
       };
 
-      // Use a reasonable token expiry (12 months from now instead of 10 years)
-      const validTokenExpiry = getValidTokenExpiryDate(TokenInfo.TokenExDate);
-      
-      logStep("Processed token data with expiry", { 
+      logStep("Processed token data", { 
         token: tokenData.token?.substring(0, 8) + '...',
-        originalExpiry: TokenInfo.TokenExDate,
-        validTokenExpiry
+        tokenApprovalNumber: tokenData.tokenApprovalNumber,
+        tokenExDate: tokenData.tokenExDate
       });
 
       if (isMonthlyPlan) {
@@ -166,12 +127,13 @@ serve(async (req) => {
               .insert({
                 user_id: paymentSession.user_id,
                 token: tokenData.token,
-                token_expiry: validTokenExpiry,
                 token_approval_number: tokenData.tokenApprovalNumber,
                 last_4_digits: tokenData.lastFourDigits,
                 card_type: tokenData.cardType,
                 is_valid: true,
                 status: 'active',
+                payment_status: 'pending',
+                failed_attempts: 0,
                 created_at: new Date().toISOString()
               });
               
@@ -212,7 +174,6 @@ serve(async (req) => {
             expiryYear: TokenInfo.CardYear?.toString() || '',
             tokenApprovalNumber: TokenInfo.TokenApprovalNumber || '',
             cardOwnerIdentityNumber: TokenInfo.CardOwnerIdentityNumber || '',
-            tokenExpiryDate: validTokenExpiry // Use validated expiry date
           };
           
           if (webhookData.TranzactionInfo && webhookData.TranzactionInfo.Last4CardDigits) {
@@ -321,7 +282,7 @@ serve(async (req) => {
           }
           
           try {
-            // Store token with proper expiration date
+            // Store token with proper approval number and status
             const { data: existingToken } = await supabaseAdmin
               .from('recurring_payments')
               .select('id')
@@ -335,13 +296,15 @@ serve(async (req) => {
                 .insert({
                   user_id: userId,
                   token: paymentMethod.token,
-                  token_expiry: validTokenExpiry,
                   token_approval_number: paymentMethod.tokenApprovalNumber,
                   last_4_digits: paymentMethod.lastFourDigits,
                   card_type: paymentMethod.cardType || 'Unknown',
                   is_valid: true,
                   status: 'active',
-                  created_at: new Date().toISOString()
+                  payment_status: 'succeeded',
+                  failed_attempts: 0,
+                  created_at: new Date().toISOString(),
+                  last_payment_date: new Date().toISOString()
                 });
               
               logStep("Stored recurring payment token");

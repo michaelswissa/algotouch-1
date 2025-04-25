@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -133,7 +134,7 @@ serve(async (req) => {
       JValidateType: 5,
       AdvancedDefinition: {
         IsAVSEnabled: true,
-        IsAutoRecurringPayment: isMonthlyPlan ? true : false,
+        IsAutoRecurringPayment: isMonthlyPlan,
         IsRefundDeal: false,
         ThreeDSecureState: "Enabled"
       }
@@ -143,7 +144,8 @@ serve(async (req) => {
       operation,
       isMonthlyPlan,
       transactionAmount,
-      jValidateType: 5
+      jValidateType: 5,
+      isAutoRecurringPayment: isMonthlyPlan
     });
     
     // Initialize payment session with CardCom
