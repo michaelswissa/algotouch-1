@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -21,15 +22,47 @@ const logStep = (step: string, details?: any) => {
 
 // Add a function to validate token before charging
 async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
-  const { data, error } = await supabaseAdmin
-    .rpc('is_token_valid', { token_to_check: token });
-  
-  if (error) {
+  try {
+    // Check if token exists and is valid in recurring_payments table
+    const { data, error } = await supabaseAdmin
+      .from('recurring_payments')
+      .select('is_valid, token_expiry')
+      .eq('token', token)
+      .eq('status', 'active')
+      .single();
+    
+    if (error || !data) {
+      console.error('Token validation error:', error);
+      return false;
+    }
+    
+    // Check if token is marked as valid
+    if (!data.is_valid) {
+      return false;
+    }
+    
+    // Check if token is expired
+    if (data.token_expiry) {
+      const expiryDate = new Date(data.token_expiry);
+      const currentDate = new Date();
+      if (expiryDate < currentDate) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
     console.error('Token validation error:', error);
-    throw new Error('Invalid token');
+    return false;
   }
+}
 
-  return data === true;
+// Format date to YYYYMMDD format for CardCom
+function formatTokenExpiryDate(year: string, month: string): string {
+  // Ensure we have 2-digit month and add 20 to year (assuming 2-digit year)
+  const formattedMonth = month.padStart(2, '0');
+  const formattedYear = (year.length === 2) ? `20${year}` : year;
+  return `${formattedYear}${formattedMonth}01`; // First day of expiry month
 }
 
 serve(async (req) => {
@@ -162,7 +195,8 @@ serve(async (req) => {
         
         logStep("CardCom charge response", { 
           responseCode,
-          internalDealNumber
+          internalDealNumber,
+          responseText
         });
         
         if (responseCode !== '0') {
@@ -310,18 +344,3 @@ serve(async (req) => {
     );
   }
 });
-
-// When updating the recurring_payments table, set additional details
-const recurringPaymentData = {
-  user_id: session.user_id,
-  token: paymentMethod.token,
-  token_expiry: formatTokenExpiryDate(
-    paymentMethod.expiryYear, 
-    paymentMethod.expiryMonth
-  ),
-  token_approval_number: paymentMethod.tokenApprovalNumber,
-  last_4_digits: paymentMethod.lastFourDigits,
-  card_type: paymentMethod.cardType || 'Unknown',
-  is_valid: true,
-  status: 'active'
-};

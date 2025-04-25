@@ -82,12 +82,18 @@ serve(async (req) => {
                     `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                     undefined);
     
+    // Create a unique reference ID for this transaction
+    // Format: user-YYYY-MM-DD-HH-MM-SS-MS
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}-${String(now.getMilliseconds()).padStart(3, '0')}`;
     const transactionRef = userId 
-      ? `${userId}-${Date.now()}`
-      : `anon-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+      ? `user-${userId.split('-')[0]}-${dateStr}`  // Take only first part of UUID for brevity
+      : `anon-${Math.random().toString(36).substring(2, 7)}-${dateStr}`;
     
-    // Prepare webhook URL with full domain
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`;
+    // Use a full URL for the webhook, CardCom expects a complete URL
+    // The webhook URL should be an absolute URL where CardCom will send the payment result
+    const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://ndhakvhrrkczgylcmyoc.functions.supabase.co';
+    const webhookUrl = `${baseUrl}/functions/v1/cardcom-webhook`;
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
@@ -159,16 +165,23 @@ serve(async (req) => {
       );
     }
     
+    // Validate LowProfileId format (should be a GUID)
+    const lowProfileId = responseData.LowProfileId;
+    if (!lowProfileId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lowProfileId)) {
+      logStep("ERROR: Invalid LowProfileId format", { lowProfileId });
+      throw new Error("Invalid LowProfileId returned from CardCom");
+    }
+    
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: responseData.LowProfileId,
-      reference: transactionRef,
+      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
+      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
       plan_id: planId,
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
@@ -176,20 +189,26 @@ serve(async (req) => {
     let dbSessionId = null;
     
     try {
-      if (userId) {
-        const { data: dbSession, error: sessionError } = await supabaseAdmin
-          .from('payment_sessions')
-          .insert(sessionData)
-          .select('id')
-          .single();
-            
-        if (!sessionError && dbSession) {
-          dbSessionId = dbSession.id;
-          logStep("Payment session stored in DB", { sessionId: dbSessionId });
-        }
+      // Always store session data regardless of user status to ensure webhook can find it
+      const { data: dbSession, error: sessionError } = await supabaseAdmin
+        .from('payment_sessions')
+        .insert(sessionData)
+        .select('id')
+        .single();
+          
+      if (!sessionError && dbSession) {
+        dbSessionId = dbSession.id;
+        logStep("Payment session stored in DB", { 
+          sessionId: dbSessionId, 
+          lowProfileId,
+          reference: transactionRef 
+        });
+      } else {
+        logStep("Error storing payment session", { error: sessionError });
+        // Continue despite DB error to allow payment flow to proceed
       }
     } catch (dbError) {
-      logStep("Error storing payment session", { error: dbError.message });
+      logStep("Exception storing payment session", { error: dbError.message });
       // Don't fail the request if DB storage fails
     }
     
@@ -199,9 +218,10 @@ serve(async (req) => {
         message: "Payment session created",
         data: {
           sessionId: dbSessionId || `temp-${Date.now()}`,
-          lowProfileCode: responseData.LowProfileId,
+          lowProfileCode: lowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
-          cardcomUrl: "https://secure.cardcom.solutions"
+          cardcomUrl: "https://secure.cardcom.solutions",
+          reference: transactionRef
         }
       }),
       {

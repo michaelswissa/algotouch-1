@@ -13,7 +13,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string }> => {
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; reference: string }> => {
     console.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -57,8 +57,13 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     
     console.log("Payment session created:", data.data);
     
+    if (!data.data || !data.data.lowProfileCode) {
+      console.error("Missing lowProfileCode in payment session response");
+      throw new Error('חסר מזהה יחודי לעסקה בתגובה מהשרת');
+    }
+    
     // Always use the fixed terminal number for CardCom
-    const terminalNumber = '160138';
+    const terminalNumber = data.data.terminalNumber || '160138';
     
     setState(prev => ({
       ...prev,
@@ -66,13 +71,15 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       lowProfileCode: data.data.lowProfileCode,
       terminalNumber: terminalNumber,
       cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+      reference: data.data.reference || '',
       paymentStatus: PaymentStatus.IDLE
     }));
     
     return { 
       lowProfileCode: data.data.lowProfileCode, 
       sessionId: data.data.sessionId,
-      terminalNumber: terminalNumber
+      terminalNumber: terminalNumber,
+      reference: data.data.reference || ''
     };
   };
 
