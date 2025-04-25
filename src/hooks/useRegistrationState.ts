@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,14 +21,11 @@ export const useRegistrationState = () => {
   });
   const navigate = useNavigate();
 
-  // Initialize or restore registration session
   useEffect(() => {
     const initializeRegistration = async () => {
-      // Try to get existing registration ID from sessionStorage
       const storedId = sessionStorage.getItem('registration_id');
       
       if (storedId) {
-        // Attempt to restore existing registration
         const { data: regData, error } = await supabase
           .from('temp_registration_data')
           .select('*')
@@ -47,12 +43,11 @@ export const useRegistrationState = () => {
         }
       }
 
-      // Create new registration record if none exists or previous is invalid
       const { data: newReg, error: createError } = await supabase
         .from('temp_registration_data')
         .insert({
           registration_data: { currentStep: 'plan_selection' },
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
         })
         .select()
         .single();
@@ -106,7 +101,6 @@ export const useRegistrationState = () => {
     if (!state.id) return false;
 
     try {
-      // Validate current step server-side
       const { data: isValid } = await supabase
         .rpc('validate_registration_step', {
           registration_id: state.id,
@@ -118,7 +112,6 @@ export const useRegistrationState = () => {
         return false;
       }
 
-      // Update step in database and state
       const success = await updateRegistrationData({
         ...state.data,
         currentStep: nextStep
@@ -151,7 +144,6 @@ export const useRegistrationState = () => {
 
       if (error) throw error;
       
-      // Clear registration data from session
       sessionStorage.removeItem('registration_id');
       return true;
     } catch (error) {
