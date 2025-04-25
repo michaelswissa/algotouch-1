@@ -48,27 +48,21 @@ serve(async (req) => {
     
     logStep("Checking payment status", { lowProfileCode, sessionId, operationType, planType });
     
-    // First check our database session status and operation type
+    // First check our database session status
     let sessionStatus = 'pending';
     let paymentDetails = null;
-    let operationDetails = null;
     
     if (sessionId) {
       const { data: session, error } = await supabaseAdmin
         .from('payment_sessions')
-        .select('status, transaction_id, payment_details, operation_type')
+        .select('status, transaction_id, payment_details')
         .eq('id', sessionId)
-        .maybeSingle();
+        .single();
       
       if (!error && session) {
-        logStep("Session found in database", { 
-          status: session.status, 
-          operationType: session.operation_type 
-        });
-        
+        logStep("Session found in database", { status: session.status });
         sessionStatus = session.status;
         paymentDetails = session.payment_details;
-        operationDetails = session.operation_type;
         
         // If the session is already marked as completed or failed, just return that status
         if (session.status === 'completed' || session.status === 'failed') {
@@ -77,8 +71,7 @@ serve(async (req) => {
               success: true,
               status: session.status,
               transactionId: session.transaction_id,
-              paymentDetails,
-              operationType: session.operation_type
+              paymentDetails
             }),
             {
               status: 200,
@@ -114,43 +107,20 @@ serve(async (req) => {
     let success = false;
     let tokenInfo = null;
     let transactionInfo = null;
-    let operation = operationDetails || responseData.Operation || (operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly');
     
     if (responseData.ResponseCode === 0) {
-      // Check for successful token creation (for monthly subscriptions)
-      const isTokenCreation = operation === 'CreateTokenOnly' || operationType === 'token_only' || planType === 'monthly';
-      
       // Check if we have transaction info or token info based on operation
-      if (isTokenCreation && responseData.TokenInfo) {
+      if (
+        (operationType === 'payment' && responseData.TranzactionInfo) ||
+        (operationType === 'token_only' && responseData.TokenInfo)
+      ) {
         success = true;
         status = 'completed';
         tokenInfo = responseData.TokenInfo;
-        
-        logStep("Token creation completed successfully", {
-          hasToken: !!tokenInfo
-        });
-        
-        // Update session in database if we have sessionId
-        if (sessionId) {
-          await supabaseAdmin
-            .from('payment_sessions')
-            .update({
-              status: 'completed',
-              transaction_id: `token-${tokenInfo.Token}`,
-              transaction_data: responseData,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', sessionId);
-          
-          logStep("Updated session status in database", { status: 'completed', type: 'token' });
-        }
-      } else if (!isTokenCreation && responseData.TranzactionInfo) {
-        // Regular payment transaction
-        success = true;
-        status = 'completed';
         transactionInfo = responseData.TranzactionInfo;
         
         logStep("Payment completed successfully", {
+          hasToken: !!tokenInfo,
           hasTransaction: !!transactionInfo
         });
         
@@ -199,7 +169,6 @@ serve(async (req) => {
         success: status === 'completed',
         status,
         lowProfileCode,
-        operation,
         cardcomResponse: responseData,
         tokenInfo,
         transactionInfo

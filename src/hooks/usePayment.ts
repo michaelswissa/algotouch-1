@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -52,8 +51,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     operationType,
-    planType: planId,
-    operation: state.operation
+    planType: planId
   });
 
   useEffect(() => {
@@ -101,9 +99,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       
       const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
-      // Use the operation from state if available, otherwise determine based on operationType
-      const operation = state.operation || (operationType === 'token_only' ? "CreateTokenOnly" : "ChargeOnly");
-      
       const formData = {
         action: 'doTransaction',
         cardOwnerName: cardholderName,
@@ -115,7 +110,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         numberOfPayments: "1",
         ExternalUniqTranId: externalUniqTranId,
         TerminalNumber: state.terminalNumber,
-        Operation: operation,
+        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
         lowProfileCode: state.lowProfileCode,
         LowProfileCode: state.lowProfileCode,
         Document: {
@@ -146,7 +141,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       setPaymentInProgress(false);
     }
   }, [
-    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, state.operation,
+    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, 
     handleError, operationType, paymentInProgress, setState, startStatusCheck, planId
   ]);
 

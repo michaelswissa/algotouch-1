@@ -44,7 +44,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
         if (elapsed < 5000) {
           setMessage('מעבד את פרטי הכרטיס...');
         } else if (elapsed < 15000) {
-          setMessage('בודק תקינות הכרטיס...');
+          setMessage('יוצר אסימון לחיוב עתידי...');
         } else if (elapsed < 30000) {
           setMessage('ממתין לאישור מחברת האשראי...');
         } else {
@@ -79,7 +79,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
         <div>
           <h3 className="text-lg font-medium mb-1">
             {operationType === 'token_only' 
-              ? 'מאמת את פרטי הכרטיס...' 
+              ? 'מפעיל את המנוי...' 
               : 'מעבד את התשלום...'}
           </h3>
           <p className="text-muted-foreground">{message}</p>
@@ -112,7 +112,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
       {elapsedTime > 45 && (
         <p className="text-xs text-muted-foreground">
           {operationType === 'token_only'
-            ? 'אימות הכרטיס נמשך זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'
+            ? 'יצירת האסימון נמשכת זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'
             : 'עיבוד התשלום נמשך זמן רב מהרגיל. אם התהליך יימשך עוד זמן רב, באפשרותך לבטל ולנסות שנית.'}
         </p>
       )}

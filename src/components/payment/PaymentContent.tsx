@@ -1,11 +1,11 @@
 
 import React from 'react';
 import { PaymentStatus, PaymentStatusType } from './types/payment';
-import PaymentDetails from './PaymentDetails';
-import FailedPayment from './states/FailedPayment';
-import SuccessfulPayment from './states/SuccessfulPayment';
-import ProcessingPayment from './states/ProcessingPayment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
+import SuccessfulPayment from './states/SuccessfulPayment';
+import FailedPayment from './states/FailedPayment';
+import PaymentDetails from './PaymentDetails';
+import PlanSummary from './PlanSummary';
 
 interface PaymentContentProps {
   paymentStatus: PaymentStatusType;
@@ -15,8 +15,8 @@ interface PaymentContentProps {
   masterFrameRef: React.RefObject<HTMLIFrameElement>;
   onNavigateToDashboard: () => void;
   onRetry: () => void;
+  onCancel?: () => void;
   operationType?: 'payment' | 'token_only';
-  operation?: string;
   isReady?: boolean;
 }
 
@@ -29,43 +29,38 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   onNavigateToDashboard,
   onRetry,
   operationType = 'payment',
-  operation,
   isReady = false
 }) => {
-  // Determine actual operation type (prefer operation over operationType)
-  const actualOperationType = operation === 'CreateTokenOnly' ? 'token_only' : operationType;
+  console.log('Current payment status:', paymentStatus, 'isReady:', isReady);
   
-  switch (paymentStatus) {
-    case PaymentStatus.PROCESSING:
-      return <ProcessingPayment 
-        operationType={actualOperationType}
-        planType={plan.id} 
-        onCancel={onRetry} 
-      />;
-    
-    case PaymentStatus.SUCCESS:
-      return <SuccessfulPayment 
-        plan={plan} 
-        onContinue={onNavigateToDashboard} 
-      />;
-    
-    case PaymentStatus.FAILED:
-      return <FailedPayment 
-        onRetry={onRetry} 
-        operationType={actualOperationType} 
-      />;
-    
-    case PaymentStatus.IDLE:
-    default:
-      return (
-        <PaymentDetails
-          terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl} 
-          masterFrameRef={masterFrameRef}
-          isReady={isReady}
-        />
-      );
+  if (paymentStatus === PaymentStatus.SUCCESS) {
+    return <SuccessfulPayment plan={plan} onContinue={onNavigateToDashboard} />;
   }
+  
+  if (paymentStatus === PaymentStatus.FAILED) {
+    return <FailedPayment onRetry={onRetry} />;
+  }
+  
+  // Default state (IDLE)
+  return (
+    <>
+      <PlanSummary 
+        planName={plan.name} 
+        planId={plan.id}
+        price={plan.price}
+        displayPrice={plan.displayPrice}
+        description={plan.description} 
+        hasTrial={plan.hasTrial}
+        freeTrialDays={plan.freeTrialDays}
+      />
+      <PaymentDetails 
+        terminalNumber={terminalNumber}
+        cardcomUrl={cardcomUrl}
+        masterFrameRef={masterFrameRef}
+        isReady={isReady}
+      />
+    </>
+  );
 };
 
 export default PaymentContent;

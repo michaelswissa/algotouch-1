@@ -31,7 +31,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     paymentStatus,
     masterFrameRef,
     operationType,
-    operation,
     initializePayment,
     handleRetry,
     submitPayment,
@@ -60,7 +59,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   }, [masterFrameRef]);
 
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId, "operation type:", operationType);
+    console.log("Initializing payment for plan:", planId);
     const initProcess = async () => {
       setIsInitializing(true);
       await initializePayment();
@@ -72,12 +71,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
-      return operationType === 'token_only' || operation === 'CreateTokenOnly'
-        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מאמת כרטיס...</span>
+      return operationType === 'token_only' 
+        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
     
-    return operationType === 'token_only' || operation === 'CreateTokenOnly' ? 'אשר והפעל מנוי' : 'אשר תשלום';
+    return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
 
   const handleSubmitPayment = () => {
@@ -139,10 +138,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         </div>
         <CardDescription>
           {paymentStatus === PaymentStatus.SUCCESS 
-            ? operationType === 'token_only' || operation === 'CreateTokenOnly'
-              ? 'פרטי הכרטיס נשמרו בהצלחה!'
-              : 'התשלום בוצע בהצלחה!'
-            : operationType === 'token_only' || operation === 'CreateTokenOnly'
+            ? 'התשלום בוצע בהצלחה!'
+            : operationType === 'token_only'
               ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
               : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
@@ -171,7 +168,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             onNavigateToDashboard={() => window.location.href = '/dashboard'}
             onRetry={handleRetry}
             operationType={operationType}
-            operation={operation}
             isReady={isContentReady}
           />
         )}
@@ -189,7 +185,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               {getButtonText()}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              {operationType === 'token_only' || operation === 'CreateTokenOnly' 
+              {operationType === 'token_only' 
                 ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
                 : plan.hasTrial 
                   ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
