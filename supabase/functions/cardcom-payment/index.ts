@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -94,8 +93,8 @@ serve(async (req) => {
     
     // For monthly plans, we only create a token without charging
     const isMonthlyPlan = planId === 'monthly';
-    const operation = isMonthlyPlan ? 'ChargeAndCreateToken' : 'ChargeOnly'; // Use ChargeAndCreateToken for monthly plans
-    const transactionAmount = isMonthlyPlan ? 0 : amount; // Set amount to 0 for token creation
+    const operation = isMonthlyPlan ? 'ChargeAndCreateToken' : 'ChargeOnly';
+    const transactionAmount = isMonthlyPlan ? 0 : amount;
 
     // Create CardCom API request body
     const cardcomPayload = {
@@ -131,12 +130,12 @@ serve(async (req) => {
           Quantity: 1
         }]
       } : undefined,
-      JValidateType: 5, // Changed to J5 for proper authorization instead of J2
+      JValidateType: 5,
       AdvancedDefinition: {
-        IsAVSEnabled: true, // Enable AVS validation for better security
-        IsAutoRecurringPayment: isMonthlyPlan ? true : false, // Mark as recurring for monthly plans
-        IsRefundDeal: false, // Explicitly set to false for clarity
-        ThreeDSecureState: "Enabled" // Enable 3D Secure for added security
+        IsAVSEnabled: true,
+        IsAutoRecurringPayment: isMonthlyPlan ? true : false,
+        IsRefundDeal: false,
+        ThreeDSecureState: "Enabled"
       }
     };
     
@@ -144,7 +143,7 @@ serve(async (req) => {
       operation,
       isMonthlyPlan,
       transactionAmount,
-      jValidateType: 5 // Log that we're using J5
+      jValidateType: 5
     });
     
     // Initialize payment session with CardCom
@@ -188,9 +187,10 @@ serve(async (req) => {
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
-      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
+      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber,
+      payment_type: isMonthlyPlan ? 'recurring' : 'one_time'
     };
     
     let dbSessionId = null;
