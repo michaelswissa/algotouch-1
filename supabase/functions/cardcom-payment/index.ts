@@ -26,7 +26,6 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -34,7 +33,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    // Create Supabase admin client for database operations that bypass RLS
+    // Create Supabase admin client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -46,9 +45,9 @@ serve(async (req) => {
     
     const { 
       planId, 
-      amount, 
-      currency = "ILS", 
-      invoiceInfo, 
+      amount,
+      currency = "ILS",
+      invoiceInfo,
       userId,
       registrationData,
       redirectUrls
@@ -62,7 +61,7 @@ serve(async (req) => {
       hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !amount || !redirectUrls) {
+    if (!planId || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -92,7 +91,7 @@ serve(async (req) => {
     const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://ndhakvhrrkczgylcmyoc.functions.supabase.co';
     const webhookUrl = `${baseUrl}/functions/v1/cardcom-webhook`;
     
-    // Determine operation type and amount based on plan
+    // For monthly plans, we only create a token without charging
     const isMonthlyPlan = planId === 'monthly';
     const operation = isMonthlyPlan ? 'CreateTokenOnly' : 'ChargeOnly';
     const transactionAmount = isMonthlyPlan ? 0 : amount; // Set amount to 0 for token creation
@@ -118,7 +117,9 @@ serve(async (req) => {
         CardOwnerEmailValue: userEmail,
         CardOwnerNameValue: fullName,
         IsCardOwnerEmailRequired: true,
-        IsCardOwnerPhoneRequired: true
+        IsCardOwnerPhoneRequired: true,
+        IsCardOwnerIdentityNumber: true,
+        IsCardOwnerNameRequired: true
       },
       Document: invoiceInfo ? {
         Name: fullName || userEmail,
@@ -129,7 +130,10 @@ serve(async (req) => {
           Quantity: 1
         }]
       } : undefined,
-      JValidateType: isMonthlyPlan ? 2 : undefined // J2 for simple card validation on monthly plans
+      JValidateType: isMonthlyPlan ? 2 : undefined, // J2 for simple card validation on monthly plans
+      AdvancedDefinition: {
+        IsAVSEnabled: true // Enable AVS validation for better security
+      }
     };
     
     logStep("Sending request to CardCom", { 
@@ -173,8 +177,8 @@ serve(async (req) => {
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
-      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
+      low_profile_code: lowProfileId,
+      reference: transactionRef,
       plan_id: planId,
       amount: amount,
       currency: currency,

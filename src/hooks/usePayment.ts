@@ -5,6 +5,7 @@ import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
 import { toast } from 'sonner';
+import { useAuth } from '@/components/auth/useAuth';
 
 interface UsePaymentProps {
   planId: string;
@@ -15,6 +16,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const { user } = useAuth();
   
   useEffect(() => {
     if (planId === 'monthly') {
@@ -69,6 +71,22 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     initializePayment();
   }, [initializePayment, setState]);
 
+  const validateCardholderData = (formData: any) => {
+    if (!formData.cardholderName?.trim()) {
+      throw new Error('יש למלא את שם בעל הכרטיס');
+    }
+    if (!formData.cardOwnerId || !/^\d{9}$/.test(formData.cardOwnerId)) {
+      throw new Error('יש למלא תעודת זהות תקינה - 9 ספרות');
+    }
+    if (!formData.email || !formData.email.includes('@')) {
+      throw new Error('יש למלא כתובת דואר אלקטרוני תקינה');
+    }
+    if (!formData.phone || !/^05\d{8}$/.test(formData.phone)) {
+      throw new Error('יש למלא מספר טלפון נייד תקין');
+    }
+    return true;
+  };
+
   const submitPayment = useCallback(() => {
     if (paymentInProgress) {
       console.log('Payment submission already in progress');
@@ -90,40 +108,42 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
     
     try {
-      const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
-      const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
-      const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
-      const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
-      const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
-      const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
+      const formData = {
+        cardholderName: document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '',
+        cardOwnerId: document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '',
+        email: document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '',
+        phone: document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '',
+        expirationMonth: document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '',
+        expirationYear: document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || ''
+      };
+
+      validateCardholderData(formData);
       
       const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
-      const formData = {
+      const cardcomData = {
         action: 'doTransaction',
-        cardOwnerName: cardholderName,
-        cardOwnerId,
-        cardOwnerEmail: email,
-        cardOwnerPhone: phone,
-        expirationMonth,
-        expirationYear,
+        cardOwnerName: formData.cardholderName,
+        cardOwnerId: formData.cardOwnerId,
+        cardOwnerEmail: formData.email,
+        cardOwnerPhone: formData.phone,
+        expirationMonth: formData.expirationMonth,
+        expirationYear: formData.expirationYear,
         numberOfPayments: "1",
         ExternalUniqTranId: externalUniqTranId,
         TerminalNumber: state.terminalNumber,
-        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        Operation: operationType === 'token_only' ? "CreateTokenOnly" : "ChargeOnly",
         lowProfileCode: state.lowProfileCode,
-        LowProfileCode: state.lowProfileCode,
-        Document: {
-          Name: cardholderName || email,
-          Email: email,
-          TaxId: cardOwnerId,
-          Phone: phone,
-          DocumentTypeToCreate: "Receipt"
-        }
+        LowProfileCode: state.lowProfileCode
       };
 
-      console.log('Sending transaction data to CardCom:', formData);
-      masterFrameRef.current.contentWindow.postMessage(formData, '*');
+      console.log('Sending transaction data to CardCom:', { 
+        ...cardcomData,
+        operationType,
+        isMonthlyPlan: planId === 'monthly'
+      });
+      
+      masterFrameRef.current.contentWindow.postMessage(cardcomData, '*');
       
       setState(prev => ({
         ...prev,
@@ -137,12 +157,17 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       }, 5000);
     } catch (error) {
       console.error("Error submitting payment:", error);
-      handleError("שגיאה בשליחת פרטי התשלום");
+      toast.error(error.message || "שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatus.FAILED
+      }));
     }
   }, [
-    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, 
-    handleError, operationType, paymentInProgress, setState, startStatusCheck, planId
+    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId,
+    handleError, operationType, paymentInProgress, setState, startStatusCheck,
+    planId, user?.id
   ]);
 
   return {
