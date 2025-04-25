@@ -518,31 +518,40 @@ export type Database = {
       }
       recurring_payments: {
         Row: {
+          card_type: string | null
           created_at: string | null
           id: string
+          is_valid: boolean | null
           last_4_digits: string | null
           status: string
           token: string
+          token_approval_number: string | null
           token_expiry: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          card_type?: string | null
           created_at?: string | null
           id?: string
+          is_valid?: boolean | null
           last_4_digits?: string | null
           status?: string
           token: string
+          token_approval_number?: string | null
           token_expiry: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          card_type?: string | null
           created_at?: string | null
           id?: string
+          is_valid?: boolean | null
           last_4_digits?: string | null
           status?: string
           token?: string
+          token_approval_number?: string | null
           token_expiry?: string
           updated_at?: string | null
           user_id?: string
@@ -776,6 +785,10 @@ export type Database = {
       }
       is_admin: {
         Args: { user_id: string }
+        Returns: boolean
+      }
+      is_token_valid: {
+        Args: { token_to_check: string }
         Returns: boolean
       }
       validate_payment_session: {

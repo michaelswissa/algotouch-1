@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -81,6 +80,60 @@ const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-WEBHOOK] ${step}${detailsStr}`);
 };
+
+// Helper function to validate and extract token details
+function extractTokenDetails(webhookData: WebhookPayload) {
+  const tokenInfo = webhookData.TokenInfo;
+  const transactionInfo = webhookData.TranzactionInfo;
+
+  // Prioritize TokenInfo for token operations
+  if (tokenInfo) {
+    return {
+      token: tokenInfo.Token,
+      tokenExDate: formatTokenExpiryDate(tokenInfo.CardYear, tokenInfo.CardMonth),
+      lastFourDigits: tokenInfo.Token?.slice(-4) || '',
+      tokenApprovalNumber: tokenInfo.TokenApprovalNumber,
+      cardOwnerIdentityNumber: tokenInfo.CardOwnerIdentityNumber,
+      cardType: determineCardType(transactionInfo)
+    };
+  }
+
+  // Fallback to TransactionInfo, but only for specific operations
+  if (transactionInfo && 
+      (webhookData.Operation === 'ChargeAndCreateToken' || 
+       webhookData.Operation === 'ChargeOnly')) {
+    return {
+      token: transactionInfo.Token,
+      tokenExDate: formatTokenExpiryDate(transactionInfo.CardYear, transactionInfo.CardMonth),
+      lastFourDigits: transactionInfo.Last4CardDigitsString || '',
+      cardType: determineCardType(transactionInfo)
+    };
+  }
+
+  return null;
+}
+
+// Helper to format token expiry date
+function formatTokenExpiryDate(year?: number, month?: number): string {
+  if (!year || !month) return '';
+  const fullYear = year < 100 ? 2000 + year : year;
+  return `${fullYear}-${String(month).padStart(2, '0')}-01`;
+}
+
+// Helper to determine card type based on transaction info
+function determineCardType(transactionInfo?: TransactionInfo): string {
+  if (!transactionInfo) return 'Unknown';
+  
+  const cardTypeMappings = {
+    'PrivateCard': 'Private',
+    'MasterCard': 'MasterCard',
+    'Visa': 'Visa',
+    'Isracard': 'Isracard',
+    // Add more mappings as needed
+  };
+
+  return cardTypeMappings[transactionInfo.Brand] || transactionInfo.Brand || 'Unknown';
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -354,8 +407,15 @@ serve(async (req) => {
       updateData.transaction_id = String(finalTransactionId);
     }
 
-    if (paymentMethod) {
-      updateData.payment_method = paymentMethod;
+    if (operation === "ChargeAndCreateToken" || operation === "CreateTokenOnly") {
+      const paymentMethodDetails = extractTokenDetails(webhookData);
+      
+      if (paymentMethodDetails) {
+        updateData.payment_method = {
+          ...paymentMethodDetails,
+          isValid: true
+        };
+      }
     }
 
     // Always update payment session, even if called multiple times!

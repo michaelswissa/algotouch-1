@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,6 +18,19 @@ const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-RECURRING] ${step}${detailsStr}`);
 };
+
+// Add a function to validate token before charging
+async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
+  const { data, error } = await supabaseAdmin
+    .rpc('is_token_valid', { token_to_check: token });
+  
+  if (error) {
+    console.error('Token validation error:', error);
+    throw new Error('Invalid token');
+  }
+
+  return data === true;
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -87,6 +99,13 @@ serve(async (req) => {
         const paymentMethod = subscription.payment_method as any;
         if (!paymentMethod?.token) {
           throw new Error("No payment method found for this subscription");
+        }
+
+        // Validate token before processing
+        const isTokenValid = await validateTokenBeforeCharge(paymentMethod.token, supabaseAdmin);
+        
+        if (!isTokenValid) {
+          throw new Error('Token is invalid or expired');
         }
         
         // Calculate charge amount based on plan type
@@ -291,3 +310,18 @@ serve(async (req) => {
     );
   }
 });
+
+// When updating the recurring_payments table, set additional details
+const recurringPaymentData = {
+  user_id: session.user_id,
+  token: paymentMethod.token,
+  token_expiry: formatTokenExpiryDate(
+    paymentMethod.expiryYear, 
+    paymentMethod.expiryMonth
+  ),
+  token_approval_number: paymentMethod.tokenApprovalNumber,
+  last_4_digits: paymentMethod.lastFourDigits,
+  card_type: paymentMethod.cardType || 'Unknown',
+  is_valid: true,
+  status: 'active'
+};
