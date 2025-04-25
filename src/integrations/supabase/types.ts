@@ -520,12 +520,9 @@ export type Database = {
         Row: {
           card_type: string | null
           created_at: string | null
-          failed_attempts: number | null
           id: string
           is_valid: boolean | null
           last_4_digits: string | null
-          last_payment_date: string | null
-          payment_status: string | null
           status: string
           token: string
           token_approval_number: string | null
@@ -536,12 +533,9 @@ export type Database = {
         Insert: {
           card_type?: string | null
           created_at?: string | null
-          failed_attempts?: number | null
           id?: string
           is_valid?: boolean | null
           last_4_digits?: string | null
-          last_payment_date?: string | null
-          payment_status?: string | null
           status?: string
           token: string
           token_approval_number?: string | null
@@ -552,12 +546,9 @@ export type Database = {
         Update: {
           card_type?: string | null
           created_at?: string | null
-          failed_attempts?: number | null
           id?: string
           is_valid?: boolean | null
           last_4_digits?: string | null
-          last_payment_date?: string | null
-          payment_status?: string | null
           status?: string
           token?: string
           token_approval_number?: string | null

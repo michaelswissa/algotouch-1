@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -25,7 +26,7 @@ async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
     // Check if token exists and is valid in recurring_payments table
     const { data, error } = await supabaseAdmin
       .from('recurring_payments')
-      .select('is_valid, payment_status, failed_attempts')
+      .select('is_valid, token_expiry')
       .eq('token', token)
       .eq('status', 'active')
       .single();
@@ -35,20 +36,18 @@ async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
       return false;
     }
     
-    // Check if token is marked as valid and hasn't failed too many times
-    if (!data.is_valid || data.failed_attempts >= 3) {
+    // Check if token is marked as valid
+    if (!data.is_valid) {
       return false;
     }
-
-    // Check subscription status
-    const { data: subscription } = await supabaseAdmin
-      .from('subscriptions')
-      .select('status, cancelled_at')
-      .eq('payment_method->token', token)
-      .single();
-
-    if (!subscription || subscription.cancelled_at || subscription.status === 'cancelled') {
-      return false;
+    
+    // Check if token is expired
+    if (data.token_expiry) {
+      const expiryDate = new Date(data.token_expiry);
+      const currentDate = new Date();
+      if (expiryDate < currentDate) {
+        return false;
+      }
     }
     
     return true;
@@ -56,6 +55,24 @@ async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
     console.error('Token validation error:', error);
     return false;
   }
+}
+
+// Format date to YYYYMMDD format for CardCom
+function formatTokenExpiryDate(year: string, month: string): string {
+  // Ensure we have 2-digit month and add 20 to year (assuming 2-digit year)
+  const formattedMonth = month.padStart(2, '0');
+  const formattedYear = (year.length === 2) ? `20${year}` : year;
+  
+  // Set token expiry to be 12 months from now (instead of 10 years)
+  const today = new Date();
+  const expiryDate = new Date(today);
+  expiryDate.setMonth(expiryDate.getMonth() + 12);
+  
+  const expiryYear = expiryDate.getFullYear();
+  const expiryMonth = String(expiryDate.getMonth() + 1).padStart(2, '0');
+  const expiryDay = String(expiryDate.getDate()).padStart(2, '0');
+  
+  return `${expiryYear}${expiryMonth}${expiryDay}`;
 }
 
 serve(async (req) => {
@@ -131,7 +148,7 @@ serve(async (req) => {
         const isTokenValid = await validateTokenBeforeCharge(paymentMethod.token, supabaseAdmin);
         
         if (!isTokenValid) {
-          throw new Error('Token is invalid or subscription is cancelled');
+          throw new Error('Token is invalid or expired');
         }
         
         // Calculate charge amount based on plan type
@@ -155,7 +172,7 @@ serve(async (req) => {
           planType: subscription.plan_type 
         });
         
-        // Prepare URL-encoded form data for CardCom
+        // Prepare URL-encoded form data
         const params = new URLSearchParams({
           TerminalNumber: terminalNumber,
           UserName: apiName,
@@ -167,8 +184,8 @@ serve(async (req) => {
           TokenToCharge_CoinID: '1', // ILS
           TokenToCharge_ProductName: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
           TokenToCharge_UserPassword: apiPassword,
-          TokenToCharge_IsRecurringPayment: 'true',
-          TokenToCharge_J5: 'true'
+          TokenToCharge_IsRecurringPayment: 'true', // Mark as recurring payment
+          TokenToCharge_J5: 'true' // Use J5 validation for authorization
         });
         
         // Call CardCom API to charge the token
@@ -197,26 +214,6 @@ serve(async (req) => {
           throw new Error(`Failed to charge subscription: ${responseData.get('Description') || 'Unknown error'}`);
         }
         
-        // Update recurring_payments status based on charge result
-        if (responseCode === '0') {
-          await supabaseAdmin
-            .from('recurring_payments')
-            .update({
-              payment_status: 'succeeded',
-              last_payment_date: new Date().toISOString(),
-              failed_attempts: 0
-            })
-            .eq('token', paymentMethod.token);
-        } else {
-          await supabaseAdmin
-            .from('recurring_payments')
-            .update({
-              payment_status: 'failed',
-              failed_attempts: data.failed_attempts + 1
-            })
-            .eq('token', paymentMethod.token);
-        }
-        
         // Update subscription with new billing period
         const now = new Date();
         let nextChargeDate = new Date();
@@ -235,7 +232,7 @@ serve(async (req) => {
           .from('subscriptions')
           .update({
             status: 'active',
-            trial_ends_at: null,
+            trial_ends_at: null, // No longer in trial
             next_charge_date: nextChargeDate.toISOString(),
             current_period_ends_at: currentPeriodEndsAt.toISOString(),
             updated_at: now.toISOString()
