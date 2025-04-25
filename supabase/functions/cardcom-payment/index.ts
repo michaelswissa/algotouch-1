@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -82,40 +81,36 @@ serve(async (req) => {
                     `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                     undefined);
     
-    // Create a unique reference ID for this transaction
-    // Format: user-YYYY-MM-DD-HH-MM-SS-MS
+    // Create unique reference
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}-${String(now.getMilliseconds()).padStart(3, '0')}`;
     const transactionRef = userId 
-      ? `user-${userId.split('-')[0]}-${dateStr}`  // Take only first part of UUID for brevity
+      ? `user-${userId.split('-')[0]}-${dateStr}`
       : `anon-${Math.random().toString(36).substring(2, 7)}-${dateStr}`;
     
-    // Use a full URL for the webhook, CardCom expects a complete URL
-    // The webhook URL should be an absolute URL where CardCom will send the payment result
+    // Base URL setup for webhook
     const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://ndhakvhrrkczgylcmyoc.functions.supabase.co';
     const webhookUrl = `${baseUrl}/functions/v1/cardcom-webhook`;
     
-    logStep("Preparing CardCom API request", { 
-      webhookUrl,
-      transactionRef,
-      userEmail,
-      fullName
-    });
+    // Determine operation type and amount based on plan
+    const isMonthlyPlan = planId === 'monthly';
+    const operation = isMonthlyPlan ? 'CreateTokenOnly' : 'ChargeOnly';
+    const transactionAmount = isMonthlyPlan ? 0 : amount; // Set amount to 0 for token creation
 
-    // Create CardCom API request body for payment initialization
+    // Create CardCom API request body
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
+      Operation: operation,
       ReturnValue: transactionRef,
-      Amount: amount,
+      Amount: transactionAmount,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
-      ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+      ProductName: `מנוי ${isMonthlyPlan ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1, // No installments allowed
+      MaxNumOfPayments: 1,
       UIDefinition: {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
@@ -123,22 +118,25 @@ serve(async (req) => {
         CardOwnerEmailValue: userEmail,
         CardOwnerNameValue: fullName,
         IsCardOwnerEmailRequired: true,
-        reCaptchaFieldCSS: "body { margin: 0; padding:0; display: flex; }",
-        placeholder: "1111-2222-3333-4444",
-        cvvPlaceholder: "123"
+        IsCardOwnerPhoneRequired: true
       },
       Document: invoiceInfo ? {
         Name: fullName || userEmail,
         Email: userEmail,
         Products: [{
-          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: amount,
+          Description: `מנוי ${isMonthlyPlan ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+          UnitCost: transactionAmount,
           Quantity: 1
         }]
-      } : undefined
+      } : undefined,
+      JValidateType: isMonthlyPlan ? 2 : undefined // J2 for simple card validation on monthly plans
     };
     
-    logStep("Sending request to CardCom");
+    logStep("Sending request to CardCom", { 
+      operation,
+      isMonthlyPlan,
+      transactionAmount 
+    });
     
     // Initialize payment session with CardCom
     const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {

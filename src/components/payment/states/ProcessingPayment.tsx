@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,16 +18,13 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
   const [message, setMessage] = useState<string>('');
   const [elapsedTime, setElapsedTime] = useState(0);
   
-  // Update progress and messages
   useEffect(() => {
     const startTime = Date.now();
     let progressInterval: NodeJS.Timeout;
     let messageInterval: NodeJS.Timeout;
     
-    // Different timing based on operation type
-    const maxProcessingTime = operationType === 'token_only' ? 60000 : 90000; // 1-1.5 mins
+    const maxProcessingTime = operationType === 'token_only' ? 30000 : 60000;
     
-    // Set up progress bar animation
     progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const newProgress = Math.min(Math.floor((elapsed / maxProcessingTime) * 100), 95);
@@ -36,19 +32,16 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
       setElapsedTime(Math.floor(elapsed / 1000));
     }, 300);
     
-    // Update messages based on elapsed time
     messageInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       
       if (operationType === 'token_only') {
         if (elapsed < 5000) {
-          setMessage('מעבד את פרטי הכרטיס...');
+          setMessage('מאמת את פרטי הכרטיס...');
         } else if (elapsed < 15000) {
           setMessage('יוצר אסימון לחיוב עתידי...');
-        } else if (elapsed < 30000) {
-          setMessage('ממתין לאישור מחברת האשראי...');
         } else {
-          setMessage('הפעולה נמשכת זמן רב מהרגיל, אנא המתן...');
+          setMessage('ממתין לאישור מחברת האשראי...');
         }
       } else {
         if (elapsed < 5000) {
@@ -63,8 +56,7 @@ const ProcessingPayment: React.FC<ProcessingPaymentProps> = ({
       }
     }, 5000);
     
-    // Initial message
-    setMessage(operationType === 'token_only' ? 'מעבד את פרטי הכרטיס...' : 'מעבד את פרטי התשלום...');
+    setMessage(operationType === 'token_only' ? 'מאמת את פרטי הכרטיס...' : 'מעבד את פרטי התשלום...');
     
     return () => {
       clearInterval(progressInterval);
