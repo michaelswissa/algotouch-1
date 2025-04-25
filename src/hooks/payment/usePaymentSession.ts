@@ -13,7 +13,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; reference: string }> => {
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; reference: string; operation: string }> => {
     console.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -21,29 +21,38 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
-    // Determine operation based on plan and operationType
-    let operation = "ChargeOnly";
+    // Determine amount based on plan
+    let amount = 0;
+    if (planId === 'monthly' && operationType !== 'token_only') {
+      amount = 371;
+    } else if (planId === 'annual') {
+      amount = 3371;
+    } else if (planId === 'vip') {
+      amount = 13121;
+    }
+    
+    // For monthly plans or token_only operation, we only validate the card without charging
     if (operationType === 'token_only' || planId === 'monthly') {
-      operation = "ChargeAndCreateToken";
+      console.log("This is a token creation operation, no immediate charge");
+      amount = 0;  // No charge for token creation
     }
 
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
       body: {
         planId,
-        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        amount: amount,
         invoiceInfo: {
           fullName: paymentUser.fullName || paymentUser.email,
           email: paymentUser.email,
         },
         currency: "ILS",
-        operation: operation,
+        operationType: operationType,
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
         },
         userId: userId,
-        operationType,
         registrationData: sessionStorage.getItem('registration_data') 
           ? JSON.parse(sessionStorage.getItem('registration_data')!) 
           : null
@@ -72,6 +81,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       terminalNumber: terminalNumber,
       cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
       reference: data.data.reference || '',
+      operation: data.data.operation || 'ChargeOnly',
       paymentStatus: PaymentStatus.IDLE
     }));
     
@@ -79,7 +89,8 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       lowProfileCode: data.data.lowProfileCode, 
       sessionId: data.data.sessionId,
       terminalNumber: terminalNumber,
-      reference: data.data.reference || ''
+      reference: data.data.reference || '',
+      operation: data.data.operation || 'ChargeOnly'
     };
   };
 

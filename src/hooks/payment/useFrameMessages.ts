@@ -11,6 +11,7 @@ interface UseFrameMessagesProps {
   sessionId: string;
   operationType: 'payment' | 'token_only';
   planType: string;
+  operation?: string;
 }
 
 export const useFrameMessages = ({
@@ -20,7 +21,8 @@ export const useFrameMessages = ({
   lowProfileCode,
   sessionId,
   operationType,
-  planType
+  planType,
+  operation = 'ChargeOnly'
 }: UseFrameMessagesProps) => {
   // Listen to messages from the CardCom iframes, especially payment result messages
   useEffect(() => {
@@ -45,6 +47,17 @@ export const useFrameMessages = ({
         if (event.data.type === 'validation-error') {
           console.error('Card validation error:', event.data.error);
           toast.error(event.data.error || 'שגיאה באימות נתוני הכרטיס');
+          return;
+        }
+        
+        // Handle token creation success for monthly subscriptions
+        if (
+          (event.data.type === 'token-created' || event.data.tokenCreated) || 
+          (operation === 'CreateTokenOnly' && (event.data.type === 'payment-success' || event.data.success))
+        ) {
+          console.log('Token creation success message received:', event.data);
+          setState((prev: any) => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+          handlePaymentSuccess();
           return;
         }
         
@@ -116,7 +129,7 @@ export const useFrameMessages = ({
     return () => {
       window.removeEventListener('message', handleFrameMessage);
     };
-  }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType]);
+  }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType, operation]);
   
   // No methods to return as this is purely a hook for side effects
   return {};

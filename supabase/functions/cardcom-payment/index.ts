@@ -52,18 +52,20 @@ serve(async (req) => {
       invoiceInfo, 
       userId,
       registrationData,
-      redirectUrls
+      redirectUrls,
+      operationType = 'payment'
     } = await req.json();
     
     logStep("Received request data", { 
       planId, 
       amount, 
       currency,
+      operationType,
       hasUserId: !!userId,
       hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !amount || !redirectUrls) {
+    if (!planId || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -90,25 +92,50 @@ serve(async (req) => {
       ? `user-${userId.split('-')[0]}-${dateStr}`  // Take only first part of UUID for brevity
       : `anon-${Math.random().toString(36).substring(2, 7)}-${dateStr}`;
     
-    // Use a full URL for the webhook, CardCom expects a complete URL
+    // Use an absolute URL for the webhook
     // The webhook URL should be an absolute URL where CardCom will send the payment result
-    const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://ndhakvhrrkczgylcmyoc.functions.supabase.co';
-    const webhookUrl = `${baseUrl}/functions/v1/cardcom-webhook`;
+    const publicSiteUrl = Deno.env.get('PUBLIC_SITE_URL');
+    let webhookUrl;
+    
+    if (publicSiteUrl) {
+      webhookUrl = `${publicSiteUrl}/api/cardcom-webhook`;
+    } else {
+      const supabaseProjectId = supabaseUrl.match(/\/\/([^.]+)/)?.[1];
+      webhookUrl = `https://${supabaseProjectId}.functions.supabase.co/cardcom-webhook`;
+    }
     
     logStep("Preparing CardCom API request", { 
       webhookUrl,
       transactionRef,
       userEmail,
-      fullName
+      fullName,
+      operationType
     });
+
+    // Determine operation based on planId and operationType
+    let operation = "ChargeOnly";
+    let cardcomAmount = amount || 0;
+
+    // If it's a monthly subscription or explicit token_only request, use token creation
+    if (operationType === 'token_only' || planId === 'monthly') {
+      operation = "CreateTokenOnly";
+      // For token creation operations, set amount to 0 - we're just validating the card
+      cardcomAmount = 0;
+    } else if (planId === 'annual') {
+      operation = "ChargeOnly"; 
+      cardcomAmount = amount || 3371;
+    } else if (planId === 'vip') {
+      operation = "ChargeOnly";
+      cardcomAmount = amount || 13121;
+    }
 
     // Create CardCom API request body for payment initialization
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
+      Operation: operation,
       ReturnValue: transactionRef,
-      Amount: amount,
+      Amount: cardcomAmount,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
@@ -127,18 +154,18 @@ serve(async (req) => {
         placeholder: "1111-2222-3333-4444",
         cvvPlaceholder: "123"
       },
-      Document: invoiceInfo ? {
+      Document: invoiceInfo && operation === "ChargeOnly" ? {
         Name: fullName || userEmail,
         Email: userEmail,
         Products: [{
           Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: amount,
+          UnitCost: cardcomAmount,
           Quantity: 1
         }]
       } : undefined
     };
     
-    logStep("Sending request to CardCom");
+    logStep("Sending request to CardCom with operation:", operation);
     
     // Initialize payment session with CardCom
     const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
@@ -158,6 +185,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           message: responseData.Description || "CardCom initialization failed",
+          responseCode: responseData.ResponseCode
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -178,9 +206,10 @@ serve(async (req) => {
       low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
       reference: transactionRef, // This matches the ReturnValue we sent to CardCom
       plan_id: planId,
-      amount: amount,
+      amount: cardcomAmount,
       currency: currency,
       status: 'initiated',
+      operation_type: operation,
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
@@ -201,7 +230,8 @@ serve(async (req) => {
         logStep("Payment session stored in DB", { 
           sessionId: dbSessionId, 
           lowProfileId,
-          reference: transactionRef 
+          reference: transactionRef,
+          operation 
         });
       } else {
         logStep("Error storing payment session", { error: sessionError });
@@ -221,7 +251,8 @@ serve(async (req) => {
           lowProfileCode: lowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions",
-          reference: transactionRef
+          reference: transactionRef,
+          operation: operation
         }
       }),
       {
