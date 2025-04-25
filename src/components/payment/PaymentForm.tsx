@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ interface PaymentFormProps {
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitTimeout, setSubmitTimeout] = useState<NodeJS.Timeout | null>(null);
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -44,7 +44,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
-  // Monitor when master frame is loaded
   useEffect(() => {
     const masterFrame = masterFrameRef.current;
     if (!masterFrame) return;
@@ -69,6 +68,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     initProcess();
   }, []); // Run only once on mount
   
+  useEffect(() => {
+    return () => {
+      if (submitTimeout) {
+        clearTimeout(submitTimeout);
+      }
+    };
+  }, [submitTimeout]);
+
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
@@ -107,20 +114,33 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     
     setIsSubmitting(true);
     
+    const timeout = setTimeout(() => {
+      console.log('Payment submission timeout reached');
+      setIsSubmitting(false);
+      toast.error('לא התקבל מענה מחברת האשראי, נא לנסות שנית');
+    }, 30000); // 30 second timeout
+    
+    setSubmitTimeout(timeout);
+    
     try {
       submitPayment();
-      
-      setTimeout(() => {
-        setIsSubmitting(false);
-      }, 3000);
     } catch (error) {
       console.error('Error submitting payment:', error);
       toast.error('אירעה שגיאה בשליחת התשלום');
       setIsSubmitting(false);
+      if (timeout) clearTimeout(timeout);
     }
   };
 
-  // Determine if the iframe content is ready to be shown
+  useEffect(() => {
+    if (paymentStatus === PaymentStatus.SUCCESS || paymentStatus === PaymentStatus.FAILED) {
+      setIsSubmitting(false);
+      if (submitTimeout) {
+        clearTimeout(submitTimeout);
+      }
+    }
+  }, [paymentStatus, submitTimeout]);
+
   const isContentReady = !isInitializing && 
     terminalNumber && 
     cardcomUrl && 
@@ -146,7 +166,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master iframe is always loaded but hidden */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
