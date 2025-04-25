@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -93,7 +94,7 @@ serve(async (req) => {
     
     // For monthly plans, we only create a token without charging
     const isMonthlyPlan = planId === 'monthly';
-    const operation = isMonthlyPlan ? 'CreateTokenOnly' : 'ChargeOnly';
+    const operation = isMonthlyPlan ? 'ChargeAndCreateToken' : 'ChargeOnly'; // Use ChargeAndCreateToken for monthly plans
     const transactionAmount = isMonthlyPlan ? 0 : amount; // Set amount to 0 for token creation
 
     // Create CardCom API request body
@@ -130,16 +131,20 @@ serve(async (req) => {
           Quantity: 1
         }]
       } : undefined,
-      JValidateType: isMonthlyPlan ? 2 : undefined, // J2 for simple card validation on monthly plans
+      JValidateType: 5, // Changed to J5 for proper authorization instead of J2
       AdvancedDefinition: {
-        IsAVSEnabled: true // Enable AVS validation for better security
+        IsAVSEnabled: true, // Enable AVS validation for better security
+        IsAutoRecurringPayment: isMonthlyPlan ? true : false, // Mark as recurring for monthly plans
+        IsRefundDeal: false, // Explicitly set to false for clarity
+        ThreeDSecureState: "Enabled" // Enable 3D Secure for added security
       }
     };
     
     logStep("Sending request to CardCom", { 
       operation,
       isMonthlyPlan,
-      transactionAmount 
+      transactionAmount,
+      jValidateType: 5 // Log that we're using J5
     });
     
     // Initialize payment session with CardCom
