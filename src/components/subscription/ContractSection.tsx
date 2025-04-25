@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 interface ContractSectionProps {
   selectedPlan: string;
   fullName: string;
+  email?: string;
+  phone?: string;
   onSign: (contractData: any) => void;
   onBack: () => void;
 }
@@ -17,6 +19,8 @@ interface ContractSectionProps {
 const ContractSection: React.FC<ContractSectionProps> = ({ 
   selectedPlan, 
   fullName, 
+  email,
+  phone,
   onSign, 
   onBack 
 }) => {
@@ -29,27 +33,20 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       setIsProcessing(true);
       console.log('Contract signed, saving before payment');
       
-      // Get existing registration data if available
-      const registrationData = sessionStorage.getItem('registration_data');
-      const parsedRegistrationData = registrationData ? JSON.parse(registrationData) : null;
-      
-      // Save contract data to session storage for use during payment
-      const contractStateData = {
+      // Combine with prefilled data if not provided in the contract
+      const enrichedContractData = {
         ...contractData,
-        registrationData: parsedRegistrationData,
+        email: contractData.email || email,
+        phone: contractData.phone || phone,
         contractSignedAt: new Date().toISOString(),
-        isAuthenticated,
-        selectedPlan
+        isAuthenticated
       };
-      
-      // Save contract state in session storage and ensure it persists
-      sessionStorage.setItem('contract_data', JSON.stringify(contractStateData));
       
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Pass the contract data up to the parent
-      onSign(contractStateData);
+      onSign(enrichedContractData);
     } catch (error) {
       console.error('Error signing contract:', error);
       toast.error('אירעה שגיאה בשמירת החוזה');
@@ -70,7 +67,9 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       <DigitalContractForm 
         onSign={handleSignContract}
         planId={selectedPlan} 
-        fullName={fullName} 
+        fullName={fullName}
+        email={email}
+        phone={phone}
       />
       
       <div className="mt-6 flex justify-between">

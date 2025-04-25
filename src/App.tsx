@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import Subscription from './pages/Subscription';
 import MySubscriptionPage from './pages/MySubscriptionPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import { RegistrationProvider } from './contexts/registration/RegistrationContext';
 
 const queryClient = new QueryClient();
 
@@ -22,36 +23,45 @@ const App = () => {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/subscription" element={<Subscription />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/my-subscription"
-                element={
-                  <ProtectedRoute>
-                    <MySubscriptionPage />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-            <Toaster richColors position="top-center" />
+            <RegistrationProvider>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route
+                  path="/subscription"
+                  element={
+                    <ProtectedRoute requireAuth={false} allowRegistrationFlow={true}>
+                      <Subscription />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/my-subscription"
+                  element={
+                    <ProtectedRoute>
+                      <MySubscriptionPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+              <Toaster richColors position="top-center" />
+            </RegistrationProvider>
           </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>

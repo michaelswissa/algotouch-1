@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
+import { useRegistration } from '@/contexts/registration/RegistrationContext';
 
 interface SignupFormProps {
   onSignupSuccess?: () => void;
@@ -14,6 +16,7 @@ interface SignupFormProps {
 const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
+  const { updateRegistrationData } = useRegistration();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +26,20 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const [phone, setPhone] = useState('');
   const [signingUp, setSigningUp] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  // Load data from registration context if available
+  useEffect(() => {
+    const loadSavedData = async () => {
+      const { registrationData } = useRegistration();
+      
+      if (registrationData.email) setEmail(registrationData.email);
+      if (registrationData.userData?.firstName) setFirstName(registrationData.userData.firstName);
+      if (registrationData.userData?.lastName) setLastName(registrationData.userData.lastName);
+      if (registrationData.userData?.phone) setPhone(registrationData.userData.phone);
+    };
+    
+    loadSavedData();
+  }, []);
 
   const validateInputs = () => {
     const newErrors: {[key: string]: string} = {};
@@ -51,7 +68,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
     }
     
     // בדיקת תקינות מספר טלפון (אם הוזן)
-    if (phone.trim() && !/^0[2-9]\d{7,8}$/.test(phone)) {
+    if (phone.trim() && !/^05\d{8}$/.test(phone)) {
       newErrors.phone = 'מספר טלפון לא תקין';
     }
     
@@ -70,28 +87,19 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
-      // Store registration data in session storage for the subscription flow
-      const registrationData = {
+      // Save registration data to context
+      await updateRegistrationData({
         email,
-        password,
         userData: {
           firstName,
           lastName,
           phone
-        },
-        registrationTime: new Date().toISOString()
-      };
+        }
+      });
       
-      // Clear any existing registration data and contract data to start fresh
-      sessionStorage.removeItem('registration_data');
-      sessionStorage.removeItem('contract_data');
-      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
-      
-      console.log('Registration data saved, proceeding to subscription');
+      // Navigate to subscription page to continue the flow
+      navigate('/subscription', { replace: true });
       toast.success('הפרטים נשמרו בהצלחה');
-      
-      // Navigate directly to subscription page bypassing the ProtectedRoute check
-      navigate('/subscription', { replace: true, state: { isRegistering: true } });
       
       if (onSignupSuccess) {
         onSignupSuccess();

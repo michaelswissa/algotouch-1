@@ -1,19 +1,21 @@
+
 import React, { useEffect } from 'react';
 import { useParams, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
-import { useRegistrationState } from '@/hooks/useRegistrationState';
+import { useRegistration } from '@/contexts/registration/RegistrationContext';
 import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
 import SubscriptionSuccess from '@/components/subscription/SubscriptionSuccess';
 import ContractSection from '@/components/subscription/ContractSection';
 import PaymentSection from '@/components/subscription/PaymentSection';
 import { processSignedContract } from '@/lib/contracts/contract-service';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
+import { Spinner } from '@/components/ui/spinner';
 
 const SubscriptionContent = () => {
-  const { planId } = useParams<{ planId: string }>();
-  const { user, isAuthenticated, loading } = useAuth();
+  const { planId: urlPlanId } = useParams<{ planId: string }>();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { 
     hasActiveSubscription, 
     isCheckingSubscription, 
@@ -23,33 +25,28 @@ const SubscriptionContent = () => {
   } = useSubscriptionContext();
   
   const {
-    currentStep,
     registrationData,
+    isInitializing,
     updateRegistrationData,
     validateAndProceed,
     finalizeRegistration
-  } = useRegistrationState();
+  } = useRegistration();
   
   const location = useLocation();
-  const isRegistering = location.state?.isRegistering === true;
 
+  // Check authentication and subscription status
   useEffect(() => {
-    console.log('Subscription page: Checking for registration data and subscription status', {
-      isAuthenticated,
-      isRegistering,
-      planId
-    });
-    
-    // For logged-in users, check subscription status
     if (isAuthenticated && user) {
       checkUserSubscription(user.id);
     }
-    
-    // Set initial plan from URL if available
-    if (planId && !registrationData?.planId) {
-      updateRegistrationData({ planId });
+  }, [isAuthenticated, user, checkUserSubscription]);
+  
+  // Initialize plan from URL if available
+  useEffect(() => {
+    if (urlPlanId && !registrationData.planId && registrationData.id) {
+      updateRegistrationData({ planId: urlPlanId });
     }
-  }, [user, planId, isAuthenticated, isRegistering, checkUserSubscription, updateRegistrationData]);
+  }, [urlPlanId, registrationData.planId, registrationData.id, updateRegistrationData]);
 
   const handlePlanSelect = async (selectedPlanId: string) => {
     const success = await updateRegistrationData({ planId: selectedPlanId });
@@ -59,6 +56,7 @@ const SubscriptionContent = () => {
   };
 
   const handleContractSign = async (contractData: any) => {
+    // First save contract data
     const success = await updateRegistrationData({
       contractSigned: true,
       contractSignedAt: new Date().toISOString(),
@@ -76,26 +74,33 @@ const SubscriptionContent = () => {
 
     if (success) {
       if (isAuthenticated && user) {
-        const userData = registrationData?.userData || {};
-        const userEmail = email || contractData.email || registrationData?.email;
-        const userFullName = fullName || contractData.fullName || 
-          `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+        // Get the most accurate user information available
+        const userEmail = email || contractData.email || registrationData.email;
+        const userName = fullName || 
+          contractData.fullName || 
+          `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
 
-        if (userEmail && registrationData?.planId) {
-          const contractSuccess = await processSignedContract(
-            user.id,
-            registrationData.planId,
-            userFullName,
-            userEmail,
-            contractData
-          );
+        if (userEmail && registrationData.planId) {
+          try {
+            const contractSuccess = await processSignedContract(
+              user.id,
+              registrationData.planId,
+              userName,
+              userEmail,
+              contractData
+            );
 
-          if (contractSuccess) {
-            toast.success('ההסכם נחתם בהצלחה!');
-            await validateAndProceed('payment');
+            if (contractSuccess) {
+              toast.success('ההסכם נחתם בהצלחה!');
+              await validateAndProceed('payment');
+            }
+          } catch (error) {
+            console.error('Error processing contract:', error);
+            toast.error('אירעה שגיאה בשמירת החוזה החתום');
           }
         }
       } else {
+        // For non-authenticated users, just proceed to next step
         await validateAndProceed('payment');
       }
     }
@@ -106,11 +111,11 @@ const SubscriptionContent = () => {
     await validateAndProceed('success');
   };
 
-  // Show loading state while checking subscription
-  if (loading || isCheckingSubscription) {
+  // Show loading state while initializing
+  if (isInitializing || authLoading || isCheckingSubscription) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin"></div>
+        <Spinner className="h-12 w-12" />
       </div>
     );
   }
@@ -120,48 +125,47 @@ const SubscriptionContent = () => {
     return <Navigate to="/my-subscription" replace />;
   }
 
-  // Redirect to auth if no registration data and not authenticated
-  if (!isAuthenticated && !registrationData && !isRegistering) {
-    return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
-  }
-
   return (
     <div className="max-w-5xl mx-auto px-4" dir="rtl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">השלמת תהליך ההרשמה</h1>
         <p className="text-muted-foreground">יש להשלים את השלבים הבאים לקבלת גישה למערכת</p>
         
-        <SubscriptionSteps currentStep={currentStep} />
+        <SubscriptionSteps currentStep={registrationData.currentStep} />
       </div>
       
-      {currentStep === 'plan_selection' && (
+      {registrationData.currentStep === 'plan_selection' && (
         <SubscriptionPlans 
           onSelectPlan={handlePlanSelect} 
-          selectedPlanId={registrationData?.planId} 
+          selectedPlanId={registrationData.planId} 
         />
       )}
       
-      {currentStep === 'contract' && registrationData?.planId && (
+      {registrationData.currentStep === 'contract' && registrationData.planId && (
         <ContractSection
           selectedPlan={registrationData.planId}
-          fullName={fullName || (registrationData?.userData?.firstName && 
-            registrationData?.userData?.lastName ? 
+          fullName={fullName || (registrationData.userData?.firstName && 
+            registrationData.userData?.lastName ? 
             `${registrationData.userData.firstName} ${registrationData.userData.lastName}` : 
             '')}
+          email={email || registrationData.email}
+          phone={registrationData.userData?.phone}
           onSign={handleContractSign}
           onBack={() => validateAndProceed('plan_selection')}
         />
       )}
       
-      {currentStep === 'payment' && registrationData?.planId && (
+      {registrationData.currentStep === 'payment' && registrationData.planId && (
         <PaymentSection
           planId={registrationData.planId}
+          userData={registrationData.userData}
+          email={registrationData.email}
           onPaymentComplete={handlePaymentComplete}
           onBack={() => validateAndProceed('contract')}
         />
       )}
       
-      {currentStep === 'success' && (
+      {registrationData.currentStep === 'success' && (
         <SubscriptionSuccess />
       )}
     </div>
