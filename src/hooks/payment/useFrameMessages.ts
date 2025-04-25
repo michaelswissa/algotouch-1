@@ -1,4 +1,5 @@
 
+import React, { useEffect } from 'react';  // Add React and useEffect import
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
