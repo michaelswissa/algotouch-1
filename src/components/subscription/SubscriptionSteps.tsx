@@ -14,9 +14,9 @@ const stepMap: { [key: string]: number } = {
 };
 
 const SubscriptionSteps: React.FC<SubscriptionStepsProps> = ({ currentStep }) => {
-  // Convert string step to number, default to 0 if not found
+  // Convert string step to number
   const stepNumber = typeof currentStep === 'string' 
-    ? (stepMap[currentStep] ?? 0) 
+    ? stepMap[currentStep] ?? 0 
     : currentStep;
 
   return (
