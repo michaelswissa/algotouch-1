@@ -1,3 +1,4 @@
+
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -8,7 +9,7 @@ import { toast } from 'sonner';
 
 interface UsePaymentProps {
   planId: string;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (transactionId?: string) => void;
 }
 
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
@@ -29,7 +30,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     setState,
     handlePaymentSuccess,
     handleError
-  } = usePaymentStatus({ onPaymentComplete });
+  } = usePaymentStatus({ 
+    onPaymentComplete: (transactionId?: string) => onPaymentComplete(transactionId)
+  });
 
   const { initializePayment } = usePaymentInitialization({ 
     planId, 
@@ -45,7 +48,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   } = usePaymentStatusCheck({ setState });
 
   useFrameMessages({
-    handlePaymentSuccess: handlePaymentSuccess,
+    handlePaymentSuccess: () => handlePaymentSuccess(state.transactionId),
     setState,
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
@@ -151,6 +154,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     masterFrameRef,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
+    transactionId: state.transactionId,
     initializePayment,
     handleRetry,
     submitPayment

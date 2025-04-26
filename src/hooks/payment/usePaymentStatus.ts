@@ -4,7 +4,7 @@ import { PaymentState, PaymentStatus } from '@/components/payment/types/payment'
 import { toast } from 'sonner';
 
 interface UsePaymentStatusProps {
-  onPaymentComplete: () => void;
+  onPaymentComplete: (transactionId?: string) => void;
 }
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) => {
@@ -14,17 +14,21 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) =
     paymentStatus: PaymentStatus.IDLE,
     sessionId: '',
     lowProfileCode: '',
-    isFramesReady: false, // Added the missing property
+    transactionId: undefined,
+    isFramesReady: false,
   });
 
-  // Changed to match the expected signature (no parameters)
-  const handlePaymentSuccess = () => {
-    console.log('Payment successful');
-    setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+  const handlePaymentSuccess = (transactionId?: string) => {
+    console.log('Payment successful, transactionId:', transactionId);
+    setState(prev => ({ 
+      ...prev, 
+      paymentStatus: PaymentStatus.SUCCESS,
+      transactionId: transactionId || prev.transactionId
+    }));
     toast.success('התשלום בוצע בהצלחה!');
     
     setTimeout(() => {
-      onPaymentComplete();
+      onPaymentComplete(transactionId || state.transactionId);
     }, 1000);
   };
 

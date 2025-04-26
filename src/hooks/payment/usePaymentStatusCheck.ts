@@ -1,3 +1,4 @@
+
 import { useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -62,7 +63,11 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       
       if (data?.success) {
         console.log('Payment successful:', data);
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.SUCCESS,
+          transactionId: data.transactionInfo?.TranzactionId || data.cardcomResponse?.TranzactionId || null
+        }));
         toast.success('התשלום בוצע בהצלחה!');
         clearStatusCheckTimer();
         return;
@@ -71,7 +76,7 @@ export const usePaymentStatusCheck = ({ setState }: UsePaymentStatusCheckProps) 
       if (data?.failed) {
         console.error('Payment failed:', data);
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-        toast.error(data.message || 'התשלום נכשל');
+        toast.error(data.message || data.cardcomResponse?.Description || 'התשלום נכשל');
         clearStatusCheckTimer();
         return;
       }

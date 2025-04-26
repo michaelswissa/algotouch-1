@@ -4,7 +4,7 @@ import PaymentForm from '../payment/PaymentForm';
 
 interface PaymentSectionProps {
   planId: string;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (transactionId?: string) => void;
   onBack?: () => void; // Optional back handler
 }
 

@@ -12,7 +12,7 @@ import InitializingPayment from './states/InitializingPayment';
 
 interface PaymentFormProps {
   planId: string;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (transactionId?: string) => void;
   onBack?: () => void;
 }
 
@@ -35,10 +35,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     handleRetry,
     submitPayment,
     lowProfileCode,
-    sessionId
+    sessionId,
+    transactionId
   } = usePayment({
     planId,
-    onPaymentComplete
+    onPaymentComplete: (id?: string) => onPaymentComplete(id)
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
@@ -68,6 +69,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     
     initProcess();
   }, []); // Run only once on mount
+  
+  // When payment is successful, call onPaymentComplete with transactionId
+  useEffect(() => {
+    if (paymentStatus === PaymentStatus.SUCCESS && transactionId) {
+      onPaymentComplete(transactionId);
+    }
+  }, [paymentStatus, transactionId, onPaymentComplete]);
   
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {

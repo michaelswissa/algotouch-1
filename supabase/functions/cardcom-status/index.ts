@@ -40,13 +40,13 @@ serve(async (req) => {
     );
     
     // Parse request parameters
-    const { lowProfileCode, sessionId, operationType, planType } = await req.json();
+    const { lowProfileCode, sessionId, operationType, planType, attempt = 1 } = await req.json();
     
     if (!lowProfileCode) {
       throw new Error("Missing LowProfileId parameter");
     }
     
-    logStep("Checking payment status", { lowProfileCode, sessionId, operationType, planType });
+    logStep("Checking payment status", { lowProfileCode, sessionId, operationType, planType, attempt });
     
     // First check our database session status
     let sessionStatus = 'pending';
@@ -68,7 +68,8 @@ serve(async (req) => {
         if (session.status === 'completed' || session.status === 'failed') {
           return new Response(
             JSON.stringify({
-              success: true,
+              success: session.status === 'completed',
+              failed: session.status === 'failed',
               status: session.status,
               transactionId: session.transaction_id,
               paymentDetails
@@ -105,27 +106,50 @@ serve(async (req) => {
     // Process the response
     let status = 'pending';
     let success = false;
+    let failed = false;
     let tokenInfo = null;
     let transactionInfo = null;
     
     if (responseData.ResponseCode === 0) {
       // Check if we have transaction info or token info based on operation
-      if (
-        (operationType === 'payment' && responseData.TranzactionInfo) ||
-        (operationType === 'token_only' && responseData.TokenInfo)
-      ) {
+      if (operationType === 'payment' && responseData.TranzactionInfo) {
+        // For payment operations, check TranzactionInfo
         success = true;
         status = 'completed';
-        tokenInfo = responseData.TokenInfo;
         transactionInfo = responseData.TranzactionInfo;
         
         logStep("Payment completed successfully", {
+          hasTransaction: !!transactionInfo
+        });
+      } else if (operationType === 'token_only' && responseData.TokenInfo) {
+        // For token operations, check TokenInfo
+        success = true;
+        status = 'completed';
+        tokenInfo = responseData.TokenInfo;
+        
+        logStep("Token creation completed successfully", {
+          hasToken: !!tokenInfo
+        });
+      } else if (operationType === 'token_only' && responseData.TranzactionInfo) {
+        // For monthly subscriptions we also get transaction info with the token
+        success = true;
+        status = 'completed';
+        transactionInfo = responseData.TranzactionInfo;
+        tokenInfo = responseData.TokenInfo;
+        
+        logStep("Transaction with token completed successfully", {
           hasToken: !!tokenInfo,
           hasTransaction: !!transactionInfo
         });
-        
-        // Update session in database if we have sessionId
-        if (sessionId) {
+      } else {
+        // We got a success response but no transaction or token - payment may not be completed yet
+        status = 'pending';
+        logStep("Payment still pending, no transaction or token info yet");
+      }
+      
+      // Update session in database if we have sessionId
+      if (sessionId && status === 'completed') {
+        try {
           await supabaseAdmin
             .from('payment_sessions')
             .update({
@@ -137,29 +161,37 @@ serve(async (req) => {
             .eq('id', sessionId);
           
           logStep("Updated session status in database", { status: 'completed' });
+        } catch (dbError) {
+          logStep("Error updating session in database", { error: dbError.message });
         }
-      } else {
-        // We got a success response but no transaction or token - payment may not be completed yet
-        status = 'pending';
-        logStep("Payment still pending, no transaction or token info yet");
       }
+    } else if ([5119, 5002].includes(responseData.ResponseCode)) {
+      // 5119 - Transaction pending or not completed
+      // 5002 - Another common "pending" code
+      status = 'pending';
+      logStep("Payment still in progress", { responseCode: responseData.ResponseCode, description: responseData.Description });
     } else {
       // Non-zero response code means an error
       status = 'failed';
+      failed = true;
       logStep("Payment failed", { responseCode: responseData.ResponseCode, description: responseData.Description });
       
       // Update session status to failed if we have sessionId
       if (sessionId) {
-        await supabaseAdmin
-          .from('payment_sessions')
-          .update({
-            status: 'failed',
-            transaction_data: responseData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', sessionId);
-        
-        logStep("Updated session status in database", { status: 'failed' });
+        try {
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              status: 'failed',
+              transaction_data: responseData,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId);
+          
+          logStep("Updated session status in database", { status: 'failed' });
+        } catch (dbError) {
+          logStep("Error updating session in database", { error: dbError.message });
+        }
       }
     }
     
@@ -167,11 +199,15 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: status === 'completed',
+        processing: status === 'pending',
+        failed: status === 'failed',
         status,
+        message: responseData.Description || null,
         lowProfileCode,
         cardcomResponse: responseData,
         tokenInfo,
-        transactionInfo
+        transactionInfo,
+        attempt
       }),
       {
         status: 200,

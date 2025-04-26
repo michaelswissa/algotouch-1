@@ -51,7 +51,11 @@ export const useFrameMessages = ({
         // Handle payment success response (could be from our webhook redirect)
         if (event.data.type === 'payment-success' || (event.data.success && event.data.transactionId)) {
           console.log('Payment success message received:', event.data);
-          setState((prev: any) => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+          setState((prev: any) => ({ 
+            ...prev, 
+            paymentStatus: PaymentStatus.SUCCESS,
+            transactionId: event.data.transactionId || null
+          }));
           handlePaymentSuccess();
           return;
         }
@@ -93,9 +97,37 @@ export const useFrameMessages = ({
         if (event.data.action === 'fieldValidation') {
           const { field, isValid, message } = event.data;
           console.log(`Field validation - ${field}:`, { isValid, message });
+          return;
+        }
+        
+        // Check for response codes
+        if (event.data.ResponseCode !== undefined) {
+          console.log('CardCom response received:', event.data);
           
-          // Update state with validation results if needed
-          // This can be used to show inline validation messages
+          if (event.data.ResponseCode === 0) {
+            // Success case
+            let transactionId = null;
+            
+            if (event.data.TranzactionInfo) {
+              transactionId = event.data.TranzactionInfo.TranzactionId;
+            }
+            
+            setState((prev: any) => ({ 
+              ...prev, 
+              paymentStatus: PaymentStatus.SUCCESS,
+              transactionId
+            }));
+            handlePaymentSuccess();
+          } else if ([5119, 5002].includes(event.data.ResponseCode)) {
+            // Transaction pending - check status
+            setTimeout(() => {
+              checkPaymentStatus(lowProfileCode, sessionId, operationType, planType);
+            }, 2000);
+          } else {
+            // Failed case
+            setState((prev: any) => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+            toast.error(event.data.Description || 'התשלום נכשל');
+          }
           return;
         }
         
