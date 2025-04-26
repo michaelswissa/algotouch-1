@@ -28,9 +28,9 @@ const App = () => {
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route
-                  path="/subscription"
+                  path="/subscription/*"
                   element={
-                    <ProtectedRoute requireAuth={false} allowRegistrationFlow={true}>
+                    <ProtectedRoute requireAuth={true} allowRegistrationFlow={false}>
                       <Subscription />
                     </ProtectedRoute>
                   }

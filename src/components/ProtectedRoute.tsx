@@ -20,7 +20,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   publicPaths = ['/auth']
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
-  const { registrationData, isInitializing } = useRegistration();
+  const { registrationData, isInitializing, clearRegistrationData } = useRegistration();
   const [isCheckingRoute, setIsCheckingRoute] = useState(true);
   const location = useLocation();
   
@@ -30,6 +30,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       setIsCheckingRoute(false);
     }
   }, [initialized, loading, isInitializing]);
+
+  // Prevent automatic redirection to subscription for new visitors
+  useEffect(() => {
+    // Check if we're on the root or index page
+    if (location.pathname === '/' || location.pathname === '/index.html') {
+      // If there's registration data without auth, clear it to prevent automatic redirects
+      if (!isAuthenticated && registrationData) {
+        clearRegistrationData();
+      }
+    }
+  }, [location.pathname, isAuthenticated, registrationData, clearRegistrationData]);
   
   // Show loading state while checking auth and registration data
   if (isCheckingRoute) {
@@ -47,10 +58,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Special handling for subscription flow
   if (location.pathname.startsWith('/subscription') && allowRegistrationFlow) {
-    // Check registration data validity
-    const hasValidRegistrationFlow = registrationData && registrationData.isValid;
-    
-    if (isAuthenticated || hasValidRegistrationFlow) {
+    // FIXED: Only allow registration flow if user is authenticated
+    // Previously allowed non-authenticated users with registrationData to access subscription
+    if (isAuthenticated) {
       return <>{children}</>;
     }
     
