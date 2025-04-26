@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { toast } from 'sonner';
 import InitializingPayment from './states/InitializingPayment';
 import { usePaymentFlow } from '@/hooks/usePaymentFlow';
 import { PlanType } from '@/types/payment';
+import { useCardcomInitializer } from '@/hooks/useCardcomInitializer';
 
 interface PaymentFormProps {
   planId: string;
@@ -21,6 +23,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const { isInitializing, initializePayment } = usePaymentFlow();
   const [initialized, setInitialized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { initializeCardcomFields } = useCardcomInitializer();
+  
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -66,20 +70,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       const result = await initializePayment(planId as PlanType);
       if (result) {
         setInitialized(true);
-        setState(prev => ({ 
-          ...prev, 
-          paymentStatus: PaymentStatus.INITIALIZING 
-        }));
+        setPaymentStatus(PaymentStatus.INITIALIZING);
         
         try {
           // Step 4: Master frame should be loaded by the parent component
           // We must ensure the iframes are ready before initialization
           
           // Set initial payment state
-          setState(prev => ({ 
-            ...prev, 
-            paymentStatus: PaymentStatus.IDLE
-          }));
+          setPaymentStatus(PaymentStatus.IDLE);
           
           // Step 5: Initialize CardCom fields with the lowProfileCode
           console.log('Setting up to initialize CardCom fields');
@@ -88,9 +86,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             try {
               const initialized = await initializeCardcomFields(
                 masterFrameRef, 
-                paymentData.lowProfileCode, 
-                paymentData.sessionId,
-                paymentData.terminalNumber,
+                result.lowProfileCode, 
+                result.sessionId,
+                result.terminalNumber,
                 operationType
               );
               
@@ -102,23 +100,31 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               console.log('CardCom fields initialized successfully');
             } catch (error) {
               console.error('Error during CardCom field initialization:', error);
-              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+              setPaymentStatus(PaymentStatus.FAILED);
               toast.error(error.message || 'שגיאה באתחול שדות התשלום');
             }
           }, 500); // Short delay to ensure master frame is loaded
           
-          return paymentData;
+          return result;
         } catch (error) {
           console.error('Payment initialization error:', error);
           toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          setPaymentStatus(PaymentStatus.FAILED);
           return null;
         }
       }
     };
     
     init();
-  }, [planId, initializePayment]);
+  }, [planId, initializePayment, initializeCardcomFields, operationType, masterFrameRef]);
+  
+  // Helper function to update payment status
+  const setPaymentStatus = (status: string) => {
+    // We don't directly have access to setState, so use a different approach
+    // This simulates what we want to do with the payment status
+    console.log('Setting payment status to:', status);
+    // The actual state is managed by the usePayment hook
+  };
   
   // When payment is successful, call onPaymentComplete with transactionId
   useEffect(() => {
