@@ -23,16 +23,18 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
       <div className="flex items-center justify-between">
         {childrenArray.map((child, index) => {
           const stepNumber = index + 1;
-          const isActive = stepNumber === currentStep + 1; // Adjust for 0-based index
-          const isCompleted = stepNumber <= currentStep;
+          const isActive = stepNumber === currentStep;
+          const isCompleted = stepNumber < currentStep;
           
+          // Create a new element with the needed props
+          // Don't pass any data attributes to the Fragment
           return (
             <React.Fragment key={index}>
               <div className="flex flex-col items-center">
                 <div 
                   className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-center font-medium transition-all duration-200",
-                    isActive && "border-primary bg-primary text-primary-foreground scale-110",
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-center font-medium",
+                    isActive && "border-primary bg-primary text-primary-foreground",
                     isCompleted && "border-primary bg-primary text-primary-foreground",
                     !isActive && !isCompleted && "border-muted-foreground text-muted-foreground"
                   )}
@@ -43,11 +45,7 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
                     stepNumber
                   )}
                 </div>
-                <div className={cn(
-                  "mt-2 text-center text-xs transition-all duration-200",
-                  isActive && "text-primary font-medium scale-105",
-                  !isActive && !isCompleted && "text-muted-foreground"
-                )}>
+                <div className="mt-2 text-center text-xs">
                   {React.isValidElement(child) && child.props.title}
                 </div>
               </div>
@@ -55,8 +53,8 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
               {stepNumber < totalSteps && (
                 <div 
                   className={cn(
-                    "h-0.5 w-full max-w-14 transition-all duration-200",
-                    stepNumber < currentStep + 1 ? "bg-primary" : "bg-muted"
+                    "h-0.5 w-full max-w-14",
+                    isCompleted ? "bg-primary" : "bg-muted"
                   )}
                 />
               )}
@@ -71,3 +69,4 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
 export const Step = ({ title }: StepProps) => {
   return null; // This component is just a placeholder for the steps structure
 };
+

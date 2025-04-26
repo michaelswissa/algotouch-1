@@ -62,17 +62,7 @@ function formatTokenExpiryDate(year: string, month: string): string {
   // Ensure we have 2-digit month and add 20 to year (assuming 2-digit year)
   const formattedMonth = month.padStart(2, '0');
   const formattedYear = (year.length === 2) ? `20${year}` : year;
-  
-  // Set token expiry to be 12 months from now (instead of 10 years)
-  const today = new Date();
-  const expiryDate = new Date(today);
-  expiryDate.setMonth(expiryDate.getMonth() + 12);
-  
-  const expiryYear = expiryDate.getFullYear();
-  const expiryMonth = String(expiryDate.getMonth() + 1).padStart(2, '0');
-  const expiryDay = String(expiryDate.getDate()).padStart(2, '0');
-  
-  return `${expiryYear}${expiryMonth}${expiryDay}`;
+  return `${formattedYear}${formattedMonth}01`; // First day of expiry month
 }
 
 serve(async (req) => {
@@ -184,8 +174,7 @@ serve(async (req) => {
           TokenToCharge_CoinID: '1', // ILS
           TokenToCharge_ProductName: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
           TokenToCharge_UserPassword: apiPassword,
-          TokenToCharge_IsRecurringPayment: 'true', // Mark as recurring payment
-          TokenToCharge_J5: 'true' // Use J5 validation for authorization
+          TokenToCharge_IsRecurringPayment: 'true'
         });
         
         // Call CardCom API to charge the token

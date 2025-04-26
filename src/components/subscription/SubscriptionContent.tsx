@@ -1,21 +1,19 @@
-
 import React, { useEffect } from 'react';
 import { useParams, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
-import { useRegistration } from '@/contexts/registration/RegistrationContext';
+import { useRegistrationData } from '@/hooks/useRegistrationData';
 import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
 import SubscriptionSuccess from '@/components/subscription/SubscriptionSuccess';
 import ContractSection from '@/components/subscription/ContractSection';
 import PaymentSection from '@/components/subscription/PaymentSection';
 import { processSignedContract } from '@/lib/contracts/contract-service';
 import SubscriptionPlans from '@/components/SubscriptionPlans';
-import { Spinner } from '@/components/ui/spinner';
 
 const SubscriptionContent = () => {
-  const { planId: urlPlanId } = useParams<{ planId: string }>();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { planId } = useParams<{ planId: string }>();
+  const { user, isAuthenticated, loading } = useAuth();
   const { 
     hasActiveSubscription, 
     isCheckingSubscription, 
@@ -26,43 +24,81 @@ const SubscriptionContent = () => {
   
   const {
     registrationData,
-    isInitializing,
     updateRegistrationData,
-    validateAndProceed,
-    finalizeRegistration
-  } = useRegistration();
+    currentStep,
+    setCurrentStep,
+    selectedPlan,
+    setSelectedPlan
+  } = useRegistrationData();
   
   const location = useLocation();
+  const isRegistering = location.state?.isRegistering === true;
 
-  // Check authentication and subscription status
   useEffect(() => {
+    console.log('Subscription page: Checking for registration data and subscription status', {
+      isAuthenticated,
+      isRegistering,
+      planId
+    });
+    
+    // For logged-in users, check subscription status
     if (isAuthenticated && user) {
       checkUserSubscription(user.id);
     }
-  }, [isAuthenticated, user, checkUserSubscription]);
-  
-  // Initialize plan from URL if available
-  useEffect(() => {
-    if (urlPlanId && !registrationData.planId && registrationData.id) {
-      updateRegistrationData({ planId: urlPlanId });
+    
+    // Set initial plan from URL if available
+    if (planId && !selectedPlan) {
+      setSelectedPlan(planId);
     }
-  }, [urlPlanId, registrationData.planId, registrationData.id, updateRegistrationData]);
+  }, [user, planId, isAuthenticated, isRegistering, checkUserSubscription]);
 
-  const handlePlanSelect = async (selectedPlanId: string) => {
-    const success = await updateRegistrationData({ planId: selectedPlanId });
-    if (success) {
-      await validateAndProceed('contract');
-    }
+  // Show loading state while checking subscription
+  if (loading || isCheckingSubscription) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin"></div>
+      </div>
+    );
+  }
+
+  // If a logged-in user visits this page, check if they already have a subscription
+  // Redirect to my-subscription page instead of dashboard
+  if (isAuthenticated && hasActiveSubscription) {
+    console.log('User has active subscription, redirecting to my-subscription page');
+    return <Navigate to="/my-subscription" replace />;
+  }
+
+  // If no registration data is found and user is not authenticated, redirect to auth
+  if (!isAuthenticated && !registrationData && !isRegistering) {
+    console.log('No registration data found and user is not authenticated, redirecting to auth');
+    return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
+  }
+
+  const handlePlanSelect = (planId: string) => {
+    console.log('Selected plan in handlePlanSelect:', planId);
+    updateRegistrationData({ planId });
+    setSelectedPlan(planId);
+    setCurrentStep(2);
   };
 
   const handleContractSign = async (contractData: any) => {
-    // First save contract data
-    const success = await updateRegistrationData({
+    console.log('Contract signed, data received:', {
+      hasSignature: Boolean(contractData?.signature),
+      hasHTML: Boolean(contractData?.contractHtml),
+      fullName: contractData?.fullName
+    });
+    
+    // Store the contract details in the registration data
+    updateRegistrationData({
       contractSigned: true,
       contractSignedAt: new Date().toISOString(),
       contractDetails: {
-        ...contractData,
-        browserInfo: {
+        contractHtml: contractData.contractHtml,
+        signature: contractData.signature,
+        agreedToTerms: contractData.agreedToTerms,
+        agreedToPrivacy: contractData.agreedToPrivacy,
+        contractVersion: contractData.contractVersion || "1.0",
+        browserInfo: contractData.browserInfo || {
           userAgent: navigator.userAgent,
           language: navigator.language,
           platform: navigator.platform,
@@ -71,59 +107,47 @@ const SubscriptionContent = () => {
         }
       }
     });
-
-    if (success) {
-      if (isAuthenticated && user) {
-        // Get the most accurate user information available
-        const userEmail = email || contractData.email || registrationData.email;
-        const userName = fullName || 
-          contractData.fullName || 
-          `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
-
-        if (userEmail && registrationData.planId) {
-          try {
-            const contractSuccess = await processSignedContract(
-              user.id,
-              registrationData.planId,
-              userName,
-              userEmail,
-              contractData
-            );
-
-            if (contractSuccess) {
-              toast.success('ההסכם נחתם בהצלחה!');
-              await validateAndProceed('payment');
-            }
-          } catch (error) {
-            console.error('Error processing contract:', error);
-            toast.error('אירעה שגיאה בשמירת החוזה החתום');
-          }
+    
+    // If the user is authenticated, process the contract in the backend
+    if (isAuthenticated && user) {
+      const userData = registrationData?.userData || {};
+      const userEmail = email || contractData.email || registrationData?.email || '';
+      const userFullName = fullName || contractData.fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+      
+      console.log('Processing contract with data:', {
+        userId: user.id,
+        planId: selectedPlan,
+        fullName: userFullName,
+        email: userEmail
+      });
+      
+      if (userEmail && selectedPlan) {
+        const success = await processSignedContract(
+          user.id,
+          selectedPlan,
+          userFullName,
+          userEmail,
+          contractData
+        );
+        
+        if (success) {
+          toast.success('ההסכם נחתם בהצלחה!');
         }
       } else {
-        // For non-authenticated users, just proceed to next step
-        await validateAndProceed('payment');
+        console.error('Missing required data for contract processing', { userEmail, selectedPlan });
+        toast.error('חסרים נתונים לעיבוד ההסכם');
       }
+    } else {
+      console.log('User not authenticated, storing contract data for later processing');
     }
+    
+    setCurrentStep(3);
   };
 
-  const handlePaymentComplete = async () => {
-    await finalizeRegistration();
-    await validateAndProceed('success');
+  const handlePaymentComplete = () => {
+    setCurrentStep(4);
+    console.log('Payment completed');
   };
-
-  // Show loading state while initializing
-  if (isInitializing || authLoading || isCheckingSubscription) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <Spinner className="h-12 w-12" />
-      </div>
-    );
-  }
-
-  // Redirect logic for authenticated users with active subscriptions
-  if (isAuthenticated && hasActiveSubscription) {
-    return <Navigate to="/my-subscription" replace />;
-  }
 
   return (
     <div className="max-w-5xl mx-auto px-4" dir="rtl">
@@ -131,41 +155,36 @@ const SubscriptionContent = () => {
         <h1 className="text-3xl font-bold mb-2">השלמת תהליך ההרשמה</h1>
         <p className="text-muted-foreground">יש להשלים את השלבים הבאים לקבלת גישה למערכת</p>
         
-        <SubscriptionSteps currentStep={registrationData.currentStep} />
+        <SubscriptionSteps currentStep={currentStep} />
       </div>
       
-      {registrationData.currentStep === 'plan_selection' && (
+      {currentStep === 1 && (
         <SubscriptionPlans 
           onSelectPlan={handlePlanSelect} 
-          selectedPlanId={registrationData.planId} 
+          selectedPlanId={selectedPlan} 
         />
       )}
       
-      {registrationData.currentStep === 'contract' && registrationData.planId && (
+      {currentStep === 2 && selectedPlan && (
         <ContractSection
-          selectedPlan={registrationData.planId}
-          fullName={fullName || (registrationData.userData?.firstName && 
-            registrationData.userData?.lastName ? 
-            `${registrationData.userData.firstName} ${registrationData.userData.lastName}` : 
-            '')}
-          email={email || registrationData.email}
-          phone={registrationData.userData?.phone}
+          selectedPlan={selectedPlan}
+          fullName={fullName || (registrationData?.userData?.firstName && registrationData?.userData?.lastName 
+            ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}` 
+            : '')}
           onSign={handleContractSign}
-          onBack={() => validateAndProceed('plan_selection')}
+          onBack={() => setCurrentStep(1)}
         />
       )}
       
-      {registrationData.currentStep === 'payment' && registrationData.planId && (
+      {currentStep === 3 && selectedPlan && (
         <PaymentSection
-          planId={registrationData.planId}
-          userData={registrationData.userData}
-          email={registrationData.email}
+          planId={selectedPlan}
           onPaymentComplete={handlePaymentComplete}
-          onBack={() => validateAndProceed('contract')}
+          onBack={() => setCurrentStep(2)}
         />
       )}
       
-      {registrationData.currentStep === 'success' && (
+      {currentStep === 4 && (
         <SubscriptionSuccess />
       )}
     </div>

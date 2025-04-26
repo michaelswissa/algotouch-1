@@ -15,8 +15,6 @@ interface DigitalContractFormProps {
   onSign: (contractData: any) => void;
   planId: string;
   fullName: string;
-  email?: string;
-  phone?: string;
 }
 
 const DigitalContractForm: React.FC<DigitalContractFormProps> = ({

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,25 +6,14 @@ import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
-import { useRegistration } from '@/contexts/registration/RegistrationContext';
+import { toast } from 'sonner';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
-  const { registrationData, isInitializing, clearRegistrationData } = useRegistration();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { from?: Location, redirectToSubscription?: boolean };
-
-  // Reset registration flow if there's an error
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const resetRegistration = searchParams.get('reset');
-    
-    if (resetRegistration === 'true') {
-      clearRegistrationData();
-    }
-  }, [location, clearRegistrationData]);
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -43,12 +31,57 @@ const Auth = () => {
     }
   }, [state]);
 
+  // Check if there's valid registration data in session storage
+  useEffect(() => {
+    const checkSessionData = () => {
+      const contractData = sessionStorage.getItem('contract_data');
+      const registrationData = sessionStorage.getItem('registration_data');
+      
+      if (contractData || registrationData) {
+        try {
+          // If we have contract data, prioritize that
+          if (contractData) {
+            const data = JSON.parse(contractData);
+            if (data.selectedPlan) {
+              console.log("Auth: Valid contract data found, redirecting to subscription");
+              navigate('/subscription', { replace: true });
+              return;
+            }
+          }
+          
+          // Otherwise check registration data
+          if (registrationData) {
+            const data = JSON.parse(registrationData);
+            const registrationTime = new Date(data.registrationTime);
+            const now = new Date();
+            const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+            
+            if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
+              console.log("Auth: Valid registration data found, redirecting to subscription");
+              navigate('/subscription', { replace: true, state: { isRegistering: true } });
+            } else if (timeDiffInMinutes >= 30) {
+              console.log("Auth: Clearing stale registration data");
+              sessionStorage.removeItem('registration_data');
+              sessionStorage.removeItem('contract_data');
+              toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
+            }
+          }
+        } catch (error) {
+          console.error("Error checking session data:", error);
+          sessionStorage.removeItem('registration_data');
+          sessionStorage.removeItem('contract_data');
+        }
+      }
+    };
+    
+    checkSessionData();
+  }, [navigate, location.state]);
+
   // Show loading state while auth is initializing
-  if (!initialized || loading || isInitializing) {
+  if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
         <Spinner className="h-8 w-8" />
-        <span className="ml-2 text-sm text-muted-foreground">טוען...</span>
       </div>
     );
   }
@@ -62,17 +95,6 @@ const Auth = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // If there's valid registration data, redirect to subscription
-  if (!isAuthenticated && registrationData && registrationData.isValid) {
-    console.log("Auth page: Valid registration data found, redirecting to subscription");
-    return <Navigate to="/subscription" replace state={{ isRegistering: true }} />;
-  }
-
-  const handleAuthFailure = () => {
-    // Reset registration flow on persistent auth failures
-    clearRegistrationData();
-  };
-
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
       <div className="w-full max-w-md space-y-6">
@@ -85,19 +107,13 @@ const Auth = () => {
           </TabsList>
           
           <TabsContent value="login">
-            <LoginForm onAuthFailure={handleAuthFailure} />
+            <LoginForm />
           </TabsContent>
           
           <TabsContent value="signup">
-            <SignupForm onAuthFailure={handleAuthFailure} />
+            <SignupForm />
           </TabsContent>
         </Tabs>
-        
-        {location.search.includes('error=true') && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-200 rounded-md text-sm">
-            אירעה שגיאה בתהליך ההרשמה. אנא נסה שנית או צור קשר עם התמיכה.
-          </div>
-        )}
       </div>
     </div>
   );

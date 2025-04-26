@@ -12,13 +12,6 @@ import InitializingPayment from './states/InitializingPayment';
 
 interface PaymentFormProps {
   planId: string;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    [key: string]: any;
-  };
-  email?: string;
   onPaymentComplete: () => void;
   onBack?: () => void;
 }

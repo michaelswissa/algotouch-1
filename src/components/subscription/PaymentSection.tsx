@@ -4,30 +4,19 @@ import PaymentForm from '../payment/PaymentForm';
 
 interface PaymentSectionProps {
   planId: string;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    [key: string]: any;
-  };
-  email?: string;
   onPaymentComplete: () => void;
-  onBack?: () => void;
+  onBack?: () => void; // Optional back handler
 }
 
 const PaymentSection: React.FC<PaymentSectionProps> = ({ 
   planId, 
-  userData,
-  email,
   onPaymentComplete, 
   onBack 
 }) => {
   return (
     <div className="max-w-2xl mx-auto px-4">
       <PaymentForm 
-        planId={planId}
-        userData={userData}
-        email={email}
+        planId={planId} 
         onPaymentComplete={onPaymentComplete} 
         onBack={onBack} 
       />

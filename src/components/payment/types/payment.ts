@@ -4,8 +4,7 @@ export const PaymentStatus = {
   INITIALIZING: 'initializing' as const,
   PROCESSING: 'processing' as const,
   SUCCESS: 'success' as const,
-  FAILED: 'failed' as const,
-  TOKEN_CREATED: 'token_created' as const
+  FAILED: 'failed' as const
 } as const;
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];

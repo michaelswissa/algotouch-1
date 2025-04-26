@@ -27,6 +27,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -34,7 +35,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    // Create Supabase admin client
+    // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -46,9 +47,9 @@ serve(async (req) => {
     
     const { 
       planId, 
-      amount,
-      currency = "ILS",
-      invoiceInfo,
+      amount, 
+      currency = "ILS", 
+      invoiceInfo, 
       userId,
       registrationData,
       redirectUrls
@@ -62,7 +63,7 @@ serve(async (req) => {
       hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !redirectUrls) {
+    if (!planId || !amount || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -81,36 +82,40 @@ serve(async (req) => {
                     `${registrationData.userData.firstName || ''} ${registrationData.userData.lastName || ''}`.trim() : 
                     undefined);
     
-    // Create unique reference
+    // Create a unique reference ID for this transaction
+    // Format: user-YYYY-MM-DD-HH-MM-SS-MS
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}-${String(now.getMilliseconds()).padStart(3, '0')}`;
     const transactionRef = userId 
-      ? `user-${userId.split('-')[0]}-${dateStr}`
+      ? `user-${userId.split('-')[0]}-${dateStr}`  // Take only first part of UUID for brevity
       : `anon-${Math.random().toString(36).substring(2, 7)}-${dateStr}`;
     
-    // Base URL setup for webhook
+    // Use a full URL for the webhook, CardCom expects a complete URL
+    // The webhook URL should be an absolute URL where CardCom will send the payment result
     const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://ndhakvhrrkczgylcmyoc.functions.supabase.co';
     const webhookUrl = `${baseUrl}/functions/v1/cardcom-webhook`;
     
-    // For monthly plans, we only create a token without charging
-    const isMonthlyPlan = planId === 'monthly';
-    const operation = isMonthlyPlan ? 'ChargeAndCreateToken' : 'ChargeOnly'; // Use ChargeAndCreateToken for monthly plans
-    const transactionAmount = isMonthlyPlan ? 0 : amount; // Set amount to 0 for token creation
+    logStep("Preparing CardCom API request", { 
+      webhookUrl,
+      transactionRef,
+      userEmail,
+      fullName
+    });
 
-    // Create CardCom API request body
+    // Create CardCom API request body for payment initialization
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: operation,
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
       ReturnValue: transactionRef,
-      Amount: transactionAmount,
+      Amount: amount,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
-      ProductName: `מנוי ${isMonthlyPlan ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+      ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1,
+      MaxNumOfPayments: 1, // No installments allowed
       UIDefinition: {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
@@ -118,34 +123,22 @@ serve(async (req) => {
         CardOwnerEmailValue: userEmail,
         CardOwnerNameValue: fullName,
         IsCardOwnerEmailRequired: true,
-        IsCardOwnerPhoneRequired: true,
-        IsCardOwnerIdentityNumber: true,
-        IsCardOwnerNameRequired: true
+        reCaptchaFieldCSS: "body { margin: 0; padding:0; display: flex; }",
+        placeholder: "1111-2222-3333-4444",
+        cvvPlaceholder: "123"
       },
       Document: invoiceInfo ? {
         Name: fullName || userEmail,
         Email: userEmail,
         Products: [{
-          Description: `מנוי ${isMonthlyPlan ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: transactionAmount,
+          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
+          UnitCost: amount,
           Quantity: 1
         }]
-      } : undefined,
-      JValidateType: 5, // Changed to J5 for proper authorization instead of J2
-      AdvancedDefinition: {
-        IsAVSEnabled: true, // Enable AVS validation for better security
-        IsAutoRecurringPayment: isMonthlyPlan ? true : false, // Mark as recurring for monthly plans
-        IsRefundDeal: false, // Explicitly set to false for clarity
-        ThreeDSecureState: "Enabled" // Enable 3D Secure for added security
-      }
+      } : undefined
     };
     
-    logStep("Sending request to CardCom", { 
-      operation,
-      isMonthlyPlan,
-      transactionAmount,
-      jValidateType: 5 // Log that we're using J5
-    });
+    logStep("Sending request to CardCom");
     
     // Initialize payment session with CardCom
     const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
@@ -182,8 +175,8 @@ serve(async (req) => {
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: lowProfileId,
-      reference: transactionRef,
+      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
+      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
       plan_id: planId,
       amount: amount,
       currency: currency,

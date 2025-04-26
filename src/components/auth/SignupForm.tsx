@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,16 +6,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
-import { useRegistration } from '@/contexts/registration/RegistrationContext';
 
 interface SignupFormProps {
-  onAuthFailure?: () => void;
+  onSignupSuccess?: () => void;
 }
 
-const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
+const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
-  const { updateRegistrationData, registrationData } = useRegistration();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,16 +23,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
   const [phone, setPhone] = useState('');
   const [signingUp, setSigningUp] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
-
-  // Load data from registration context if available
-  useEffect(() => {
-    if (registrationData && registrationData.isValid) {
-      if (registrationData.email) setEmail(registrationData.email);
-      if (registrationData.userData?.firstName) setFirstName(registrationData.userData.firstName);
-      if (registrationData.userData?.lastName) setLastName(registrationData.userData.lastName);
-      if (registrationData.userData?.phone) setPhone(registrationData.userData.phone);
-    }
-  }, [registrationData]);
 
   const validateInputs = () => {
     const newErrors: {[key: string]: string} = {};
@@ -64,7 +51,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
     }
     
     // בדיקת תקינות מספר טלפון (אם הוזן)
-    if (phone.trim() && !/^05\d{8}$/.test(phone)) {
+    if (phone.trim() && !/^0[2-9]\d{7,8}$/.test(phone)) {
       newErrors.phone = 'מספר טלפון לא תקין';
     }
     
@@ -83,31 +70,35 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
-      // Save registration data to context first
-      const saved = await updateRegistrationData({
+      // Store registration data in session storage for the subscription flow
+      const registrationData = {
         email,
+        password,
         userData: {
           firstName,
           lastName,
           phone
-        }
-      });
+        },
+        registrationTime: new Date().toISOString()
+      };
       
-      if (!saved) {
-        throw new Error('שגיאה בשמירת נתוני הרשמה');
-      }
+      // Clear any existing registration data and contract data to start fresh
+      sessionStorage.removeItem('registration_data');
+      sessionStorage.removeItem('contract_data');
+      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
       
-      // For now just navigate to subscription without creating user account
-      navigate('/subscription', { replace: true });
+      console.log('Registration data saved, proceeding to subscription');
       toast.success('הפרטים נשמרו בהצלחה');
       
+      // Navigate directly to subscription page bypassing the ProtectedRoute check
+      navigate('/subscription', { replace: true, state: { isRegistering: true } });
+      
+      if (onSignupSuccess) {
+        onSignupSuccess();
+      }
     } catch (error: any) {
       console.error('Signup error:', error);
       toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');
-      
-      if (onAuthFailure) {
-        onAuthFailure();
-      }
     } finally {
       setSigningUp(false);
     }
@@ -130,7 +121,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className={errors.lastName ? "border-red-500" : ""}
-                disabled={signingUp}
                 required
               />
               {errors.lastName && <p className="text-xs text-red-500">{errors.lastName}</p>}
@@ -143,7 +133,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className={errors.firstName ? "border-red-500" : ""}
-                disabled={signingUp}
                 required
               />
               {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
@@ -158,7 +147,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={errors.email ? "border-red-500" : ""}
-              disabled={signingUp}
               required
             />
             {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
@@ -172,7 +160,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="05XXXXXXXX"
               className={errors.phone ? "border-red-500" : ""}
-              disabled={signingUp}
             />
             {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
           </div>
@@ -186,7 +173,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
               required
               minLength={6}
               className={errors.password ? "border-red-500" : ""}
-              disabled={signingUp}
             />
             {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
           </div>
@@ -199,14 +185,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ onAuthFailure }) => {
               onChange={(e) => setPasswordConfirm(e.target.value)}
               required
               className={errors.passwordConfirm ? "border-red-500" : ""}
-              disabled={signingUp}
             />
             {errors.passwordConfirm && <p className="text-xs text-red-500">{errors.passwordConfirm}</p>}
           </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={signingUp}>
-            {signingUp ? 'מעבד בקשה...' : 'המשך לבחירת תכנית'}
+            {signingUp ? 'בודק פרטים...' : 'המשך לבחירת תכנית'}
           </Button>
         </CardFooter>
       </form>

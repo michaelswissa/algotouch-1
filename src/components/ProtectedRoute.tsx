@@ -4,46 +4,67 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
-import { useRegistration } from '@/contexts/registration/RegistrationContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAuth?: boolean;
-  allowRegistrationFlow?: boolean;
   publicPaths?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
-  allowRegistrationFlow = false,
   publicPaths = ['/auth']
 }) => {
   const { isAuthenticated, loading, initialized } = useAuth();
-  const { registrationData, isInitializing, clearRegistrationData } = useRegistration();
-  const [isCheckingRoute, setIsCheckingRoute] = useState(true);
   const location = useLocation();
+  const [hasRegistrationData, setHasRegistrationData] = useState(false);
+  const [hasValidFlow, setHasValidFlow] = useState(false);
   
-  // Perform route check after auth and registration are initialized
   useEffect(() => {
-    if (initialized && !loading && !isInitializing) {
-      setIsCheckingRoute(false);
-    }
-  }, [initialized, loading, isInitializing]);
-
-  // Prevent automatic redirection to subscription for new visitors
-  useEffect(() => {
-    // Check if we're on the root or index page
-    if (location.pathname === '/' || location.pathname === '/index.html') {
-      // If there's registration data without auth, clear it to prevent automatic redirects
-      if (!isAuthenticated && registrationData) {
-        clearRegistrationData();
+    try {
+      // Validate registration data
+      const registrationData = sessionStorage.getItem('registration_data');
+      const contractData = sessionStorage.getItem('contract_data');
+      
+      if (registrationData) {
+        const data = JSON.parse(registrationData);
+        const registrationTime = new Date(data.registrationTime);
+        const now = new Date();
+        const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+        
+        const isRegistrationValid = timeDiffInMinutes < 30;
+        setHasRegistrationData(isRegistrationValid);
+        
+        if (!isRegistrationValid) {
+          console.log('Registration data expired');
+          sessionStorage.removeItem('registration_data');
+          sessionStorage.removeItem('contract_data');
+          toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
+        }
       }
+      
+      // Consider the flow valid if:
+      // 1. User is authenticated OR
+      // 2. Has valid contract data OR
+      // 3. Has valid registration data and is in the signup process
+      const isValidFlow = isAuthenticated || 
+                         Boolean(contractData) || 
+                         (registrationData && hasRegistrationData);
+                         
+      setHasValidFlow(isValidFlow);
+      
+    } catch (error) {
+      console.error("Error checking registration/contract data:", error);
+      setHasRegistrationData(false);
+      setHasValidFlow(false);
+      sessionStorage.removeItem('registration_data');
+      sessionStorage.removeItem('contract_data');
     }
-  }, [location.pathname, isAuthenticated, registrationData, clearRegistrationData]);
-  
-  // Show loading state while checking auth and registration data
-  if (isCheckingRoute) {
+  }, [location.pathname, isAuthenticated]);
+
+  // Show loading state while checking auth
+  if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner className="h-8 w-8" />
@@ -51,23 +72,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
+  // Special handling for subscription flow
+  if (location.pathname.startsWith('/subscription')) {
+    if (isAuthenticated || hasValidFlow) {
+      console.log("ProtectedRoute: Allowing access to subscription path", {
+        isAuthenticated,
+        hasRegistrationData,
+        hasValidFlow
+      });
+      return <>{children}</>;
+    }
+    
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
   // Allow access to public paths regardless of auth status
   if (publicPaths.some(path => location.pathname === path || location.pathname.startsWith(`${path}/`))) {
     return <>{children}</>;
   }
 
-  // Special handling for subscription flow
-  if (location.pathname.startsWith('/subscription') && allowRegistrationFlow) {
-    // FIXED: Only allow registration flow if user is authenticated
-    // Previously allowed non-authenticated users with registrationData to access subscription
-    if (isAuthenticated) {
-      return <>{children}</>;
-    }
-    
-    return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
-  }
-
-  // Standard auth checks
   if (requireAuth && !isAuthenticated) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
