@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,8 @@ import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import InitializingPayment from './states/InitializingPayment';
+import { usePaymentFlow } from '@/hooks/usePaymentFlow';
+import { PlanType } from '@/types/payment';
 
 interface PaymentFormProps {
   planId: string;
@@ -17,6 +18,8 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
+  const { isInitializing, initializePayment } = usePaymentFlow();
+  const [initialized, setInitialized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -31,7 +34,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     paymentStatus,
     masterFrameRef,
     operationType,
-    initializePayment,
+    initializePayment: initializePaymentHook,
     handleRetry,
     submitPayment,
     lowProfileCode,
@@ -42,7 +45,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     onPaymentComplete: (id?: string) => onPaymentComplete(id)
   });
 
-  const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
   // Monitor when master frame is loaded
@@ -60,15 +62,63 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   }, [masterFrameRef]);
 
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId);
-    const initProcess = async () => {
-      setIsInitializing(true);
-      await initializePayment();
-      setIsInitializing(false);
+    const init = async () => {
+      const result = await initializePayment(planId as PlanType);
+      if (result) {
+        setInitialized(true);
+        setState(prev => ({ 
+          ...prev, 
+          paymentStatus: PaymentStatus.INITIALIZING 
+        }));
+        
+        try {
+          // Step 4: Master frame should be loaded by the parent component
+          // We must ensure the iframes are ready before initialization
+          
+          // Set initial payment state
+          setState(prev => ({ 
+            ...prev, 
+            paymentStatus: PaymentStatus.IDLE
+          }));
+          
+          // Step 5: Initialize CardCom fields with the lowProfileCode
+          console.log('Setting up to initialize CardCom fields');
+          setTimeout(async () => {
+            console.log('Starting CardCom fields initialization');
+            try {
+              const initialized = await initializeCardcomFields(
+                masterFrameRef, 
+                paymentData.lowProfileCode, 
+                paymentData.sessionId,
+                paymentData.terminalNumber,
+                operationType
+              );
+              
+              if (!initialized) {
+                console.error("Failed to initialize CardCom fields");
+                throw new Error('שגיאה באתחול שדות התשלום');
+              }
+              
+              console.log('CardCom fields initialized successfully');
+            } catch (error) {
+              console.error('Error during CardCom field initialization:', error);
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+              toast.error(error.message || 'שגיאה באתחול שדות התשלום');
+            }
+          }, 500); // Short delay to ensure master frame is loaded
+          
+          return paymentData;
+        } catch (error) {
+          console.error('Payment initialization error:', error);
+          toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+          return null;
+        }
+      }
     };
     
-    initProcess();
-  }, []); // Run only once on mount
+    init();
+  }, [planId, initializePayment]);
   
   // When payment is successful, call onPaymentComplete with transactionId
   useEffect(() => {
@@ -142,14 +192,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       <CardHeader>
         <div className="flex items-center gap-2">
           <CreditCard className="h-5 w-5 text-primary" />
-          <CardTitle>פרטי תשלום</CardTitle>
+          <CardTitle>
+            {planId === 'monthly' ? 'הפעלת תקופת ניסיון'
+              : planId === 'annual' ? 'רכישת מנוי שנתי'
+              : 'רכישת מנוי VIP'}
+          </CardTitle>
         </div>
         <CardDescription>
-          {paymentStatus === PaymentStatus.SUCCESS 
-            ? 'התשלום בוצע בהצלחה!'
-            : operationType === 'token_only'
-              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
-              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
+          {planId === 'monthly' 
+            ? 'הזן את פרטי כרטיס האשראי שלך להפעלת תקופת הניסיון' 
+            : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
       
