@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentSessionData, CardComPaymentResponse, PaymentError } from '@/components/payment/types/payment';
 import { CARDCOM_CONFIG } from './cardcom-config';
@@ -18,7 +17,7 @@ export async function initializeCardcomPayment({
   fullName: string;
 }): Promise<PaymentSessionData> {
   try {
-    const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+    const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
       body: {
         planId,
         amount,
