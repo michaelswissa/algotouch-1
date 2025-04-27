@@ -1,12 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders, logStep, validateLowProfileId } from "../cardcom-utils/index.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// CardCom Configuration with validation
 const CARDCOM_CONFIG = {
   terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || '',
   apiName: Deno.env.get("CARDCOM_API_NAME") || '',
@@ -15,22 +10,15 @@ const CARDCOM_CONFIG = {
   }
 };
 
-// Helper logging function for enhanced debugging
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CARDCOM-STATUS] ${step}${detailsStr}`);
-};
-
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    logStep("Function started");
+    const functionName = 'status';
+    await logStep(functionName, "Function started");
     
-    // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -40,34 +28,24 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Extract low profile ID from request body
     const { lowProfileId } = await req.json();
     
-    if (!lowProfileId) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Missing lowProfileId parameter",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (!lowProfileId || !validateLowProfileId(lowProfileId)) {
+      await logStep(functionName, "Invalid lowProfileId format", { lowProfileId }, 'error', supabaseAdmin);
+      throw new Error("Invalid lowProfileId format");
     }
 
-    logStep("Checking payment status", { lowProfileId });
+    await logStep(functionName, "Checking payment status", { lowProfileId });
     
-    // Validate configuration
     if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
       throw new Error("Missing CardCom configuration");
     }
     
-    // First, check our database to see if we've already processed this transaction
     const { data: existingPayment } = await supabaseAdmin
       .rpc('check_duplicate_payment_extended', { low_profile_id: lowProfileId });
     
     if (existingPayment?.exists) {
-      logStep("Payment already processed", existingPayment);
+      await logStep(functionName, "Payment already processed", existingPayment);
       return new Response(
         JSON.stringify({
           success: true,
@@ -80,7 +58,6 @@ serve(async (req) => {
       );
     }
     
-    // Otherwise, check with CardCom API using v11 endpoint
     if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
       throw new Error("Missing CardCom configuration");
     }
@@ -91,7 +68,7 @@ serve(async (req) => {
       LowProfileId: lowProfileId
     };
     
-    logStep("Sending status request to CardCom", { 
+    await logStep(functionName, "Sending status request to CardCom", { 
       terminalNumber: CARDCOM_CONFIG.terminalNumber,
       lowProfileId
     });
@@ -103,7 +80,7 @@ serve(async (req) => {
     });
     
     const responseData = await response.json();
-    logStep("CardCom payment status response", responseData);
+    await logStep(functionName, "CardCom payment status response", responseData);
     
     if (responseData.ResponseCode !== 0) {
       return new Response(
@@ -117,20 +94,17 @@ serve(async (req) => {
       );
     }
 
-    // Check for transaction info to determine if payment was successful
     const successful = responseData.TranzactionInfo && 
                       (responseData.TranzactionInfo.ResponseCode === 0 || 
                        responseData.TranzactionInfo.ResponseCode === '0');
     
-    logStep("Payment status check complete", { 
+    await logStep(functionName, "Payment status check complete", { 
       successful,
       responseCode: responseData.TranzactionInfo?.ResponseCode
     });
     
-    // If payment is successful, update any related user records
     if (successful) {
       try {
-        // Find the payment session to get the user ID
         const { data: paymentSession } = await supabaseAdmin
           .from('payment_sessions')
           .select('user_id, reference, plan_id')
@@ -138,13 +112,12 @@ serve(async (req) => {
           .single();
         
         if (paymentSession?.user_id) {
-          logStep("Found payment session", {
+          await logStep(functionName, "Found payment session", {
             userId: paymentSession.user_id,
             reference: paymentSession.reference,
             planId: paymentSession.plan_id
           });
           
-          // Update payment session status
           await supabaseAdmin
             .from('payment_sessions')
             .update({
@@ -154,7 +127,6 @@ serve(async (req) => {
             })
             .eq('low_profile_code', lowProfileId);
             
-          // Record successful payment
           await supabaseAdmin
             .from('user_payment_logs')
             .insert({
@@ -166,13 +138,12 @@ serve(async (req) => {
               payment_data: responseData
             });
           
-          logStep("Updated payment records", { userId: paymentSession.user_id });
+          await logStep(functionName, "Updated payment records", { userId: paymentSession.user_id });
         } else {
-          logStep("No payment session found for this low profile code");
+          await logStep(functionName, "No payment session found for this low profile code");
         }
       } catch (dbError) {
-        logStep("Error updating payment records", { error: dbError.message });
-        // Continue despite DB error to allow client to proceed
+        await logStep(functionName, "Error updating payment records", { error: dbError.message });
       }
     }
     
@@ -188,7 +159,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    await logStep('status', "ERROR", { message: errorMessage }, 'error', supabaseAdmin);
     
     return new Response(
       JSON.stringify({

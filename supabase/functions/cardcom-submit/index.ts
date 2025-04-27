@@ -1,17 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Helper logging function for enhanced debugging
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CARDCOM-SUBMIT] ${step}${detailsStr}`);
-};
+import { corsHeaders, logStep, validateLowProfileId } from "../cardcom-utils/index.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -20,8 +9,9 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
-    
+    const functionName = 'submit';
+    await logStep(functionName, "Function started");
+
     // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -39,6 +29,11 @@ serve(async (req) => {
       cardOwnerDetails
     } = await req.json();
     
+    if (!lowProfileCode || !validateLowProfileId(lowProfileCode)) {
+      await logStep(functionName, "Invalid lowProfileId format", { lowProfileCode }, 'error', supabaseAdmin);
+      throw new Error("Invalid lowProfileId format");
+    }
+
     logStep("Received request data", {
       lowProfileCode,
       terminalNumber,
@@ -141,7 +136,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    await logStep('submit', "ERROR", { message: errorMessage }, 'error', supabaseAdmin);
     
     return new Response(
       JSON.stringify({

@@ -694,6 +694,33 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          function_name: string
+          id: number
+          level: string
+          message: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          function_name: string
+          id?: number
+          level: string
+          message: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          function_name?: string
+          id?: number
+          level?: string
+          message?: string
+        }
+        Relationships: []
+      }
       temp_registration_data: {
         Row: {
           created_at: string
