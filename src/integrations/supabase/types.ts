@@ -444,6 +444,71 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number | null
+          id: number
+          paid_at: string | null
+          payload: Json | null
+          response_code: number | null
+          subscription_id: string | null
+          tranzaction_id: number | null
+        }
+        Insert: {
+          amount?: number | null
+          id?: never
+          paid_at?: string | null
+          payload?: Json | null
+          response_code?: number | null
+          subscription_id?: string | null
+          tranzaction_id?: number | null
+        }
+        Update: {
+          amount?: number | null
+          id?: never
+          paid_at?: string | null
+          payload?: Json | null
+          response_code?: number | null
+          subscription_id?: string | null
+          tranzaction_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          code: string
+          cycle_days: number | null
+          id: number
+          name: string
+          price: number
+          trial_days: number | null
+        }
+        Insert: {
+          code: string
+          cycle_days?: number | null
+          id?: number
+          name: string
+          price: number
+          trial_days?: number | null
+        }
+        Update: {
+          code?: string
+          cycle_days?: number | null
+          id?: number
+          name?: string
+          price?: number
+          trial_days?: number | null
+        }
+        Relationships: []
+      }
       post_tags: {
         Row: {
           post_id: string
@@ -520,9 +585,12 @@ export type Database = {
         Row: {
           card_type: string | null
           created_at: string | null
+          failed_attempts: number | null
           id: string
           is_valid: boolean | null
           last_4_digits: string | null
+          last_payment_date: string | null
+          payment_status: string | null
           status: string
           token: string
           token_approval_number: string | null
@@ -533,9 +601,12 @@ export type Database = {
         Insert: {
           card_type?: string | null
           created_at?: string | null
+          failed_attempts?: number | null
           id?: string
           is_valid?: boolean | null
           last_4_digits?: string | null
+          last_payment_date?: string | null
+          payment_status?: string | null
           status?: string
           token: string
           token_approval_number?: string | null
@@ -546,9 +617,12 @@ export type Database = {
         Update: {
           card_type?: string | null
           created_at?: string | null
+          failed_attempts?: number | null
           id?: string
           is_valid?: boolean | null
           last_4_digits?: string | null
+          last_payment_date?: string | null
+          payment_status?: string | null
           status?: string
           token?: string
           token_approval_number?: string | null
@@ -560,57 +634,47 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          cancelled_at: string | null
-          contract_signed: boolean | null
-          contract_signed_at: string | null
-          contract_signed_location: string | null
           created_at: string | null
-          current_period_ends_at: string | null
+          fail_count: number | null
           id: string
-          next_charge_date: string | null
-          payment_method: Json | null
-          payment_token_id: string | null
-          plan_type: string
-          status: string
-          trial_ends_at: string | null
-          updated_at: string | null
-          user_id: string
+          next_charge_at: string | null
+          plan_id: number | null
+          status: string | null
+          token: string | null
+          token_expires_ym: string | null
+          user_id: string | null
         }
         Insert: {
-          cancelled_at?: string | null
-          contract_signed?: boolean | null
-          contract_signed_at?: string | null
-          contract_signed_location?: string | null
           created_at?: string | null
-          current_period_ends_at?: string | null
+          fail_count?: number | null
           id?: string
-          next_charge_date?: string | null
-          payment_method?: Json | null
-          payment_token_id?: string | null
-          plan_type?: string
-          status?: string
-          trial_ends_at?: string | null
-          updated_at?: string | null
-          user_id: string
+          next_charge_at?: string | null
+          plan_id?: number | null
+          status?: string | null
+          token?: string | null
+          token_expires_ym?: string | null
+          user_id?: string | null
         }
         Update: {
-          cancelled_at?: string | null
-          contract_signed?: boolean | null
-          contract_signed_at?: string | null
-          contract_signed_location?: string | null
           created_at?: string | null
-          current_period_ends_at?: string | null
+          fail_count?: number | null
           id?: string
-          next_charge_date?: string | null
-          payment_method?: Json | null
-          payment_token_id?: string | null
-          plan_type?: string
-          status?: string
-          trial_ends_at?: string | null
-          updated_at?: string | null
-          user_id?: string
+          next_charge_at?: string | null
+          plan_id?: number | null
+          status?: string | null
+          token?: string | null
+          token_expires_ym?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       temp_registration_data: {
         Row: {
@@ -669,7 +733,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string | null
-          currency: string
+          currency: string | null
           id: string
           payment_data: Json | null
           status: string
@@ -681,7 +745,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string | null
-          currency?: string
+          currency?: string | null
           id?: string
           payment_data?: Json | null
           status: string
@@ -693,7 +757,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string | null
-          currency?: string
+          currency?: string | null
           id?: string
           payment_data?: Json | null
           status?: string
@@ -791,8 +855,16 @@ export type Database = {
         Args: { token_to_check: string }
         Returns: boolean
       }
+      update_expired_trials: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       validate_payment_session: {
         Args: { session_id: string }
+        Returns: boolean
+      }
+      validate_registration_step: {
+        Args: { registration_id: string; current_step: string }
         Returns: boolean
       }
     }
