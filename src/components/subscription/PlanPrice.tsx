@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BadgeShekel } from 'lucide-react';
+import { CircleDollarSign } from 'lucide-react';
 
 interface PlanPriceProps {
   price: number;
@@ -12,7 +12,7 @@ export const PlanPrice: React.FC<PlanPriceProps> = ({ price, className = '' }) =
   
   return (
     <div className={`flex items-center gap-1 ${className}`}>
-      <BadgeShekel className="h-4 w-4" />
+      <span>₪</span>
       <span>{formattedPrice}</span>
     </div>
   );
