@@ -90,6 +90,7 @@ export interface DirectTransactionRequest {
   currencyCode?: string;
   document?: DocumentInfo;
   advanced?: TransactionAdvanced;
+  userId?: string; // Add userId field to store the user identifier
 }
 
 export interface CardDetailResponse {
