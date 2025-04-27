@@ -27,7 +27,7 @@ interface PaymentContextType extends PaymentState {
 const initialState: PaymentState = {
   paymentStatus: PaymentStatus.IDLE,
   isInitializing: false,
-  terminalNumber: '',
+  terminalNumber: '160138',
   cardcomUrl: 'https://secure.cardcom.solutions',
   lowProfileCode: '',
   sessionId: '',
@@ -53,6 +53,11 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [state, setState] = useState<PaymentState>(initialState);
 
   const initializePayment = async (planId: string): Promise<boolean> => {
+    if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
+      console.log('Payment already initialized with lowProfileCode:', state.lowProfileCode);
+      return true;
+    }
+
     try {
       setState(prev => ({ 
         ...prev, 
@@ -64,24 +69,23 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       // Set operationType based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
-      setState(prev => ({ ...prev, operationType }));
-
+      
       // In a real implementation, we would make API calls here to initialize payment
       // For now, let's simulate a successful initialization
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // When connected to the payment service, this would set all the necessary session data
-      // For now, just update the state for demonstration
+      const sessionId = `session-${Date.now()}`;
+      const lowProfileCode = `profile-${Date.now()}`;
+      const reference = `ref-${Date.now()}`;
+
       setState(prev => ({
         ...prev,
         isInitializing: false,
         paymentStatus: PaymentStatus.IDLE,
-        // In a real implementation, these values would come from the API response
-        terminalNumber: '160138', // Example value
-        cardcomUrl: 'https://secure.cardcom.solutions',
-        lowProfileCode: `mock-${Date.now()}`,
-        sessionId: `session-${Date.now()}`,
-        reference: `ref-${Date.now()}`,
+        operationType,
+        sessionId,
+        lowProfileCode,
+        reference,
       }));
 
       return true;
@@ -117,7 +121,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       
       // In a real implementation, we would make API calls here to process payment
       // For now, let's simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       setState(prev => ({
         ...prev,

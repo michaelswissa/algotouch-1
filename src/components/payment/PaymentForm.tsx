@@ -28,7 +28,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     resetPaymentState,
     terminalNumber,
     cardcomUrl,
-    submitPayment
+    submitPayment,
+    lowProfileCode
   } = usePaymentContext();
   
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
@@ -40,20 +41,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Initialize payment on mount
+  // Initialize payment on mount only
   useEffect(() => {
-    const setupPayment = async () => {
-      console.log("Initializing payment for plan:", planId);
-      await initializePayment(planId);
-    };
+    console.log("Initializing payment for plan:", planId);
+    initializePayment(planId);
     
-    setupPayment();
-    
-    // Cleanup on unmount
+    // Cleanup on unmount only
     return () => {
       resetPaymentState();
     };
-  }, [planId, initializePayment, resetPaymentState]);
+  }, [planId]); // Only depend on planId
 
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {
@@ -82,6 +79,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       expirationYear: '',
     });
   };
+
+  const shouldShowPaymentContent = 
+    paymentStatus !== PaymentStatus.SUCCESS && 
+    paymentStatus !== PaymentStatus.FAILED &&
+    !isInitializing;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -121,14 +123,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               terminalNumber={terminalNumber}
               cardcomUrl={cardcomUrl}
               masterFrameRef={masterFrameRef}
-              isReady={!isInitializing && paymentStatus !== PaymentStatus.FAILED}
+              isReady={!isInitializing && lowProfileCode !== ''}
             />
           </>
         )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {(paymentStatus === PaymentStatus.IDLE || paymentStatus === PaymentStatus.PROCESSING) && !isInitializing && (
+        {shouldShowPaymentContent && (
           <>
             <Button 
               type="button" 
