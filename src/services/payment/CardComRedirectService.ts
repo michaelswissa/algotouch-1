@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentLogger } from './PaymentLogger';
+import { toast } from 'sonner';
 
 export class CardComRedirectService {
   /**
@@ -80,6 +81,7 @@ export class CardComRedirectService {
     error?: string;
     transactionId?: string;
     status?: string;
+    paymentData?: any; // Add complete payment data
   }> {
     try {
       PaymentLogger.log('Verifying payment status after redirect', { lowProfileCode });
@@ -114,13 +116,15 @@ export class CardComRedirectService {
 
       PaymentLogger.log('Payment successfully verified', { 
         transactionId: data.transactionId,
-        status: data.status
+        status: data.status,
+        fullResponse: data
       });
 
       return { 
         success: true,
         transactionId: data.transactionId,
-        status: data.status
+        status: data.status,
+        paymentData: data // Return the full payment data
       };
     } catch (error) {
       PaymentLogger.error('Exception during payment verification:', error);

@@ -1,7 +1,9 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { toast } from 'sonner';
 
 export interface RegistrationData {
   email: string;
@@ -31,6 +33,7 @@ export class RegistrationService {
   }> {
     try {
       if (!registrationData.email || !registrationData.password) {
+        PaymentLogger.error('Missing required registration fields', { registrationData });
         return { 
           success: false, 
           user: null, 
@@ -136,7 +139,7 @@ export class RegistrationService {
       // Sign in the user immediately
       if (!authData.session) {
         PaymentLogger.log('No session after signup, signing in explicitly');
-        return await this.signInUser(registrationData.email, registrationData.password);
+        await this.signInUser(registrationData.email, registrationData.password);
       }
       
       return { success: true, user: authData.user };
@@ -150,12 +153,14 @@ export class RegistrationService {
   /**
    * Sign in an existing user
    */
-  private static async signInUser(email: string, password: string): Promise<{
+  static async signInUser(email: string, password: string): Promise<{
     success: boolean;
     user: User | null;
     error?: string;
   }> {
     try {
+      PaymentLogger.log('Attempting to sign in user', { email });
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
@@ -166,6 +171,7 @@ export class RegistrationService {
         return { success: false, user: null, error: error.message };
       }
       
+      PaymentLogger.log('User signed in successfully', { userId: data.user?.id });
       return { success: true, user: data.user };
     } catch (error: any) {
       PaymentLogger.error('Exception during sign in:', error);

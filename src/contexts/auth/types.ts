@@ -11,8 +11,8 @@ export interface AuthContextType {
   initialized: boolean;
   signIn: (email: string, password: string) => Promise<{
     success: boolean;
-    session: Session | null;
-    user: User | null;
+    session?: Session | null;
+    user?: User | null;
     error?: string;
   }>;
   signUp: (userData: {
@@ -21,7 +21,7 @@ export interface AuthContextType {
     firstName?: string;
     lastName?: string;
     phone?: string;
-  }) => Promise<{ success: boolean; user: User | null }>;
+  }) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (userData: any) => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
