@@ -1,4 +1,3 @@
-
 // Define payment status types
 export type PaymentStatusType = 'idle' | 'initializing' | 'processing' | 'success' | 'failed';
 
@@ -22,7 +21,7 @@ export interface CardOwnerDetails {
 export interface PaymentSessionData {
   terminalNumber?: string;
   cardcomUrl?: string;
-  lowProfileCode?: string;
+  lowProfileId?: string;
   sessionId?: string;
   reference?: string;
 }
