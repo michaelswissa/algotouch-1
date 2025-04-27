@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { PaymentStatus, PaymentStatusType } from './types/payment';
+import { usePaymentContext } from '@/contexts/payment/PaymentContext';
+import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import PaymentDetails from './PaymentDetails';
@@ -11,7 +12,6 @@ import PlanSummary from './PlanSummary';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import InitializingPayment from './states/InitializingPayment';
-import { initializeCardcomRedirect } from '@/lib/payment/cardcom-service';
 
 interface PaymentFormProps {
   planId: string;
@@ -20,10 +20,19 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusType>(PaymentStatus.IDLE);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
-  const masterFrameRef = React.useRef<HTMLIFrameElement>(null);
+  const { 
+    initializePayment, 
+    paymentStatus, 
+    isInitializing, 
+    operationType,
+    resetPaymentState,
+    terminalNumber,
+    cardcomUrl,
+    submitPayment,
+    lowProfileCode
+  } = usePaymentContext();
+  
+  const masterFrameRef = useRef<HTMLIFrameElement>(null);
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -32,143 +41,49 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Initialize payment when component mounts
+  // Initialize payment on mount only
   useEffect(() => {
-    const initPayment = async () => {
-      setIsInitializing(true);
-      try {
-        // Get registration data from storage
-        const registrationDataStr = sessionStorage.getItem('registration_data');
-        const contractDataStr = sessionStorage.getItem('contract_data');
-        let email = '';
-        let fullName = '';
-        
-        // Try to get email and name from contract data first
-        if (contractDataStr) {
-          const contractData = JSON.parse(contractDataStr);
-          email = contractData.email || '';
-          fullName = contractData.fullName || '';
-        } 
-        // If not available, try registration data
-        else if (registrationDataStr) {
-          const regData = JSON.parse(registrationDataStr);
-          email = regData.email || '';
-          if (regData.userData) {
-            const { firstName, lastName } = regData.userData;
-            if (firstName && lastName) {
-              fullName = `${firstName} ${lastName}`;
-            }
-          }
-        }
-
-        // Calculate amount based on plan
-        let amount = 0;
-        switch (planId) {
-          case 'monthly':
-            amount = 371;
-            break;
-          case 'annual':
-            amount = 3371;
-            break;
-          case 'vip':
-            amount = 13121;
-            break;
-          default:
-            throw new Error(`Unsupported plan: ${planId}`);
-        }
-
-        // Initialize direct CardCom payment
-        const response = await initializeCardcomRedirect({
-          planId,
-          amount,
-          userEmail: email,
-          fullName,
-        });
-
-        console.log('Payment redirect initialized:', response);
-        
-        // Store the redirect URL
-        setRedirectUrl(response.url);
-        
-        // Store payment reference in session storage
-        sessionStorage.setItem('payment_data', JSON.stringify({
-          reference: response.reference,
-          lowProfileCode: response.lowProfileCode,
-          planId,
-          timestamp: new Date().toISOString(),
-          status: 'initialized'
-        }));
-
-      } catch (error) {
-        console.error('Error initializing payment:', error);
-        toast.error(error instanceof Error ? error.message : 'שגיאה באתחול תשלום');
-        setPaymentStatus(PaymentStatus.FAILED);
-      } finally {
-        setIsInitializing(false);
-      }
+    console.log("Initializing payment for plan:", planId);
+    initializePayment(planId);
+    
+    // Cleanup on unmount only
+    return () => {
+      resetPaymentState();
     };
+  }, [planId]); // Only depend on planId
 
-    initPayment();
-  }, [planId]);
-
-  // Check for iframe redirects (payment complete)
+  // Call onPaymentComplete when payment succeeds
   useEffect(() => {
-    const checkIframeStatus = () => {
-      const iframe = masterFrameRef.current;
-      
-      if (!iframe || !iframe.contentWindow) return;
-      
-      try {
-        const location = iframe.contentWindow.location.href;
-        
-        if (location.includes('/success')) {
-          setPaymentStatus(PaymentStatus.SUCCESS);
-          onPaymentComplete();
-        } else if (location.includes('/failed')) {
-          setPaymentStatus(PaymentStatus.FAILED);
-        }
-      } catch (e) {
-        // Cross-origin error, can't access iframe location
-        // This is normal during processing
-      }
-    };
-    
-    const interval = setInterval(checkIframeStatus, 1000);
-    return () => clearInterval(interval);
-  }, [onPaymentComplete]);
-
-  const renderContent = () => {
-    if (isInitializing) {
-      return <InitializingPayment />;
-    }
-    
     if (paymentStatus === PaymentStatus.SUCCESS) {
-      return <SuccessfulPayment plan={plan} onContinue={() => window.location.href = '/dashboard'} />;
+      onPaymentComplete();
+    }
+  }, [paymentStatus, onPaymentComplete]);
+
+  const getButtonText = () => {
+    if (paymentStatus === PaymentStatus.PROCESSING) {
+      return operationType === 'token_only' 
+        ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
+        : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
     
-    if (paymentStatus === PaymentStatus.FAILED) {
-      return <FailedPayment onRetry={() => setPaymentStatus(PaymentStatus.IDLE)} />;
-    }
-    
-    return (
-      <>
-        <PlanSummary 
-          planName={plan.name} 
-          planId={plan.id}
-          price={plan.price}
-          displayPrice={plan.displayPrice}
-          description={plan.description} 
-          hasTrial={plan.hasTrial}
-          freeTrialDays={plan.freeTrialDays}
-        />
-        <PaymentDetails 
-          paymentUrl={redirectUrl || ''}
-          isReady={!isInitializing && !!redirectUrl}
-          masterFrameRef={masterFrameRef}
-        />
-      </>
-    );
+    return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
+
+  const handleSubmitClick = () => {
+    submitPayment({
+      cardOwnerName: '', // These values will be taken from the usePaymentForm hook inside PaymentDetails
+      cardOwnerId: '',
+      cardOwnerEmail: '',
+      cardOwnerPhone: '',
+      expirationMonth: '',
+      expirationYear: '',
+    });
+  };
+
+  const shouldShowPaymentContent = 
+    paymentStatus !== PaymentStatus.SUCCESS && 
+    paymentStatus !== PaymentStatus.FAILED &&
+    !isInitializing;
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
@@ -180,23 +95,59 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         <CardDescription>
           {paymentStatus === PaymentStatus.SUCCESS 
             ? 'התשלום בוצע בהצלחה!'
-            : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
+            : operationType === 'token_only'
+              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
+              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
         </CardDescription>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {renderContent()}
+        {isInitializing ? (
+          <InitializingPayment />
+        ) : paymentStatus === PaymentStatus.SUCCESS ? (
+          <SuccessfulPayment plan={plan} onContinue={() => window.location.href = '/dashboard'} />
+        ) : paymentStatus === PaymentStatus.FAILED ? (
+          <FailedPayment onRetry={() => initializePayment(planId)} />
+        ) : (
+          <>
+            <PlanSummary 
+              planName={plan.name} 
+              planId={plan.id}
+              price={plan.price}
+              displayPrice={plan.displayPrice}
+              description={plan.description} 
+              hasTrial={plan.hasTrial}
+              freeTrialDays={plan.freeTrialDays}
+            />
+            <PaymentDetails 
+              terminalNumber={terminalNumber}
+              cardcomUrl={cardcomUrl}
+              masterFrameRef={masterFrameRef}
+              isReady={!isInitializing && lowProfileCode !== ''}
+            />
+          </>
+        )}
       </CardContent>
 
       <CardFooter className="flex flex-col space-y-2">
-        {paymentStatus !== PaymentStatus.SUCCESS && 
-         paymentStatus !== PaymentStatus.FAILED &&
-         !isInitializing && (
-          <p className="text-xs text-center text-muted-foreground">
-            {plan.hasTrial 
-              ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
-              : 'החיוב יבוצע מיידית'}
-          </p>
+        {shouldShowPaymentContent && (
+          <>
+            <Button 
+              type="button" 
+              className="w-full" 
+              onClick={handleSubmitClick}
+              disabled={paymentStatus === PaymentStatus.PROCESSING}
+            >
+              {getButtonText()}
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              {operationType === 'token_only' 
+                ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
+                : plan.hasTrial 
+                  ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
+                  : 'החיוב יבוצע מיידית'}
+            </p>
+          </>
         )}
         
         {onBack && paymentStatus !== PaymentStatus.SUCCESS && (

@@ -63,7 +63,7 @@ const Auth = () => {
           }
         } else {
           // Clear expired registration data
-          const hasExpired = StorageService.getRegistrationData()?.registrationTime;
+          const hasExpired = StorageService.getRegistrationData().registrationTime;
           
           if (hasExpired) {
             PaymentLogger.log("Auth: Clearing expired registration data");

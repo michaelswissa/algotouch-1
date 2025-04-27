@@ -228,10 +228,6 @@ serve(async (req) => {
         // No trial for annual plans
         nextChargeDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
         currentPeriodEndsAt = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-      } else if (planId === 'vip') {
-        // VIP is forever, no next charge
-        nextChargeDate = null;
-        currentPeriodEndsAt = null; // Infinite
       }
       
       // Prepare subscription data
@@ -239,8 +235,8 @@ serve(async (req) => {
         user_id: userId,
         plan_type: planId,
         status: trialEndsAt ? 'trial' : 'active',
-        next_charge_date: nextChargeDate?.toISOString(),
-        current_period_ends_at: currentPeriodEndsAt?.toISOString(),
+        next_charge_date: nextChargeDate.toISOString(),
+        current_period_ends_at: currentPeriodEndsAt.toISOString(),
         trial_ends_at: trialEndsAt ? trialEndsAt.toISOString() : null,
         payment_method: paymentMethod,
         updated_at: now.toISOString()

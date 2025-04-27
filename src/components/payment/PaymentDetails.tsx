@@ -1,77 +1,181 @@
 
-import React, { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import React from 'react';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { CreditCard } from 'lucide-react';
+import CardExpiryInputs from './CardExpiryInputs';
+import SecurityNote from './SecurityNote';
+import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
+import CardNumberFrame from './iframes/CardNumberFrame';
+import CVVFrame from './iframes/CVVFrame';
 
 interface PaymentDetailsProps {
-  paymentUrl?: string;
+  terminalNumber: string;
+  cardcomUrl: string;
+  masterFrameRef: React.RefObject<HTMLIFrameElement>;
   isReady?: boolean;
-  masterFrameRef?: React.RefObject<HTMLIFrameElement>;
-  terminalNumber?: string;
-  cardcomUrl?: string;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
-  paymentUrl,
-  isReady = false,
+  terminalNumber, 
+  cardcomUrl, 
   masterFrameRef,
-  terminalNumber,
-  cardcomUrl
+  isReady = false
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [height, setHeight] = useState(650);
+  const { formData, errors, handleChange } = usePaymentForm();
+  const [cardNumberLoaded, setCardNumberLoaded] = React.useState(false);
+  const [cvvLoaded, setCvvLoaded] = React.useState(false);
   
-  useEffect(() => {
-    const handleIframeMessage = (event: MessageEvent) => {
-      if (event.origin.includes('cardcom')) {
-        const { type, height } = event.data || {};
-        if (type === 'resize' && height) {
-          setHeight(height);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleIframeMessage);
-    return () => {
-      window.removeEventListener('message', handleIframeMessage);
-    };
-  }, []);
-
-  const handleIframeLoad = () => {
-    setIsLoading(false);
-  };
-
-  if (!isReady || !paymentUrl) {
-    return (
-      <div className="flex justify-center items-center p-10">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="relative">
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/80 z-10">
-          <Loader2 className="h-8 w-8 animate-spin mb-2" />
-          <p className="text-sm text-muted-foreground">טוען טופס תשלום...</p>
+    <div className="space-y-4" dir="rtl">
+      {/* Card Owner Name */}
+      <div className="space-y-2">
+        <Label htmlFor="cardOwnerName">שם בעל הכרטיס</Label>
+        <Input
+          id="cardOwnerName"
+          name="cardOwnerName"
+          placeholder="ישראל ישראלי"
+          value={formData.cardOwnerName}
+          onChange={handleChange}
+          className={errors.cardOwnerName ? 'border-red-500' : ''}
+          required
+        />
+        {errors.cardOwnerName && (
+          <p className="text-sm text-red-500">{errors.cardOwnerName}</p>
+        )}
+      </div>
+
+      {/* ID Number */}
+      <div className="space-y-2">
+        <Label htmlFor="cardOwnerId">תעודת זהות</Label>
+        <Input
+          id="cardOwnerId"
+          name="cardOwnerId"
+          placeholder="123456789"
+          value={formData.cardOwnerId}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '');
+            const syntheticEvent = {
+              ...e,
+              target: {
+                ...e.target,
+                name: 'cardOwnerId',
+                value
+              }
+            };
+            handleChange(syntheticEvent as any);
+          }}
+          maxLength={9}
+          className={errors.cardOwnerId ? 'border-red-500' : ''}
+          required
+        />
+        {errors.cardOwnerId && (
+          <p className="text-sm text-red-500">{errors.cardOwnerId}</p>
+        )}
+      </div>
+
+      {/* Email */}
+      <div className="space-y-2">
+        <Label htmlFor="cardOwnerEmail">דוא"ל</Label>
+        <Input
+          id="cardOwnerEmail"
+          name="cardOwnerEmail"
+          type="email"
+          placeholder="example@example.com"
+          value={formData.cardOwnerEmail}
+          onChange={handleChange}
+          className={errors.cardOwnerEmail ? 'border-red-500' : ''}
+          required
+        />
+        {errors.cardOwnerEmail && (
+          <p className="text-sm text-red-500">{errors.cardOwnerEmail}</p>
+        )}
+      </div>
+
+      {/* Phone */}
+      <div className="space-y-2">
+        <Label htmlFor="cardOwnerPhone">טלפון</Label>
+        <Input
+          id="cardOwnerPhone"
+          name="cardOwnerPhone"
+          placeholder="05xxxxxxxx"
+          value={formData.cardOwnerPhone}
+          onChange={handleChange}
+          className={errors.cardOwnerPhone ? 'border-red-500' : ''}
+          required
+        />
+        {errors.cardOwnerPhone && (
+          <p className="text-sm text-red-500">{errors.cardOwnerPhone}</p>
+        )}
+      </div>
+
+      {/* Card Number Frame */}
+      <div className="space-y-2">
+        <Label htmlFor="cardNumber">מספר כרטיס</Label>
+        <div className="relative">
+          <CardNumberFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => setCardNumberLoaded(true)}
+            isReady={isReady}
+          />
+          <div className="absolute top-0 right-0 h-full flex items-center pr-3 pointer-events-none">
+            <CreditCard className="h-5 w-5 text-gray-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* Card Expiry */}
+      <CardExpiryInputs
+        expiryMonth={formData.expirationMonth}
+        expiryYear={formData.expirationYear}
+        onMonthChange={(value) => {
+          const e = {
+            target: {
+              name: 'expirationMonth',
+              value
+            }
+          } as React.ChangeEvent<HTMLSelectElement>;
+          handleChange(e);
+        }}
+        onYearChange={(value) => {
+          const e = {
+            target: {
+              name: 'expirationYear',
+              value
+            }
+          } as React.ChangeEvent<HTMLSelectElement>;
+          handleChange(e);
+        }}
+        error={errors.expirationMonth || errors.expirationYear}
+      />
+
+      {/* CVV Frame */}
+      <div className="space-y-2">
+        <Label htmlFor="cvv">קוד אבטחה (CVV)</Label>
+        <div className="relative max-w-[188px]">
+          <CVVFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => setCvvLoaded(true)}
+            isReady={isReady}
+          />
+        </div>
+      </div>
+
+      {isReady && (
+        <div className="mt-6">
+          <iframe 
+            ref={masterFrameRef}
+            src={`${cardcomUrl}/Interface/MasterPage.aspx?TerminalNumber=${terminalNumber}&nocss=true`}
+            title="CardCom Payment"
+            className="w-full h-0"
+            style={{ border: 'none' }}
+          />
         </div>
       )}
 
-      <iframe
-        id="cardcom-frame"
-        ref={masterFrameRef}
-        src={paymentUrl}
-        style={{
-          width: '100%',
-          height: `${height}px`,
-          border: 0,
-          overflow: 'hidden'
-        }}
-        onLoad={handleIframeLoad}
-        allow="payment *; clipboard-write"
-        sandbox="allow-forms allow-same-origin allow-scripts"
-        title="CardCom Payment"
-      />
+      <SecurityNote />
     </div>
   );
 };

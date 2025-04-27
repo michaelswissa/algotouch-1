@@ -227,12 +227,6 @@ export function usePaymentForm() {
     
     try {
       await submitPayment({
-        // Use the property names that match the CardOwnerDetails interface
-        name: formData.cardOwnerName,
-        email: formData.cardOwnerEmail,
-        phone: formData.cardOwnerPhone,
-        identityNumber: formData.cardOwnerId,
-        // Include the original property names as they might be used elsewhere
         cardOwnerName: formData.cardOwnerName,
         cardOwnerId: formData.cardOwnerId,
         cardOwnerEmail: formData.cardOwnerEmail,

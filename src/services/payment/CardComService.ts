@@ -1,107 +1,171 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { PaymentLogger } from './PaymentLogger';
 
-/**
- * Service for communicating with CardCom payment gateway
- */
 export class CardComService {
   /**
-   * Initialize a payment session
+   * Initialize a CardCom payment session for iframe-based payments
    */
-  static async initializePayment({
-    planId,
-    userId,
-    email,
-    fullName,
-    operationType = 'payment'
-  }: {
+  static async initializePayment(params: {
     planId: string;
     userId: string | null;
     email: string;
     fullName: string;
     operationType?: 'payment' | 'token_only';
-  }): Promise<{
-    lowProfileCode: string;
-    sessionId: string;
-    terminalNumber: string;
-    cardcomUrl: string;
-    reference: string;
-  }> {
-    PaymentLogger.log('Initializing payment', { planId, email, operationType });
-
-    // Determine amount based on plan
-    const amount = 
-      planId === 'monthly' ? 371 :
-      planId === 'annual' ? 3371 : 13121;
-
-    // Determine operation based on plan and operationType
-    let operation = "ChargeOnly";
-    if (operationType === 'token_only' || planId === 'monthly') {
-      operation = "ChargeAndCreateToken";
-    }
+  }): Promise<PaymentSessionData> {
+    const { planId, userId, email, fullName, operationType = 'payment' } = params;
 
     try {
-      const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
+      PaymentLogger.log('Initializing payment', { planId, userId, email, operationType });
+      
+      // Determine amount based on plan
+      let amount = 0;
+      switch (planId) {
+        case 'monthly':
+          amount = 371;
+          break;
+        case 'annual':
+          amount = 3371;
+          break;
+        case 'vip':
+          amount = 13121;
+          break;
+        default:
+          throw new Error(`Unsupported plan: ${planId}`);
+      }
+
+      // Determine operation based on plan and operationType
+      const operation = operationType === 'token_only' || planId === 'monthly' 
+        ? "ChargeAndCreateToken" 
+        : "ChargeOnly";
+
+      // Call CardCom payment initialization Edge Function
+      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
           amount,
+          operation,
           invoiceInfo: {
             fullName: fullName || email,
             email,
           },
           currency: "ILS",
-          operation,
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`
           },
           userId,
-          operationType
+          registrationData: sessionStorage.getItem('registration_data') 
+            ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+            : null
+        }
+      });
+      
+      if (error || !data?.success) {
+        PaymentLogger.error("Payment initialization error:", error || data?.message);
+        throw new Error(error?.message || data?.message || 'שגיאה באתחול התשלום');
+      }
+      
+      PaymentLogger.log("Payment session created:", data.data);
+      
+      if (!data.data || !data.data.lowProfileCode) {
+        PaymentLogger.error("Missing lowProfileCode in payment session response");
+        throw new Error('חסר מזהה יחודי לעסקה בתגובה מהשרת');
+      }
+      
+      return { 
+        lowProfileCode: data.data.lowProfileCode, 
+        sessionId: data.data.sessionId,
+        terminalNumber: data.data.terminalNumber || '160138',
+        cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+        reference: data.data.reference || ''
+      };
+    } catch (error) {
+      PaymentLogger.error("Exception during payment initialization:", error);
+      throw error instanceof Error ? error : new Error('שגיאה באתחול התשלום');
+    }
+  }
+
+  /**
+   * Submit payment information to CardCom
+   */
+  static async submitPayment(params: {
+    lowProfileCode: string;
+    terminalNumber: string;
+    operationType?: 'payment' | 'token_only';
+    cardOwnerDetails: CardOwnerDetails;
+  }): Promise<{ success: boolean; transactionId?: string }> {
+    const { 
+      lowProfileCode, 
+      terminalNumber, 
+      operationType = 'payment',
+      cardOwnerDetails
+    } = params;
+    
+    try {
+      PaymentLogger.log('Submitting payment', { 
+        lowProfileCode,
+        operationType 
+      });
+      
+      // Validate critical fields
+      if (!cardOwnerDetails.cardOwnerName?.trim()) {
+        throw new Error('שם בעל הכרטיס חסר');
+      }
+      
+      if (!cardOwnerDetails.cardOwnerId?.trim() || !(/^\d{9}$/.test(cardOwnerDetails.cardOwnerId))) {
+        throw new Error('תעודת זהות לא תקינה - יש להזין 9 ספרות');
+      }
+      
+      if (!cardOwnerDetails.cardOwnerEmail?.trim() || 
+          !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cardOwnerDetails.cardOwnerEmail))) {
+        throw new Error('כתובת אימייל לא תקינה');
+      }
+      
+      if (!cardOwnerDetails.cardOwnerPhone?.trim() || !(/^0\d{8,9}$/.test(cardOwnerDetails.cardOwnerPhone))) {
+        throw new Error('מספר טלפון לא תקין');
+      }
+      
+      const { data, error } = await supabase.functions.invoke('cardcom-submit', {
+        body: {
+          lowProfileCode,
+          terminalNumber,
+          operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+          cardOwnerDetails
         }
       });
 
-      if (error) {
-        throw new Error(error.message || 'שגיאה באתחול התשלום');
+      if (error || !data?.success) {
+        PaymentLogger.error('Payment submission error', error || data?.message);
+        throw new Error(error?.message || data?.message || 'שגיאה בעיבוד התשלום');
       }
 
-      if (!data?.success) {
-        throw new Error(data?.message || 'שגיאה באתחול התשלום');
-      }
-
-      PaymentLogger.log('Payment session created', data.data);
-
-      if (!data.data || !data.data.lowProfileCode) {
-        throw new Error('חסר מזהה יחודי לעסקה בתגובה מהשרת');
-      }
-
-      return {
-        lowProfileCode: data.data.lowProfileCode,
-        sessionId: data.data.sessionId || data.data.reference,
-        terminalNumber: data.data.terminalNumber,
-        cardcomUrl: data.data.cardcomUrl,
-        reference: data.data.reference
+      PaymentLogger.log('Payment submitted successfully', data);
+      return { 
+        success: true, 
+        transactionId: data.transactionId 
       };
     } catch (error) {
-      PaymentLogger.error('Payment initialization error:', error);
-      throw error;
+      PaymentLogger.error('Exception during payment submission', error);
+      throw error instanceof Error ? error : new Error('שגיאה בעיבוד התשלום');
     }
   }
-  
+
   /**
    * Check the status of a payment transaction
    */
   static async checkPaymentStatus(lowProfileCode: string): Promise<{
     success: boolean;
+    status?: string;
     transactionId?: string;
-    error?: string;
   }> {
-    if (!lowProfileCode) {
-      PaymentLogger.error('Missing lowProfileCode for status check');
-      return { success: false, error: 'Missing transaction ID' };
-    }
-
     try {
+      if (!lowProfileCode) {
+        PaymentLogger.error('Missing lowProfileCode for status check');
+        return { success: false };
+      }
+
       PaymentLogger.log('Checking payment status', { lowProfileCode });
       
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
@@ -110,36 +174,23 @@ export class CardComService {
 
       if (error) {
         PaymentLogger.error('Error checking payment status', error);
-        return { 
-          success: false, 
-          error: error.message || 'שגיאה בבדיקת סטטוס התשלום' 
-        };
+        return { success: false };
       }
 
       PaymentLogger.log('Payment status check result', data);
-      
-      if (!data?.success) {
-        return { 
-          success: false, 
-          error: data?.message || 'העסקה לא אושרה' 
-        };
-      }
-
-      return {
-        success: true,
-        transactionId: data.transactionId
+      return { 
+        success: data?.success || false,
+        status: data?.status,
+        transactionId: data?.transactionId
       };
     } catch (error) {
       PaymentLogger.error('Exception during payment status check', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'שגיאה בבדיקת סטטוס התשלום' 
-      };
+      return { success: false };
     }
   }
 
   /**
-   * Validate card owner information
+   * Validate card information using client-side checks
    */
   static validateCardInfo(cardInfo: {
     cardOwnerName?: string;
@@ -148,40 +199,61 @@ export class CardComService {
     cardOwnerPhone?: string;
     expirationMonth?: string;
     expirationYear?: string;
-  }): {
-    isValid: boolean;
-    errors: Record<string, string>;
-  } {
+  }): { valid: boolean; errors: Record<string, string> } {
     const errors: Record<string, string> = {};
     
-    // Validate cardOwnerName
+    // Validate cardholder name
     if (!cardInfo.cardOwnerName?.trim()) {
-      errors.cardOwnerName = 'נא להזין שם מלא';
+      errors.cardOwnerName = 'שם בעל הכרטיס הוא שדה חובה';
+    } else if (cardInfo.cardOwnerName.length < 2) {
+      errors.cardOwnerName = 'שם בעל הכרטיס חייב להכיל לפחות 2 תווים';
+    }
+    
+    // Validate ID
+    if (!cardInfo.cardOwnerId?.trim()) {
+      errors.cardOwnerId = 'תעודת זהות היא שדה חובה';
+    } else if (!/^\d{9}$/.test(cardInfo.cardOwnerId)) {
+      errors.cardOwnerId = 'תעודת זהות חייבת להכיל 9 ספרות בדיוק';
     }
     
     // Validate email
     if (!cardInfo.cardOwnerEmail?.trim()) {
-      errors.cardOwnerEmail = 'נא להזין כתובת אימייל';
+      errors.cardOwnerEmail = 'דואר אלקטרוני הוא שדה חובה';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cardInfo.cardOwnerEmail)) {
-      errors.cardOwnerEmail = 'כתובת אימייל לא תקינה';
+      errors.cardOwnerEmail = 'יש להזין כתובת דואר אלקטרוני תקינה';
     }
     
     // Validate phone
-    if (cardInfo.cardOwnerPhone && !/^0[2-9]\d{7,8}$/.test(cardInfo.cardOwnerPhone)) {
-      errors.cardOwnerPhone = 'מספר טלפון לא תקין';
+    if (!cardInfo.cardOwnerPhone?.trim()) {
+      errors.cardOwnerPhone = 'מספר טלפון הוא שדה חובה';
+    } else if (!/^0\d{8,9}$/.test(cardInfo.cardOwnerPhone)) {
+      errors.cardOwnerPhone = 'יש להזין מספר טלפון ישראלי תקין';
     }
     
-    // Validate expiration dates if provided
-    if (cardInfo.expirationMonth && (isNaN(Number(cardInfo.expirationMonth)) || Number(cardInfo.expirationMonth) < 1 || Number(cardInfo.expirationMonth) > 12)) {
-      errors.expirationMonth = 'חודש לא תקין';
+    // Validate expiry date
+    if (!cardInfo.expirationMonth) {
+      errors.expirationMonth = 'חודש תפוגה הוא שדה חובה';
     }
     
-    if (cardInfo.expirationYear && isNaN(Number(cardInfo.expirationYear))) {
-      errors.expirationYear = 'שנה לא תקינה';
+    if (!cardInfo.expirationYear) {
+      errors.expirationYear = 'שנת תפוגה היא שדה חובה';
+    }
+    
+    if (cardInfo.expirationMonth && cardInfo.expirationYear) {
+      // Check if card is expired
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear() % 100; // Last two digits
+      const currentMonth = currentDate.getMonth() + 1; // 1-12
+      const expiryMonth = parseInt(cardInfo.expirationMonth);
+      const expiryYear = parseInt(cardInfo.expirationYear);
+      
+      if (expiryYear < currentYear || (expiryYear === currentYear && expiryMonth < currentMonth)) {
+        errors.expirationYear = 'כרטיס האשראי פג תוקף';
+      }
     }
     
     return {
-      isValid: Object.keys(errors).length === 0,
+      valid: Object.keys(errors).length === 0,
       errors
     };
   }

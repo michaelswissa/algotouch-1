@@ -54,7 +54,6 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         freeTrialDays={plan.freeTrialDays}
       />
       <PaymentDetails 
-        paymentUrl={`${cardcomUrl}/LowProfile/?LowProfileCode=${terminalNumber}`}
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         masterFrameRef={masterFrameRef}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -8,10 +9,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { Loader2 } from 'lucide-react';
-import { StorageService } from '@/services/storage/StorageService';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "כתובת אימייל לא תקינה" }),
@@ -24,7 +24,6 @@ const LoginForm: React.FC = () => {
   const { signIn, loading, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
   const form = useForm<LoginFormValues>({
@@ -37,39 +36,19 @@ const LoginForm: React.FC = () => {
 
   // Check for any payment redirect parameters
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
     const paymentResult = searchParams.get('payment_result');
     const paymentError = searchParams.get('error');
-    const lowProfileCode = searchParams.get('lowProfileCode');
     
     if (paymentResult === 'failed' || paymentError) {
       const errorMessage = paymentError || 'התשלום נכשל, אנא נסה שנית';
-      PaymentLogger.error('Login redirect after payment failure:', { 
-        paymentResult, 
-        paymentError, 
-        lowProfileCode 
-      });
+      PaymentLogger.error('Login redirect after payment failure:', { paymentResult, paymentError });
       toast.error(errorMessage);
-      
-      // Update payment status in storage if we have a lowProfileCode
-      if (lowProfileCode) {
-        StorageService.updatePaymentData({
-          status: 'failed',
-          lowProfileCode
-        });
-      }
       
       // Clear the URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    
-    // If we have successful lowProfileCode but not logged in, we need to check payment status
-    if (lowProfileCode && !paymentError && !paymentResult) {
-      PaymentLogger.log('Found lowProfileCode in URL, redirecting to success page', {
-        lowProfileCode 
-      });
-      navigate(`/subscription/success?lowProfileCode=${lowProfileCode}`);
-    }
-  }, [searchParams, navigate]);
+  }, []);
 
   const onSubmit = async (values: LoginFormValues) => {
     if (isSubmitting) return;
@@ -83,13 +62,6 @@ const LoginForm: React.FC = () => {
       
       if (!result.success) {
         setAuthError(result.error || 'התחברות נכשלה. אנא בדוק את פרטי ההתחברות שלך ונסה שוב.');
-      } else {
-        // Check if we have a pending payment
-        const paymentData = StorageService.getPaymentData();
-        if (paymentData && paymentData.lowProfileCode && paymentData.status === 'pending') {
-          // Redirect to verify payment
-          navigate(`/subscription/success?lowProfileCode=${paymentData.lowProfileCode}`);
-        }
       }
     } catch (error) {
       PaymentLogger.error('Login error:', error);
@@ -101,24 +73,11 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  // If user is already authenticated, redirect to dashboard or check pending payments
+  // If user is already authenticated, redirect to dashboard
   useEffect(() => {
     if (isAuthenticated) {
-      PaymentLogger.log('User already authenticated');
-      
-      // Check if we have a pending payment
-      const paymentData = StorageService.getPaymentData();
-      if (paymentData && paymentData.lowProfileCode && paymentData.status === 'pending') {
-        PaymentLogger.log('Found pending payment, redirecting to verify', {
-          lowProfileCode: paymentData.lowProfileCode
-        });
-        
-        // Redirect to verify payment
-        navigate(`/subscription/success?lowProfileCode=${paymentData.lowProfileCode}`);
-      } else {
-        // Otherwise redirect to dashboard
-        navigate('/dashboard', { replace: true });
-      }
+      PaymentLogger.log('User already authenticated, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 

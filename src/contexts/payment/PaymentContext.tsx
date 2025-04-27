@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { PaymentStatus, PaymentStatusType, PaymentSessionData, CardOwnerDetails } from '@/components/payment/types/payment';
+import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface PaymentState {

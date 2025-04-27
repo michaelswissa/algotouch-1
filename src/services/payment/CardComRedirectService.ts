@@ -1,13 +1,22 @@
 
-import { PaymentLogger } from './PaymentLogger';
+import { PaymentSessionData } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
+import { PaymentLogger } from './PaymentLogger';
+
+interface RedirectPaymentParams {
+  planId: string;
+  amount: number;
+  userEmail: string;
+  fullName: string;
+  userId?: string | null;
+}
 
 /**
- * Service for handling CardCom redirect payments
+ * Service responsible for handling CardCom redirect payment flows
  */
 export class CardComRedirectService {
   /**
-   * Initialize a redirect payment flow with CardCom
+   * Initialize a redirect-based payment flow with CardCom
    */
   static async initializeRedirect({
     planId,
@@ -15,25 +24,20 @@ export class CardComRedirectService {
     userEmail,
     fullName,
     userId
-  }: {
-    planId: string;
-    amount: number;
-    userEmail: string;
-    fullName: string;
-    userId?: string;
-  }): Promise<{
-    url: string;
-    lowProfileCode: string;
-    reference: string;
-    sessionId?: string;
-  }> {
-    PaymentLogger.log('Initializing CardCom redirect payment', { planId, amount, userEmail });
-
+  }: RedirectPaymentParams): Promise<{ url: string; lowProfileCode: string; reference: string }> {
     try {
+      PaymentLogger.log('Initializing CardCom redirect payment', {
+        planId,
+        amount,
+        userEmail,
+        hasUserId: !!userId
+      });
+      
       const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
         body: {
           planId,
           amount,
+          userId,
           invoiceInfo: {
             fullName,
             email: userEmail,
@@ -41,20 +45,25 @@ export class CardComRedirectService {
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`
-          },
-          userId: userId
+          }
         }
       });
 
       if (error) {
+        PaymentLogger.error('CardCom redirect initialization error:', error);
         throw new Error(error.message || 'שגיאה באתחול דף התשלום');
       }
-
-      if (!data?.success || !data?.data?.url || !data?.data?.lowProfileCode) {
+      
+      if (!data?.success) {
+        PaymentLogger.error('CardCom redirect initialization failed:', data?.message);
         throw new Error(data?.message || 'שגיאה באתחול דף התשלום');
       }
 
-      PaymentLogger.log('CardCom redirect initialized', { 
+      if (!data.data?.url) {
+        throw new Error('חסרה כתובת מעבר לתשלום');
+      }
+      
+      PaymentLogger.log('CardCom redirect initialized successfully', {
         lowProfileCode: data.data.lowProfileCode,
         reference: data.data.reference
       });
@@ -62,17 +71,16 @@ export class CardComRedirectService {
       return {
         url: data.data.url,
         lowProfileCode: data.data.lowProfileCode,
-        reference: data.data.reference,
-        sessionId: data.data.sessionId
+        reference: data.data.reference
       };
     } catch (error) {
-      PaymentLogger.error('CardCom redirect initialization error:', error);
-      throw error;
+      PaymentLogger.error('Exception during redirect initialization:', error);
+      throw new Error(error instanceof Error ? error.message : 'שגיאה באתחול דף התשלום');
     }
   }
-
+  
   /**
-   * Redirect the browser to the CardCom payment page
+   * Redirect to CardCom payment page
    */
   static redirectToPayment(url: string): void {
     if (!url) {
@@ -82,52 +90,32 @@ export class CardComRedirectService {
     PaymentLogger.log('Redirecting to CardCom payment page', { url });
     window.location.href = url;
   }
-
+  
   /**
-   * Verify the status of a payment transaction
+   * Verify payment status after return from CardCom
    */
-  static async verifyPaymentStatus(lowProfileCode: string): Promise<{
-    success: boolean;
-    transactionId?: string;
-    error?: string;
-    userId?: string;
-  }> {
+  static async verifyPaymentStatus(lowProfileCode: string): Promise<boolean> {
     if (!lowProfileCode) {
-      return { success: false, error: 'חסר קוד זיהוי עסקה' };
+      PaymentLogger.error('Missing lowProfileCode for status check');
+      return false;
     }
     
-    PaymentLogger.log('Verifying payment status', { lowProfileCode });
-    
     try {
+      PaymentLogger.log('Checking payment status', { lowProfileCode });
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: { lowProfileCode }
       });
 
       if (error) {
-        PaymentLogger.error('Error verifying payment status:', error);
-        return { success: false, error: error.message || 'שגיאה בבדיקת סטטוס התשלום' };
+        PaymentLogger.error('Error checking payment status:', error);
+        throw new Error(error.message || 'שגיאה בבדיקת סטטוס התשלום');
       }
 
-      if (!data?.success) {
-        return { success: false, error: data?.message || 'העסקה לא אושרה' };
-      }
-
-      PaymentLogger.log('Payment verified successfully', {
-        transactionId: data.transactionId,
-        userId: data.userId
-      });
-
-      return {
-        success: true,
-        transactionId: data.transactionId,
-        userId: data.userId
-      };
+      PaymentLogger.log('Payment status check result', { success: data?.success });
+      return data?.success || false;
     } catch (error) {
-      PaymentLogger.error('Exception verifying payment status:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'שגיאה בבדיקת סטטוס התשלום'
-      };
+      PaymentLogger.error('Exception during payment status check:', error);
+      return false;
     }
   }
 }
