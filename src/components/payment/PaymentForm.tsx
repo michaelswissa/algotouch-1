@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -11,9 +11,6 @@ import PlanSummary from './PlanSummary';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import InitializingPayment from './states/InitializingPayment';
-import { CardComRedirectService } from '@/services/payment/CardComRedirectService';
-import { StorageService } from '@/services/storage/StorageService';
-import { useAuth } from '@/contexts/auth';
 
 interface PaymentFormProps {
   planId: string;
@@ -22,11 +19,8 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
-  const [paymentStatus, setPaymentStatus] = useState<typeof PaymentStatus[keyof typeof PaymentStatus]>(PaymentStatus.IDLE);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [paymentUrl, setPaymentUrl] = useState<string>('');
-  const [lowProfileCode, setLowProfileCode] = useState<string>('');
-  const { user } = useAuth();
+  const [paymentStatus, setPaymentStatus] = useState<keyof typeof PaymentStatus>(PaymentStatus.IDLE);
+  const [isInitializing, setIsInitializing] = useState(false);
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -34,77 +28,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     : planId === 'vip' 
       ? planDetails.vip 
       : planDetails.monthly;
+      
+  // Direct CardCom URL construction
+  const cardcomUrl = 'https://secure.cardcom.solutions';
+  const terminalNumber = '160138'; // Your CardCom terminal number
+  const paymentUrl = `${cardcomUrl}/LowProfile/?LowProfileCode=${terminalNumber}`;
 
-  // Initialize payment on mount
-  useEffect(() => {
-    initializePayment();
-    
-    // Cleanup on unmount
-    return () => {
-      setPaymentStatus(PaymentStatus.IDLE);
-    };
-  }, [planId]);
-
-  const initializePayment = async () => {
-    setIsInitializing(true);
-    setPaymentStatus(PaymentStatus.INITIALIZING);
-    
-    try {
-      // Get registration data
-      const registrationData = StorageService.getRegistrationData();
-      if (!registrationData || !registrationData.email) {
-        toast.error('מידע הרשמה חסר או לא תקין');
-        setPaymentStatus(PaymentStatus.FAILED);
-        return;
-      }
-      
-      // Prepare user information for the payment
-      const fullName = `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
-      const email = registrationData.email;
-      
-      // Calculate amount based on plan
-      const amount = 
-        planId === 'monthly' ? 371 :
-        planId === 'annual' ? 3371 : 13121;
-      
-      // Initialize payment redirect
-      const { url, lowProfileCode } = await CardComRedirectService.initializeRedirect({
-        planId,
-        amount,
-        userEmail: email,
-        fullName,
-        userId: user?.id || registrationData.userId
-      });
-      
-      // Store payment session information
-      StorageService.updatePaymentData({
-        lowProfileCode,
-        status: 'pending'
-      });
-      
-      // Set payment URL and code
-      setPaymentUrl(url);
-      setLowProfileCode(lowProfileCode);
-      setPaymentStatus(PaymentStatus.IDLE);
-      
-    } catch (error) {
-      console.error("Error initializing payment:", error);
-      toast.error(error instanceof Error ? error.message : 'שגיאה באתחול התשלום');
-      setPaymentStatus(PaymentStatus.FAILED);
-    } finally {
-      setIsInitializing(false);
-    }
-  };
-  
   // Check for iframe redirects (payment complete)
-  useEffect(() => {
+  React.useEffect(() => {
     const checkIframeStatus = () => {
       const iframe = document.getElementById('cardcom-frame') as HTMLIFrameElement;
       
       if (!iframe || !iframe.contentWindow) return;
       
       try {
-        // If we can access the iframe's location, check for success/failure paths
         const location = iframe.contentWindow.location.href;
         
         if (location.includes('/success')) {
@@ -119,7 +56,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       }
     };
     
-    // Check every second
     const interval = setInterval(checkIframeStatus, 1000);
     return () => clearInterval(interval);
   }, [onPaymentComplete]);
@@ -134,7 +70,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     }
     
     if (paymentStatus === PaymentStatus.FAILED) {
-      return <FailedPayment onRetry={() => initializePayment()} />;
+      return <FailedPayment onRetry={() => setPaymentStatus(PaymentStatus.IDLE)} />;
     }
     
     return (
@@ -150,7 +86,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         />
         <PaymentDetails 
           paymentUrl={paymentUrl}
-          isReady={!isInitializing && !!paymentUrl}
+          isReady={!isInitializing}
         />
       </>
     );
