@@ -1,113 +1,52 @@
 
 /**
- * Logging service for payment operations with structured logs
- * and client-side persistence for debugging
+ * Logger class for payment-related operations
  */
 export class PaymentLogger {
-  private static readonly MAX_LOGS = 100;
-  private static readonly STORAGE_KEY = 'payment_logs';
-  
+  private static readonly PREFIX = '[PAYMENT]';
+  private static readonly DEBUG = true;
+
   /**
-   * Log an informational message with optional data
+   * Log an informational message
    */
   static log(message: string, data?: any): void {
-    const entry = this.createLogEntry('info', message, data);
-    this.saveLog(entry);
-    console.log(`[PAYMENT] ${message}`, data || '');
+    if (this.DEBUG) {
+      if (data) {
+        console.log(`${this.PREFIX} ${message}`, data);
+      } else {
+        console.log(`${this.PREFIX} ${message}`);
+      }
+    }
   }
-  
+
   /**
-   * Log an error message with optional error object
+   * Log an error message
    */
   static error(message: string, error?: any): void {
-    const entry = this.createLogEntry('error', message, error);
-    this.saveLog(entry);
-    console.error(`[PAYMENT ERROR] ${message}`, error || '');
+    if (error) {
+      console.error(`${this.PREFIX} ${message}`, error);
+    } else {
+      console.error(`${this.PREFIX} ${message}`);
+    }
   }
-  
+
   /**
-   * Log a warning message with optional data
+   * Log a warning message
    */
   static warn(message: string, data?: any): void {
-    const entry = this.createLogEntry('warn', message, data);
-    this.saveLog(entry);
-    console.warn(`[PAYMENT WARNING] ${message}`, data || '');
-  }
-  
-  /**
-   * Create a log entry with timestamp and metadata
-   */
-  private static createLogEntry(level: 'info' | 'error' | 'warn', message: string, data?: any): LogEntry {
-    return {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      data: data ? this.sanitizeData(data) : undefined
-    };
-  }
-  
-  /**
-   * Sanitize sensitive data before logging
-   */
-  private static sanitizeData(data: any): any {
-    if (!data) return undefined;
-    
-    // Create a deep copy to avoid mutating the original
-    const sanitized = JSON.parse(JSON.stringify(data));
-    
-    // Remove sensitive fields
-    if (sanitized.cardNumber) sanitized.cardNumber = 'XXXX-XXXX-XXXX-' + sanitized.cardNumber.slice(-4);
-    if (sanitized.cvv) sanitized.cvv = 'XXX';
-    if (sanitized.password) sanitized.password = '[REDACTED]';
-    
-    return sanitized;
-  }
-  
-  /**
-   * Save log entry to session storage
-   */
-  private static saveLog(entry: LogEntry): void {
-    try {
-      // Get existing logs
-      const existingLogs = this.getLogs();
-      
-      // Add new entry and limit size
-      existingLogs.push(entry);
-      if (existingLogs.length > this.MAX_LOGS) {
-        existingLogs.shift(); // Remove oldest entry
+    if (this.DEBUG) {
+      if (data) {
+        console.warn(`${this.PREFIX} ${message}`, data);
+      } else {
+        console.warn(`${this.PREFIX} ${message}`);
       }
-      
-      // Save back to storage
-      sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(existingLogs));
-    } catch (e) {
-      console.error('Failed to save payment log:', e);
     }
   }
-  
+
   /**
-   * Get all stored logs
-   */
-  static getLogs(): LogEntry[] {
-    try {
-      const logsStr = sessionStorage.getItem(this.STORAGE_KEY);
-      return logsStr ? JSON.parse(logsStr) : [];
-    } catch (e) {
-      console.error('Failed to retrieve payment logs:', e);
-      return [];
-    }
-  }
-  
-  /**
-   * Clear all stored logs
+   * Clear all payment related logs from the console
    */
   static clearLogs(): void {
-    sessionStorage.removeItem(this.STORAGE_KEY);
+    console.clear();
   }
-}
-
-interface LogEntry {
-  timestamp: string;
-  level: 'info' | 'error' | 'warn';
-  message: string;
-  data?: any;
 }

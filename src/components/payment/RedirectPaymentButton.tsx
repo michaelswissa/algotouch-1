@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CardComRedirectService } from '@/services/payment/CardComRedirectService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { StorageService } from '@/services/storage/StorageService';
+import { useAuth } from '@/contexts/auth';
 
 interface RedirectPaymentButtonProps {
   planId: string;
@@ -21,6 +22,7 @@ const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
   children
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
   
   const handleRedirectPayment = async () => {
     if (isLoading) return;
@@ -54,8 +56,8 @@ const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
         amount,
         userEmail: email,
         fullName,
-        // Pass userId only if already created, otherwise leave it undefined
-        userId: registrationData.userId
+        // Pass userId if user is already created
+        userId: user?.id || registrationData.userId
       });
       
       // Store payment session information

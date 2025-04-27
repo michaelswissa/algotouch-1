@@ -7,17 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// CardCom Configuration
-const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6",
-  endpoints: {
-    createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
-  }
-};
-
-// Helper logging function for enhanced debugging
+// Helper logging function
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-REDIRECT] ${step}${detailsStr}`);
@@ -31,8 +21,8 @@ serve(async (req) => {
 
   try {
     logStep("Function started");
-    
-    // Create Supabase admin client for database operations that bypass RLS
+
+    // Create Supabase admin client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -42,28 +32,31 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
+    // CardCom Configuration
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
+    const cardcomBaseUrl = "https://secure.cardcom.solutions";
+    
+    const requestBody = await req.json();
+    logStep("Request body", requestBody);
+    
     const { 
       planId, 
       amount, 
-      currency = "ILS", 
-      invoiceInfo,
+      invoiceInfo = {},
+      redirectUrls,
       userId,
-      redirectUrls
-    } = await req.json();
-    
-    logStep("Received request data", { 
-      planId, 
-      amount, 
-      currency,
-      hasUserId: !!userId,
-      hasInvoiceInfo: !!invoiceInfo
-    });
+      operation = "ChargeOnly",
+      currencyCode = "ILS",
+      language = "he"
+    } = requestBody;
 
-    if (!planId || !amount || !redirectUrls) {
+    // Validate required fields
+    if (!amount) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Missing required parameters",
+          message: "Missing required amount parameter",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -71,162 +64,135 @@ serve(async (req) => {
       );
     }
 
-    // Get user information and prepare transaction reference
-    let userEmail = invoiceInfo?.email;
-    let fullName = invoiceInfo?.fullName;
-    
-    // Create a unique reference ID for this transaction
-    // Format: user-YYYY-MM-DD-HH-MM-SS-MS
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}-${String(now.getMilliseconds()).padStart(3, '0')}`;
-    const transactionRef = userId 
-      ? `user-${userId.split('-')[0]}-${dateStr}`  // Take only first part of UUID for brevity
-      : `anon-${Math.random().toString(36).substring(2, 7)}-${dateStr}`;
-    
-    // Use a full URL for the webhook, CardCom expects a complete URL
-    const baseUrl = Deno.env.get('PUBLIC_SITE_URL') || 'https://ndhakvhrrkczgylcmyoc.functions.supabase.co';
-    const webhookUrl = `${baseUrl}/functions/v1/cardcom-webhook`;
-    
-    logStep("Preparing CardCom API request", { 
-      webhookUrl,
-      transactionRef,
-      userEmail,
-      fullName
-    });
+    if (!redirectUrls?.success || !redirectUrls?.failed) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Missing required redirect URLs",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
-    // Define the operation type based on plan
-    const operationType = planId === 'monthly' ? 'ChargeAndCreateToken' : 'ChargeOnly';
+    // Generate a unique reference for this payment
+    const reference = `${planId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    logStep("Generated reference", { reference });
+    
+    // Generate webhook URL
+    const functionsDomain = supabaseUrl.replace('.supabase.co', '.supabase.co/functions/v1');
+    const webhookUrl = `${functionsDomain}/cardcom-webhook`;
+    logStep("Webhook URL", { webhookUrl });
 
-    // Create CardCom API request body for payment initialization with enhanced validation
-    const cardcomPayload = {
-      TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-      ApiName: CARDCOM_CONFIG.apiName,
-      Operation: operationType,
-      ReturnValue: transactionRef,
+    // Prepare request to CardCom
+    const createLowProfileUrl = `${cardcomBaseUrl}/api/v11/LowProfile/Create`;
+    const fullName = invoiceInfo.fullName || "";
+    const email = invoiceInfo.email || "";
+
+    // Create payload for CardCom API
+    const lowProfilePayload = {
+      TerminalNumber: terminalNumber,
+      ApiName: apiName,
       Amount: amount,
+      SuccessRedirectUrl: redirectUrls.success,
+      FailedRedirectUrl: redirectUrls.failed,
       WebHookUrl: webhookUrl,
-      SuccessRedirectUrl: `${redirectUrls.success}?lowProfileCode={LowProfileID}`,
-      FailedRedirectUrl: `${redirectUrls.failed}?lowProfileCode={LowProfileID}&error=payment_failed`,
-      ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-      Language: "he",
-      ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1, // No installments allowed
+      ReturnValue: reference,
+      Operation: operation,
+      Language: language,
+      ISOCoinId: currencyCode === "ILS" ? 1 : (currencyCode === "USD" ? 2 : 1),
       UIDefinition: {
         IsHideCardOwnerName: false,
-        IsHideCardOwnerEmail: false,
-        IsHideCardOwnerPhone: false,
-        CardOwnerEmailValue: userEmail,
         CardOwnerNameValue: fullName,
+        IsHideCardOwnerEmail: false,
+        CardOwnerEmailValue: email,
         IsCardOwnerEmailRequired: true,
-        IsCardOwnerPhoneRequired: true,
-        IsHideCardOwnerIdentityNumber: false
-      },
-      // Add advanced validation parameters
-      AdvancedDefinition: {
-        JValidateType: 5, // Full authorization
-        ThreeDSecureState: "Enable", // Enable 3D-Secure validation
-        IsAVSEnable: true, // Enable Address Verification Service
-        IsRefundDeal: false
-      },
-      Document: invoiceInfo ? {
-        Name: fullName || userEmail,
-        Email: userEmail,
-        Products: [{
-          Description: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
-          UnitCost: amount,
-          Quantity: 1
-        }]
-      } : undefined
+        IsHideCardOwnerPhone: false,
+        IsCardOwnerPhoneRequired: true
+      }
     };
     
-    logStep("Sending request to CardCom");
+    if (invoiceInfo && Object.keys(invoiceInfo).length > 0) {
+      lowProfilePayload.Document = {
+        Name: invoiceInfo.fullName || email || "Customer",
+        Email: email,
+        TaxId: invoiceInfo.taxId,
+        Phone: invoiceInfo.phone,
+        Mobile: invoiceInfo.mobile,
+        Comments: `Subscription: ${planId}`,
+        IsVatFree: false
+      };
+    }
     
-    // Initialize payment session with CardCom
-    const response = await fetch(CARDCOM_CONFIG.endpoints.createLowProfile, {
+    logStep("Sending request to CardCom", lowProfilePayload);
+    
+    // Call CardCom API
+    const response = await fetch(createLowProfileUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(cardcomPayload),
+      body: JSON.stringify(lowProfilePayload),
     });
     
     const responseData = await response.json();
-    
     logStep("CardCom response", responseData);
     
-    if (responseData.ResponseCode !== 0) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: responseData.Description || "CardCom initialization failed",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (responseData.ResponseCode !== 0 || !responseData.LowProfileId) {
+      throw new Error(responseData.Description || "Failed to create payment page");
     }
-    
-    // Validate LowProfileId format (should be a GUID)
-    const lowProfileId = responseData.LowProfileId;
-    if (!lowProfileId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lowProfileId)) {
-      logStep("ERROR: Invalid LowProfileId format", { lowProfileId });
-      throw new Error("Invalid LowProfileId returned from CardCom");
-    }
-    
-    // Store payment session in database 
-    const sessionData = {
-      user_id: userId,
-      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
-      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
-      plan_id: planId,
-      amount: amount,
-      currency: currency,
-      status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
-      anonymous_data: !userId ? { email: userEmail, fullName } : null,
-      transaction_data: {
-        redirect_url: responseData.Url
-      }
-    };
-    
-    let dbSessionId = null;
-    
+
+    // Store payment session in database
     try {
-      // Always store session data regardless of user status to ensure webhook can find it
-      const { data: dbSession, error: sessionError } = await supabaseAdmin
+      const sessionData = {
+        user_id: userId,
+        plan_id: planId,
+        amount: amount,
+        currency: currencyCode,
+        status: "initiated",
+        low_profile_code: responseData.LowProfileId,
+        reference: reference,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+        payment_details: {
+          operation: operation,
+          cardcomUrl: cardcomBaseUrl
+        }
+      };
+      
+      const { data: paymentSession, error: dbError } = await supabaseAdmin
         .from('payment_sessions')
         .insert(sessionData)
         .select('id')
         .single();
-          
-      if (!sessionError && dbSession) {
-        dbSessionId = dbSession.id;
-        logStep("Payment session stored in DB", { 
-          sessionId: dbSessionId, 
-          lowProfileId,
-          reference: transactionRef 
-        });
+      
+      if (dbError) {
+        logStep("Error storing payment session", { error: dbError });
+        // Continue despite DB error
       } else {
-        logStep("Error storing payment session", { error: sessionError });
-        // Continue despite DB error to allow payment flow to proceed
+        logStep("Payment session stored", { sessionId: paymentSession?.id });
       }
     } catch (dbError) {
-      logStep("Exception storing payment session", { error: dbError.message });
-      // Don't fail the request if DB storage fails
+      logStep("Exception storing payment session", { error: dbError });
+      // Continue despite DB error
     }
+
+    // Return success with the redirect URL
+    const successResponse = {
+      success: true,
+      message: "Payment page created successfully",
+      data: {
+        lowProfileCode: responseData.LowProfileId,
+        url: responseData.Url,
+        reference: reference,
+        sessionId: reference,
+        terminalNumber: terminalNumber,
+        cardcomUrl: cardcomBaseUrl
+      }
+    };
     
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Payment redirect URL created",
-        data: {
-          sessionId: dbSessionId || `temp-${Date.now()}`,
-          lowProfileCode: lowProfileId,
-          terminalNumber: CARDCOM_CONFIG.terminalNumber,
-          url: responseData.Url,
-          reference: transactionRef
-        }
-      }),
+      JSON.stringify(successResponse),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -239,7 +205,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: errorMessage || "Payment redirect initialization failed",
+        message: errorMessage || "Failed to create payment page",
       }),
       {
         status: 200,

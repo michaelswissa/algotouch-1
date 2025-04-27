@@ -1,254 +1,78 @@
-import { toast } from 'sonner';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
-export interface StorageData {
-  planId?: string;
-  contractSigned?: boolean;
-  email?: string;
-  password?: string;
-  userId?: string;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    [key: string]: any;
-  };
-  registrationTime?: string;
-  userCreated?: boolean;
-  [key: string]: any;
-}
-
-export interface ContractData {
-  planId?: string;
-  fullName?: string;
-  email?: string;
-  signed: boolean;
-  signedDate?: string;
-  agreeToTerms: boolean;
-  [key: string]: any;
-}
-
-export interface PaymentData {
-  sessionId?: string;
-  lowProfileCode?: string;
-  terminalNumber?: string;
-  reference?: string;
-  status?: 'pending' | 'completed' | 'failed' | 'declined' | 'pending_3ds' | 'timeout';
-  cardLastFour?: string;
-  cardExpiry?: string;
-  cardToken?: string;
-  cardType?: string;
-  cardBrand?: string;
-  ownerName?: string;
-  ownerEmail?: string;
-  ownerPhone?: string;
-  approvalNumber?: string;
-  documentUrl?: string;
-  timestamp?: string;
-  transactionId?: string;
-}
-
-export interface PaymentIntent {
-  planId: string;
-  amount: number;
-  timestamp?: string;
-}
-
-export const StorageKeys = {
-  REGISTRATION: 'registration_data',
-  CONTRACT: 'contract_data',
-  PAYMENT: 'payment_data',
-  PAYMENT_INTENT: 'payment_intent',
-} as const;
-
+/**
+ * Service for managing browser storage
+ */
 export class StorageService {
+  // Keys for different storage items
+  private static readonly PAYMENT_DATA_KEY = 'payment_data';
+  private static readonly REGISTRATION_DATA_KEY = 'registration_data';
+  private static readonly REGISTRATION_INTENT_KEY = 'registration_intent';
+
   /**
-   * Get data from session storage with error handling
+   * Get stored payment data
    */
-  static get<T>(key: string): T | null {
-    try {
-      const data = sessionStorage.getItem(key);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      PaymentLogger.error(`Error reading from storage (${key}):`, error);
-      return null;
-    }
+  static getPaymentData(): any {
+    const data = sessionStorage.getItem(this.PAYMENT_DATA_KEY);
+    return data ? JSON.parse(data) : null;
   }
 
   /**
-   * Set data in session storage with error handling
+   * Update stored payment data
    */
-  static set<T>(key: string, data: T): boolean {
-    try {
-      sessionStorage.setItem(key, JSON.stringify(data));
-      return true;
-    } catch (error) {
-      PaymentLogger.error(`Error writing to storage (${key}):`, error);
-      toast.error('אירעה שגיאה בשמירת הנתונים');
-      return false;
-    }
+  static updatePaymentData(data: any): void {
+    const existingData = this.getPaymentData() || {};
+    const updatedData = { ...existingData, ...data, updatedAt: new Date().toISOString() };
+    sessionStorage.setItem(this.PAYMENT_DATA_KEY, JSON.stringify(updatedData));
   }
 
   /**
-   * Remove data from session storage
+   * Clear payment data
    */
-  static remove(key: string): void {
-    try {
-      sessionStorage.removeItem(key);
-    } catch (error) {
-      PaymentLogger.error(`Error removing from storage (${key}):`, error);
-    }
+  static clearPaymentData(): void {
+    sessionStorage.removeItem(this.PAYMENT_DATA_KEY);
   }
 
   /**
-   * Store registration intent for pending payment
+   * Store registration data temporarily
    */
-  static storeRegistrationIntent(data: Partial<PaymentIntent>): boolean {
-    const intent = {
+  static storeRegistrationData(data: any): void {
+    sessionStorage.setItem(this.REGISTRATION_DATA_KEY, JSON.stringify({
       ...data,
       timestamp: new Date().toISOString()
-    };
-    return this.set(StorageKeys.PAYMENT_INTENT, intent);
-  }
-
-  /**
-   * Get registration intent
-   */
-  static getRegistrationIntent(): PaymentIntent | null {
-    return this.get<PaymentIntent>(StorageKeys.PAYMENT_INTENT);
+    }));
   }
 
   /**
    * Get registration data
    */
-  static getRegistrationData(): StorageData {
-    const data = this.get<StorageData>(StorageKeys.REGISTRATION);
-    return data || {};
+  static getRegistrationData(): any {
+    const data = sessionStorage.getItem(this.REGISTRATION_DATA_KEY);
+    return data ? JSON.parse(data) : null;
   }
 
   /**
-   * Store registration data with timestamp
+   * Store registration intent - used to track registration after payment completion
    */
-  static storeRegistrationData(data: Partial<StorageData>): boolean {
-    const existingData = this.getRegistrationData();
-    const updatedData = { ...existingData, ...data };
-    
-    // Update timestamp if not set
-    if (!updatedData.registrationTime) {
-      updatedData.registrationTime = new Date().toISOString();
-    }
-    
-    return this.set(StorageKeys.REGISTRATION, updatedData);
-  }
-
-  /**
-   * Get contract data
-   */
-  static getContractData(): ContractData | null {
-    return this.get<ContractData>(StorageKeys.CONTRACT);
-  }
-
-  /**
-   * Update contract data
-   */
-  static updateContractData(data: Partial<ContractData>): boolean {
-    const current = this.getContractData() || { signed: false, agreeToTerms: false };
-    return this.set(StorageKeys.CONTRACT, { ...current, ...data });
-  }
-
-  /**
-   * Get payment data
-   */
-  static getPaymentData(): PaymentData | null {
-    return this.get<PaymentData>(StorageKeys.PAYMENT);
-  }
-
-  /**
-   * Update payment data with timestamp
-   */
-  static updatePaymentData(data: Partial<PaymentData>): boolean {
-    const current = this.getPaymentData() || {};
-    
-    // Add timestamp if updating status
-    if (data.status && data.status !== current.status) {
-      data.timestamp = new Date().toISOString();
-    }
-    
-    return this.set(StorageKeys.PAYMENT, { ...current, ...data });
-  }
-
-  /**
-   * Store detailed transaction result
-   */
-  static storeTransactionResult(data: {
-    status: 'completed' | 'failed' | 'declined';
-    transactionId?: string;
-    approvalNumber?: string;
-    cardLastFour?: string;
-    cardToken?: string;
-    documentUrl?: string;
-  }): boolean {
-    const current = this.getPaymentData() || {};
-    return this.updatePaymentData({
+  static storeRegistrationIntent(data: any): void {
+    sessionStorage.setItem(this.REGISTRATION_INTENT_KEY, JSON.stringify({
       ...data,
-      status: data.status,
       timestamp: new Date().toISOString()
-    });
+    }));
   }
 
   /**
-   * Clear all subscription data
+   * Get registration intent
    */
-  static clearAllSubscriptionData(): void {
-    this.remove(StorageKeys.REGISTRATION);
-    this.remove(StorageKeys.CONTRACT);
-    this.remove(StorageKeys.PAYMENT);
-    this.remove(StorageKeys.PAYMENT_INTENT);
-  }
-  
-  /**
-   * Check if registration data is valid and not expired
-   */
-  static isRegistrationValid(): boolean {
-    try {
-      const data = this.getRegistrationData();
-      
-      if (!data.registrationTime) {
-        return false;
-      }
-      
-      const registrationTime = new Date(data.registrationTime);
-      const now = new Date();
-      const timeDiffMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
-      
-      // Registration expires after 30 minutes
-      return timeDiffMinutes <= 30;
-    } catch (error) {
-      PaymentLogger.error('Error checking registration validity:', error);
-      return false;
-    }
+  static getRegistrationIntent(): any {
+    const data = sessionStorage.getItem(this.REGISTRATION_INTENT_KEY);
+    return data ? JSON.parse(data) : null;
   }
 
   /**
-   * Check if payment intent is valid and not expired
+   * Clear all registration data
    */
-  static isPaymentIntentValid(): boolean {
-    try {
-      const data = this.getRegistrationIntent();
-      
-      if (!data || !data.timestamp) {
-        return false;
-      }
-      
-      const intentTime = new Date(data.timestamp);
-      const now = new Date();
-      const timeDiffMinutes = (now.getTime() - intentTime.getTime()) / (1000 * 60);
-      
-      // Payment intent expires after 60 minutes
-      return timeDiffMinutes <= 60;
-    } catch (error) {
-      PaymentLogger.error('Error checking payment intent validity:', error);
-      return false;
-    }
+  static clearRegistrationData(): void {
+    sessionStorage.removeItem(this.REGISTRATION_DATA_KEY);
+    sessionStorage.removeItem(this.REGISTRATION_INTENT_KEY);
   }
 }
