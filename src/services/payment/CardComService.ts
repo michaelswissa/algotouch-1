@@ -41,7 +41,7 @@ export class CardComService {
         : "ChargeOnly";
 
       // Call CardCom payment initialization Edge Function
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
         body: {
           planId,
           amount,
@@ -77,7 +77,7 @@ export class CardComService {
       return { 
         lowProfileCode: data.data.lowProfileCode, 
         sessionId: data.data.sessionId,
-        terminalNumber: data.data.terminalNumber || '160138',
+        terminalNumber: data.data.terminalNumber,
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
         reference: data.data.reference || ''
       };

@@ -9,9 +9,9 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || '',
+  apiName: Deno.env.get("CARDCOM_API_NAME") || '',
+  apiPassword: Deno.env.get("CARDCOM_API_PASSWORD") || '',
   endpoints: {
     createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
   }
@@ -48,13 +48,15 @@ serve(async (req) => {
       currency = "ILS", 
       invoiceInfo,
       userId,
-      redirectUrls
+      redirectUrls,
+      operation = "ChargeOnly"
     } = await req.json();
     
     logStep("Received request data", { 
       planId, 
       amount, 
       currency,
+      operation,
       hasUserId: !!userId,
       hasInvoiceInfo: !!invoiceInfo
     });
@@ -69,6 +71,11 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+    
+    // Validate configuration
+    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName || !CARDCOM_CONFIG.apiPassword) {
+      throw new Error("Missing CardCom API configuration in environment variables");
     }
 
     // Get user information and prepare transaction reference
@@ -91,14 +98,15 @@ serve(async (req) => {
       webhookUrl,
       transactionRef,
       userEmail,
-      fullName
+      fullName,
+      operation
     });
 
     // Create CardCom API request body for payment initialization
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken',
+      Operation: operation,
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
@@ -174,7 +182,8 @@ serve(async (req) => {
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       transaction_data: {
         redirect_url: responseData.Url
-      }
+      },
+      cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
     
     let dbSessionId = null;
@@ -212,7 +221,8 @@ serve(async (req) => {
           lowProfileCode: lowProfileId,
           terminalNumber: CARDCOM_CONFIG.terminalNumber,
           url: responseData.Url,
-          reference: transactionRef
+          reference: transactionRef,
+          cardcomUrl: "https://secure.cardcom.solutions"
         }
       }),
       {

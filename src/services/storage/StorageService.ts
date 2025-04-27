@@ -108,6 +108,13 @@ export class StorageService {
   }
 
   /**
+   * For backward compatibility
+   */
+  static setRegistrationData(data: Partial<StorageData>): boolean {
+    return this.storeRegistrationData(data);
+  }
+
+  /**
    * Get contract data
    */
   static getContractData(): ContractData | null {

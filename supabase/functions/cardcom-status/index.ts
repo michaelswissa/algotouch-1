@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,10 +9,10 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
-  apiName: Deno.env.get("CARDCOM_API_NAME"),
+  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || '',
+  apiName: Deno.env.get("CARDCOM_API_NAME") || '',
   endpoints: {
-    getLowProfileResult: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLowProfileResult"
+    getLowProfileResult: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult"
   }
 };
 
@@ -56,6 +57,11 @@ serve(async (req) => {
     }
 
     logStep("Checking payment status", { lowProfileCode });
+    
+    // Validate configuration
+    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
+      throw new Error("Missing CardCom configuration");
+    }
     
     // First, check our database to see if we've already processed this transaction
     const { data: existingPayment } = await supabaseAdmin

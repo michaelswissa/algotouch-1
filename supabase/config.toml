@@ -36,3 +36,9 @@ verify_jwt = false
 
 [functions.cardcom-redirect]
 verify_jwt = false
+
+[functions.cardcom-recurring]
+verify_jwt = false
+
+[functions.cardcom-submit]
+verify_jwt = false

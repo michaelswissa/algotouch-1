@@ -2,7 +2,7 @@
 import { useRef, useCallback } from 'react';
 import { CardComService } from '@/services/payment/CardComService';
 import { StorageService } from '@/services/storage/StorageService';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
