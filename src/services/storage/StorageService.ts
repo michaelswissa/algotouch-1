@@ -6,7 +6,7 @@ export interface StorageData {
   planId?: string;
   contractSigned?: boolean;
   email?: string;
-  password?: string; // Adding password to match RegistrationData interface
+  password?: string; // Added to match RegistrationData interface
   userId?: string;
   userData?: {
     firstName?: string;
