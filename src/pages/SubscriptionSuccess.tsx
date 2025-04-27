@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { CheckCircle, Loader2, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { StorageService } from '@/services/storage/StorageService';
 import { CardComRedirectService } from '@/services/payment/CardComRedirectService';
 import { RegistrationService } from '@/services/registration/RegistrationService';

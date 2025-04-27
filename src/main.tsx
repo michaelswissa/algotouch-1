@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from '@/contexts/theme/ThemeProvider';
+import { ThemeProvider } from '@/components/ui/theme-provider'; // Updated import path
 import { AuthProvider } from '@/contexts/auth';
 import App from './App';
 import './index.css';
