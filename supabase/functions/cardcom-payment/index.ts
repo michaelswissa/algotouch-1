@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -9,9 +8,9 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
+  apiName: Deno.env.get("CARDCOM_API_NAME"),
+  apiPassword: Deno.env.get("CARDCOM_API_PASSWORD"),
   endpoints: {
     master: "https://secure.cardcom.solutions/api/openfields/master",
     cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
@@ -35,6 +34,11 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
+    // Validate configuration
+    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName || !CARDCOM_CONFIG.apiPassword) {
+      throw new Error("Missing CardCom API configuration in environment variables");
+    }
+
     // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -106,7 +110,7 @@ serve(async (req) => {
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken',
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
@@ -115,7 +119,7 @@ serve(async (req) => {
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1, // No installments allowed
+      MaxNumOfPayments: 1,
       UIDefinition: {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
@@ -175,13 +179,13 @@ serve(async (req) => {
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
-      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
+      low_profile_code: lowProfileId,
+      reference: transactionRef,
       plan_id: planId,
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -9,9 +8,9 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || '',
-  apiName: Deno.env.get("CARDCOM_API_NAME") || '',
-  apiPassword: Deno.env.get("CARDCOM_API_PASSWORD") || '',
+  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
+  apiName: Deno.env.get("CARDCOM_API_NAME"),
+  apiPassword: Deno.env.get("CARDCOM_API_PASSWORD"),
   endpoints: {
     createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
   }
@@ -32,6 +31,11 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
+    // Validate configuration
+    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName || !CARDCOM_CONFIG.apiPassword) {
+      throw new Error("Missing CardCom API configuration in environment variables");
+    }
+
     // Create Supabase admin client for database operations that bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -73,11 +77,6 @@ serve(async (req) => {
       );
     }
     
-    // Validate configuration
-    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName || !CARDCOM_CONFIG.apiPassword) {
-      throw new Error("Missing CardCom API configuration in environment variables");
-    }
-
     // Get user information and prepare transaction reference
     let userEmail = invoiceInfo?.email;
     let fullName = invoiceInfo?.fullName;

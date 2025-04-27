@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,62 +7,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configuration from environment variables
-const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
-const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
-const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD") || "i9nr6caGbgheTdYfQbo6";
-const cardcomUrl = "https://secure.cardcom.solutions";
+// Configuration from environment variables with validation
+const CARDCOM_CONFIG = {
+  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
+  apiName: Deno.env.get("CARDCOM_API_NAME"),
+  apiPassword: Deno.env.get("CARDCOM_API_PASSWORD"),
+  cardcomUrl: "https://secure.cardcom.solutions"
+};
 
 // Helper logging function
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-RECURRING] ${step}${detailsStr}`);
 };
-
-// Add a function to validate token before charging
-async function validateTokenBeforeCharge(token: string, supabaseAdmin: any) {
-  try {
-    // Check if token exists and is valid in recurring_payments table
-    const { data, error } = await supabaseAdmin
-      .from('recurring_payments')
-      .select('is_valid, token_expiry')
-      .eq('token', token)
-      .eq('status', 'active')
-      .single();
-    
-    if (error || !data) {
-      console.error('Token validation error:', error);
-      return false;
-    }
-    
-    // Check if token is marked as valid
-    if (!data.is_valid) {
-      return false;
-    }
-    
-    // Check if token is expired
-    if (data.token_expiry) {
-      const expiryDate = new Date(data.token_expiry);
-      const currentDate = new Date();
-      if (expiryDate < currentDate) {
-        return false;
-      }
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Token validation error:', error);
-    return false;
-  }
-}
-
-// Format date to YYYYMMDD format for CardCom
-function formatTokenExpiryDate(year: string, month: string): string {
-  // Ensure we have 2-digit month and add 20 to year (assuming 2-digit year)
-  const formattedMonth = month.padStart(2, '0');
-  const formattedYear = (year.length === 2) ? `20${year}` : year;
-  return `${formattedYear}${formattedMonth}01`; // First day of expiry month
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -73,6 +29,11 @@ serve(async (req) => {
 
   try {
     logStep("Function started");
+
+    // Validate configuration
+    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName || !CARDCOM_CONFIG.apiPassword) {
+      throw new Error("Missing CardCom API configuration in environment variables");
+    }
     
     // Create Supabase clients
     const supabaseClient = createClient(
@@ -164,8 +125,8 @@ serve(async (req) => {
         
         // Prepare URL-encoded form data
         const params = new URLSearchParams({
-          TerminalNumber: terminalNumber,
-          UserName: apiName,
+          TerminalNumber: CARDCOM_CONFIG.terminalNumber,
+          UserName: CARDCOM_CONFIG.apiName,
           TokenToCharge_Token: paymentMethod.token,
           TokenToCharge_CardValidityMonth: paymentMethod.expiryMonth || '',
           TokenToCharge_CardValidityYear: paymentMethod.expiryYear || '',
@@ -173,12 +134,12 @@ serve(async (req) => {
           TokenToCharge_APILevel: '10',
           TokenToCharge_CoinID: '1', // ILS
           TokenToCharge_ProductName: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
-          TokenToCharge_UserPassword: apiPassword,
+          TokenToCharge_UserPassword: CARDCOM_CONFIG.apiPassword,
           TokenToCharge_IsRecurringPayment: 'true'
         });
         
         // Call CardCom API to charge the token
-        const response = await fetch(`${cardcomUrl}/Interface/ChargeToken.aspx`, {
+        const response = await fetch(`${CARDCOM_CONFIG.cardcomUrl}/Interface/ChargeToken.aspx`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
