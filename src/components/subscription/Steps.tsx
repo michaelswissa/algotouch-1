@@ -19,15 +19,17 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
   const totalSteps = childrenArray.length;
   
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full", className)} role="navigation" aria-label="Progress Steps">
       <div className="flex items-center justify-between">
         {childrenArray.map((child, index) => {
           const stepNumber = index + 1;
           const isActive = stepNumber === currentStep;
           const isCompleted = stepNumber < currentStep;
+          const stepStatus = isActive ? 'current' : isCompleted ? 'complete' : 'upcoming';
           
-          // Create a new element with the needed props
-          // Don't pass any data attributes to the Fragment
+          // Extract title from the Step component props
+          const title = React.isValidElement(child) ? child.props.title : '';
+          
           return (
             <React.Fragment key={index}>
               <div className="flex flex-col items-center">
@@ -38,15 +40,19 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
                     isCompleted && "border-primary bg-primary text-primary-foreground",
                     !isActive && !isCompleted && "border-muted-foreground text-muted-foreground"
                   )}
+                  aria-current={isActive ? 'step' : undefined}
+                  aria-label={`${title} ${isActive ? '(current step)' : isCompleted ? '(completed)' : ''}`}
+                  role="status"
+                  aria-valuetext={stepStatus}
                 >
                   {isCompleted ? (
-                    <Check className="h-4 w-4" />
+                    <Check className="h-4 w-4" aria-hidden="true" />
                   ) : (
-                    stepNumber
+                    <span aria-hidden="true">{stepNumber}</span>
                   )}
                 </div>
                 <div className="mt-2 text-center text-xs">
-                  {React.isValidElement(child) && child.props.title}
+                  {title}
                 </div>
               </div>
               
@@ -56,6 +62,7 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
                     "h-0.5 w-full max-w-14",
                     isCompleted ? "bg-primary" : "bg-muted"
                   )}
+                  aria-hidden="true"
                 />
               )}
             </React.Fragment>
@@ -67,6 +74,6 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
 };
 
 export const Step = ({ title }: StepProps) => {
-  return null; // This component is just a placeholder for the steps structure
+  // This component is just a placeholder for the steps structure
+  return null;
 };
-

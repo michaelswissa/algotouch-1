@@ -1,8 +1,15 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export type SubscriptionStep = 'plan_selection' | 'contract' | 'payment' | 'success';
+
+interface RegistrationData {
+  planId?: string;
+  contractSigned?: boolean;
+  [key: string]: any;
+}
 
 interface SubscriptionStepsState {
   currentStep: number;
@@ -33,11 +40,11 @@ export function useSubscriptionSteps(): SubscriptionStepsState {
     const isRegistering = location.state?.isRegistering === true;
     
     // Get registration data if available
-    const storedData = sessionStorage.getItem('registration_data');
-    
-    if (storedData) {
-      try {
-        const data = JSON.parse(storedData);
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      
+      if (storedData) {
+        const data: RegistrationData = JSON.parse(storedData);
         
         // Determine current step based on stored data
         if (data.contractSigned) {
@@ -50,9 +57,10 @@ export function useSubscriptionSteps(): SubscriptionStepsState {
         if (data.planId && !selectedPlan) {
           setSelectedPlan(data.planId);
         }
-      } catch (e) {
-        console.error('Error parsing registration data:', e);
       }
+    } catch (error) {
+      console.error('Error parsing registration data:', error);
+      toast.error('אירעה שגיאה בטעינת נתוני ההרשמה');
     }
   }, [planId, selectedPlan, location.state]);
 

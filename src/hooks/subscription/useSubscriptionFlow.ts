@@ -13,6 +13,8 @@ interface ContractData {
   agreedToTerms: boolean;
   agreedToPrivacy: boolean;
   contractVersion?: string;
+  email?: string;
+  fullName?: string;
   browserInfo?: {
     userAgent: string;
     language: string;
