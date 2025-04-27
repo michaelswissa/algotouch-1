@@ -10,7 +10,7 @@ export const PaymentStatus = {
   TIMEOUT: 'timeout'
 } as const;
 
-export type PaymentStatusType = keyof typeof PaymentStatus;
+export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
 export interface PaymentSessionData {
   lowProfileCode: string;
@@ -18,4 +18,28 @@ export interface PaymentSessionData {
   terminalNumber: string;
   cardcomUrl: string;
   reference: string;
+}
+
+export interface CardOwnerDetails {
+  name: string;
+  email: string;
+  phone?: string;
+  identityNumber?: string;
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  displayPrice: string;
+  hasTrial: boolean;
+  freeTrialDays: number;
+}
+
+export interface CardComFieldsInitConfig {
+  terminalNumber: string;
+  lowProfileCode: string;
+  sessionId: string;
+  operationType: 'payment' | 'token_only';
 }

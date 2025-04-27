@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { PaymentStatus } from './types/payment';
+import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import PaymentDetails from './PaymentDetails';
@@ -19,7 +19,7 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
-  const [paymentStatus, setPaymentStatus] = useState<keyof typeof PaymentStatus>(PaymentStatus.IDLE);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusType>(PaymentStatus.IDLE);
   const [isInitializing, setIsInitializing] = useState(false);
   
   const planDetails = getSubscriptionPlans();
@@ -87,6 +87,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         <PaymentDetails 
           paymentUrl={paymentUrl}
           isReady={!isInitializing}
+          terminalNumber={terminalNumber}
+          cardcomUrl={cardcomUrl}
         />
       </>
     );
