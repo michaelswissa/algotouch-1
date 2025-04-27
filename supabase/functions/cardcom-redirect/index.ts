@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, logStep, validateAmount, validateTransaction } from "../cardcom-utils/index.ts";
@@ -19,18 +20,21 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
     
-    // Create admin client for database operations that bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-    
-    // Get current user
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
 
-    const { planId, amount, operation = "ChargeOnly", invoiceInfo, redirectUrls, userId, registrationData } = await req.json();
+    const { 
+      planId, 
+      amount, 
+      operation = "ChargeOnly",
+      invoiceInfo, 
+      redirectUrls, 
+      userId, 
+      registrationData,
+      isIframePrefill = false // New flag to determine if this is an iframe prefill request
+    } = await req.json();
 
     // Validate inputs
     if (!validateAmount(amount)) {
@@ -70,7 +74,7 @@ serve(async (req) => {
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .insert({
-        user_id: userId || user?.id || null,
+        user_id: userId || null,
         plan_id: planId,
         amount: amount,
         currency: "ILS",
@@ -92,18 +96,38 @@ serve(async (req) => {
     const sessionId = sessionData.id;
     await logStep(functionName, "Payment session created", { sessionId });
 
-    // Get CardCom API configuration from environment variables
+    // Get CardCom API configuration
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
     const apiName = Deno.env.get("CARDCOM_API_NAME");
-    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD");
-    const cardcomUrl = "https://secure.cardcom.solutions";
-
-    if (!terminalNumber || !apiName || !apiPassword) {
+    
+    if (!terminalNumber || !apiName) {
       await logStep(functionName, "Missing CardCom API configuration", {}, 'error', supabaseAdmin);
-      throw new Error("Missing CardCom API configuration in environment variables");
+      throw new Error("Missing CardCom API configuration");
     }
 
-    // Construct the URL for redirection
+    // Build response based on request type
+    if (isIframePrefill) {
+      // Return data for iframe prefill without redirect
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Payment session initialized",
+          data: {
+            sessionId: sessionId,
+            reference: transactionRef,
+            terminalNumber,
+            apiName,
+          }
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Construct the redirect URL for standard payment flow
+    const cardcomUrl = "https://secure.cardcom.solutions";
     const fullRedirectUrl =
       `${cardcomUrl}/BillGoldLowProfile.aspx?terminalnumber=${terminalNumber}` +
       `&total=${amount}` +

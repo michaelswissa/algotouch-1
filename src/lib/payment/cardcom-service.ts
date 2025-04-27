@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentSessionData, CardComPaymentResponse, PaymentError } from '@/components/payment/types/payment';
 import { CARDCOM_CONFIG } from './cardcom-config';
@@ -29,7 +30,8 @@ export async function initializeCardcomPayment({
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
-        }
+        },
+        isIframePrefill: true
       }
     });
 
