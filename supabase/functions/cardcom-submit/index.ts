@@ -1,95 +1,103 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from '@supabase/supabase-js';
 
-// Define your CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
-
-// Create a Supabase client
-function createSupabaseClient() {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { terminalNumber, apiName, cardcomUrl, lowProfileCode, cardholderData, planId, userId } = await req.json();
+    // Get the request body
+    const requestData = await req.json();
 
-    if (!terminalNumber || !apiName || !lowProfileCode) {
+    // Validate required fields
+    if (!requestData.lowProfileCode || !requestData.terminalNumber) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing required parameters" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing required fields: lowProfileCode and terminalNumber are required' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
 
-    console.log(`Processing payment submission for lowProfileCode: ${lowProfileCode}`);
-
-    // Simulate successful payment submission
-    // In a real implementation, you would call CardCom's API here
-    const result = {
+    // Here would be the actual CardCom API integration
+    // For demonstration purposes, we'll simulate a successful response
+    const simulatedResponse = {
       success: true,
-      responseCode: 0,
-      description: "Transaction processed successfully",
-      lowProfileId: lowProfileCode,
-      transactionId: `tr-${Date.now()}`,
-      tokenInfo: planId === 'monthly' ? {
-        token: `token-${Date.now()}`,
-        expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
-      } : null
+      data: {
+        lowProfileCode: requestData.lowProfileCode,
+        sessionId: `session-${Date.now()}`,
+        transactionId: `txn-${Date.now()}`,
+        status: 'pending',
+        cardholderName: requestData.cardholderData?.name || '',
+        cardholderEmail: requestData.cardholderData?.email || '',
+        operationType: requestData.operationType || 'ChargeOnly',
+        planId: requestData.planId || '',
+      }
     };
 
-    // Store the payment result in the database
-    if (userId) {
+    // In a real implementation, you would:
+    // 1. Call the CardCom API to process the payment
+    // 2. Store the result in the database
+    // 3. Return the appropriate response
+
+    // Let's simulate storing the transaction in the database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    
+    if (supabaseUrl && supabaseKey) {
       try {
-        const supabase = createSupabaseClient();
+        const supabase = createClient(supabaseUrl, supabaseKey);
         
-        // Record payment attempt
+        // Record the transaction
         await supabase
-          .from("payment_sessions")
-          .update({
-            status: "submitted",
-            updated_at: new Date().toISOString(),
-            metadata: {
-              ...result,
-              cardholderData: {
-                email: cardholderData?.email || null,
-                name: cardholderData?.name || null
-              }
-            }
-          })
-          .eq("low_profile_code", lowProfileCode);
-          
-        console.log(`Payment submission recorded for lowProfileCode: ${lowProfileCode}`);
+          .from('payment_transactions')
+          .insert({
+            low_profile_code: requestData.lowProfileCode,
+            terminal_number: requestData.terminalNumber,
+            operation_type: requestData.operationType || 'ChargeOnly',
+            status: 'pending',
+            cardholder_name: requestData.cardholderData?.name || '',
+            cardholder_email: requestData.cardholderData?.email || '',
+            plan_id: requestData.planId || '',
+            session_data: simulatedResponse.data,
+          });
       } catch (dbError) {
-        console.error("Error recording payment submission:", dbError);
+        console.error("Database error:", dbError);
+        // Continue even if database insert fails
       }
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify(simulatedResponse),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   } catch (error) {
     console.error("Error processing payment submission:", error);
     
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+      JSON.stringify({ 
+        success: false, 
+        error: `Error processing payment submission: ${error.message}` 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }

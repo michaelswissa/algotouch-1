@@ -8,7 +8,7 @@ interface UsePaymentStatusProps {
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) => {
   const [state, setState] = useState({
-    paymentStatus: PaymentStatus.IDLE,
+    paymentStatus: PaymentStatus.IDLE as PaymentStatusType,
     isInitializing: false,
     error: null as string | null,
     lowProfileCode: '',

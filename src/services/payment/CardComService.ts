@@ -19,6 +19,52 @@ export class CardComService {
   private static readonly SUBMIT_FUNCTION_URL = '/submit-payment';
   
   /**
+   * Initialize a payment session with CardCom
+   */
+  static async initializePayment(options: {
+    terminalNumber: string;
+    apiName: string;
+    amount: number;
+    currency?: string;
+    successUrl: string;
+    failureUrl: string;
+    operationType?: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
+    language?: string;
+    planId?: string;
+    returnValue?: string;
+  }): Promise<any> {
+    try {
+      PaymentLogger.log('Initializing CardCom payment', options);
+      
+      // Call the edge function for initializing the payment
+      const response = await fetch('/functions/v1/cardcom-redirect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(options),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Payment initialization failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      PaymentLogger.log('Payment initialization response', result);
+      
+      if (result.success === false) {
+        throw new Error(result.error || 'Payment initialization failed');
+      }
+      
+      return result;
+    } catch (error) {
+      PaymentLogger.error('Error initializing payment with CardCom:', error);
+      throw error;
+    }
+  }
+  
+  /**
    * Submit a payment to CardCom
    */
   static async submitPayment(options: CardComPaymentOptions): Promise<any> {
@@ -98,5 +144,27 @@ export class CardComService {
       PaymentLogger.error('Error checking payment status:', error);
       throw error;
     }
+  }
+
+  /**
+   * Validate card information
+   */
+  static validateCardInfo(cardInfo: {
+    cardNumber?: string;
+    expiryMonth?: string;
+    expiryYear?: string;
+    cvv?: string;
+    holderName?: string;
+  }): { valid: boolean; error?: string } {
+    // Implement card validation logic here
+    if (!cardInfo.cardNumber) {
+      return { valid: false, error: 'מספר כרטיס חסר' };
+    }
+    
+    if (!cardInfo.expiryMonth || !cardInfo.expiryYear) {
+      return { valid: false, error: 'תוקף כרטיס חסר' };
+    }
+
+    return { valid: true };
   }
 }

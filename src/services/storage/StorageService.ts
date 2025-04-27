@@ -135,7 +135,7 @@ export class StorageService {
   }
   
   /**
-   * Clear all subscription related data (registration, contract, payment)
+   * Clear all subscription-related data (registration, contract, payment)
    */
   static clearAllSubscriptionData(): void {
     sessionStorage.removeItem(this.REGISTRATION_KEY);
