@@ -19,7 +19,6 @@
 }
 
 .credit-cvv-container {
-  max-width: 188px !important;
   min-height: 57px;
   position: relative;
 }
@@ -54,5 +53,6 @@
 
 /* Focus and error states */
 .invalid {
-  border: 1px solid #c01111;
+  border-color: #e74c3c !important;
 }
+

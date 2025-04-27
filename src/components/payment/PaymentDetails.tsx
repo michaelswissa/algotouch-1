@@ -6,6 +6,8 @@ import { CreditCard } from 'lucide-react';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
 import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
+import CardNumberFrame from './iframes/CardNumberFrame';
+import CVVFrame from './iframes/CVVFrame';
 
 interface PaymentDetailsProps {
   terminalNumber: string;
@@ -20,10 +22,13 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   masterFrameRef,
   isReady = false
 }) => {
-  const { formData, errors, handleChange, handleSubmitPayment, isSubmitting } = usePaymentForm();
+  const { formData, errors, handleChange } = usePaymentForm();
+  const [cardNumberLoaded, setCardNumberLoaded] = React.useState(false);
+  const [cvvLoaded, setCvvLoaded] = React.useState(false);
   
   return (
     <div className="space-y-4" dir="rtl">
+      {/* Card Owner Name */}
       <div className="space-y-2">
         <Label htmlFor="cardOwnerName">שם בעל הכרטיס</Label>
         <Input
@@ -40,6 +45,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         )}
       </div>
 
+      {/* ID Number */}
       <div className="space-y-2">
         <Label htmlFor="cardOwnerId">תעודת זהות</Label>
         <Input
@@ -68,6 +74,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         )}
       </div>
 
+      {/* Email */}
       <div className="space-y-2">
         <Label htmlFor="cardOwnerEmail">דוא"ל</Label>
         <Input
@@ -85,6 +92,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         )}
       </div>
 
+      {/* Phone */}
       <div className="space-y-2">
         <Label htmlFor="cardOwnerPhone">טלפון</Label>
         <Input
@@ -101,24 +109,23 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         )}
       </div>
 
+      {/* Card Number Frame */}
       <div className="space-y-2">
         <Label htmlFor="cardNumber">מספר כרטיס</Label>
         <div className="relative">
-          <Input
-            id="cardNumber"
-            name="cardNumber"
-            placeholder="**** **** **** ****"
-            className="bg-gray-50"
-            disabled
-            required
+          <CardNumberFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => setCardNumberLoaded(true)}
+            isReady={isReady}
           />
           <div className="absolute top-0 right-0 h-full flex items-center pr-3 pointer-events-none">
             <CreditCard className="h-5 w-5 text-gray-400" />
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">מספר הכרטיס יוזן בצורה מאובטחת בעמוד התשלום</p>
       </div>
 
+      {/* Card Expiry */}
       <CardExpiryInputs
         expiryMonth={formData.expirationMonth}
         expiryYear={formData.expirationYear}
@@ -143,20 +150,17 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         error={errors.expirationMonth || errors.expirationYear}
       />
 
+      {/* CVV Frame */}
       <div className="space-y-2">
         <Label htmlFor="cvv">קוד אבטחה (CVV)</Label>
-        <div className="relative">
-          <Input
-            id="cvv"
-            name="cvv"
-            placeholder="***"
-            className="bg-gray-50"
-            disabled
-            required
-            maxLength={4}
+        <div className="relative max-w-[188px]">
+          <CVVFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => setCvvLoaded(true)}
+            isReady={isReady}
           />
         </div>
-        <p className="text-sm text-muted-foreground">קוד האבטחה יוזן בצורה מאובטחת בעמוד התשלום</p>
       </div>
 
       {isReady && (
