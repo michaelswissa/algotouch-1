@@ -95,7 +95,7 @@ export class CardComService {
     terminalNumber: string;
     operationType?: 'payment' | 'token_only';
     cardOwnerDetails: CardOwnerDetails;
-  }): Promise<{ success: boolean; transactionId?: string }> {
+  }): Promise<{ success: boolean; transactionId?: string; isAlreadyProcessed?: boolean }> {
     const { 
       lowProfileCode, 
       terminalNumber, 
@@ -136,15 +136,21 @@ export class CardComService {
         }
       });
 
-      if (error || !data?.success) {
-        PaymentLogger.error('Payment submission error', error || data?.message);
-        throw new Error(error?.message || data?.message || 'שגיאה בעיבוד התשלום');
+      if (error) {
+        PaymentLogger.error('Payment submission error', error);
+        throw new Error(error?.message || 'שגיאה בעיבוד התשלום');
+      }
+      
+      if (!data?.success && !data?.isAlreadyProcessed) {
+        PaymentLogger.error('Payment submission failed', data?.message);
+        throw new Error(data?.message || 'שגיאה בעיבוד התשלום');
       }
 
       PaymentLogger.log('Payment submitted successfully', data);
       return { 
         success: true, 
-        transactionId: data.transactionId 
+        transactionId: data.data?.transactionId,
+        isAlreadyProcessed: data.data?.isAlreadyProcessed
       };
     } catch (error) {
       PaymentLogger.error('Exception during payment submission', error);

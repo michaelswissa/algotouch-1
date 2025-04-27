@@ -1,177 +1,84 @@
 
-import { toast } from 'sonner';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
-
-export interface StorageData {
-  planId?: string;
-  contractSigned?: boolean;
-  email?: string;
-  userId?: string;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    [key: string]: any;
-  };
-  registrationTime?: string;
-  userCreated?: boolean;
-  [key: string]: any;
-}
-
-export interface ContractData {
-  planId?: string;
-  fullName?: string;
-  email?: string;
-  signed: boolean;
-  signedDate?: string;
-  agreeToTerms: boolean;
-  [key: string]: any;
-}
-
-export interface PaymentData {
-  sessionId?: string;
-  lowProfileCode?: string;
-  terminalNumber?: string;
-  reference?: string;
-  status?: 'pending' | 'completed' | 'failed';
-  cardLastFour?: string;
-  cardExpiry?: string;
-  timestamp?: string;
-}
-
-export const StorageKeys = {
-  REGISTRATION: 'registration_data',
-  CONTRACT: 'contract_data',
-  PAYMENT: 'payment_data',
-} as const;
-
+/**
+ * Service for handling local storage operations
+ */
 export class StorageService {
+  // Keys used in storage
+  private static readonly REGISTRATION_KEY = 'registration_data';
+  private static readonly CONTRACT_KEY = 'contract_data';
+  private static readonly PAYMENT_KEY = 'payment_data';
+  private static readonly USER_ID_KEY = 'userId';
+  
   /**
-   * Get data from session storage with error handling
+   * Get registration data from storage
    */
-  static get<T>(key: string): T | null {
+  static getRegistrationData(): any | null {
     try {
-      const data = sessionStorage.getItem(key);
+      const data = sessionStorage.getItem(this.REGISTRATION_KEY);
       return data ? JSON.parse(data) : null;
-    } catch (error) {
-      PaymentLogger.error(`Error reading from storage (${key}):`, error);
+    } catch (e) {
+      console.error('Error parsing registration data', e);
       return null;
     }
   }
-
+  
   /**
-   * Set data in session storage with error handling
+   * Get contract data from storage
    */
-  static set<T>(key: string, data: T): boolean {
+  static getContractData(): any | null {
     try {
-      sessionStorage.setItem(key, JSON.stringify(data));
-      return true;
-    } catch (error) {
-      PaymentLogger.error(`Error writing to storage (${key}):`, error);
-      toast.error('אירעה שגיאה בשמירת הנתונים');
-      return false;
+      const data = sessionStorage.getItem(this.CONTRACT_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error parsing contract data', e);
+      return null;
     }
-  }
-
-  /**
-   * Remove data from session storage
-   */
-  static remove(key: string): void {
-    try {
-      sessionStorage.removeItem(key);
-    } catch (error) {
-      PaymentLogger.error(`Error removing from storage (${key}):`, error);
-    }
-  }
-
-  /**
-   * Get registration data
-   */
-  static getRegistrationData(): StorageData {
-    const data = this.get<StorageData>(StorageKeys.REGISTRATION);
-    return data || {};
-  }
-
-  /**
-   * Store registration data with timestamp
-   */
-  static storeRegistrationData(data: Partial<StorageData>): boolean {
-    const existingData = this.getRegistrationData();
-    const updatedData = { ...existingData, ...data };
-    
-    // Update timestamp if not set
-    if (!updatedData.registrationTime) {
-      updatedData.registrationTime = new Date().toISOString();
-    }
-    
-    return this.set(StorageKeys.REGISTRATION, updatedData);
-  }
-
-  /**
-   * Get contract data
-   */
-  static getContractData(): ContractData | null {
-    return this.get<ContractData>(StorageKeys.CONTRACT);
-  }
-
-  /**
-   * Update contract data
-   */
-  static updateContractData(data: Partial<ContractData>): boolean {
-    const current = this.getContractData() || { signed: false, agreeToTerms: false };
-    return this.set(StorageKeys.CONTRACT, { ...current, ...data });
-  }
-
-  /**
-   * Get payment data
-   */
-  static getPaymentData(): PaymentData | null {
-    return this.get<PaymentData>(StorageKeys.PAYMENT);
-  }
-
-  /**
-   * Update payment data with timestamp
-   */
-  static updatePaymentData(data: Partial<PaymentData>): boolean {
-    const current = this.getPaymentData() || {};
-    
-    // Add timestamp if updating status
-    if (data.status && data.status !== current.status) {
-      data.timestamp = new Date().toISOString();
-    }
-    
-    return this.set(StorageKeys.PAYMENT, { ...current, ...data });
-  }
-
-  /**
-   * Clear all subscription data
-   */
-  static clearAllSubscriptionData(): void {
-    this.remove(StorageKeys.REGISTRATION);
-    this.remove(StorageKeys.CONTRACT);
-    this.remove(StorageKeys.PAYMENT);
   }
   
   /**
-   * Check if registration data is valid and not expired
+   * Get payment data from storage
    */
-  static isRegistrationValid(): boolean {
+  static getPaymentData(): any | null {
     try {
-      const data = this.getRegistrationData();
-      
-      if (!data.registrationTime) {
-        return false;
-      }
-      
-      const registrationTime = new Date(data.registrationTime);
-      const now = new Date();
-      const timeDiffMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
-      
-      // Registration expires after 30 minutes
-      return timeDiffMinutes <= 30;
-    } catch (error) {
-      PaymentLogger.error('Error checking registration validity:', error);
-      return false;
+      const data = localStorage.getItem(this.PAYMENT_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error parsing payment data', e);
+      return null;
     }
+  }
+  
+  /**
+   * Update payment data in storage
+   */
+  static updatePaymentData(data: any): void {
+    try {
+      const existingData = this.getPaymentData() || {};
+      const updatedData = { ...existingData, ...data, updatedAt: new Date().toISOString() };
+      localStorage.setItem(this.PAYMENT_KEY, JSON.stringify(updatedData));
+    } catch (e) {
+      console.error('Error updating payment data', e);
+    }
+  }
+  
+  /**
+   * Get user ID from storage
+   */
+  static getUserId(): string | null {
+    return sessionStorage.getItem(this.USER_ID_KEY);
+  }
+  
+  /**
+   * Set user ID in storage
+   */
+  static setUserId(userId: string): void {
+    sessionStorage.setItem(this.USER_ID_KEY, userId);
+  }
+  
+  /**
+   * Clear payment data from storage
+   */
+  static clearPaymentData(): void {
+    localStorage.removeItem(this.PAYMENT_KEY);
   }
 }

@@ -1,6 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
+import { usePaymentSession } from '@/hooks/payment/usePaymentSession';
+import { CardComService } from '@/services/payment/CardComService';
+import { usePaymentStatusCheck } from '@/hooks/payment/usePaymentStatusCheck';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 interface PaymentState {
   paymentStatus: PaymentStatusType;
@@ -51,6 +56,23 @@ export const usePaymentContext = () => useContext(PaymentContext);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PaymentState>(initialState);
+  const { initializePaymentSession } = usePaymentSession({ setState });
+  
+  // Add payment status check hook for monitoring payment completion
+  const { startStatusCheck, checkPaymentStatus, cleanupStatusCheck } = 
+    usePaymentStatusCheck({ 
+      setState,
+      onSuccess: () => {
+        PaymentLogger.log('Payment status check succeeded, payment is confirmed');
+      }
+    });
+
+  // Cleanup payment status check on unmount
+  useEffect(() => {
+    return () => {
+      cleanupStatusCheck();
+    };
+  }, [cleanupStatusCheck]);
 
   const initializePayment = async (planId: string): Promise<boolean> => {
     if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
@@ -70,23 +92,69 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Set operationType based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
       
-      // In a real implementation, we would make API calls here to initialize payment
-      // For now, let's simulate a successful initialization
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Get user data for payment
+      let email = '';
+      let fullName = '';
 
-      const sessionId = `session-${Date.now()}`;
-      const lowProfileCode = `profile-${Date.now()}`;
-      const reference = `ref-${Date.now()}`;
+      // Try to get data from contract or registration
+      const contractData = sessionStorage.getItem('contract_data');
+      const registrationData = sessionStorage.getItem('registration_data');
+      
+      if (contractData) {
+        try {
+          const parsed = JSON.parse(contractData);
+          email = parsed.email || '';
+          fullName = parsed.fullName || '';
+        } catch (e) {
+          console.error('Error parsing contract data', e);
+        }
+      } else if (registrationData) {
+        try {
+          const parsed = JSON.parse(registrationData);
+          email = parsed.email || '';
+          if (parsed.userData) {
+            const { firstName, lastName } = parsed.userData;
+            if (firstName && lastName) {
+              fullName = `${firstName} ${lastName}`;
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing registration data', e);
+        }
+      }
 
+      if (!email) {
+        throw new Error('חסרים פרטי התקשרות, אנא מלא את פרטי הרישום');
+      }
+      
+      // Get user ID if available (might not be if user is not logged in yet)
+      const userId = sessionStorage.getItem('userId') || null;
+
+      // Real payment initialization via CardCom
+      const paymentSession = await initializePaymentSession(
+        planId,
+        userId,
+        { email, fullName },
+        operationType
+      );
+      
+      // Update state with real session data
       setState(prev => ({
         ...prev,
         isInitializing: false,
         paymentStatus: PaymentStatus.IDLE,
         operationType,
-        sessionId,
-        lowProfileCode,
-        reference,
+        sessionId: paymentSession.sessionId,
+        lowProfileCode: paymentSession.lowProfileCode,
+        terminalNumber: paymentSession.terminalNumber,
+        cardcomUrl: paymentSession.cardcomUrl || 'https://secure.cardcom.solutions',
+        reference: paymentSession.reference,
       }));
+      
+      PaymentLogger.log('Payment initialized successfully', { 
+        lowProfileCode: paymentSession.lowProfileCode,
+        operationType 
+      });
 
       return true;
     } catch (error) {
@@ -119,14 +187,30 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      // In a real implementation, we would make API calls here to process payment
-      // For now, let's simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      PaymentLogger.log('Submitting payment', { 
+        lowProfileCode: state.lowProfileCode,
+        operationType: state.operationType
+      });
 
-      setState(prev => ({
-        ...prev,
-        paymentStatus: PaymentStatus.SUCCESS,
-      }));
+      // Start status check for payment completion
+      startStatusCheck(
+        state.lowProfileCode,
+        state.sessionId,
+        state.operationType,
+        state.planId || ''
+      );
+      
+      // In real implementation, CardCom handles the submission through the iframe
+      // We just need to check the status after submission
+      
+      // Check payment status after a short delay to allow CardCom to process
+      setTimeout(async () => {
+        try {
+          await checkPaymentStatus(state.lowProfileCode);
+        } catch (e) {
+          PaymentLogger.error('Error during payment status check', e);
+        }
+      }, 3000);
       
       return true;
     } catch (error) {
@@ -142,6 +226,8 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const resetPaymentState = () => {
+    // Clean up any status check in progress
+    cleanupStatusCheck();
     setState(initialState);
   };
 

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,8 +9,9 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
-  apiName: Deno.env.get("CARDCOM_API_NAME"),
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
     getLowProfileResult: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLowProfileResult"
   }
@@ -40,9 +42,10 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Extract low profile code from request body
     const { lowProfileCode } = await req.json();
     
+    logStep("Received request for lowProfileCode", { lowProfileCode });
+
     if (!lowProfileCode) {
       return new Response(
         JSON.stringify({
@@ -54,20 +57,60 @@ serve(async (req) => {
         }
       );
     }
-
-    logStep("Checking payment status", { lowProfileCode });
     
-    // First, check our database to see if we've already processed this transaction
-    const { data: existingPayment } = await supabaseAdmin
-      .rpc('check_duplicate_payment_extended', { low_profile_id: lowProfileCode });
+    // First check if we already know the payment status from our database
+    let paymentComplete = false;
+    let paymentStatus = null;
+    let transactionId = null;
     
-    if (existingPayment?.exists) {
-      logStep("Payment already processed", existingPayment);
+    // Check payment_sessions table first
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .select('*')
+      .eq('low_profile_code', lowProfileCode)
+      .single();
+      
+    if (!sessionError && session) {
+      logStep("Found payment session", { status: session.status });
+      
+      if (session.status === 'completed') {
+        paymentComplete = true;
+        paymentStatus = 'completed';
+        transactionId = session.transaction_id;
+      } else if (session.status === 'failed') {
+        paymentStatus = 'failed';
+      }
+    } else {
+      // If not found in sessions, check payment logs
+      const { data: logs, error: logsError } = await supabaseAdmin
+        .from('user_payment_logs')
+        .select('*')
+        .eq('token', lowProfileCode)
+        .order('created_at', { ascending: false })
+        .limit(1);
+        
+      if (!logsError && logs && logs.length > 0) {
+        logStep("Found payment log", { status: logs[0].status });
+        
+        if (logs[0].status === 'payment_success' || logs[0].status === 'token_created') {
+          paymentComplete = true;
+          paymentStatus = 'completed';
+          transactionId = logs[0].transaction_id;
+        } else if (logs[0].status === 'payment_failed') {
+          paymentStatus = 'failed';
+        }
+      }
+    }
+    
+    // If we already know the payment was successful, return immediately
+    if (paymentComplete) {
+      logStep("Payment already confirmed as successful");
       return new Response(
         JSON.stringify({
           success: true,
-          message: "Payment already processed",
-          data: existingPayment
+          status: paymentStatus,
+          transactionId,
+          message: "Payment confirmed successful"
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,112 +118,143 @@ serve(async (req) => {
       );
     }
     
-    // Otherwise, check with CardCom API
-    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
-      throw new Error("Missing CardCom configuration");
-    }
+    // If we don't know or payment is still pending, check with CardCom
+    logStep("Checking payment status with CardCom API");
     
+    // Get the result from CardCom
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
       LowProfileId: lowProfileCode
     };
     
-    logStep("Sending status request to CardCom", { 
-      terminalNumber: CARDCOM_CONFIG.terminalNumber,
-      lowProfileCode
-    });
-    
     const response = await fetch(CARDCOM_CONFIG.endpoints.getLowProfileResult, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(cardcomPayload),
     });
     
     const responseData = await response.json();
-    logStep("CardCom payment status response", responseData);
     
+    logStep("CardCom API response", {
+      responseCode: responseData.ResponseCode,
+      hasTransaction: !!responseData.TranzactionInfo
+    });
+    
+    // If CardCom returned an error or no transaction found
     if (responseData.ResponseCode !== 0) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: responseData.Description || "Failed to get payment status",
+          message: responseData.Description || "Failed to get transaction status",
+          status: 'pending'
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
-
-    // Check for transaction info to determine if payment was successful
-    const successful = responseData.TranzactionInfo && 
-                      (responseData.TranzactionInfo.ResponseCode === 0 || 
-                       responseData.TranzactionInfo.ResponseCode === '0');
     
-    logStep("Payment status check complete", { 
-      successful,
-      responseCode: responseData.TranzactionInfo?.ResponseCode
-    });
-    
-    // If payment is successful, update any related user records
-    if (successful) {
-      try {
-        // Find the payment session to get the user ID
-        const { data: paymentSession } = await supabaseAdmin
-          .from('payment_sessions')
-          .select('user_id, reference, plan_id')
-          .eq('low_profile_code', lowProfileCode)
-          .single();
-        
-        if (paymentSession?.user_id) {
-          logStep("Found payment session", {
-            userId: paymentSession.user_id,
-            reference: paymentSession.reference,
-            planId: paymentSession.plan_id
-          });
-          
-          // Update payment session status
-          await supabaseAdmin
+    // Extract transaction details
+    const trxInfo = responseData.TranzactionInfo;
+    if (trxInfo) {
+      paymentStatus = trxInfo.ResponseCode === 0 ? 'completed' : 'failed';
+      transactionId = trxInfo.TranzactionId;
+      
+      // If transaction was successful and we have session info, update our database
+      if (trxInfo.ResponseCode === 0 && session) {
+        try {
+          // Update the payment session
+          const { error: updateError } = await supabaseAdmin
             .from('payment_sessions')
             .update({
               status: 'completed',
-              transaction_id: responseData.TranzactionInfo.TranzactionId,
-              payment_details: responseData
+              transaction_id: transactionId,
+              payment_details: {
+                ...session.payment_details,
+                transaction_id: transactionId,
+                response_code: trxInfo.ResponseCode,
+                response_message: trxInfo.Description || '',
+                payment_date: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString()
             })
-            .eq('low_profile_code', lowProfileCode);
+            .eq('id', session.id);
             
-          // Record successful payment
-          await supabaseAdmin
+          if (updateError) {
+            logStep("Error updating payment session", updateError);
+          } else {
+            logStep("Payment session updated to completed");
+          }
+          
+          // Create a payment log
+          const { error: logError } = await supabaseAdmin
             .from('user_payment_logs')
             .insert({
-              user_id: paymentSession.user_id,
+              user_id: session.user_id,
+              subscription_id: null,
+              amount: session.amount,
               token: lowProfileCode,
-              transaction_id: responseData.TranzactionInfo.TranzactionId,
-              amount: responseData.TranzactionInfo.Amount,
+              currency: session.currency,
               status: 'payment_success',
-              payment_data: responseData
+              transaction_id: transactionId,
+              payment_data: {
+                session_id: session.id,
+                plan_id: session.plan_id,
+                transaction_info: trxInfo
+              }
             });
+            
+          if (logError) {
+            logStep("Error creating payment log", logError);
+          } else {
+            logStep("Payment log created");
+          }
           
-          logStep("Updated payment records", { userId: paymentSession.user_id });
-        } else {
-          logStep("No payment session found for this low profile code");
+          // If this was a token creation, record the token
+          if (responseData.TokenInfo && responseData.TokenInfo.Token) {
+            const { error: tokenError } = await supabaseAdmin
+              .from('recurring_payments')
+              .insert({
+                user_id: session.user_id,
+                token: responseData.TokenInfo.Token,
+                token_approval_number: responseData.TokenInfo.TokenApprovalNumber,
+                token_expiry: new Date(responseData.TokenInfo.TokenExDate),
+                last_4_digits: trxInfo?.Last4CardDigits?.toString(),
+                card_type: trxInfo?.CardInfo,
+                terminal_number: CARDCOM_CONFIG.terminalNumber,
+                status: 'active'
+              });
+              
+            if (tokenError) {
+              logStep("Error recording token", tokenError);
+            } else {
+              logStep("Token recorded successfully", { token: responseData.TokenInfo.Token });
+            }
+          }
+        } catch (dbError) {
+          logStep("Database error", dbError);
         }
-      } catch (dbError) {
-        logStep("Error updating payment records", { error: dbError.message });
-        // Continue despite DB error to allow client to proceed
       }
     }
     
     return new Response(
       JSON.stringify({
-        success: successful,
-        message: successful ? "Payment successful" : "Payment failed or pending",
-        data: responseData
+        success: paymentStatus === 'completed',
+        status: paymentStatus,
+        transactionId,
+        hasToken: !!responseData.TokenInfo,
+        message: paymentStatus === 'completed' 
+          ? "Payment confirmed successful"
+          : "Payment status checked"
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
@@ -188,7 +262,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: errorMessage,
+        message: errorMessage || "Error checking payment status",
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
