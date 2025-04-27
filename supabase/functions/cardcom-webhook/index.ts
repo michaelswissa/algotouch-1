@@ -86,9 +86,9 @@ serve(async (req) => {
     // Find the corresponding payment session
     let paymentQuery = supabaseAdmin.from('payment_sessions').select('*');
     
-    // First try to find by LowProfileId (as stored in low_profile_code)
+    // First try to find by LowProfileId (as stored in low_profile_id)
     if (LowProfileId) {
-      paymentQuery = paymentQuery.eq('low_profile_code', LowProfileId);
+      paymentQuery = paymentQuery.eq('low_profile_id', LowProfileId);
     } 
     // If no LowProfileId, try to find by ReturnValue (as stored in reference)
     else if (ReturnValue) {

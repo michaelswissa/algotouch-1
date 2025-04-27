@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/types/payment';
@@ -15,7 +14,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; reference: string }> => {
+  ): Promise<{ lowProfileId: string; sessionId: string; terminalNumber: string; reference: string }> => {
     PaymentLogger.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -24,7 +23,6 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     });
 
     try {
-      // Use CardComService to initialize payment
       const sessionData = await CardComService.initializePayment({
         planId,
         userId,
@@ -33,25 +31,22 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         operationType
       });
       
-      // Make sure all required properties exist
-      if (!sessionData.lowProfileCode || !sessionData.sessionId || !sessionData.terminalNumber) {
+      if (!sessionData.lowProfileId || !sessionData.sessionId || !sessionData.terminalNumber) {
         throw new Error('חסרים פרטי תשלום בתגובה מהשרת');
       }
       
-      // Update state with the new session data
       setState(prev => ({
         ...prev,
         sessionId: sessionData.sessionId,
-        lowProfileCode: sessionData.lowProfileCode,
+        lowProfileId: sessionData.lowProfileId,
         terminalNumber: sessionData.terminalNumber,
         cardcomUrl: sessionData.cardcomUrl,
         reference: sessionData.reference || '',
         paymentStatus: PaymentStatus.IDLE
       }));
       
-      // Return object with all required properties (with empty string fallbacks where needed)
       return {
-        lowProfileCode: sessionData.lowProfileCode,
+        lowProfileId: sessionData.lowProfileId,
         sessionId: sessionData.sessionId,
         terminalNumber: sessionData.terminalNumber,
         reference: sessionData.reference || ''

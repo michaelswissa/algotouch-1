@@ -40,14 +40,14 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Extract low profile code from request body
-    const { lowProfileCode } = await req.json();
+    // Extract low profile ID from request body
+    const { lowProfileId } = await req.json();
     
-    if (!lowProfileCode) {
+    if (!lowProfileId) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Missing lowProfileCode parameter",
+          message: "Missing lowProfileId parameter",
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,7 +55,7 @@ serve(async (req) => {
       );
     }
 
-    logStep("Checking payment status", { lowProfileCode });
+    logStep("Checking payment status", { lowProfileId });
     
     // Validate configuration
     if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
@@ -64,7 +64,7 @@ serve(async (req) => {
     
     // First, check our database to see if we've already processed this transaction
     const { data: existingPayment } = await supabaseAdmin
-      .rpc('check_duplicate_payment_extended', { low_profile_id: lowProfileCode });
+      .rpc('check_duplicate_payment_extended', { low_profile_id: lowProfileId });
     
     if (existingPayment?.exists) {
       logStep("Payment already processed", existingPayment);
@@ -88,12 +88,12 @@ serve(async (req) => {
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      LowProfileId: lowProfileCode
+      LowProfileId: lowProfileId
     };
     
     logStep("Sending status request to CardCom", { 
       terminalNumber: CARDCOM_CONFIG.terminalNumber,
-      lowProfileCode
+      lowProfileId
     });
     
     const response = await fetch(CARDCOM_CONFIG.endpoints.getLowProfileResult, {
@@ -134,7 +134,7 @@ serve(async (req) => {
         const { data: paymentSession } = await supabaseAdmin
           .from('payment_sessions')
           .select('user_id, reference, plan_id')
-          .eq('low_profile_code', lowProfileCode)
+          .eq('low_profile_code', lowProfileId)
           .single();
         
         if (paymentSession?.user_id) {
@@ -152,14 +152,14 @@ serve(async (req) => {
               transaction_id: responseData.TranzactionInfo.TranzactionId,
               payment_details: responseData
             })
-            .eq('low_profile_code', lowProfileCode);
+            .eq('low_profile_code', lowProfileId);
             
           // Record successful payment
           await supabaseAdmin
             .from('user_payment_logs')
             .insert({
               user_id: paymentSession.user_id,
-              token: lowProfileCode,
+              token: lowProfileId,
               transaction_id: responseData.TranzactionInfo.TranzactionId,
               amount: responseData.TranzactionInfo.Amount,
               status: 'payment_success',

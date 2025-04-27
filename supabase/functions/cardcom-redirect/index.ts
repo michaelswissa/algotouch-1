@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -172,20 +171,20 @@ serve(async (req) => {
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
-      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
+      low_profile_id: lowProfileId,
+      reference: transactionRef,
       plan_id: planId,
       amount: amount,
       currency: currency,
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       transaction_data: {
         redirect_url: responseData.Url
       },
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
-    
+
     let dbSessionId = null;
     
     try {
