@@ -28,23 +28,9 @@ export function usePaymentForm() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardValidationComplete, setCardValidationComplete] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   
-  // Define validation rules using CardComService validators
-  const validate = (name: string, value: string) => {
-    const formData = {
-      cardOwnerName: name === 'cardOwnerName' ? value : formData.cardOwnerName,
-      cardOwnerId: name === 'cardOwnerId' ? value : formData.cardOwnerId,
-      cardOwnerEmail: name === 'cardOwnerEmail' ? value : formData.cardOwnerEmail,
-      cardOwnerPhone: name === 'cardOwnerPhone' ? value : formData.cardOwnerPhone,
-      expirationMonth: name === 'expirationMonth' ? value : formData.expirationMonth,
-      expirationYear: name === 'expirationYear' ? value : formData.expirationYear
-    };
-    
-    const { errors } = CardComService.validateCardInfo(formData);
-    return errors[name] || null;
-  };
-  
-  // Initialize form validation
+  // Initialize form data with default empty values
   const initialFormData: PaymentFormData = {
     cardOwnerName: '',
     cardOwnerId: '',
@@ -55,15 +41,41 @@ export function usePaymentForm() {
     numberOfPayments: '1',
   };
   
+  // Define validation rules using CardComService validators
+  const validateField = (name: string, value: string, currentFormData: PaymentFormData): string | null => {
+    const dataToValidate = {
+      cardOwnerName: name === 'cardOwnerName' ? value : currentFormData.cardOwnerName,
+      cardOwnerId: name === 'cardOwnerId' ? value : currentFormData.cardOwnerId,
+      cardOwnerEmail: name === 'cardOwnerEmail' ? value : currentFormData.cardOwnerEmail,
+      cardOwnerPhone: name === 'cardOwnerPhone' ? value : currentFormData.cardOwnerPhone,
+      expirationMonth: name === 'expirationMonth' ? value : currentFormData.expirationMonth,
+      expirationYear: name === 'expirationYear' ? value : currentFormData.expirationYear
+    };
+    
+    const { errors } = CardComService.validateCardInfo(dataToValidate);
+    return errors[name] || null;
+  };
+  
+  // Initialize form validation
   const {
     formData,
     errors,
     handleChange,
     validateForm,
     setFormData,
-    setFieldError
-  } = useFormValidation<PaymentFormData>(initialFormData, validate);
+    setFieldValue
+  } = useFormValidation<PaymentFormData>(initialFormData, (name: string, value: any, formData?: PaymentFormData) => {
+    return validateField(name, value, formData || initialFormData);
+  });
   
+  // Set a field error manually
+  const setFieldError = (field: string, error: string | null) => {
+    setFieldErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+  };
+
   // Monitor iframe messages for validation results
   useEffect(() => {
     const handleFrameMessages = (message: MessageEvent) => {
@@ -97,7 +109,7 @@ export function usePaymentForm() {
     
     window.addEventListener('message', handleFrameMessages);
     return () => window.removeEventListener('message', handleFrameMessages);
-  }, [setFieldError]);
+  }, []);
   
   // Pre-fill form data if available
   useEffect(() => {
@@ -210,7 +222,7 @@ export function usePaymentForm() {
     setIsSubmitting(true);
     PaymentLogger.log('Submitting payment', { 
       lowProfileCode,
-      operationType
+      operationType 
     });
     
     try {
@@ -230,12 +242,16 @@ export function usePaymentForm() {
     }
   };
   
+  // Merge the errors from form validation and field errors
+  const combinedErrors = { ...errors, ...fieldErrors };
+  
   return {
     formData,
-    errors,
+    errors: combinedErrors,
     isSubmitting,
     handleChange,
     handleSubmitPayment,
-    validateCardFields
+    validateCardFields,
+    setFieldError
   };
 }

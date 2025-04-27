@@ -1,25 +1,20 @@
 
 import { useState, useCallback } from 'react';
 
-interface ValidationRules<T> {
-  [key: string]: (value: any, formData?: T) => string | null;
-}
+type ValidationFunction<T> = (name: string, value: any, formData?: T) => string | null;
 
 interface ValidationState {
   [key: string]: string | null;
 }
 
-export function useFormValidation<T>(initialData: T, validationRules: ValidationRules<T>) {
+export function useFormValidation<T>(initialData: T, validationFunction: ValidationFunction<T>) {
   const [formData, setFormData] = useState<T>(initialData);
   const [errors, setErrors] = useState<ValidationState>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const validateField = useCallback((name: string, value: any) => {
-    if (validationRules[name]) {
-      return validationRules[name](value, formData);
-    }
-    return null;
-  }, [formData, validationRules]);
+    return validationFunction(name, value, formData);
+  }, [formData, validationFunction]);
   
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -43,8 +38,7 @@ export function useFormValidation<T>(initialData: T, validationRules: Validation
     let isValid = true;
     
     // Validate all fields
-    Object.keys(validationRules).forEach((name) => {
-      const value = (formData as any)[name];
+    Object.entries(formData).forEach(([name, value]) => {
       const error = validateField(name, value);
       
       if (error) {
@@ -55,7 +49,7 @@ export function useFormValidation<T>(initialData: T, validationRules: Validation
     
     setErrors(newErrors);
     return isValid;
-  }, [formData, validateField, validationRules]);
+  }, [formData, validateField]);
   
   const handleSubmit = useCallback((onSubmit: (data: T) => void) => {
     return async (e: React.FormEvent) => {
