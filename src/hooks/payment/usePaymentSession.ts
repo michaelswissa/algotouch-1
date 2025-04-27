@@ -33,6 +33,11 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         operationType
       });
       
+      // Make sure all required properties exist
+      if (!sessionData.lowProfileCode || !sessionData.sessionId || !sessionData.terminalNumber) {
+        throw new Error('חסרים פרטי תשלום בתגובה מהשרת');
+      }
+      
       // Update state with the new session data
       setState(prev => ({
         ...prev,
@@ -40,11 +45,17 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         lowProfileCode: sessionData.lowProfileCode,
         terminalNumber: sessionData.terminalNumber,
         cardcomUrl: sessionData.cardcomUrl,
-        reference: sessionData.reference,
+        reference: sessionData.reference || '',
         paymentStatus: PaymentStatus.IDLE
       }));
       
-      return sessionData;
+      // Return object with all required properties (with empty string fallbacks where needed)
+      return {
+        lowProfileCode: sessionData.lowProfileCode,
+        sessionId: sessionData.sessionId,
+        terminalNumber: sessionData.terminalNumber,
+        reference: sessionData.reference || ''
+      };
     } catch (error) {
       PaymentLogger.error("Payment initialization error:", error);
       toast.error(error instanceof Error ? error.message : 'אירעה שגיאה באתחול התשלום');
