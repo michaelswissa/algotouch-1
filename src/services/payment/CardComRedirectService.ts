@@ -11,6 +11,13 @@ interface RedirectPaymentParams {
   userId?: string | null;
 }
 
+interface PaymentVerificationResult {
+  success: boolean;
+  transactionId?: string;
+  error?: string;
+  data?: any;
+}
+
 /**
  * Service responsible for handling CardCom redirect payment flows
  */
@@ -94,10 +101,13 @@ export class CardComRedirectService {
   /**
    * Verify payment status after return from CardCom
    */
-  static async verifyPaymentStatus(lowProfileCode: string): Promise<boolean> {
+  static async verifyPaymentStatus(lowProfileCode: string): Promise<PaymentVerificationResult> {
     if (!lowProfileCode) {
       PaymentLogger.error('Missing lowProfileCode for status check');
-      return false;
+      return { 
+        success: false, 
+        error: 'חסר קוד זיהוי עסקה' 
+      };
     }
     
     try {
@@ -108,14 +118,36 @@ export class CardComRedirectService {
 
       if (error) {
         PaymentLogger.error('Error checking payment status:', error);
-        throw new Error(error.message || 'שגיאה בבדיקת סטטוס התשלום');
+        return {
+          success: false,
+          error: error.message || 'שגיאה בבדיקת סטטוס התשלום'
+        };
       }
 
-      PaymentLogger.log('Payment status check result', { success: data?.success });
-      return data?.success || false;
+      PaymentLogger.log('Payment status check result', { 
+        success: data?.success,
+        transactionId: data?.transactionId,
+        hasData: !!data?.transactionData
+      });
+
+      if (!data?.success) {
+        return {
+          success: false,
+          error: data?.message || 'העסקה לא אושרה'
+        };
+      }
+      
+      return { 
+        success: true, 
+        transactionId: data?.transactionId,
+        data: data?.transactionData || {}
+      };
     } catch (error) {
       PaymentLogger.error('Exception during payment status check:', error);
-      return false;
+      return { 
+        success: false,
+        error: error instanceof Error ? error.message : 'שגיאה בבדיקת סטטוס העסקה'
+      };
     }
   }
 }

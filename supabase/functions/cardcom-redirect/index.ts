@@ -94,16 +94,19 @@ serve(async (req) => {
       fullName
     });
 
-    // Create CardCom API request body for payment initialization
+    // Define the operation type based on plan
+    const operationType = planId === 'monthly' ? 'ChargeAndCreateToken' : 'ChargeOnly';
+
+    // Create CardCom API request body for payment initialization with enhanced validation
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken',
+      Operation: operationType,
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
-      SuccessRedirectUrl: redirectUrls.success,
-      FailedRedirectUrl: redirectUrls.failed,
+      SuccessRedirectUrl: `${redirectUrls.success}?lowProfileCode={LowProfileID}`,
+      FailedRedirectUrl: `${redirectUrls.failed}?lowProfileCode={LowProfileID}&error=payment_failed`,
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
       ISOCoinId: currency === "ILS" ? 1 : 2,
@@ -115,6 +118,15 @@ serve(async (req) => {
         CardOwnerEmailValue: userEmail,
         CardOwnerNameValue: fullName,
         IsCardOwnerEmailRequired: true,
+        IsCardOwnerPhoneRequired: true,
+        IsHideCardOwnerIdentityNumber: false
+      },
+      // Add advanced validation parameters
+      AdvancedDefinition: {
+        JValidateType: 5, // Full authorization
+        ThreeDSecureState: "Enable", // Enable 3D-Secure validation
+        IsAVSEnable: true, // Enable Address Verification Service
+        IsRefundDeal: false
       },
       Document: invoiceInfo ? {
         Name: fullName || userEmail,

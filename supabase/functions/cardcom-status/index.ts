@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,8 +9,9 @@ const corsHeaders = {
 
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
-  apiName: Deno.env.get("CARDCOM_API_NAME"),
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
     getLowProfileResult: "https://secure.cardcom.solutions/api/v11/LowProfile/GetLowProfileResult"
   }
@@ -40,9 +42,10 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Extract low profile code from request body
     const { lowProfileCode } = await req.json();
     
+    logStep("Received request data", { lowProfileCode });
+
     if (!lowProfileCode) {
       return new Response(
         JSON.stringify({
@@ -55,30 +58,51 @@ serve(async (req) => {
       );
     }
 
-    logStep("Checking payment status", { lowProfileCode });
+    // Check if we already have payment session stored
+    let paymentSession = null;
+    let paymentStatus = 'unknown';
     
-    // First, check our database to see if we've already processed this transaction
-    const { data: existingPayment } = await supabaseAdmin
-      .rpc('check_duplicate_payment_extended', { low_profile_id: lowProfileCode });
-    
-    if (existingPayment?.exists) {
-      logStep("Payment already processed", existingPayment);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Payment already processed",
-          data: existingPayment
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    try {
+      const { data: session, error } = await supabaseAdmin
+        .from('payment_sessions')
+        .select('*')
+        .eq('low_profile_code', lowProfileCode)
+        .single();
+      
+      if (!error && session) {
+        paymentSession = session;
+        paymentStatus = session.status;
+        
+        // If payment is already verified as completed, return immediately
+        if (session.status === 'completed') {
+          logStep("Payment already completed (cached)", { 
+            sessionId: session.id,
+            status: session.status,
+            transactionId: session.transaction_id
+          });
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: "Payment status retrieved from cache",
+              status: session.status,
+              transactionId: session.transaction_id,
+              transactionData: session.transaction_data
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
         }
-      );
+      }
+    } catch (dbError) {
+      logStep("Error checking session cache", { error: dbError.message });
+      // Continue with verification despite DB error
     }
     
-    // Otherwise, check with CardCom API
-    if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
-      throw new Error("Missing CardCom configuration");
-    }
+    // Query CardCom API for payment status
+    logStep("Querying CardCom for payment status");
     
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
@@ -86,97 +110,115 @@ serve(async (req) => {
       LowProfileId: lowProfileCode
     };
     
-    logStep("Sending status request to CardCom", { 
-      terminalNumber: CARDCOM_CONFIG.terminalNumber,
-      lowProfileCode
-    });
-    
+    // Make request to CardCom API to get low profile status
     const response = await fetch(CARDCOM_CONFIG.endpoints.getLowProfileResult, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(cardcomPayload),
     });
     
     const responseData = await response.json();
-    logStep("CardCom payment status response", responseData);
+    logStep("CardCom response", responseData);
     
+    // Handle errors from CardCom
     if (responseData.ResponseCode !== 0) {
+      // Update payment session status if we have one
+      if (paymentSession) {
+        try {
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              status: 'failed',
+              error_description: responseData.Description,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', paymentSession.id);
+        } catch (updateError) {
+          logStep("Error updating session status", { error: updateError.message });
+        }
+      }
+      
       return new Response(
         JSON.stringify({
           success: false,
-          message: responseData.Description || "Failed to get payment status",
-        }), {
+          message: responseData.Description || "Failed to verify payment status",
+        }),
+        {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
-
-    // Check for transaction info to determine if payment was successful
-    const successful = responseData.TranzactionInfo && 
-                      (responseData.TranzactionInfo.ResponseCode === 0 || 
-                       responseData.TranzactionInfo.ResponseCode === '0');
     
-    logStep("Payment status check complete", { 
-      successful,
-      responseCode: responseData.TranzactionInfo?.ResponseCode
+    // Check transaction status from CardCom response
+    const transactionInfo = responseData.TranzactionInfo;
+    const transactionId = transactionInfo?.TranzactionId;
+    const tokenInfo = responseData.TokenInfo;
+    
+    // Determine if transaction was successful based on TranzactionInfo
+    const isSuccessful = !!transactionId && 
+      transactionInfo && 
+      (transactionInfo.ResponseCode === 0 || 
+       transactionInfo.ResponseCode === 700 || 
+       transactionInfo.ResponseCode === 701);
+    
+    // Extract card details if available
+    const cardDetails = transactionInfo ? {
+      last4CardDigits: transactionInfo.Last4CardDigits,
+      cardType: transactionInfo.CardInfo,
+      cardExpMonth: transactionInfo.CardMonth,
+      cardExpYear: transactionInfo.CardYear,
+      cardOwnerName: transactionInfo.CardOwnerName,
+      cardOwnerEmail: transactionInfo.CardOwnerEmail,
+    } : null;
+    
+    // Extract token details if available
+    const tokenDetails = tokenInfo ? {
+      token: tokenInfo.Token,
+      tokenExpDate: tokenInfo.TokenExDate,
+      approvalNumber: tokenInfo.TokenApprovalNumber
+    } : null;
+    
+    logStep("Payment verification result", { 
+      isSuccessful,
+      transactionId,
+      hasToken: !!tokenDetails
     });
     
-    // If payment is successful, update any related user records
-    if (successful) {
+    // Update payment session in database
+    if (paymentSession) {
       try {
-        // Find the payment session to get the user ID
-        const { data: paymentSession } = await supabaseAdmin
+        await supabaseAdmin
           .from('payment_sessions')
-          .select('user_id, reference, plan_id')
-          .eq('low_profile_code', lowProfileCode)
-          .single();
-        
-        if (paymentSession?.user_id) {
-          logStep("Found payment session", {
-            userId: paymentSession.user_id,
-            reference: paymentSession.reference,
-            planId: paymentSession.plan_id
-          });
-          
-          // Update payment session status
-          await supabaseAdmin
-            .from('payment_sessions')
-            .update({
-              status: 'completed',
-              transaction_id: responseData.TranzactionInfo.TranzactionId,
-              payment_details: responseData
-            })
-            .eq('low_profile_code', lowProfileCode);
-            
-          // Record successful payment
-          await supabaseAdmin
-            .from('user_payment_logs')
-            .insert({
-              user_id: paymentSession.user_id,
-              token: lowProfileCode,
-              transaction_id: responseData.TranzactionInfo.TranzactionId,
-              amount: responseData.TranzactionInfo.Amount,
-              status: 'payment_success',
-              payment_data: responseData
-            });
-          
-          logStep("Updated payment records", { userId: paymentSession.user_id });
-        } else {
-          logStep("No payment session found for this low profile code");
-        }
-      } catch (dbError) {
-        logStep("Error updating payment records", { error: dbError.message });
-        // Continue despite DB error to allow client to proceed
+          .update({
+            status: isSuccessful ? 'completed' : 'failed',
+            transaction_id: transactionId || null,
+            updated_at: new Date().toISOString(),
+            card_details: cardDetails,
+            token_details: tokenDetails,
+            transaction_data: transactionInfo || null
+          })
+          .eq('id', paymentSession.id);
+      } catch (updateError) {
+        logStep("Error updating payment session", { error: updateError.message });
       }
     }
     
     return new Response(
       JSON.stringify({
-        success: successful,
-        message: successful ? "Payment successful" : "Payment failed or pending",
-        data: responseData
-      }), {
+        success: isSuccessful,
+        message: isSuccessful 
+          ? "Payment verified successfully" 
+          : "Payment verification failed",
+        transactionId: transactionId,
+        status: isSuccessful ? 'completed' : 'failed',
+        transactionData: transactionInfo,
+        tokenData: tokenDetails,
+        lowProfileCode,
+      }),
+      {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
@@ -188,8 +230,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: errorMessage,
-      }), {
+        message: errorMessage || "Payment status check failed",
+      }),
+      {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }

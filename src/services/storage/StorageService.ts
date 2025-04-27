@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
@@ -39,10 +38,17 @@ export interface PaymentData {
   timestamp?: string;
 }
 
+export interface PaymentIntent {
+  planId: string;
+  amount: number;
+  timestamp?: string;
+}
+
 export const StorageKeys = {
   REGISTRATION: 'registration_data',
   CONTRACT: 'contract_data',
   PAYMENT: 'payment_data',
+  PAYMENT_INTENT: 'payment_intent',
 } as const;
 
 export class StorageService {
@@ -82,6 +88,24 @@ export class StorageService {
     } catch (error) {
       PaymentLogger.error(`Error removing from storage (${key}):`, error);
     }
+  }
+
+  /**
+   * Store registration intent for pending payment
+   */
+  static storeRegistrationIntent(data: Partial<PaymentIntent>): boolean {
+    const intent = {
+      ...data,
+      timestamp: new Date().toISOString()
+    };
+    return this.set(StorageKeys.PAYMENT_INTENT, intent);
+  }
+
+  /**
+   * Get registration intent
+   */
+  static getRegistrationIntent(): PaymentIntent | null {
+    return this.get<PaymentIntent>(StorageKeys.PAYMENT_INTENT);
   }
 
   /**
@@ -150,6 +174,7 @@ export class StorageService {
     this.remove(StorageKeys.REGISTRATION);
     this.remove(StorageKeys.CONTRACT);
     this.remove(StorageKeys.PAYMENT);
+    this.remove(StorageKeys.PAYMENT_INTENT);
   }
   
   /**
@@ -171,6 +196,29 @@ export class StorageService {
       return timeDiffMinutes <= 30;
     } catch (error) {
       PaymentLogger.error('Error checking registration validity:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if payment intent is valid and not expired
+   */
+  static isPaymentIntentValid(): boolean {
+    try {
+      const data = this.getRegistrationIntent();
+      
+      if (!data || !data.timestamp) {
+        return false;
+      }
+      
+      const intentTime = new Date(data.timestamp);
+      const now = new Date();
+      const timeDiffMinutes = (now.getTime() - intentTime.getTime()) / (1000 * 60);
+      
+      // Payment intent expires after 60 minutes
+      return timeDiffMinutes <= 60;
+    } catch (error) {
+      PaymentLogger.error('Error checking payment intent validity:', error);
       return false;
     }
   }

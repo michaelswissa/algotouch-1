@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CardComRedirectService } from '@/services/payment/CardComRedirectService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { RegistrationService } from '@/services/registration/RegistrationService';
+import { StorageService } from '@/services/storage/StorageService';
 
 interface RedirectPaymentButtonProps {
   planId: string;
@@ -29,9 +29,9 @@ const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
       setIsLoading(true);
       PaymentLogger.log('Starting redirect payment process', { planId, amount });
       
-      // Step 1: Get and validate registration data
-      const registrationData = RegistrationService.getValidRegistrationData();
-      if (!registrationData) {
+      // Get registration data without creating user
+      const registrationData = StorageService.getRegistrationData();
+      if (!registrationData || !registrationData.email) {
         toast.error('מידע הרשמה חסר או לא תקין');
         throw new Error('מידע הרשמה חסר או לא תקין');
       }
@@ -41,30 +41,32 @@ const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
         hasUserData: !!registrationData.userData
       });
       
-      // Step 2: Create user account first
-      PaymentLogger.log('Creating/validating user account before payment');
-      const { success, user, error } = await RegistrationService.createUserAccount(registrationData);
-      
-      if (!success || !user) {
-        toast.error(error || 'שגיאה ביצירת חשבון המשתמש');
-        throw new Error(error || 'שגיאה ביצירת חשבון המשתמש');
-      }
-      
-      PaymentLogger.log('User account ready for payment', { userId: user.id });
-      
-      // Step 3: Initialize payment redirect
+      // Prepare user information for the payment without creating account
       const fullName = `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
       const email = registrationData.email;
       
-      const { url } = await CardComRedirectService.initializeRedirect({
+      // Store registration intent in storage for later use after payment
+      StorageService.storeRegistrationIntent({ planId, amount });
+      
+      // Initialize payment redirect
+      const { url, lowProfileCode, reference } = await CardComRedirectService.initializeRedirect({
         planId,
         amount,
         userEmail: email,
         fullName,
-        userId: user.id
+        // Pass userId only if already created, otherwise leave it undefined
+        userId: registrationData.userId
       });
       
-      // Step 4: Redirect to payment page
+      // Store payment session information
+      StorageService.updatePaymentData({
+        sessionId: reference,
+        lowProfileCode: lowProfileCode,
+        reference: reference,
+        status: 'pending'
+      });
+      
+      // Redirect to payment page
       CardComRedirectService.redirectToPayment(url);
       
     } catch (error) {
