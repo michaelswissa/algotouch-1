@@ -1,145 +1,162 @@
 
-/**
- * Service for handling local storage operations
- */
+// Helper service for storing and retrieving data from localStorage
 export class StorageService {
-  // Keys used in storage
-  private static readonly REGISTRATION_KEY = 'registration_data';
-  private static readonly CONTRACT_KEY = 'contract_data';
-  private static readonly PAYMENT_KEY = 'payment_data';
+  // Subscription data keys
+  private static readonly SUBSCRIPTION_DATA_KEY = 'subscription_data';
+  private static readonly CONTRACT_DATA_KEY = 'contract_data';
+  private static readonly REGISTRATION_DATA_KEY = 'registration_data';
   private static readonly USER_ID_KEY = 'userId';
-  
-  /**
-   * Get registration data from storage
-   */
-  static getRegistrationData(): any | null {
+  private static readonly LAST_PAYMENT_ATTEMPT_KEY = 'last_payment_attempt';
+
+  // Store subscription data
+  static storeSubscriptionData(data: any) {
     try {
-      const data = sessionStorage.getItem(this.REGISTRATION_KEY);
-      return data ? JSON.parse(data) : null;
-    } catch (e) {
-      console.error('Error parsing registration data', e);
-      return null;
-    }
-  }
-  
-  /**
-   * Store registration data to storage
-   */
-  static storeRegistrationData(data: any): boolean {
-    try {
-      const existingData = this.getRegistrationData() || {};
-      const updatedData = { ...existingData, ...data };
-      sessionStorage.setItem(this.REGISTRATION_KEY, JSON.stringify(updatedData));
+      localStorage.setItem(this.SUBSCRIPTION_DATA_KEY, JSON.stringify(data));
       return true;
     } catch (e) {
-      console.error('Error storing registration data', e);
+      console.error('Error storing subscription data', e);
       return false;
     }
   }
-  
-  /**
-   * Check if registration data is valid (not expired)
-   */
-  static isRegistrationValid(): boolean {
+
+  // Get subscription data
+  static getSubscriptionData(): any | null {
     try {
-      const data = this.getRegistrationData();
-      if (!data || !data.registrationTime) {
-        return false;
-      }
-      
-      // Check if registration is expired (30 minutes)
-      const registrationTime = new Date(data.registrationTime);
-      const now = new Date();
-      const timeDiffMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
-      
-      return timeDiffMinutes <= 30;
-    } catch (e) {
-      console.error('Error checking registration validity', e);
-      return false;
-    }
-  }
-  
-  /**
-   * Get contract data from storage
-   */
-  static getContractData(): any | null {
-    try {
-      const data = sessionStorage.getItem(this.CONTRACT_KEY);
+      const data = localStorage.getItem(this.SUBSCRIPTION_DATA_KEY);
       return data ? JSON.parse(data) : null;
     } catch (e) {
-      console.error('Error parsing contract data', e);
+      console.error('Error getting subscription data', e);
       return null;
     }
   }
-  
-  /**
-   * Store contract data to storage
-   */
-  static storeContractData(data: any): boolean {
+
+  // Store contract data
+  static storeContractData(data: any) {
     try {
-      const existingData = this.getContractData() || {};
-      const updatedData = { ...existingData, ...data };
-      sessionStorage.setItem(this.CONTRACT_KEY, JSON.stringify(updatedData));
+      localStorage.setItem(this.CONTRACT_DATA_KEY, JSON.stringify(data));
       return true;
     } catch (e) {
       console.error('Error storing contract data', e);
       return false;
     }
   }
-  
-  /**
-   * Get payment data from storage
-   */
-  static getPaymentData(): any | null {
+
+  // Get contract data
+  static getContractData(): any | null {
     try {
-      const data = localStorage.getItem(this.PAYMENT_KEY);
+      const data = localStorage.getItem(this.CONTRACT_DATA_KEY);
       return data ? JSON.parse(data) : null;
     } catch (e) {
-      console.error('Error parsing payment data', e);
+      console.error('Error getting contract data', e);
       return null;
     }
   }
-  
-  /**
-   * Update payment data in storage
-   */
-  static updatePaymentData(data: any): void {
+
+  // Store registration data
+  static storeRegistrationData(data: any) {
     try {
-      const existingData = this.getPaymentData() || {};
-      const updatedData = { ...existingData, ...data, updatedAt: new Date().toISOString() };
-      localStorage.setItem(this.PAYMENT_KEY, JSON.stringify(updatedData));
+      localStorage.setItem(this.REGISTRATION_DATA_KEY, JSON.stringify(data));
+      return true;
     } catch (e) {
-      console.error('Error updating payment data', e);
+      console.error('Error storing registration data', e);
+      return false;
     }
   }
-  
-  /**
-   * Get user ID from storage
-   */
+
+  // Get registration data
+  static getRegistrationData(): any | null {
+    try {
+      const data = localStorage.getItem(this.REGISTRATION_DATA_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error getting registration data', e);
+      return null;
+    }
+  }
+
+  // Check if registration data is valid
+  static isRegistrationValid(): boolean {
+    try {
+      const data = this.getRegistrationData();
+      if (!data) return false;
+      
+      // Check basic validity criteria
+      if (!data.email || !data.userData) return false;
+      
+      // If planId is present but no contractSigned - invalid state
+      if (data.planId && data.contractSigned !== true) return false;
+      
+      return true;
+    } catch (e) {
+      console.error('Error checking registration validity', e);
+      return false;
+    }
+  }
+
+  // Store user ID
+  static storeUserId(userId: string) {
+    try {
+      localStorage.setItem(this.USER_ID_KEY, userId);
+      return true;
+    } catch (e) {
+      console.error('Error storing user ID', e);
+      return false;
+    }
+  }
+
+  // Get user ID
   static getUserId(): string | null {
-    return sessionStorage.getItem(this.USER_ID_KEY);
+    return localStorage.getItem(this.USER_ID_KEY);
   }
-  
-  /**
-   * Set user ID in storage
-   */
-  static setUserId(userId: string): void {
-    sessionStorage.setItem(this.USER_ID_KEY, userId);
+
+  // Store last payment attempt
+  static storeLastPaymentAttempt(data: any) {
+    try {
+      localStorage.setItem(this.LAST_PAYMENT_ATTEMPT_KEY, JSON.stringify({
+        ...data,
+        timestamp: Date.now()
+      }));
+      return true;
+    } catch (e) {
+      console.error('Error storing last payment attempt', e);
+      return false;
+    }
   }
-  
-  /**
-   * Clear payment data from storage
-   */
-  static clearPaymentData(): void {
-    localStorage.removeItem(this.PAYMENT_KEY);
+
+  // Get last payment attempt
+  static getLastPaymentAttempt(): any | null {
+    try {
+      const data = localStorage.getItem(this.LAST_PAYMENT_ATTEMPT_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error getting last payment attempt', e);
+      return null;
+    }
   }
-  
-  /**
-   * Clear all subscription-related data (registration, contract, payment)
-   */
-  static clearAllSubscriptionData(): void {
-    sessionStorage.removeItem(this.REGISTRATION_KEY);
-    sessionStorage.removeItem(this.CONTRACT_KEY);
-    localStorage.removeItem(this.PAYMENT_KEY);
+
+  // Clear all subscription-related data
+  static clearAllSubscriptionData() {
+    try {
+      localStorage.removeItem(this.SUBSCRIPTION_DATA_KEY);
+      localStorage.removeItem(this.CONTRACT_DATA_KEY);
+      localStorage.removeItem(this.REGISTRATION_DATA_KEY);
+      localStorage.removeItem(this.LAST_PAYMENT_ATTEMPT_KEY);
+      // Don't remove user ID here as it might be needed for other features
+      return true;
+    } catch (e) {
+      console.error('Error clearing subscription data', e);
+      return false;
+    }
+  }
+
+  // Clear everything including user ID
+  static clearEverything() {
+    try {
+      localStorage.clear();
+      return true;
+    } catch (e) {
+      console.error('Error clearing localStorage', e);
+      return false;
+    }
   }
 }

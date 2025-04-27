@@ -1,21 +1,18 @@
 
-import { useState, useEffect } from 'react';
-import { usePaymentContext } from '@/contexts/payment/PaymentContext';
-import { CardComService } from '@/services/payment/CardComService';
-import { toast } from 'sonner';
+import { useState, useCallback } from 'react';
 
-interface PaymentFormData {
+export interface PaymentFormData {
   cardOwnerName: string;
   cardOwnerId: string;
   cardOwnerEmail: string;
   cardOwnerPhone: string;
   cardMonth: string;
   cardYear: string;
-  expirationMonth: string; // Add this missing property
-  expirationYear: string;  // Add this missing property
+  expirationMonth: string;
+  expirationYear: string;
 }
 
-interface PaymentFormErrors {
+export interface PaymentFormErrors {
   cardOwnerName?: string;
   cardOwnerId?: string;
   cardOwnerEmail?: string;
@@ -24,8 +21,17 @@ interface PaymentFormErrors {
   cardYear?: string;
   cardNumber?: string;
   cvv?: string;
-  expirationMonth?: string; // Add this missing property
-  expirationYear?: string;  // Add this missing property
+  expirationMonth?: string;
+  expirationYear?: string;
+}
+
+export interface CardOwnerDetails {
+  cardOwnerName: string;
+  cardOwnerId: string;
+  cardOwnerEmail: string;
+  cardOwnerPhone: string;
+  expirationMonth: string;
+  expirationYear: string;
 }
 
 export const usePaymentForm = () => {
@@ -36,88 +42,62 @@ export const usePaymentForm = () => {
     cardOwnerPhone: '',
     cardMonth: '',
     cardYear: '',
-    expirationMonth: '', // Initialize the new property
-    expirationYear: ''   // Initialize the new property
+    expirationMonth: '',
+    expirationYear: ''
   });
   
   const [errors, setErrors] = useState<PaymentFormErrors>({});
-  const { submitPayment, paymentStatus } = usePaymentContext();
   
-  // Load data from session storage if available
-  useEffect(() => {
-    try {
-      const contractData = sessionStorage.getItem('contract_data');
-      const registrationData = sessionStorage.getItem('registration_data');
-      
-      if (contractData) {
-        const parsed = JSON.parse(contractData);
-        if (parsed.fullName || parsed.email) {
-          setFormData(prev => ({
-            ...prev,
-            cardOwnerName: parsed.fullName || prev.cardOwnerName,
-            cardOwnerEmail: parsed.email || prev.cardOwnerEmail
-          }));
-        }
-      } else if (registrationData) {
-        const parsed = JSON.parse(registrationData);
-        if (parsed.userData || parsed.email) {
-          const name = parsed.userData?.firstName && parsed.userData?.lastName ? 
-            `${parsed.userData.firstName} ${parsed.userData.lastName}` : '';
-          
-          setFormData(prev => ({
-            ...prev,
-            cardOwnerName: name || prev.cardOwnerName,
-            cardOwnerEmail: parsed.email || prev.cardOwnerEmail,
-            cardOwnerPhone: parsed.userData?.phone || prev.cardOwnerPhone
-          }));
-        }
-      }
-    } catch (e) {
-      console.error('Error loading form data from storage', e);
-    }
-  }, []);
-  
-  const validateForm = () => {
+  const validateForm = useCallback((): boolean => {
     const newErrors: PaymentFormErrors = {};
     let isValid = true;
     
-    // Validate name
-    if (!formData.cardOwnerName.trim()) {
+    // Card owner name validation
+    if (!formData.cardOwnerName) {
       newErrors.cardOwnerName = 'שדה חובה';
       isValid = false;
     }
     
-    // Validate email
-    if (!formData.cardOwnerEmail.trim()) {
+    // ID validation (9 digits for Israeli ID)
+    if (!formData.cardOwnerId) {
+      newErrors.cardOwnerId = 'שדה חובה';
+      isValid = false;
+    } else if (!/^\d{9}$/.test(formData.cardOwnerId)) {
+      newErrors.cardOwnerId = 'תעודת זהות לא תקינה, נדרשים 9 ספרות';
+      isValid = false;
+    }
+    
+    // Email validation
+    if (!formData.cardOwnerEmail) {
       newErrors.cardOwnerEmail = 'שדה חובה';
       isValid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.cardOwnerEmail)) {
-      newErrors.cardOwnerEmail = 'כתובת דוא"ל לא תקינה';
+    } else if (!/^\S+@\S+\.\S+$/.test(formData.cardOwnerEmail)) {
+      newErrors.cardOwnerEmail = 'כתובת דואר אלקטרוני לא תקינה';
       isValid = false;
     }
     
-    // Validate ID
-    if (formData.cardOwnerId.trim() && !/^\d{9}$/.test(formData.cardOwnerId)) {
-      newErrors.cardOwnerId = 'מספר זהות לא תקין';
+    // Phone validation
+    if (!formData.cardOwnerPhone) {
+      newErrors.cardOwnerPhone = 'שדה חובה';
       isValid = false;
-    }
-    
-    // Validate phone
-    if (formData.cardOwnerPhone.trim() && !/^0\d{8,9}$/.test(formData.cardOwnerPhone)) {
+    } else if (!/^0\d{8,9}$/.test(formData.cardOwnerPhone.replace(/[-\s]/g, ''))) {
       newErrors.cardOwnerPhone = 'מספר טלפון לא תקין';
       isValid = false;
     }
     
-    // Validate card month/year
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear() % 100;
-    const currentMonth = currentDate.getMonth() + 1;
-    
-    // Check both expirationMonth/Year and cardMonth/Year to maintain compatibility
+    // Card expiration validation
     const month = formData.expirationMonth || formData.cardMonth;
     const year = formData.expirationYear || formData.cardYear;
-    
-    if (month && year) {
+
+    if (!month || !year) {
+      newErrors.expirationMonth = 'שדה חובה';
+      isValid = false;
+    } else {
+      // Check if card is expired
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear() % 100;
+      const currentMonth = currentDate.getMonth() + 1;
+      
       const monthNum = parseInt(month);
       const yearNum = parseInt(year);
       
@@ -129,7 +109,7 @@ export const usePaymentForm = () => {
     
     setErrors(newErrors);
     return isValid;
-  };
+  }, [formData]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -148,13 +128,13 @@ export const usePaymentForm = () => {
     }
   };
   
-  const handleSubmit = () => {
-    if (!validateForm()) {
-      toast.error('יש למלא את כל שדות החובה');
-      return;
+  const submitForm = useCallback(() => {
+    const isValid = validateForm();
+    if (!isValid) {
+      return false;
     }
     
-    submitPayment({
+    return ({
       cardOwnerName: formData.cardOwnerName,
       cardOwnerId: formData.cardOwnerId,
       cardOwnerEmail: formData.cardOwnerEmail,
@@ -162,13 +142,13 @@ export const usePaymentForm = () => {
       expirationMonth: formData.expirationMonth || formData.cardMonth,
       expirationYear: formData.expirationYear || formData.cardYear,
     });
-  };
+  }, [formData, validateForm]);
   
   return {
     formData,
     errors,
     handleChange,
-    handleSubmit,
-    isSubmitting: paymentStatus === 'processing'
+    validateForm,
+    submitForm
   };
 };

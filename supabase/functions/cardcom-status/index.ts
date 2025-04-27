@@ -8,6 +8,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper logging function
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CARDCOM-STATUS] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -15,11 +21,19 @@ serve(async (req) => {
   }
 
   try {
+    // Get CardCom configuration from environment
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
+    const cardcomUrl = "https://secure.cardcom.solutions";
+    
+    logStep("Function started");
+
     // Get the request body
     const requestData = await req.json();
 
     // Validate required fields
     if (!requestData.lowProfileCode) {
+      logStep("ERROR: Missing required field", { field: "lowProfileCode" });
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -32,15 +46,35 @@ serve(async (req) => {
       );
     }
 
-    // In a real implementation, you would:
-    // 1. Call the CardCom API to check the payment status
-    // 2. Update the transaction status in the database
-    // 3. Return the appropriate response
+    logStep("Checking payment status", { lowProfileCode: requestData.lowProfileCode });
+    
+    // Call CardCom API to check payment status for real
+    const cardcomApiUrl = `${cardcomUrl}/api/v11/LowProfile/GetLpResult`;
 
-    // Let's simulate checking the transaction status
+    const cardcomPayload = {
+      TerminalNumber: terminalNumber,
+      ApiName: apiName,
+      LowProfileId: requestData.lowProfileCode
+    };
+    
+    logStep("Sending request to CardCom", cardcomPayload);
+
+    const response = await fetch(cardcomApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(cardcomPayload)
+    });
+
+    // Get response from CardCom
+    const cardcomResponse = await response.json();
+    
+    logStep("CardCom response received", cardcomResponse);
+
+    // Update the transaction status in the database
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    let transactionStatus = 'success'; // Default to success for demo
     
     if (supabaseUrl && supabaseKey) {
       try {
@@ -48,61 +82,74 @@ serve(async (req) => {
         
         // Check if the transaction exists
         const { data: transaction } = await supabase
-          .from('payment_transactions')
+          .from('payment_sessions')
           .select('*')
           .eq('low_profile_code', requestData.lowProfileCode)
           .single();
         
         if (transaction) {
-          // For demo purposes, let's simulate a transaction that completes after a short time
-          const createdAt = new Date(transaction.created_at);
-          const now = new Date();
-          const secondsElapsed = (now.getTime() - createdAt.getTime()) / 1000;
+          // Determine status based on CardCom response
+          let transactionStatus = 'pending';
           
-          // Simulate success after 5 seconds
-          if (secondsElapsed > 5) {
-            transactionStatus = 'success';
+          if (cardcomResponse.ResponseCode === 0) {
+            // Success case
+            transactionStatus = 'completed';
             
-            // Update the transaction status
-            await supabase
-              .from('payment_transactions')
-              .update({ status: 'success', updated_at: new Date().toISOString() })
-              .eq('low_profile_code', requestData.lowProfileCode);
-          } else {
-            transactionStatus = 'pending';
+            // If we have transaction info or token info, it's a success
+            if (cardcomResponse.TranzactionInfo || cardcomResponse.TokenInfo) {
+              transactionStatus = 'completed';
+            }
+          } else if (cardcomResponse.ResponseCode !== 0) {
+            transactionStatus = 'failed';
           }
+          
+          // Update the transaction status
+          await supabase
+            .from('payment_sessions')
+            .update({ 
+              status: transactionStatus, 
+              updated_at: new Date().toISOString(),
+              transaction_data: cardcomResponse
+            })
+            .eq('low_profile_code', requestData.lowProfileCode);
+            
+          logStep("Updated payment session status", { 
+            low_profile_code: requestData.lowProfileCode,
+            status: transactionStatus
+          });
         } else {
-          transactionStatus = 'not_found';
+          logStep("WARNING: Payment session not found", { 
+            low_profile_code: requestData.lowProfileCode 
+          });
         }
       } catch (dbError) {
-        console.error("Database error:", dbError);
+        logStep("ERROR: Database error", { error: dbError.message });
         // Continue even if database query fails
       }
     }
 
     // Prepare the response
-    const simulatedResponse = {
+    const result = {
       success: true,
       data: {
         lowProfileCode: requestData.lowProfileCode,
-        status: transactionStatus,
+        status: cardcomResponse.ResponseCode === 0 ? 'success' : 'failed',
         timestamp: new Date().toISOString(),
-        isComplete: transactionStatus === 'success' || transactionStatus === 'failed',
-        details: transactionStatus === 'success' ? 
-          { message: 'Transaction completed successfully' } : 
-          { message: 'Transaction is still being processed' }
+        isComplete: cardcomResponse.ResponseCode === 0,
+        details: cardcomResponse.Description || 'No description provided',
+        cardcomResponse: cardcomResponse // Include the full CardCom response
       }
     };
 
     return new Response(
-      JSON.stringify(simulatedResponse),
+      JSON.stringify(result),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   } catch (error) {
-    console.error("Error checking payment status:", error);
+    logStep("ERROR: Exception processing request", { error: error.message });
     
     return new Response(
       JSON.stringify({ 
