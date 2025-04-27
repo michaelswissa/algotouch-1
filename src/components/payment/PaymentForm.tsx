@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const [initialized, setInitialized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { initializeCardcomFields } = useCardcomInitializer();
-  const { setStatus: setPaymentStatus } = usePaymentStatus();
+  const { setState } = usePaymentStatus({ onPaymentComplete });
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -70,10 +71,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       const result = await initializePayment(planId as PlanType);
       if (result) {
         setInitialized(true);
-        setPaymentStatus(PaymentStatus.INITIALIZING);
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.INITIALIZING }));
         
         try {
-          setPaymentStatus(PaymentStatus.IDLE);
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
           
           console.log('Setting up to initialize CardCom fields');
           setTimeout(async () => {
@@ -95,7 +96,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               console.log('CardCom fields initialized successfully');
             } catch (error) {
               console.error('Error during CardCom field initialization:', error);
-              setPaymentStatus(PaymentStatus.FAILED);
+              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
               toast.error(error.message || 'שגיאה באתחול שדות התשלום');
             }
           }, 500);
@@ -104,14 +105,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         } catch (error) {
           console.error('Payment initialization error:', error);
           toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
-          setPaymentStatus(PaymentStatus.FAILED);
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           return null;
         }
       }
     };
     
     init();
-  }, [planId, initializePayment, initializeCardcomFields, operationType, masterFrameRef, setPaymentStatus]);
+  }, [planId, initializePayment, initializeCardcomFields, operationType, masterFrameRef, setState]);
 
   // When payment is successful, call onPaymentComplete with transactionId
   useEffect(() => {
