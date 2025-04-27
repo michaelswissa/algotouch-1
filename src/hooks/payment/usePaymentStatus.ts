@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { PaymentState, PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentState, PaymentStatus, PaymentStatusType } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UsePaymentStatusProps {

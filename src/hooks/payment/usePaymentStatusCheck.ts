@@ -1,12 +1,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentStatus, PaymentStatusType } from '@/components/payment/types/payment';
 
 interface UsePaymentStatusCheckProps {
   lowProfileCode: string | null;
   setState: (updater: any) => void;
-  paymentStatus: PaymentStatus;
+  paymentStatus: PaymentStatusType;
 }
 
 export const usePaymentStatusCheck = ({ 
@@ -46,7 +46,7 @@ export const usePaymentStatusCheck = ({
       
       if (data.success && data.status === 'completed') {
         console.log("Payment completed successfully!");
-        setState(prev => ({ 
+        setState((prev: any) => ({ 
           ...prev, 
           paymentStatus: PaymentStatus.SUCCESS,
           transactionId: data.transactionId || 'token-created'
@@ -56,7 +56,7 @@ export const usePaymentStatusCheck = ({
         localStorage.removeItem('payment_session');
       } else if (data.success && data.status === 'failed') {
         console.error("Payment failed:", data);
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+        setState((prev: any) => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       }
     } catch (error) {
       console.error("Error checking payment status:", error);

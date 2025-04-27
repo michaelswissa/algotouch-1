@@ -5,7 +5,7 @@ export const PaymentStatus = {
   PROCESSING: 'processing' as const,
   SUCCESS: 'success' as const,
   FAILED: 'failed' as const
-} as const;
+};
 
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 
@@ -41,7 +41,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
 }
 
 export interface PaymentState {

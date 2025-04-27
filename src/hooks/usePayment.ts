@@ -1,6 +1,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentStatus, PaymentStatusType } from '@/components/payment/types/payment';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { toast } from 'sonner';
@@ -10,8 +10,18 @@ interface UsePaymentProps {
   onPaymentComplete: (transactionId?: string) => void;
 }
 
+interface PaymentStateType {
+  paymentStatus: PaymentStatusType;
+  lowProfileCode: string;
+  sessionId: string;
+  terminalNumber: string;
+  cardcomUrl: string;
+  reference: string;
+  transactionId: string;
+}
+
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
-  const [state, setState] = useState({
+  const [state, setState] = useState<PaymentStateType>({
     paymentStatus: PaymentStatus.INITIALIZING,
     lowProfileCode: '',
     sessionId: '',
@@ -98,9 +108,9 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     // Re-initialize payment
     setTimeout(() => {
-      initializePayment(planId);
+      initializePayment();
     }, 500);
-  }, [initializePayment, planId]);
+  }, [initializePayment]);
 
   // Handle payment success
   useEffect(() => {

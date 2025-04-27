@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
-import { PaymentStatus } from './types/payment';
+import { PaymentStatus, PaymentStatusType } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import InitializingPayment from './states/InitializingPayment';
 import { usePaymentFlow } from '@/hooks/usePaymentFlow';
