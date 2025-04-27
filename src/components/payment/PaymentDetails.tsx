@@ -6,12 +6,16 @@ interface PaymentDetailsProps {
   paymentUrl?: string;
   isReady?: boolean;
   masterFrameRef?: React.RefObject<HTMLIFrameElement>;
+  terminalNumber?: string;
+  cardcomUrl?: string;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   paymentUrl,
   isReady = false,
-  masterFrameRef
+  masterFrameRef,
+  terminalNumber,
+  cardcomUrl
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [height, setHeight] = useState(650);
