@@ -1,4 +1,5 @@
 
+// Define payment status types
 export type PaymentStatusType = 'idle' | 'initializing' | 'processing' | 'success' | 'failed';
 
 export const PaymentStatus = {

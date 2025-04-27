@@ -1,15 +1,32 @@
 
-import React from 'react';
-import { PaymentSessionData } from '@/components/payment/types/payment';
+import React, { useState } from 'react';
+import { CardComFieldsInitConfig, PaymentSessionData } from '@/components/payment/types/payment';
 
+/**
+ * Hook for initializing CardCom payment fields
+ * Handles the initialization of CardCom fields in iframes
+ */
 export const useCardcomInitializer = () => {
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  /**
+   * Initialize CardCom payment fields in iframes
+   * 
+   * @param masterFrameRef - Reference to the master iframe
+   * @param lowProfileCode - Unique code for this payment session
+   * @param sessionId - Session ID for tracking
+   * @param terminalNumber - CardCom terminal number
+   * @param operationType - Type of operation (payment or token_only)
+   * @returns Promise resolving to boolean indicating success
+   */
   const initializeCardcomFields = async (
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string = '160138',
     operationType: 'payment' | 'token_only' = 'payment'
-  ) => {
+  ): Promise<boolean> => {
+    // Validate required parameters
     if (!lowProfileCode || !sessionId) {
       console.error("Missing required parameters for CardCom initialization:", { 
         hasLowProfileCode: Boolean(lowProfileCode), 
@@ -18,6 +35,7 @@ export const useCardcomInitializer = () => {
       return false;
     }
     
+    // Validate master frame reference
     if (!masterFrameRef.current) {
       console.error("Master frame reference is not available");
       return false;
@@ -53,49 +71,56 @@ export const useCardcomInitializer = () => {
         }
 
         try {
-          const config: any = {
+          // Prepare CardCom configuration
+          const cardNumberFieldCSS = `
+            body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
+            .cardNumberField {
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              height: 40px;
+              width: 100%;
+              padding: 0 10px;
+              font-size: 16px;
+              box-sizing: border-box;
+            }
+            .cardNumberField:focus {
+              border-color: #3498db;
+              outline: none;
+            }
+            .cardNumberField.invalid {
+              border-color: #e74c3c;
+            }`;
+
+          const cvvFieldCSS = `
+            body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
+            .cvvField {
+              border: 1px solid #ccc;
+              border-radius: 3px;
+              height: 39px;
+              margin: 0;
+              padding: 0 10px;
+              width: 100%;
+              box-sizing: border-box;
+            }
+            .cvvField:focus {
+              border-color: #3498db;
+              outline: none;
+            }
+            .cvvField.invalid {
+              border-color: #e74c3c;
+            }`;
+            
+          const reCaptchaFieldCSS = 'body { margin: 0; padding:0; display: flex; justify-content: center; }';
+          
+          const config = {
             action: 'init',
             lowProfileCode,
             LowProfileCode: lowProfileCode,
             sessionId,
             terminalNumber,
-            cardFieldCSS: `
-              body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
-              .cardNumberField {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                height: 40px;
-                width: 100%;
-                padding: 0 10px;
-                font-size: 16px;
-                box-sizing: border-box;
-              }
-              .cardNumberField:focus {
-                border-color: #3498db;
-                outline: none;
-              }
-              .cardNumberField.invalid {
-                border-color: #e74c3c;
-              }`,
-            cvvFieldCSS: `
-              body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
-              .cvvField {
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                height: 39px;
-                margin: 0;
-                padding: 0 10px;
-                width: 100%;
-                box-sizing: border-box;
-              }
-              .cvvField:focus {
-                border-color: #3498db;
-                outline: none;
-              }
-              .cvvField.invalid {
-                border-color: #e74c3c;
-              }`,
-            reCaptchaFieldCSS: 'body { margin: 0; padding:0; display: flex; justify-content: center; }',
+            cardFieldCSS: cardNumberFieldCSS,
+            cvvFieldCSS: cvvFieldCSS,
+            reCaptchaFieldCSS,
             placeholder: "1111-2222-3333-4444",
             cvvPlaceholder: "123",
             language: 'he',
@@ -107,6 +132,7 @@ export const useCardcomInitializer = () => {
           
           setTimeout(() => {
             loadScript();
+            setIsInitialized(true);
             resolve(true);
           }, 1000);
           
@@ -120,6 +146,7 @@ export const useCardcomInitializer = () => {
         }
       };
 
+      // Load the 3DS script for secure payments
       const loadScript = () => {
         console.log('Loading 3DS script...');
         const script = document.createElement('script');
@@ -129,9 +156,10 @@ export const useCardcomInitializer = () => {
         console.log('3DS script loaded');
       };
 
+      // Start initialization with a slight delay to ensure frames are loaded
       setTimeout(checkFramesAndInitialize, 300);
     });
   };
 
-  return { initializeCardcomFields };
+  return { initializeCardcomFields, isInitialized };
 };
