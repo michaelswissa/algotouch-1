@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -220,7 +219,7 @@ serve(async (req) => {
       if (planId === 'monthly') {
         // For monthly subscriptions, add trial only if it's a new subscription
         if (!existingSubscriptions || existingSubscriptions.length === 0) {
-          trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days trial
+          trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days trial (updated from 14 to match planData.ts)
         }
         nextChargeDate = trialEndsAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
         currentPeriodEndsAt = trialEndsAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
@@ -228,6 +227,14 @@ serve(async (req) => {
         // No trial for annual plans
         nextChargeDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
         currentPeriodEndsAt = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+      } else if (planId === 'vip') {
+        // VIP plan is lifetime, set dates far in the future (10 years)
+        const farFuture = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate());
+        nextChargeDate = farFuture;
+        currentPeriodEndsAt = farFuture;
+        
+        // Log special handling for VIP plan
+        logStep("Processing VIP lifetime plan", { userId });
       }
       
       // Prepare subscription data
