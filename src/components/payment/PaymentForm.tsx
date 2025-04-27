@@ -1,18 +1,20 @@
 
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useEffect, useRef } from 'react';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
 import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
-import { toast } from 'sonner';
 import InitializingPayment from './states/InitializingPayment';
 import { usePaymentFlow } from '@/hooks/usePaymentFlow';
 import { PlanType } from '@/types/payment';
 import { useCardcomInitializer } from '@/hooks/useCardcomInitializer';
 import { usePaymentStatus } from '@/hooks/payment/usePaymentStatus';
+import { usePaymentInit } from '@/hooks/payment/usePaymentInit';
+import { usePaymentSubmission } from '@/hooks/payment/usePaymentSubmission';
+import PaymentHeader from './PaymentHeader';
 
 interface PaymentFormProps {
   planId: string;
@@ -22,10 +24,9 @@ interface PaymentFormProps {
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const { isInitializing, initializePayment } = usePaymentFlow();
-  const [initialized, setInitialized] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { initializeCardcomFields } = useCardcomInitializer();
   const { setState } = usePaymentStatus({ onPaymentComplete });
+  const masterFrameRef = useRef<HTMLIFrameElement>(null);
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -38,7 +39,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     terminalNumber,
     cardcomUrl,
     paymentStatus,
-    masterFrameRef,
     operationType,
     handleRetry,
     submitPayment,
@@ -49,6 +49,30 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     planId,
     onPaymentComplete: (id?: string) => onPaymentComplete(id)
   });
+
+  // Initialize payment
+  const { initialized } = usePaymentInit({
+    planId: planId as PlanType,
+    initializePayment,
+    initializeCardcomFields,
+    masterFrameRef,
+    operationType,
+    setState
+  });
+
+  // Handle payment submission
+  const { isSubmitting, handleSubmitPayment } = usePaymentSubmission({
+    submitPayment,
+    setState,
+    lowProfileCode
+  });
+
+  // When payment is successful, call onPaymentComplete with transactionId
+  useEffect(() => {
+    if (paymentStatus === PaymentStatus.SUCCESS && transactionId) {
+      onPaymentComplete(transactionId);
+    }
+  }, [paymentStatus, transactionId, onPaymentComplete]);
 
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
@@ -66,110 +90,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => masterFrame.removeEventListener('load', handleMasterLoad);
   }, [masterFrameRef]);
 
-  useEffect(() => {
-    const init = async () => {
-      const result = await initializePayment(planId as PlanType);
-      if (result) {
-        setInitialized(true);
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.INITIALIZING }));
-        
-        try {
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
-          
-          console.log('Setting up to initialize CardCom fields');
-          setTimeout(async () => {
-            console.log('Starting CardCom fields initialization');
-            try {
-              const initialized = await initializeCardcomFields(
-                masterFrameRef, 
-                result.lowProfileCode, 
-                result.sessionId,
-                result.terminalNumber,
-                operationType
-              );
-              
-              if (!initialized) {
-                console.error("Failed to initialize CardCom fields");
-                throw new Error('שגיאה באתחול שדות התשלום');
-              }
-              
-              console.log('CardCom fields initialized successfully');
-            } catch (error) {
-              console.error('Error during CardCom field initialization:', error);
-              setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-              toast.error(error.message || 'שגיאה באתחול שדות התשלום');
-            }
-          }, 500);
-          
-          return result;
-        } catch (error) {
-          console.error('Payment initialization error:', error);
-          toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          return null;
-        }
-      }
-    };
-    
-    init();
-  }, [planId, initializePayment, initializeCardcomFields, operationType, masterFrameRef, setState]);
-
-  // When payment is successful, call onPaymentComplete with transactionId
-  useEffect(() => {
-    if (paymentStatus === PaymentStatus.SUCCESS && transactionId) {
-      onPaymentComplete(transactionId);
-    }
-  }, [paymentStatus, transactionId, onPaymentComplete]);
-  
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
-    
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
-  };
-
-  const handleSubmitPayment = () => {
-    const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
-    const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value;
-    
-    if (!cardholderName) {
-      toast.error('יש למלא את שם בעל הכרטיס');
-      return;
-    }
-
-    if (!cardOwnerId || !/^\d{9}$/.test(cardOwnerId)) {
-      toast.error('יש למלא תעודת זהות תקינה');
-      return;
-    }
-
-    const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value;
-    if (!email) {
-      toast.error('יש למלא כתובת דואר אלקטרוני');
-      return;
-    }
-
-    const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value;
-    if (!phone) {
-      toast.error('יש למלא מספר טלפון');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      submitPayment();
-      
-      setTimeout(() => {
-        setIsSubmitting(false);
-      }, 3000);
-    } catch (error) {
-      console.error('Error submitting payment:', error);
-      toast.error('אירעה שגיאה בשליחת התשלום');
-      setIsSubmitting(false);
-    }
   };
 
   // Determine if the iframe content is ready to be shown
@@ -183,24 +110,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5 text-primary" />
-          <CardTitle>
-            {planId === 'monthly' ? 'הפעלת תקופת ניסיון'
-              : planId === 'annual' ? 'רכישת מנוי שנתי'
-              : 'רכישת מנוי VIP'}
-          </CardTitle>
-        </div>
-        <CardDescription>
-          {planId === 'monthly' 
-            ? 'הזן את פרטי כרטיס האשראי שלך להפעלת תקופת הניסיון' 
-            : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
-        </CardDescription>
-      </CardHeader>
+      <PaymentHeader planId={planId as PlanType} />
       
       <CardContent className="space-y-4">
-        {/* Master iframe is always loaded but hidden */}
+        {/* Master iframe */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
