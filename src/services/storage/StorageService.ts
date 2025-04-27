@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
@@ -34,10 +33,19 @@ export interface PaymentData {
   lowProfileCode?: string;
   terminalNumber?: string;
   reference?: string;
-  status?: 'pending' | 'completed' | 'failed';
+  status?: 'pending' | 'completed' | 'failed' | 'declined' | 'pending_3ds' | 'timeout';
   cardLastFour?: string;
   cardExpiry?: string;
+  cardToken?: string;
+  cardType?: string;
+  cardBrand?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
+  approvalNumber?: string;
+  documentUrl?: string;
   timestamp?: string;
+  transactionId?: string;
 }
 
 export interface PaymentIntent {
@@ -167,6 +175,25 @@ export class StorageService {
     }
     
     return this.set(StorageKeys.PAYMENT, { ...current, ...data });
+  }
+
+  /**
+   * Store detailed transaction result
+   */
+  static storeTransactionResult(data: {
+    status: 'completed' | 'failed' | 'declined';
+    transactionId?: string;
+    approvalNumber?: string;
+    cardLastFour?: string;
+    cardToken?: string;
+    documentUrl?: string;
+  }): boolean {
+    const current = this.getPaymentData() || {};
+    return this.updatePaymentData({
+      ...data,
+      status: data.status,
+      timestamp: new Date().toISOString()
+    });
   }
 
   /**

@@ -1,58 +1,38 @@
 
-import { PaymentSessionData } from '@/components/payment/types/payment';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentLogger } from './PaymentLogger';
 
-interface RedirectPaymentParams {
-  planId: string;
-  amount: number;
-  userEmail: string;
-  fullName: string;
-  userId?: string | null;
-}
-
-interface PaymentVerificationResult {
-  success: boolean;
-  transactionId?: string;
-  error?: string;
-  data?: any;
-}
-
-/**
- * Service responsible for handling CardCom redirect payment flows
- */
 export class CardComRedirectService {
   /**
    * Initialize a redirect-based payment flow with CardCom
    */
-  static async initializeRedirect({
-    planId,
-    amount,
-    userEmail,
-    fullName,
-    userId
-  }: RedirectPaymentParams): Promise<{ url: string; lowProfileCode: string; reference: string }> {
+  static async initializeRedirect(params: {
+    planId: string;
+    amount: number;
+    userEmail: string;
+    fullName: string;
+    userId?: string;
+  }): Promise<{ url: string; lowProfileCode: string; reference: string }> {
     try {
-      PaymentLogger.log('Initializing CardCom redirect payment', {
-        planId,
-        amount,
-        userEmail,
-        hasUserId: !!userId
+      PaymentLogger.log('Initializing redirect payment', { 
+        planId: params.planId, 
+        amount: params.amount,
+        email: params.userEmail
       });
-      
+
       const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
         body: {
-          planId,
-          amount,
-          userId,
+          planId: params.planId,
+          amount: params.amount,
           invoiceInfo: {
-            fullName,
-            email: userEmail,
+            fullName: params.fullName,
+            email: params.userEmail,
           },
           redirectUrls: {
             success: `${window.location.origin}/subscription/success`,
             failed: `${window.location.origin}/subscription/failed`
-          }
+          },
+          userId: params.userId
         }
       });
 
@@ -69,11 +49,6 @@ export class CardComRedirectService {
       if (!data.data?.url) {
         throw new Error('חסרה כתובת מעבר לתשלום');
       }
-      
-      PaymentLogger.log('CardCom redirect initialized successfully', {
-        lowProfileCode: data.data.lowProfileCode,
-        reference: data.data.reference
-      });
 
       return {
         url: data.data.url,
@@ -85,68 +60,73 @@ export class CardComRedirectService {
       throw new Error(error instanceof Error ? error.message : 'שגיאה באתחול דף התשלום');
     }
   }
-  
+
   /**
-   * Redirect to CardCom payment page
+   * Redirect the user to CardCom payment page
    */
   static redirectToPayment(url: string): void {
     if (!url) {
       throw new Error('חסרה כתובת מעבר לתשלום');
     }
     
-    PaymentLogger.log('Redirecting to CardCom payment page', { url });
     window.location.href = url;
   }
-  
+
   /**
-   * Verify payment status after return from CardCom
+   * Verify the status of a payment after redirect
    */
-  static async verifyPaymentStatus(lowProfileCode: string): Promise<PaymentVerificationResult> {
-    if (!lowProfileCode) {
-      PaymentLogger.error('Missing lowProfileCode for status check');
-      return { 
-        success: false, 
-        error: 'חסר קוד זיהוי עסקה' 
-      };
-    }
-    
+  static async verifyPaymentStatus(lowProfileCode: string): Promise<{
+    success: boolean;
+    error?: string;
+    transactionId?: string;
+    status?: string;
+  }> {
     try {
-      PaymentLogger.log('Checking payment status', { lowProfileCode });
+      PaymentLogger.log('Verifying payment status after redirect', { lowProfileCode });
+      
+      if (!lowProfileCode) {
+        PaymentLogger.error('Missing lowProfileCode for status verification');
+        return { 
+          success: false, 
+          error: 'חסר מזהה עסקה' 
+        };
+      }
+
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: { lowProfileCode }
       });
 
       if (error) {
-        PaymentLogger.error('Error checking payment status:', error);
-        return {
-          success: false,
-          error: error.message || 'שגיאה בבדיקת סטטוס התשלום'
+        PaymentLogger.error('Error checking redirect payment status:', error);
+        return { 
+          success: false, 
+          error: error.message || 'שגיאה בבדיקת סטטוס התשלום' 
         };
       }
-
-      PaymentLogger.log('Payment status check result', { 
-        success: data?.success,
-        transactionId: data?.transactionId,
-        hasData: !!data?.transactionData
-      });
 
       if (!data?.success) {
-        return {
-          success: false,
-          error: data?.message || 'העסקה לא אושרה'
+        PaymentLogger.error('Payment verification failed:', data?.message);
+        return { 
+          success: false, 
+          error: data?.message || 'התשלום נכשל או בוטל' 
         };
       }
-      
+
+      PaymentLogger.log('Payment successfully verified', { 
+        transactionId: data.transactionId,
+        status: data.status
+      });
+
       return { 
-        success: true, 
-        transactionId: data?.transactionId,
-        data: data?.transactionData || {}
+        success: true,
+        transactionId: data.transactionId,
+        status: data.status
       };
     } catch (error) {
-      PaymentLogger.error('Exception during payment status check:', error);
+      PaymentLogger.error('Exception during payment verification:', error);
       return { 
-        success: false,
-        error: error instanceof Error ? error.message : 'שגיאה בבדיקת סטטוס העסקה'
+        success: false, 
+        error: error instanceof Error ? error.message : 'שגיאה בתהליך אימות התשלום' 
       };
     }
   }
