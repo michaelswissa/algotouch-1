@@ -5,27 +5,23 @@ import { Input } from '@/components/ui/input';
 import { CreditCard } from 'lucide-react';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
+import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
 
 interface PaymentDetailsProps {
-  formData: {
-    cardOwnerName: string;
-    cardOwnerId: string;
-    cardOwnerEmail: string;
-    cardOwnerPhone: string;
-    expirationMonth: string;
-    expirationYear: string;
-  };
-  errors: {
-    [key: string]: string | null;
-  };
-  handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  terminalNumber: string;
+  cardcomUrl: string;
+  masterFrameRef: React.RefObject<HTMLIFrameElement>;
+  isReady?: boolean;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
-  formData,
-  errors,
-  handleChange
+  terminalNumber, 
+  cardcomUrl, 
+  masterFrameRef,
+  isReady = false
 }) => {
+  const { formData, errors, handleChange, handleSubmitPayment, isSubmitting } = usePaymentForm();
+  
   return (
     <div className="space-y-4" dir="rtl">
       <div className="space-y-2">
@@ -162,6 +158,18 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         </div>
         <p className="text-sm text-muted-foreground">קוד האבטחה יוזן בצורה מאובטחת בעמוד התשלום</p>
       </div>
+
+      {isReady && (
+        <div className="mt-6">
+          <iframe 
+            ref={masterFrameRef}
+            src={`${cardcomUrl}/Interface/MasterPage.aspx?TerminalNumber=${terminalNumber}&nocss=true`}
+            title="CardCom Payment"
+            className="w-full h-0"
+            style={{ border: 'none' }}
+          />
+        </div>
+      )}
 
       <SecurityNote />
     </div>
