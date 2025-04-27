@@ -7,6 +7,7 @@ export class StorageService {
   private static readonly PAYMENT_DATA_KEY = 'payment_data';
   private static readonly REGISTRATION_DATA_KEY = 'registration_data';
   private static readonly REGISTRATION_INTENT_KEY = 'registration_intent';
+  private static readonly CONTRACT_DATA_KEY = 'contract_data';
 
   /**
    * Get stored payment data
@@ -51,6 +52,23 @@ export class StorageService {
   }
 
   /**
+   * Check if registration data is valid (not expired)
+   */
+  static isRegistrationValid(): boolean {
+    try {
+      const data = this.getRegistrationData();
+      if (!data || !data.timestamp) return false;
+      
+      // Registration data valid for 30 minutes
+      const expiryTime = new Date(data.timestamp).getTime() + (30 * 60 * 1000);
+      return new Date().getTime() < expiryTime;
+    } catch (error) {
+      console.error("Error checking registration validity:", error);
+      return false;
+    }
+  }
+
+  /**
    * Store registration intent - used to track registration after payment completion
    */
   static storeRegistrationIntent(data: any): void {
@@ -69,10 +87,37 @@ export class StorageService {
   }
 
   /**
-   * Clear all registration data
+   * Store contract data
+   */
+  static storeContractData(data: any): void {
+    sessionStorage.setItem(this.CONTRACT_DATA_KEY, JSON.stringify({
+      ...data,
+      timestamp: new Date().toISOString()
+    }));
+  }
+
+  /**
+   * Get contract data
+   */
+  static getContractData(): any {
+    const data = sessionStorage.getItem(this.CONTRACT_DATA_KEY);
+    return data ? JSON.parse(data) : null;
+  }
+
+  /**
+   * Clear registration data
    */
   static clearRegistrationData(): void {
     sessionStorage.removeItem(this.REGISTRATION_DATA_KEY);
     sessionStorage.removeItem(this.REGISTRATION_INTENT_KEY);
+  }
+
+  /**
+   * Clear all subscription related data
+   */
+  static clearAllSubscriptionData(): void {
+    this.clearPaymentData();
+    this.clearRegistrationData();
+    sessionStorage.removeItem(this.CONTRACT_DATA_KEY);
   }
 }

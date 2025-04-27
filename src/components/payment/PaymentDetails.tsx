@@ -5,11 +5,17 @@ import { Loader2 } from 'lucide-react';
 interface PaymentDetailsProps {
   paymentUrl?: string;
   isReady?: boolean;
+  terminalNumber?: string;
+  cardcomUrl?: string;
+  masterFrameRef?: React.RefObject<HTMLIFrameElement>;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   paymentUrl,
-  isReady = false
+  isReady = false,
+  terminalNumber,
+  cardcomUrl,
+  masterFrameRef
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [height, setHeight] = useState(650);
@@ -53,6 +59,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
       <iframe
         id="cardcom-frame"
+        ref={masterFrameRef}
         src={paymentUrl}
         style={{
           width: '100%',

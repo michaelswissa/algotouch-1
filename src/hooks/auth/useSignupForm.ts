@@ -76,11 +76,7 @@ export const useSignupForm = () => {
       };
       
       // Store registration data
-      const storedSuccessfully = StorageService.storeRegistrationData(registrationData);
-      
-      if (!storedSuccessfully) {
-        throw new Error('שגיאה בשמירת נתוני הרשמה');
-      }
+      StorageService.storeRegistrationData(registrationData);
       
       PaymentLogger.log('Registration data saved successfully');
       toast.success('הפרטים נשמרו בהצלחה');

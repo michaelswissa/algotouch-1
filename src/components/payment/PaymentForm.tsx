@@ -22,7 +22,7 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.IDLE);
+  const [paymentStatus, setPaymentStatus] = useState<typeof PaymentStatus[keyof typeof PaymentStatus]>(PaymentStatus.IDLE);
   const [isInitializing, setIsInitializing] = useState(true);
   const [paymentUrl, setPaymentUrl] = useState<string>('');
   const [lowProfileCode, setLowProfileCode] = useState<string>('');
