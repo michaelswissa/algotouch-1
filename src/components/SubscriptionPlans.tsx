@@ -5,7 +5,7 @@ import PlanCard from './subscription/PlanCard';
 import { getPlansData } from './subscription/planData';
 
 interface SubscriptionPlansProps {
-  onSelectPlan?: (planId: string) => void;
+  onSelectPlan?: (planId: string) => void; // Changed to string to match the existing implementation
   selectedPlanId?: string;
 }
 
@@ -16,7 +16,7 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const navigate = useNavigate();
   const plans = getPlansData();
 
-  const handlePlanClick = (planId: string) => {
+  const handlePlanClick = (planId: string) => { // Keep as string to match the existing implementation
     if (onSelectPlan) {
       onSelectPlan(planId);
     } else {
@@ -35,7 +35,7 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           <PlanCard 
             key={plan.id}
             {...plan}
-            onSelect={handlePlanClick}
+            onSelect={() => handlePlanClick(plan.id)} // Pass the ID as string
             isSelected={selectedPlanId === plan.id}
           />
         ))}
