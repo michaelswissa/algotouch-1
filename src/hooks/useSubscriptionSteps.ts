@@ -1,15 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { toast } from 'sonner';
+import StorageService from '@/lib/subscription/storage-service';
+import SubscriptionLogger from '@/lib/subscription/logging-service';
 
 export type SubscriptionStep = 'plan_selection' | 'contract' | 'payment' | 'success';
-
-interface RegistrationData {
-  planId?: string;
-  contractSigned?: boolean;
-  [key: string]: any;
-}
 
 interface SubscriptionStepsState {
   currentStep: number;
@@ -20,9 +15,6 @@ interface SubscriptionStepsState {
   goToPreviousStep: () => void;
 }
 
-/**
- * A hook for managing subscription flow steps
- */
 export function useSubscriptionSteps(): SubscriptionStepsState {
   const { planId } = useParams<{ planId: string }>();
   const location = useLocation();
@@ -34,42 +26,34 @@ export function useSubscriptionSteps(): SubscriptionStepsState {
     // Check if there's a plan ID in the URL
     if (planId && !selectedPlan) {
       setSelectedPlan(planId);
+      SubscriptionLogger.logPlanSelection(planId);
     }
 
-    // Check if we're coming from registration with state
-    const isRegistering = location.state?.isRegistering === true;
+    const registrationData = StorageService.getRegistrationData();
     
-    // Get registration data if available
-    try {
-      const storedData = sessionStorage.getItem('registration_data');
-      
-      if (storedData) {
-        const data: RegistrationData = JSON.parse(storedData);
-        
-        // Determine current step based on stored data
-        if (data.contractSigned) {
-          setCurrentStep(3); // Payment step
-        } else if (data.planId) {
-          setCurrentStep(2); // Contract step
-        }
-        
-        // Set selected plan if it exists in stored data
-        if (data.planId && !selectedPlan) {
-          setSelectedPlan(data.planId);
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing registration data:', error);
-      toast.error('אירעה שגיאה בטעינת נתוני ההרשמה');
+    // Determine current step based on stored data
+    if (registrationData.contractSigned) {
+      setCurrentStep(3); // Payment step
+    } else if (registrationData.planId) {
+      setCurrentStep(2); // Contract step
+    }
+    
+    // Set selected plan if it exists in stored data
+    if (registrationData.planId && !selectedPlan) {
+      setSelectedPlan(registrationData.planId);
     }
   }, [planId, selectedPlan, location.state]);
 
   const goToNextStep = () => {
-    setCurrentStep(prev => Math.min(prev + 1, 4));
+    const nextStep = Math.min(currentStep + 1, 4);
+    SubscriptionLogger.logStepChange(currentStep, nextStep);
+    setCurrentStep(nextStep);
   };
 
   const goToPreviousStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    const prevStep = Math.max(currentStep - 1, 1);
+    SubscriptionLogger.logStepChange(currentStep, prevStep);
+    setCurrentStep(prevStep);
   };
 
   return {

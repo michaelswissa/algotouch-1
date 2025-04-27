@@ -1,12 +1,12 @@
-
 import React, { useEffect } from 'react';
 import { useParams, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useSubscriptionSteps } from '@/hooks/useSubscriptionSteps';
 import { useSubscriptionFlow } from '@/hooks/subscription/useSubscriptionFlow';
-import { getRegistrationData } from '@/lib/registration/registration-service';
+import StorageService from '@/lib/subscription/storage-service';
 import { validatePlanSelection, validateContractData } from '@/lib/subscription/step-validation';
+import SubscriptionLogger from '@/lib/subscription/logging-service';
 import SubscriptionSteps from './SubscriptionSteps';
 import PlanSelectionStep from './PlanSelectionStep';
 import ContractSection from './ContractSection';
@@ -19,7 +19,7 @@ const SubscriptionStepHandler: React.FC = () => {
   const { hasActiveSubscription, isCheckingSubscription } = useSubscriptionContext();
   const location = useLocation();
   const isRegistering = location.state?.isRegistering === true;
-  const registrationData = getRegistrationData();
+  const registrationData = StorageService.getRegistrationData();
   
   const {
     currentStep,
@@ -39,6 +39,7 @@ const SubscriptionStepHandler: React.FC = () => {
   useEffect(() => {
     if (planId && !selectedPlan) {
       setSelectedPlan(planId);
+      SubscriptionLogger.logPlanSelection(planId);
     }
     
     // Skip validation during initial loading
@@ -46,8 +47,10 @@ const SubscriptionStepHandler: React.FC = () => {
     
     // Validate current step
     if (currentStep === 2 && !validatePlanSelection(selectedPlan)) {
+      SubscriptionLogger.logError('Invalid step transition', 'Missing plan selection');
       setCurrentStep(1);
     } else if (currentStep === 3 && !validateContractData()) {
+      SubscriptionLogger.logError('Invalid step transition', 'Missing contract data');
       setCurrentStep(2);
     }
   }, [planId, selectedPlan, currentStep, loading, isCheckingSubscription]);
@@ -63,10 +66,11 @@ const SubscriptionStepHandler: React.FC = () => {
 
   // Handle redirects
   if (isAuthenticated && hasActiveSubscription) {
+    SubscriptionLogger.logError('Unauthorized access', 'User already has active subscription');
     return <Navigate to="/my-subscription" replace />;
   }
 
-  if (!isAuthenticated && !registrationData && !isRegistering) {
+  if (!isAuthenticated && !StorageService.getRegistrationData() && !isRegistering) {
     return <Navigate to="/auth" state={{ redirectToSubscription: true }} replace />;
   }
 
@@ -74,18 +78,27 @@ const SubscriptionStepHandler: React.FC = () => {
     if (handlePlanSelect(planId)) {
       setSelectedPlan(planId);
       setCurrentStep(2);
+      SubscriptionLogger.logPlanSelection(planId);
     }
   };
 
   const onContractSign = async (contractData: any) => {
     if (await handleContractSign(contractData)) {
       setCurrentStep(3);
+      SubscriptionLogger.logContractSigned({ 
+        planId: selectedPlan || '', 
+        email: contractData.email 
+      });
     }
   };
 
   const onPaymentComplete = async () => {
     if (await handlePaymentComplete()) {
       setCurrentStep(4);
+      SubscriptionLogger.logPaymentComplete({ 
+        planId: selectedPlan || '', 
+        success: true 
+      });
     }
   };
 
