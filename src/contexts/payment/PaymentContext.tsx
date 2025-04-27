@@ -1,12 +1,6 @@
-
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
-import { usePaymentSession } from '@/hooks/payment/usePaymentSession';
-import { CardComService } from '@/services/payment/CardComService';
-import { usePaymentStatusCheck } from '@/hooks/payment/usePaymentStatusCheck';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { StorageService } from '@/services/storage/StorageService';
 
 interface PaymentState {
   paymentStatus: PaymentStatusType;
@@ -57,23 +51,6 @@ export const usePaymentContext = () => useContext(PaymentContext);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PaymentState>(initialState);
-  const { initializePaymentSession } = usePaymentSession({ setState });
-  
-  // Add payment status check hook for monitoring payment completion
-  const { startStatusCheck, checkPaymentStatus, cleanupStatusCheck } = 
-    usePaymentStatusCheck({ 
-      setState,
-      onSuccess: () => {
-        PaymentLogger.log('Payment status check succeeded, payment is confirmed');
-      }
-    });
-
-  // Cleanup payment status check on unmount
-  useEffect(() => {
-    return () => {
-      cleanupStatusCheck();
-    };
-  }, [cleanupStatusCheck]);
 
   const initializePayment = async (planId: string): Promise<boolean> => {
     if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
@@ -93,67 +70,23 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Set operationType based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
       
-      // Get user data for payment
-      let email = '';
-      let fullName = '';
+      // In a real implementation, we would make API calls here to initialize payment
+      // For now, let's simulate a successful initialization
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Try to get data from contract or registration
-      const contractData = StorageService.getContractData();
-      const registrationData = StorageService.getRegistrationData();
-      
-      if (contractData) {
-        email = contractData.email || '';
-        fullName = contractData.fullName || '';
-      } else if (registrationData) {
-        email = registrationData.email || '';
-        if (registrationData.userData) {
-          const { firstName, lastName } = registrationData.userData;
-          if (firstName && lastName) {
-            fullName = `${firstName} ${lastName}`;
-          }
-        }
-      }
+      const sessionId = `session-${Date.now()}`;
+      const lowProfileCode = `profile-${Date.now()}`;
+      const reference = `ref-${Date.now()}`;
 
-      if (!email) {
-        throw new Error('חסרים פרטי התקשרות, אנא מלא את פרטי הרישום');
-      }
-      
-      // Get user ID if available (might not be if user is not logged in yet)
-      const userId = StorageService.getUserId();
-
-      // Real payment initialization via CardCom
-      const paymentSession = await initializePaymentSession(
-        planId,
-        userId,
-        { email, fullName },
-        operationType
-      );
-      
-      // Save session data for potential recovery
-      StorageService.setPaymentSessionData({
-        lowProfileCode: paymentSession.lowProfileCode,
-        sessionId: paymentSession.sessionId,
-        planId,
-        operationType
-      });
-      
-      // Update state with real session data
       setState(prev => ({
         ...prev,
         isInitializing: false,
         paymentStatus: PaymentStatus.IDLE,
         operationType,
-        sessionId: paymentSession.sessionId,
-        lowProfileCode: paymentSession.lowProfileCode,
-        terminalNumber: paymentSession.terminalNumber,
-        cardcomUrl: paymentSession.cardcomUrl || 'https://secure.cardcom.solutions',
-        reference: paymentSession.reference,
+        sessionId,
+        lowProfileCode,
+        reference,
       }));
-      
-      PaymentLogger.log('Payment initialized successfully', { 
-        lowProfileCode: paymentSession.lowProfileCode,
-        operationType 
-      });
 
       return true;
     } catch (error) {
@@ -186,32 +119,14 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      PaymentLogger.log('Submitting payment', { 
-        lowProfileCode: state.lowProfileCode,
-        operationType: state.operationType
-      });
+      // In a real implementation, we would make API calls here to process payment
+      // For now, let's simulate a successful payment
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Use real CardCom service for submission
-      const result = await CardComService.submitPayment({
-        lowProfileCode: state.lowProfileCode,
-        terminalNumber: state.terminalNumber,
-        cardholderData: {
-          name: cardOwnerDetails.cardOwnerName,
-          email: cardOwnerDetails.cardOwnerEmail,
-          phone: cardOwnerDetails.cardOwnerPhone,
-          id: cardOwnerDetails.cardOwnerId
-        },
-        operationType: state.operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly',
-        planId: state.planId || undefined
-      });
-      
-      // Start status check for payment completion
-      startStatusCheck(
-        state.lowProfileCode,
-        state.sessionId,
-        state.operationType,
-        state.planId || ''
-      );
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatus.SUCCESS,
+      }));
       
       return true;
     } catch (error) {
@@ -227,9 +142,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const resetPaymentState = () => {
-    // Clean up any status check in progress
-    cleanupStatusCheck();
-    StorageService.clearPaymentData();
     setState(initialState);
   };
 

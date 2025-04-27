@@ -1,82 +1,87 @@
 
-import { useState, useCallback } from 'react';
-import { PaymentSessionData } from '@/components/payment/types/payment';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { PaymentStatus } from '@/components/payment/types/payment';
 
 interface UsePaymentSessionProps {
-  setState: React.Dispatch<React.SetStateAction<any>>;
+  setState: (updater: any) => void;
 }
 
 export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
-  const [isInitializing, setIsInitializing] = useState(false);
-  
-  const initializePaymentSession = useCallback(async (
+  const initializePaymentSession = async (
     planId: string,
     userId: string | null,
-    userDetails: { email: string; fullName: string },
-    operationType: 'payment' | 'token_only'
-  ): Promise<PaymentSessionData> => {
-    try {
-      setIsInitializing(true);
-      PaymentLogger.log('Initializing payment session', { planId, operationType });
-      
-      // Calculate amount based on plan
-      let amount = 0;
-      switch (planId) {
-        case 'monthly':
-          amount = 371;
-          break;
-        case 'annual':
-          amount = 3371;
-          break;
-        case 'vip':
-          amount = 13121;
-          break;
-        default:
-          throw new Error(`Unsupported plan: ${planId}`);
-      }
+    paymentUser: { email: string; fullName: string },
+    operationType: 'payment' | 'token_only' = 'payment'
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; reference: string }> => {
+    console.log("Initializing payment for:", {
+      planId,
+      email: paymentUser.email,
+      fullName: paymentUser.fullName,
+      operationType
+    });
 
-      // Determine operation type based on plan
-      const operation = operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly';
-      
-      // Call the real cardcom-redirect edge function
-      const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
-        body: {
-          planId,
-          amount,
-          userId,
-          invoiceInfo: {
-            fullName: userDetails.fullName,
-            email: userDetails.email,
-          },
-          redirectUrls: {
-            success: `${window.location.origin}/subscription/success`,
-            failed: `${window.location.origin}/subscription/failed`
-          }
-        }
-      });
-      
-      if (error) {
-        console.error('CardCom payment initialization error:', error);
-        throw new Error(error.message || 'שגיאה באתחול תהליך התשלום');
-      }
-      
-      if (!data?.success) {
-        console.error('CardCom payment initialization failed:', data?.message);
-        throw new Error(data?.message || 'שגיאה באתחול תהליך התשלום');
-      }
-      
-      PaymentLogger.log('Payment session initialized successfully', data.data);
-      
-      return data.data;
-    } catch (error) {
-      PaymentLogger.error('Error initializing payment session:', error);
-      throw error;
-    } finally {
-      setIsInitializing(false);
+    // Determine operation based on plan and operationType
+    let operation = "ChargeOnly";
+    if (operationType === 'token_only' || planId === 'monthly') {
+      operation = "ChargeAndCreateToken";
     }
-  }, [setState]);
-  
-  return { initializePaymentSession, isInitializing };
+
+    // Call CardCom payment initialization Edge Function
+    const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      body: {
+        planId,
+        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        invoiceInfo: {
+          fullName: paymentUser.fullName || paymentUser.email,
+          email: paymentUser.email,
+        },
+        currency: "ILS",
+        operation: operation,
+        redirectUrls: {
+          success: `${window.location.origin}/subscription/success`,
+          failed: `${window.location.origin}/subscription/failed`
+        },
+        userId: userId,
+        operationType,
+        registrationData: sessionStorage.getItem('registration_data') 
+          ? JSON.parse(sessionStorage.getItem('registration_data')!) 
+          : null
+      }
+    });
+    
+    if (error || !data?.success) {
+      console.error("Payment initialization error:", error || data?.message);
+      throw new Error(error?.message || data?.message || 'אירעה שגיאה באתחול התשלום');
+    }
+    
+    console.log("Payment session created:", data.data);
+    
+    if (!data.data || !data.data.lowProfileCode) {
+      console.error("Missing lowProfileCode in payment session response");
+      throw new Error('חסר מזהה יחודי לעסקה בתגובה מהשרת');
+    }
+    
+    // Always use the fixed terminal number for CardCom
+    const terminalNumber = data.data.terminalNumber || '160138';
+    
+    setState(prev => ({
+      ...prev,
+      sessionId: data.data.sessionId,
+      lowProfileCode: data.data.lowProfileCode,
+      terminalNumber: terminalNumber,
+      cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+      reference: data.data.reference || '',
+      paymentStatus: PaymentStatus.IDLE
+    }));
+    
+    return { 
+      lowProfileCode: data.data.lowProfileCode, 
+      sessionId: data.data.sessionId,
+      terminalNumber: terminalNumber,
+      reference: data.data.reference || ''
+    };
+  };
+
+  return { initializePaymentSession };
 };
