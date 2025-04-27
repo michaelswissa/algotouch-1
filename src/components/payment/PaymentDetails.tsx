@@ -1,11 +1,13 @@
 
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { CreditCard } from 'lucide-react';
+import CardNumberFrame from './iframes/CardNumberFrame';
+import CVVFrame from './iframes/CVVFrame';
+import ReCaptchaFrame from './iframes/ReCaptchaFrame';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
-import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
+import { usePaymentValidation } from '@/hooks/payment/usePaymentValidation';
 
 interface PaymentDetailsProps {
   terminalNumber: string;
@@ -16,12 +18,64 @@ interface PaymentDetailsProps {
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   terminalNumber, 
-  cardcomUrl, 
+  cardcomUrl,
   masterFrameRef,
   isReady = false
 }) => {
-  const { formData, errors, handleChange, handleSubmitPayment, isSubmitting } = usePaymentForm();
-  
+  const [cardholderName, setCardholderName] = useState('');
+  const [cardOwnerId, setCardOwnerId] = useState(''); 
+  const [expiryMonth, setExpiryMonth] = useState('');
+  const [expiryYear, setExpiryYear] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loadedFields, setLoadedFields] = useState(new Set<string>());
+
+  const {
+    cardNumberError,
+    cardTypeInfo,
+    cvvError,
+    cardholderNameError,
+    expiryError,
+    idNumberError,
+    isValid,
+    validateCardNumber,
+    validateCvv,
+    validateIdNumber
+  } = usePaymentValidation({
+    cardholderName,
+    cardOwnerId,
+    expiryMonth,
+    expiryYear
+  });
+
+  const handleFieldLoad = useCallback((fieldName: string) => {
+    console.log(`Field loaded: ${fieldName}`);
+    setLoadedFields(prev => {
+      const newFields = new Set(prev);
+      newFields.add(fieldName);
+      return newFields;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isReady || !masterFrameRef.current?.contentWindow) return;
+
+    const data = {
+      action: 'setCardOwnerDetails',
+      data: {
+        cardOwnerName: cardholderName,
+        cardOwnerId: cardOwnerId,
+        cardOwnerEmail: email,
+        cardOwnerPhone: phone,
+        expirationMonth: expiryMonth,
+        expirationYear: expiryYear
+      }
+    };
+    
+    console.log('Setting card owner details:', data);
+    masterFrameRef.current.contentWindow.postMessage(data, '*');
+  }, [cardholderName, cardOwnerId, email, phone, expiryMonth, expiryYear, isReady, masterFrameRef]);
+
   return (
     <div className="space-y-4" dir="rtl">
       <div className="space-y-2">
@@ -30,13 +84,13 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           id="cardOwnerName"
           name="cardOwnerName"
           placeholder="ישראל ישראלי"
-          value={formData.cardOwnerName}
-          onChange={handleChange}
-          className={errors.cardOwnerName ? 'border-red-500' : ''}
+          value={cardholderName}
+          onChange={(e) => setCardholderName(e.target.value)}
+          className={cardholderNameError ? 'border-red-500' : ''}
           required
         />
-        {errors.cardOwnerName && (
-          <p className="text-sm text-red-500">{errors.cardOwnerName}</p>
+        {cardholderNameError && (
+          <p className="text-sm text-red-500">{cardholderNameError}</p>
         )}
       </div>
 
@@ -46,25 +100,18 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           id="cardOwnerId"
           name="cardOwnerId"
           placeholder="123456789"
-          value={formData.cardOwnerId}
+          value={cardOwnerId}
           onChange={(e) => {
             const value = e.target.value.replace(/\D/g, '');
-            const syntheticEvent = {
-              ...e,
-              target: {
-                ...e.target,
-                name: 'cardOwnerId',
-                value
-              }
-            };
-            handleChange(syntheticEvent as any);
+            setCardOwnerId(value);
+            validateIdNumber(value);
           }}
           maxLength={9}
-          className={errors.cardOwnerId ? 'border-red-500' : ''}
+          className={idNumberError ? 'border-red-500' : ''}
           required
         />
-        {errors.cardOwnerId && (
-          <p className="text-sm text-red-500">{errors.cardOwnerId}</p>
+        {idNumberError && (
+          <p className="text-sm text-red-500">{idNumberError}</p>
         )}
       </div>
 
@@ -75,14 +122,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           name="cardOwnerEmail"
           type="email"
           placeholder="example@example.com"
-          value={formData.cardOwnerEmail}
-          onChange={handleChange}
-          className={errors.cardOwnerEmail ? 'border-red-500' : ''}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
-        {errors.cardOwnerEmail && (
-          <p className="text-sm text-red-500">{errors.cardOwnerEmail}</p>
-        )}
       </div>
 
       <div className="space-y-2">
@@ -91,85 +134,62 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           id="cardOwnerPhone"
           name="cardOwnerPhone"
           placeholder="05xxxxxxxx"
-          value={formData.cardOwnerPhone}
-          onChange={handleChange}
-          className={errors.cardOwnerPhone ? 'border-red-500' : ''}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           required
         />
-        {errors.cardOwnerPhone && (
-          <p className="text-sm text-red-500">{errors.cardOwnerPhone}</p>
-        )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cardNumber">מספר כרטיס</Label>
+        <Label htmlFor="CardComCardNumber">מספר כרטיס</Label>
         <div className="relative">
-          <Input
-            id="cardNumber"
-            name="cardNumber"
-            placeholder="**** **** **** ****"
-            className="bg-gray-50"
-            disabled
-            required
+          <CardNumberFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => handleFieldLoad('cardNumber')}
+            isReady={isReady}
           />
-          <div className="absolute top-0 right-0 h-full flex items-center pr-3 pointer-events-none">
-            <CreditCard className="h-5 w-5 text-gray-400" />
-          </div>
+          {cardNumberError && (
+            <p className="text-sm text-red-500">{cardNumberError}</p>
+          )}
+          {cardTypeInfo && (
+            <p className="text-sm text-muted-foreground">
+              סוג כרטיס: {cardTypeInfo}
+            </p>
+          )}
         </div>
-        <p className="text-sm text-muted-foreground">מספר הכרטיס יוזן בצורה מאובטחת בעמוד התשלום</p>
       </div>
 
       <CardExpiryInputs
-        expiryMonth={formData.expirationMonth}
-        expiryYear={formData.expirationYear}
-        onMonthChange={(value) => {
-          const e = {
-            target: {
-              name: 'expirationMonth',
-              value
-            }
-          } as React.ChangeEvent<HTMLSelectElement>;
-          handleChange(e);
-        }}
-        onYearChange={(value) => {
-          const e = {
-            target: {
-              name: 'expirationYear',
-              value
-            }
-          } as React.ChangeEvent<HTMLSelectElement>;
-          handleChange(e);
-        }}
-        error={errors.expirationMonth || errors.expirationYear}
+        expiryMonth={expiryMonth}
+        expiryYear={expiryYear}
+        onMonthChange={setExpiryMonth}
+        onYearChange={setExpiryYear}
+        error={expiryError}
       />
 
       <div className="space-y-2">
-        <Label htmlFor="cvv">קוד אבטחה (CVV)</Label>
+        <Label htmlFor="CardComCvv">קוד אבטחה (CVV)</Label>
         <div className="relative">
-          <Input
-            id="cvv"
-            name="cvv"
-            placeholder="***"
-            className="bg-gray-50"
-            disabled
-            required
-            maxLength={4}
+          <CVVFrame
+            terminalNumber={terminalNumber}
+            cardcomUrl={cardcomUrl}
+            onLoad={() => handleFieldLoad('cvv')}
+            isReady={isReady}
           />
+          {cvvError && (
+            <p className="text-sm text-red-500">{cvvError}</p>
+          )}
         </div>
-        <p className="text-sm text-muted-foreground">קוד האבטחה יוזן בצורה מאובטחת בעמוד התשלום</p>
       </div>
 
-      {isReady && (
-        <div className="mt-6">
-          <iframe 
-            ref={masterFrameRef}
-            src={`${cardcomUrl}/Interface/MasterPage.aspx?TerminalNumber=${terminalNumber}&nocss=true`}
-            title="CardCom Payment"
-            className="w-full h-0"
-            style={{ border: 'none' }}
-          />
-        </div>
-      )}
+      <div className="space-y-2">
+        <ReCaptchaFrame
+          terminalNumber={terminalNumber}
+          cardcomUrl={cardcomUrl}
+          onLoad={() => {}}
+        />
+      </div>
 
       <SecurityNote />
     </div>
