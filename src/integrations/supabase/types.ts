@@ -446,43 +446,31 @@ export type Database = {
       }
       payments: {
         Row: {
-          amount: number
-          created_at: string | null
-          currency: string | null
-          id: string
+          amount: number | null
+          id: number
           paid_at: string | null
-          payment_data: Json | null
-          response_code: string | null
-          response_message: string | null
+          payload: Json | null
+          response_code: number | null
           subscription_id: string | null
-          trx_id: string | null
-          user_id: string | null
+          tranzaction_id: number | null
         }
         Insert: {
-          amount: number
-          created_at?: string | null
-          currency?: string | null
-          id?: string
+          amount?: number | null
+          id?: never
           paid_at?: string | null
-          payment_data?: Json | null
-          response_code?: string | null
-          response_message?: string | null
+          payload?: Json | null
+          response_code?: number | null
           subscription_id?: string | null
-          trx_id?: string | null
-          user_id?: string | null
+          tranzaction_id?: number | null
         }
         Update: {
-          amount?: number
-          created_at?: string | null
-          currency?: string | null
-          id?: string
+          amount?: number | null
+          id?: never
           paid_at?: string | null
-          payment_data?: Json | null
-          response_code?: string | null
-          response_message?: string | null
+          payload?: Json | null
+          response_code?: number | null
           subscription_id?: string | null
-          trx_id?: string | null
-          user_id?: string | null
+          tranzaction_id?: number | null
         }
         Relationships: [
           {
@@ -496,31 +484,25 @@ export type Database = {
       }
       plans: {
         Row: {
-          created_at: string | null
-          cycle_days: number
-          description: string | null
-          display_price: string
-          id: string
+          code: string
+          cycle_days: number | null
+          id: number
           name: string
           price: number
           trial_days: number | null
         }
         Insert: {
-          created_at?: string | null
-          cycle_days: number
-          description?: string | null
-          display_price: string
-          id: string
+          code: string
+          cycle_days?: number | null
+          id?: number
           name: string
           price: number
           trial_days?: number | null
         }
         Update: {
-          created_at?: string | null
-          cycle_days?: number
-          description?: string | null
-          display_price?: string
-          id?: string
+          code?: string
+          cycle_days?: number | null
+          id?: number
           name?: string
           price?: number
           trial_days?: number | null
@@ -652,76 +634,37 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          cancelled_at: string | null
-          contract_signed: boolean | null
-          contract_signed_at: string | null
-          contract_signed_location: string | null
           created_at: string | null
-          current_period_ends_at: string | null
           fail_count: number | null
           id: string
-          last_response_code: string | null
-          last_trx_id: string | null
           next_charge_at: string | null
-          next_charge_date: string | null
-          payment_method: Json | null
-          payment_token_id: string | null
-          plan_id: string | null
-          plan_type: string
-          status: string
+          plan_id: number | null
+          status: string | null
           token: string | null
-          token_expiry: string | null
-          trial_ends_at: string | null
-          updated_at: string | null
-          user_id: string
+          token_expires_ym: string | null
+          user_id: string | null
         }
         Insert: {
-          cancelled_at?: string | null
-          contract_signed?: boolean | null
-          contract_signed_at?: string | null
-          contract_signed_location?: string | null
           created_at?: string | null
-          current_period_ends_at?: string | null
           fail_count?: number | null
           id?: string
-          last_response_code?: string | null
-          last_trx_id?: string | null
           next_charge_at?: string | null
-          next_charge_date?: string | null
-          payment_method?: Json | null
-          payment_token_id?: string | null
-          plan_id?: string | null
-          plan_type?: string
-          status?: string
+          plan_id?: number | null
+          status?: string | null
           token?: string | null
-          token_expiry?: string | null
-          trial_ends_at?: string | null
-          updated_at?: string | null
-          user_id: string
+          token_expires_ym?: string | null
+          user_id?: string | null
         }
         Update: {
-          cancelled_at?: string | null
-          contract_signed?: boolean | null
-          contract_signed_at?: string | null
-          contract_signed_location?: string | null
           created_at?: string | null
-          current_period_ends_at?: string | null
           fail_count?: number | null
           id?: string
-          last_response_code?: string | null
-          last_trx_id?: string | null
           next_charge_at?: string | null
-          next_charge_date?: string | null
-          payment_method?: Json | null
-          payment_token_id?: string | null
-          plan_id?: string | null
-          plan_type?: string
-          status?: string
+          plan_id?: number | null
+          status?: string | null
           token?: string | null
-          token_expiry?: string | null
-          trial_ends_at?: string | null
-          updated_at?: string | null
-          user_id?: string
+          token_expires_ym?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -790,7 +733,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string | null
-          currency: string
+          currency: string | null
           id: string
           payment_data: Json | null
           status: string
@@ -802,7 +745,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string | null
-          currency?: string
+          currency?: string | null
           id?: string
           payment_data?: Json | null
           status: string
@@ -814,7 +757,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string | null
-          currency?: string
+          currency?: string | null
           id?: string
           payment_data?: Json | null
           status?: string
