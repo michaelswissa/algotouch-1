@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { PaymentLogger } from './PaymentLogger';
@@ -69,13 +68,13 @@ export class CardComService {
       
       PaymentLogger.log("Payment session created:", data.data);
       
-      if (!data.data || !data.data.lowProfileCode) {
-        PaymentLogger.error("Missing lowProfileCode in payment session response");
+      if (!data.data || !data.data.lowProfileId) {
+        PaymentLogger.error("Missing lowProfileId in payment session response");
         throw new Error('חסר מזהה יחודי לעסקה בתגובה מהשרת');
       }
       
       return { 
-        lowProfileCode: data.data.lowProfileCode, 
+        lowProfileId: data.data.lowProfileId, 
         sessionId: data.data.sessionId,
         terminalNumber: data.data.terminalNumber,
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',

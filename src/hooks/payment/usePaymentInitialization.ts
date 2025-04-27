@@ -1,4 +1,4 @@
-
+import React, { useEffect } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { RegistrationService } from '@/services/registration/RegistrationService';
 import { CardComService } from '@/services/payment/CardComService';
@@ -95,7 +95,7 @@ export const usePaymentInitialization = ({
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        lowProfileCode: paymentData.lowProfileCode,
+        lowProfileId: paymentData.lowProfileId,
         sessionId: paymentData.sessionId,
         terminalNumber: paymentData.terminalNumber,
         cardcomUrl: paymentData.cardcomUrl,
