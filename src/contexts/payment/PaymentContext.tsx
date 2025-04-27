@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
+import { usePaymentSession } from '@/hooks/payment/usePaymentSession';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
 interface PaymentState {
@@ -51,6 +53,7 @@ export const usePaymentContext = () => useContext(PaymentContext);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PaymentState>(initialState);
+  const { initializePaymentSession } = usePaymentSession({ setState });
 
   const initializePayment = async (planId: string): Promise<boolean> => {
     if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
@@ -69,23 +72,33 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       // Set operationType based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
-      
-      // In a real implementation, we would make API calls here to initialize payment
-      // For now, let's simulate a successful initialization
-      await new Promise(resolve => setTimeout(resolve, 500));
 
-      const sessionId = `session-${Date.now()}`;
-      const lowProfileCode = `profile-${Date.now()}`;
-      const reference = `ref-${Date.now()}`;
+      // Get user data from local storage
+      const registrationData = sessionStorage.getItem('registration_data');
+      const userData = registrationData ? JSON.parse(registrationData) : null;
+      
+      // Initialize payment session with CardCom
+      const paymentSession = await initializePaymentSession(
+        planId,
+        userData?.userId || null,
+        {
+          email: userData?.email || '',
+          fullName: userData?.userData ? 
+            `${userData.userData.firstName || ''} ${userData.userData.lastName || ''}`.trim() : 
+            ''
+        },
+        operationType
+      );
 
       setState(prev => ({
         ...prev,
         isInitializing: false,
         paymentStatus: PaymentStatus.IDLE,
         operationType,
-        sessionId,
-        lowProfileCode,
-        reference,
+        sessionId: paymentSession.sessionId,
+        lowProfileCode: paymentSession.lowProfileCode,
+        reference: paymentSession.reference,
+        terminalNumber: paymentSession.terminalNumber
       }));
 
       return true;
@@ -105,7 +118,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const submitPayment = async (cardOwnerDetails: CardOwnerDetails): Promise<boolean> => {
     try {
       if (state.paymentStatus === PaymentStatus.PROCESSING) {
-        return false; // Prevent duplicate submissions
+        return false;
       }
 
       if (!state.lowProfileCode) {
@@ -119,9 +132,19 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      // In a real implementation, we would make API calls here to process payment
-      // For now, let's simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Submit payment to CardCom through our edge function
+      const { data, error } = await supabase.functions.invoke('cardcom-submit', {
+        body: {
+          lowProfileCode: state.lowProfileCode,
+          terminalNumber: state.terminalNumber,
+          cardOwnerDetails,
+          operationType: state.operationType
+        }
+      });
+
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.message || 'Failed to process payment');
+      }
 
       setState(prev => ({
         ...prev,
