@@ -70,29 +70,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   };
 
   const handleSubmitClick = () => {
-    // Add better validation before submission
-    const cardOwnerName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
-    const cardOwnerEmail = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
-    
-    // Basic email validation
-    if (cardOwnerEmail && !cardOwnerEmail.includes('@')) {
-      toast.error('כתובת אימייל לא תקינה');
-      return;
-    }
-    
-    // Check if card details frames are loaded
-    if (!masterFrameRef.current?.contentWindow) {
-      toast.error("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
-      return;
-    }
-    
     submitPayment({
-      cardOwnerName,
-      cardOwnerId: document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '',
-      cardOwnerEmail,
-      cardOwnerPhone: document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '',
-      expirationMonth: document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '',
-      expirationYear: document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '',
+      cardOwnerName: '', // These values will be taken from the usePaymentForm hook inside PaymentDetails
+      cardOwnerId: '',
+      cardOwnerEmail: '',
+      cardOwnerPhone: '',
+      expirationMonth: '',
+      expirationYear: '',
     });
   };
 
