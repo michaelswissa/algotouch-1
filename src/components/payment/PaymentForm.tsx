@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import InitializingPayment from './states/InitializingPayment';
 import { usePaymentFlow } from '@/hooks/usePaymentFlow';
 import { PlanType } from '@/types/payment';
 import { useCardcomInitializer } from '@/hooks/useCardcomInitializer';
+import { usePaymentStatus } from '@/hooks/payment/usePaymentStatus';
 
 interface PaymentFormProps {
   planId: string;
@@ -24,6 +24,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   const [initialized, setInitialized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { initializeCardcomFields } = useCardcomInitializer();
+  const { setStatus: setPaymentStatus } = usePaymentStatus();
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -38,7 +39,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     paymentStatus,
     masterFrameRef,
     operationType,
-    initializePayment: initializePaymentHook,
     handleRetry,
     submitPayment,
     lowProfileCode,
@@ -73,13 +73,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         setPaymentStatus(PaymentStatus.INITIALIZING);
         
         try {
-          // Step 4: Master frame should be loaded by the parent component
-          // We must ensure the iframes are ready before initialization
-          
-          // Set initial payment state
           setPaymentStatus(PaymentStatus.IDLE);
           
-          // Step 5: Initialize CardCom fields with the lowProfileCode
           console.log('Setting up to initialize CardCom fields');
           setTimeout(async () => {
             console.log('Starting CardCom fields initialization');
@@ -103,7 +98,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               setPaymentStatus(PaymentStatus.FAILED);
               toast.error(error.message || 'שגיאה באתחול שדות התשלום');
             }
-          }, 500); // Short delay to ensure master frame is loaded
+          }, 500);
           
           return result;
         } catch (error) {
@@ -116,16 +111,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     };
     
     init();
-  }, [planId, initializePayment, initializeCardcomFields, operationType, masterFrameRef]);
-  
-  // Helper function to update payment status
-  const setPaymentStatus = (status: string) => {
-    // We don't directly have access to setState, so use a different approach
-    // This simulates what we want to do with the payment status
-    console.log('Setting payment status to:', status);
-    // The actual state is managed by the usePayment hook
-  };
-  
+  }, [planId, initializePayment, initializeCardcomFields, operationType, masterFrameRef, setPaymentStatus]);
+
   // When payment is successful, call onPaymentComplete with transactionId
   useEffect(() => {
     if (paymentStatus === PaymentStatus.SUCCESS && transactionId) {
