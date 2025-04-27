@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { BadgeShekelsIcon as BadgeShekelsIconComponent } from "lucide-react";
 import { Shekel } from '@/components/icons/Shekel';
 
 interface PlanPriceProps {
