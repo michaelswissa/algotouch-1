@@ -6,7 +6,7 @@ export interface Plan {
   id: string;
   name: string;
   price: number;
-  displayPrice: number;
+  displayPrice: number | string;
   currency: string;
   displayCurrency: string;
   billingPeriod: string;
@@ -24,7 +24,7 @@ export const getPlansData = (): Plan[] => {
       id: 'monthly',
       name: 'מסלול חודשי',
       price: 371, // Actual price in ILS
-      displayPrice: 99, // Display price in USD
+      displayPrice: '99', // Changed to string
       currency: '₪',
       displayCurrency: '$',
       billingPeriod: 'לחודש',
@@ -48,7 +48,7 @@ export const getPlansData = (): Plan[] => {
       id: 'annual',
       name: 'מסלול שנתי',
       price: 3371, // Actual price in ILS
-      displayPrice: 899, // Display price in USD
+      displayPrice: '899', // Changed to string
       currency: '₪',
       displayCurrency: '$',
       billingPeriod: 'לשנה',
@@ -63,12 +63,13 @@ export const getPlansData = (): Plan[] => {
       ],
       hasTrial: false,
       freeTrialDays: 0,
+      recommended: true,
     },
     {
       id: 'vip',
       name: 'מסלול VIP',
       price: 13121, // Actual price in ILS
-      displayPrice: 3499, // Display price in USD
+      displayPrice: '3,499', // Changed to string
       currency: '₪',
       displayCurrency: '$',
       billingPeriod: 'לכל החיים',

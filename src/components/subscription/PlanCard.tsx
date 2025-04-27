@@ -6,7 +6,7 @@ import PlanPrice from './PlanPrice';
 import PlanFeatures from './PlanFeatures';
 
 export interface PlanProps {
-  id: string; // Keep as string to match existing implementation
+  id: string;
   name: string;
   description?: string;
   price: number;
@@ -16,7 +16,7 @@ export interface PlanProps {
   cta?: string;
   hasTrial?: boolean;
   freeTrialDays?: number;
-  onSelect: () => void; // Changed to callback without parameter
+  onSelect: () => void;
   isSelected?: boolean;
 }
 

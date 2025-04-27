@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shekel } from 'lucide-react'; // Using Shekel icon instead of BadgeShekel
+import { BadgeShekelSign } from 'lucide-react'; // Using BadgeShekelSign icon
 
 interface PlanPriceProps {
   price: number;
@@ -19,7 +19,7 @@ const PlanPrice: React.FC<PlanPriceProps> = ({
     <div className="text-center py-4">
       <div className="flex items-center justify-center mb-1">
         <span className="text-3xl font-bold">{displayPrice}</span>
-        <Shekel className="h-5 w-5 ml-1" />
+        <BadgeShekelSign className="h-5 w-5 ml-1" />
       </div>
       
       {hasTrial && freeTrialDays > 0 && (
