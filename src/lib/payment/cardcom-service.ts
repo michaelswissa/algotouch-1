@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentSessionData, CardComPaymentResponse, PaymentError } from '@/components/payment/types/payment';
+import { PaymentSessionData, CardOwnerDetails, PaymentError, CardComPaymentResponse } from '@/components/payment/types/payment';
 import { CARDCOM_CONFIG } from './cardcom-config';
 
 /**
