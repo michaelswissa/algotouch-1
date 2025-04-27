@@ -26,7 +26,7 @@ const SubscriptionSuccess = () => {
   const [error, setError] = useState<string | null>(null);
   const [planId, setPlanId] = useState<string>('');
   const navigate = useNavigate();
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user: authUser, isAuthenticated, loading } = useAuth();
   
   useEffect(() => {
     const verifyPayment = async () => {
@@ -65,7 +65,7 @@ const SubscriptionSuccess = () => {
         setPlanId(resolvedPlanId);
         
         // If user is already authenticated, we're done
-        if (isAuthenticated && user) {
+        if (isAuthenticated && authUser) {
           setStatus(VerificationStatus.SUCCESS);
           return;
         }
@@ -80,10 +80,16 @@ const SubscriptionSuccess = () => {
           return;
         }
         
-        // Create user account
+        // Ensure we're passing required fields to createUserAccount by explicitly constructing the object
         const { success, user: createdUser, error: registrationError } = await RegistrationService.createUserAccount({
-          ...registrationData,
-          registrationTime: registrationData.registrationTime || new Date().toISOString() 
+          email: registrationData.email, // Explicitly required
+          password: registrationData.password, // Explicitly required
+          registrationTime: registrationData.registrationTime || new Date().toISOString(),
+          userData: registrationData.userData,
+          planId: registrationData.planId,
+          contractSigned: registrationData.contractSigned,
+          userId: registrationData.userId,
+          userCreated: registrationData.userCreated
         });
         
         if (!success || !createdUser) {
@@ -107,7 +113,7 @@ const SubscriptionSuccess = () => {
     if (!loading) {
       verifyPayment();
     }
-  }, [searchParams, isAuthenticated, user, loading]);
+  }, [searchParams, isAuthenticated, authUser, loading]);
   
   const renderContent = () => {
     switch (status) {
