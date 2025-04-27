@@ -1,6 +1,30 @@
 
 project_id = "ndhakvhrrkczgylcmyoc"
 
+[api]
+enabled = true
+port = 54321
+schemas = []
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[auth]
+enabled = true
+
+[storage]
+enabled = true
+
+[realtime]
+enabled = true
+
+[functions]
 [functions.cardcom-payment]
 verify_jwt = false
 
@@ -8,4 +32,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.cardcom-webhook]
+verify_jwt = false
+
+[functions.cardcom-redirect]
 verify_jwt = false
