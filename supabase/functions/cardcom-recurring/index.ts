@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,7 +11,10 @@ const CARDCOM_CONFIG = {
   terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
   apiName: Deno.env.get("CARDCOM_API_NAME"),
   apiPassword: Deno.env.get("CARDCOM_API_PASSWORD"),
-  cardcomUrl: "https://secure.cardcom.solutions"
+  cardcomUrl: "https://secure.cardcom.solutions",
+  endpoints: {
+    transaction: "https://secure.cardcom.solutions/api/v11/Transactions/Transaction"
+  }
 };
 
 // Helper logging function
@@ -20,6 +22,51 @@ const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CARDCOM-RECURRING] ${step}${detailsStr}`);
 };
+
+// Modern token charging function using v11 API
+async function chargeToken(params: {
+  token: string,
+  expiryMonth?: string,
+  expiryYear?: string,
+  amount: number,
+  description?: string,
+  terminalNumber: string,
+  apiName: string,
+  apiPassword: string
+}) {
+  const transactionId = `recur-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  
+  const payload = {
+    TerminalNumber: params.terminalNumber,
+    ApiName: params.apiName,
+    ApiPassword: params.apiPassword,
+    TokenToCharge: {
+      Token: params.token,
+      CardValidityMonth: params.expiryMonth || "",
+      CardValidityYear: params.expiryYear || ""
+    },
+    CoinId: 1, // ILS
+    SumToBill: params.amount,
+    TransactionTypeId: 1, // Regular transaction
+    TransactionCode: transactionId,
+    UniqAsmachta: transactionId,
+    Description: params.description || "חיוב חוזר",
+    ValidationTypeId: 1, // Auto
+    CreateTokenForRecurringPayments: false // We already have a token
+  };
+
+  const response = await fetch(CARDCOM_CONFIG.endpoints.transaction, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return await response.json();
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -123,46 +170,21 @@ serve(async (req) => {
           planType: subscription.plan_type 
         });
         
-        // Prepare URL-encoded form data with secure credentials
-        const params = new URLSearchParams({
-          TerminalNumber: CARDCOM_CONFIG.terminalNumber,
-          UserName: CARDCOM_CONFIG.apiName,
-          TokenToCharge_Token: paymentMethod.token,
-          TokenToCharge_CardValidityMonth: paymentMethod.expiryMonth || '',
-          TokenToCharge_CardValidityYear: paymentMethod.expiryYear || '',
-          TokenToCharge_SumToBill: chargeAmount.toString(),
-          TokenToCharge_APILevel: '10',
-          TokenToCharge_CoinID: '1', // ILS
-          TokenToCharge_ProductName: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
-          TokenToCharge_UserPassword: CARDCOM_CONFIG.apiPassword,
-          TokenToCharge_IsRecurringPayment: 'true'
-        });
-        
-        // Call CardCom API to charge the token
-        const response = await fetch(`${CARDCOM_CONFIG.cardcomUrl}/Interface/ChargeToken.aspx`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: params.toString()
-        });
-        
-        // Parse response
-        const responseText = await response.text();
-        const responseData = new URLSearchParams(responseText);
-        
-        const responseCode = responseData.get('ResponseCode');
-        const internalDealNumber = responseData.get('InternalDealNumber');
-        
-        logStep("CardCom charge response", { 
-          responseCode,
-          internalDealNumber,
-          responseText
-        });
-        
-        if (responseCode !== '0') {
-          throw new Error(`Failed to charge subscription: ${responseData.get('Description') || 'Unknown error'}`);
-        }
+      // Use the new charging function
+      const chargeResponse = await chargeToken({
+        token: paymentMethod.token,
+        expiryMonth: paymentMethod.expiryMonth,
+        expiryYear: paymentMethod.expiryYear,
+        amount: chargeAmount,
+        description: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
+        terminalNumber: CARDCOM_CONFIG.terminalNumber,
+        apiName: CARDCOM_CONFIG.apiName,
+        apiPassword: CARDCOM_CONFIG.apiPassword
+      });
+
+      if (chargeResponse.ResponseCode !== 0) {
+        throw new Error(chargeResponse.Description || 'Transaction failed');
+      }
         
         // Update subscription with new billing period
         const now = new Date();
@@ -194,12 +216,12 @@ serve(async (req) => {
           .from('payment_logs')
           .insert({
             user_id: subscription.user_id,
-            transaction_id: internalDealNumber || '',
+            transaction_id: chargeResponse.InternalDealNumber || '',
             amount: chargeAmount,
             currency: 'ILS',
             plan_id: subscription.plan_type,
             payment_status: 'succeeded',
-            payment_data: Object.fromEntries(responseData.entries())
+            payment_data: chargeResponse
           });
         
         return new Response(
@@ -207,7 +229,7 @@ serve(async (req) => {
             success: true,
             message: "Subscription charged successfully",
             data: {
-              transactionId: internalDealNumber,
+              transactionId: chargeResponse.InternalDealNumber,
               amount: chargeAmount,
               nextChargeDate: nextChargeDate.toISOString()
             }
@@ -305,3 +327,10 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to validate token before charge
+async function validateTokenBeforeCharge(token: string, supabaseAdmin: any): Promise<boolean> {
+    // Implement your token validation logic here
+    // This is a placeholder, replace with actual validation
+    return true; // Assume token is valid for now
+}

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -7,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// CardCom Configuration
+// CardCom Configuration with validation
 const CARDCOM_CONFIG = {
   terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || '',
   apiName: Deno.env.get("CARDCOM_API_NAME") || '',
@@ -81,7 +80,7 @@ serve(async (req) => {
       );
     }
     
-    // Otherwise, check with CardCom API
+    // Otherwise, check with CardCom API using v11 endpoint
     if (!CARDCOM_CONFIG.terminalNumber || !CARDCOM_CONFIG.apiName) {
       throw new Error("Missing CardCom configuration");
     }
