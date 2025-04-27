@@ -1,7 +1,7 @@
-
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus } from '@/components/payment/types/payment';
+import { CARDCOM_CONFIG } from '@/lib/payment/cardcom-config';
 
 interface UsePaymentSessionProps {
   setState: (updater: any) => void;
@@ -21,28 +21,35 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       operationType
     });
 
-    // Determine operation based on plan and operationType
+    // Determine operation and validation type based on plan
     let operation = "ChargeOnly";
+    let jValidateType = CARDCOM_CONFIG.validateOptions.authorization; // Default to J5
+    let amount = planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121;
+
+    // For trial plans or token-only operations, use simple validation
     if (operationType === 'token_only' || planId === 'monthly') {
-      operation = "ChargeAndCreateToken";
+      operation = "CreateTokenOnly";
+      jValidateType = CARDCOM_CONFIG.validateOptions.simpleValidation; // Use J2
+      amount = 1; // Minimal amount for validation
     }
 
     // Call CardCom payment initialization Edge Function
     const { data, error } = await supabase.functions.invoke('cardcom-payment', {
       body: {
         planId,
-        amount: planId === 'monthly' ? 371 : planId === 'annual' ? 3371 : 13121,
+        amount,
         invoiceInfo: {
           fullName: paymentUser.fullName || paymentUser.email,
           email: paymentUser.email,
         },
         currency: "ILS",
-        operation: operation,
+        operation,
+        jValidateType, // Add JValidateType parameter
         redirectUrls: {
           success: `${window.location.origin}/subscription/success`,
           failed: `${window.location.origin}/subscription/failed`
         },
-        userId: userId,
+        userId,
         operationType,
         registrationData: sessionStorage.getItem('registration_data') 
           ? JSON.parse(sessionStorage.getItem('registration_data')!) 

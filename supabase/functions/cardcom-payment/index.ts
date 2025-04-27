@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -48,17 +47,19 @@ serve(async (req) => {
     const { 
       planId, 
       amount, 
-      currency = "ILS", 
-      invoiceInfo, 
+      operation, 
+      jValidateType,
+      invoiceInfo,
+      redirectUrls,
       userId,
-      registrationData,
-      redirectUrls
+      registrationData 
     } = await req.json();
     
     logStep("Received request data", { 
       planId, 
       amount, 
-      currency,
+      operation,
+      jValidateType,
       hasUserId: !!userId,
       hasRegistrationData: !!registrationData
     });
@@ -106,16 +107,17 @@ serve(async (req) => {
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
-      ReturnValue: transactionRef,
+      Operation: operation,
+      JValidateType: jValidateType,
       Amount: amount,
+      ReturnValue: transactionRef,
       WebHookUrl: webhookUrl,
       SuccessRedirectUrl: redirectUrls.success,
       FailedRedirectUrl: redirectUrls.failed,
       ProductName: `מנוי ${planId === 'monthly' ? 'חודשי' : planId === 'annual' ? 'שנתי' : 'VIP'}`,
       Language: "he",
-      ISOCoinId: currency === "ILS" ? 1 : 2,
-      MaxNumOfPayments: 1, // No installments allowed
+      ISOCoinId: 1,
+      MaxNumOfPayments: 1,
       UIDefinition: {
         IsHideCardOwnerName: false,
         IsHideCardOwnerEmail: false,
@@ -175,13 +177,13 @@ serve(async (req) => {
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
-      low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
-      reference: transactionRef, // This matches the ReturnValue we sent to CardCom
+      low_profile_code: lowProfileId,
+      reference: transactionRef,
       plan_id: planId,
       amount: amount,
-      currency: currency,
+      currency: "ILS",
       status: 'initiated',
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       anonymous_data: !userId ? { email: userEmail, fullName } : null,
       cardcom_terminal_number: CARDCOM_CONFIG.terminalNumber
     };
