@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
@@ -5,6 +6,7 @@ export interface StorageData {
   planId?: string;
   contractSigned?: boolean;
   email?: string;
+  password?: string; // Adding password to match RegistrationData interface
   userId?: string;
   userData?: {
     firstName?: string;

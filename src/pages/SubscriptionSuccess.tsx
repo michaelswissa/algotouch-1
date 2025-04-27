@@ -81,10 +81,13 @@ const SubscriptionSuccess = () => {
         }
         
         // Create user account
-        const { success, user, error } = await RegistrationService.createUserAccount(registrationData);
+        const { success, user: createdUser, error: registrationError } = await RegistrationService.createUserAccount({
+          ...registrationData,
+          registrationTime: registrationData.registrationTime || new Date().toISOString() 
+        });
         
-        if (!success || !user) {
-          setError(error || 'שגיאה ביצירת חשבון');
+        if (!success || !createdUser) {
+          setError(registrationError || 'שגיאה ביצירת חשבון');
           setStatus(VerificationStatus.ACCOUNT_CREATION_FAILED);
           return;
         }
