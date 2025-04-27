@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { usePaymentSession } from '@/hooks/payment/usePaymentSession';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
@@ -19,7 +20,7 @@ interface PaymentState {
 
 interface PaymentContextType extends PaymentState {
   initializePayment: (planId: string) => Promise<boolean>;
-  submitPayment: (cardOwnerDetails: CardOwnerDetails) => Promise<boolean>;
+  submitPayment: (cardOwnerDetails: CardOwnerDetails) => Promise<{ success: boolean }>;
   resetPaymentState: () => void;
   setPaymentStatus: (status: PaymentStatusType) => void;
   setError: (error: string | null) => void;
@@ -70,14 +71,11 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         planId
       }));
 
-      // Set operationType based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
 
-      // Get user data from local storage
       const registrationData = sessionStorage.getItem('registration_data');
       const userData = registrationData ? JSON.parse(registrationData) : null;
       
-      // Initialize payment session with CardCom
       const paymentSession = await initializePaymentSession(
         planId,
         userData?.userId || null,
@@ -115,15 +113,15 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const submitPayment = async (cardOwnerDetails: CardOwnerDetails): Promise<boolean> => {
+  const submitPayment = async (cardOwnerDetails: CardOwnerDetails): Promise<{ success: boolean }> => {
     try {
       if (state.paymentStatus === PaymentStatus.PROCESSING) {
-        return false;
+        return { success: false };
       }
 
       if (!state.lowProfileCode) {
         toast.error('חסר מזהה ייחודי לעסקה, אנא נסה/י שנית');
-        return false;
+        return { success: false };
       }
 
       setState(prev => ({ 
@@ -132,7 +130,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      // Submit payment to CardCom through our edge function
       const { data, error } = await supabase.functions.invoke('cardcom-submit', {
         body: {
           lowProfileCode: state.lowProfileCode,
@@ -151,7 +148,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         paymentStatus: PaymentStatus.SUCCESS,
       }));
       
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('Error submitting payment:', error);
       setState(prev => ({ 
@@ -160,7 +157,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: error instanceof Error ? error.message : 'Failed to process payment'
       }));
       toast.error('אירעה שגיאה בתהליך התשלום');
-      return false;
+      return { success: false };
     }
   };
 
