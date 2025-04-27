@@ -484,28 +484,49 @@ export type Database = {
       }
       plans: {
         Row: {
+          billing_period: string | null
           code: string
+          created_at: string
+          currency: string
           cycle_days: number | null
+          description: string | null
+          free_trial_days: number | null
+          has_trial: boolean | null
           id: string
           name: string
           price: number
           trial_days: number | null
+          updated_at: string
         }
         Insert: {
+          billing_period?: string | null
           code: string
+          created_at?: string
+          currency?: string
           cycle_days?: number | null
+          description?: string | null
+          free_trial_days?: number | null
+          has_trial?: boolean | null
           id?: string
           name: string
           price: number
           trial_days?: number | null
+          updated_at?: string
         }
         Update: {
+          billing_period?: string | null
           code?: string
+          created_at?: string
+          currency?: string
           cycle_days?: number | null
+          description?: string | null
+          free_trial_days?: number | null
+          has_trial?: boolean | null
           id?: string
           name?: string
           price?: number
           trial_days?: number | null
+          updated_at?: string
         }
         Relationships: []
       }

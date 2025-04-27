@@ -149,19 +149,22 @@ serve(async (req) => {
           throw new Error('Token is invalid or expired');
         }
         
-        // Calculate charge amount based on plan type
-        let chargeAmount = 0;
-        if (subscription.plan_type === 'monthly') {
-          chargeAmount = 371.00;
-        } else if (subscription.plan_type === 'annual') {
-          chargeAmount = 3371.00;
-        } else {
-          throw new Error("Invalid plan type for recurring charge");
+        // Get plan details to determine charge amount
+        const { data: plan, error: planError } = await supabaseAdmin
+          .from('plans')
+          .select('price, currency, billing_period')
+          .eq('id', subscription.plan_type)
+          .single();
+        
+        if (planError || !plan) {
+          throw new Error(`Failed to get plan details: ${planError?.message || 'Plan not found'}`);
         }
         
-        // Override amount if provided
-        if (amount) {
-          chargeAmount = Number(amount);
+        // Use plan price from database
+        const chargeAmount = plan.price;
+        
+        if (chargeAmount <= 0) {
+          throw new Error('Invalid plan amount');
         }
         
         logStep("Preparing to charge token", { 
@@ -170,31 +173,31 @@ serve(async (req) => {
           planType: subscription.plan_type 
         });
         
-      // Use the new charging function
-      const chargeResponse = await chargeToken({
-        token: paymentMethod.token,
-        expiryMonth: paymentMethod.expiryMonth,
-        expiryYear: paymentMethod.expiryYear,
-        amount: chargeAmount,
-        description: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
-        terminalNumber: CARDCOM_CONFIG.terminalNumber,
-        apiName: CARDCOM_CONFIG.apiName,
-        apiPassword: CARDCOM_CONFIG.apiPassword
-      });
+        // Use the charging function
+        const chargeResponse = await chargeToken({
+          token: paymentMethod.token,
+          expiryMonth: paymentMethod.expiryMonth,
+          expiryYear: paymentMethod.expiryYear,
+          amount: chargeAmount,
+          description: `מנוי ${subscription.plan_type === 'monthly' ? 'חודשי' : 'שנתי'}`,
+          terminalNumber: CARDCOM_CONFIG.terminalNumber,
+          apiName: CARDCOM_CONFIG.apiName,
+          apiPassword: CARDCOM_CONFIG.apiPassword
+        });
 
-      if (chargeResponse.ResponseCode !== 0) {
-        throw new Error(chargeResponse.Description || 'Transaction failed');
-      }
+        if (chargeResponse.ResponseCode !== 0) {
+          throw new Error(chargeResponse.Description || 'Transaction failed');
+        }
         
-        // Update subscription with new billing period
+        // Update subscription with new billing period based on plan type
         const now = new Date();
         let nextChargeDate = new Date();
         let currentPeriodEndsAt = new Date();
         
-        if (subscription.plan_type === 'monthly') {
+        if (plan.billing_period === 'monthly') {
           nextChargeDate.setMonth(nextChargeDate.getMonth() + 1);
           currentPeriodEndsAt.setMonth(currentPeriodEndsAt.getMonth() + 1);
-        } else if (subscription.plan_type === 'annual') {
+        } else if (plan.billing_period === 'yearly') {
           nextChargeDate.setFullYear(nextChargeDate.getFullYear() + 1);
           currentPeriodEndsAt.setFullYear(currentPeriodEndsAt.getFullYear() + 1);
         }
