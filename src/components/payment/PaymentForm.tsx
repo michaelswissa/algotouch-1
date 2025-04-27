@@ -35,11 +35,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
+  // Determine the operation type based on plan
+  const getOperationType = (planType: string): 'payment' | 'token_only' => {
+    if (planType === 'monthly') {
+      return 'token_only'; // Monthly plan only creates token
+    }
+    return 'payment'; // Annual and VIP charge immediately
+  };
+
+  const operationType = getOperationType(planId);
+
   const {
     terminalNumber,
     cardcomUrl,
     paymentStatus,
-    operationType,
     handleRetry,
     submitPayment,
     lowProfileCode,
@@ -61,16 +70,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   });
 
   // Handle payment submission
-  const { isSubmitting, handleSubmitPayment } = usePaymentSubmission({
+  const { isSubmitting, hasSubmitted, handleSubmitPayment } = usePaymentSubmission({
     submitPayment,
     setState,
-    lowProfileCode
+    lowProfileCode,
+    planId
   });
 
   // When payment is successful, call onPaymentComplete with transactionId
   useEffect(() => {
     if (paymentStatus === PaymentStatus.SUCCESS && transactionId) {
       onPaymentComplete(transactionId);
+      
+      // Clear payment session from localStorage on success
+      localStorage.removeItem('payment_session');
     }
   }, [paymentStatus, transactionId, onPaymentComplete]);
 
@@ -97,6 +110,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
+  };
+
+  // Get description text based on plan type
+  const getDescriptionText = () => {
+    if (planId === 'monthly') {
+      return 'החיוב הראשון יבוצע בתום תקופת הניסיון של 30 יום';
+    } else if (planId === 'annual') {
+      return 'חיוב שנתי חד פעמי, החיוב הבא יתבצע בעוד שנה';
+    } else { // VIP
+      return 'חיוב חד פעמי, ללא חיובים נוספים בעתיד';
+    }
   };
 
   // Determine if the iframe content is ready to be shown
@@ -147,16 +171,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               type="button" 
               className="w-full" 
               onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !isContentReady}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !isContentReady || hasSubmitted}
             >
               {getButtonText()}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              {operationType === 'token_only' 
-                ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
-                : plan.hasTrial 
-                  ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
-                  : 'החיוב יבוצע מיידית'}
+              {getDescriptionText()}
             </p>
           </>
         )}

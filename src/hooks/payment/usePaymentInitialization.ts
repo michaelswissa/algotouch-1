@@ -4,6 +4,7 @@ import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from '../useCardcomInitializer';
 import { useContractValidation } from './useContractValidation';
 import { usePaymentSession } from './usePaymentSession';
+import { PlanType } from '@/types/payment';
 import { toast } from 'sonner';
 
 interface UsePaymentInitializationProps {
@@ -22,7 +23,7 @@ export const usePaymentInitialization = ({
   const { handleRegistrationData } = useRegistrationHandler();
   const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
-  const { initializePaymentSession } = usePaymentSession({ setState });
+  const { initializePaymentSession, clearPaymentSession } = usePaymentSession({ setState });
 
   const initializePayment = async () => {
     console.log('Starting payment initialization process');
@@ -51,11 +52,18 @@ export const usePaymentInitialization = ({
 
       // Step 3: Initialize payment session to get lowProfileCode
       console.log('Initializing payment session with plan:', planId);
+      
+      // Define operationType based on plan
+      let paymentOperationType: 'payment' | 'token_only' = 'payment';
+      if (planId === 'monthly') {
+        paymentOperationType = 'token_only';
+      }
+      
       const paymentData = await initializePaymentSession(
         planId,
         userId,
         { email: userEmail, fullName: fullName || userEmail },
-        operationType
+        paymentOperationType
       );
       
       if (!paymentData || !paymentData.lowProfileCode) {
@@ -79,22 +87,27 @@ export const usePaymentInitialization = ({
       setTimeout(async () => {
         console.log('Starting CardCom fields initialization');
         try {
+          // Define the correct operation type for CardCom based on plan
+          let cardcomOperation = paymentOperationType;
+          
           const initialized = await initializeCardcomFields(
             masterFrameRef, 
             paymentData.lowProfileCode, 
             paymentData.sessionId,
             paymentData.terminalNumber,
-            operationType
+            cardcomOperation
           );
           
           if (!initialized) {
             console.error("Failed to initialize CardCom fields");
+            clearPaymentSession(); // Clear failed session
             throw new Error('שגיאה באתחול שדות התשלום');
           }
           
           console.log('CardCom fields initialized successfully');
         } catch (error) {
           console.error('Error during CardCom field initialization:', error);
+          clearPaymentSession(); // Clear failed session
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           toast.error(error.message || 'שגיאה באתחול שדות התשלום');
         }
@@ -103,6 +116,7 @@ export const usePaymentInitialization = ({
       return paymentData;
     } catch (error) {
       console.error('Payment initialization error:', error);
+      clearPaymentSession(); // Clear failed session
       toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
