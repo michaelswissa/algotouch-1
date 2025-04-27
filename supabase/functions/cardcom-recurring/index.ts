@@ -123,7 +123,7 @@ serve(async (req) => {
           planType: subscription.plan_type 
         });
         
-        // Prepare URL-encoded form data
+        // Prepare URL-encoded form data with secure credentials
         const params = new URLSearchParams({
           TerminalNumber: CARDCOM_CONFIG.terminalNumber,
           UserName: CARDCOM_CONFIG.apiName,
@@ -289,7 +289,7 @@ serve(async (req) => {
       default:
         throw new Error(`Unknown action: ${action}`);
     }
-  } catch (error: any) {
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
     

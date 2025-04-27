@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -6,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// CardCom Configuration
+// CardCom Configuration with validation
 const CARDCOM_CONFIG = {
   terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER"),
   apiName: Deno.env.get("CARDCOM_API_NAME"),
