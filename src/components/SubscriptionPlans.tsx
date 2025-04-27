@@ -5,7 +5,7 @@ import PlanCard from './subscription/PlanCard';
 import { getPlansData } from './subscription/planData';
 
 interface SubscriptionPlansProps {
-  onSelectPlan?: (planId: string) => void; // Keep as string type
+  onSelectPlan?: (planId: string) => void;
   selectedPlanId?: string;
 }
 
@@ -34,16 +34,8 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         {plans.map((plan) => (
           <PlanCard 
             key={plan.id}
-            id={plan.id}
-            name={plan.name}
-            description={plan.description}
-            price={plan.price}
-            displayPrice={plan.displayPrice.toString()} // Convert to string
-            features={plan.features.map(feature => feature.name)} // Extract feature names
-            popular={plan.recommended}
-            hasTrial={plan.hasTrial}
-            freeTrialDays={plan.freeTrialDays}
-            onSelect={() => handlePlanClick(plan.id)}
+            {...plan}
+            onSelect={handlePlanClick}
             isSelected={selectedPlanId === plan.id}
           />
         ))}
