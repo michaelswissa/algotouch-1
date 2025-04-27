@@ -1,46 +1,38 @@
 
 import { useState, useEffect } from 'react';
+import { getRegistrationData, storeRegistrationData, RegistrationData } from '@/lib/registration/registration-service';
 
-interface RegistrationData {
-  planId?: string;
-  email?: string;
-  contractSigned?: boolean;
-  contractSignedAt?: string;
-  contractDetails?: any;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
+interface UseRegistrationDataResult {
+  registrationData: RegistrationData | null;
+  updateRegistrationData: (newData: Partial<RegistrationData>) => void;
+  clearRegistrationData: () => void;
+  currentStep: number;
+  setCurrentStep: (step: number) => void;
+  selectedPlan: string | undefined;
+  setSelectedPlan: (plan: string | undefined) => void;
 }
 
-export function useRegistrationData() {
+export function useRegistrationData(): UseRegistrationDataResult {
   const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(undefined);
 
   // Load registration data from session storage on initial load
   useEffect(() => {
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setRegistrationData(parsedData);
-        
-        // If plan already selected, update state
-        if (parsedData.planId) {
-          setSelectedPlan(parsedData.planId);
-        }
-        
-        // Determine current step based on stored data
-        if (parsedData.contractSigned) {
-          setCurrentStep(3); // Payment step
-        } else if (parsedData.planId) {
-          setCurrentStep(2); // Contract step
-        }
-      } catch (e) {
-        console.error('Error parsing registration data:', e);
+    const storedData = getRegistrationData();
+    if (Object.keys(storedData).length > 0) {
+      setRegistrationData(storedData);
+      
+      // If plan already selected, update state
+      if (storedData.planId) {
+        setSelectedPlan(storedData.planId);
+      }
+      
+      // Determine current step based on stored data
+      if (storedData.contractSigned) {
+        setCurrentStep(3); // Payment step
+      } else if (storedData.planId) {
+        setCurrentStep(2); // Contract step
       }
     }
   }, []);
@@ -51,15 +43,27 @@ export function useRegistrationData() {
       const updatedData = { ...prevData, ...newData } as RegistrationData;
       
       // Save to session storage
-      sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+      storeRegistrationData(updatedData);
       
       return updatedData;
     });
+    
+    // Update step and plan selection based on new data
+    if (newData.contractSigned && currentStep < 3) {
+      setCurrentStep(3);
+    } else if (newData.planId && currentStep < 2) {
+      setCurrentStep(2);
+    }
+    
+    if (newData.planId) {
+      setSelectedPlan(newData.planId);
+    }
   };
 
   // Clear registration data
   const clearRegistrationData = () => {
     sessionStorage.removeItem('registration_data');
+    sessionStorage.removeItem('contract_data');
     setRegistrationData(null);
     setCurrentStep(1);
     setSelectedPlan(undefined);
