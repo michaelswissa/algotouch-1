@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -18,6 +18,7 @@ interface PaymentFormProps {
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initAttempts, setInitAttempts] = useState(0);
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -58,18 +59,32 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => masterFrame.removeEventListener('load', handleMasterLoad);
   }, [masterFrameRef]);
 
+  // Initialize payment flow - with retry limit to prevent loops
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
+    
+    if (initAttempts >= 3) {
+      console.error("Too many initialization attempts, giving up");
+      toast.error('לא ניתן לאתחל את התשלום. אנא נסה מאוחר יותר או פנה לתמיכה');
+      setIsInitializing(false);
+      return;
+    }
+    
     const initProcess = async () => {
       setIsInitializing(true);
-      await initializePayment();
-      setIsInitializing(false);
+      setInitAttempts(prev => prev + 1);
+      
+      try {
+        await initializePayment();
+      } finally {
+        setIsInitializing(false);
+      }
     };
     
     initProcess();
-  }, []); // Run only once on mount
+  }, [planId]); // Run only once on mount
   
-  const getButtonText = () => {
+  const getButtonText = useCallback(() => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
@@ -77,7 +92,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     }
     
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
-  };
+  }, [isSubmitting, operationType, paymentStatus]);
 
   const handleSubmitPayment = () => {
     const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;

@@ -444,6 +444,89 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          id: string
+          paid_at: string | null
+          payment_data: Json | null
+          response_code: string | null
+          response_message: string | null
+          subscription_id: string | null
+          trx_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          paid_at?: string | null
+          payment_data?: Json | null
+          response_code?: string | null
+          response_message?: string | null
+          subscription_id?: string | null
+          trx_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          paid_at?: string | null
+          payment_data?: Json | null
+          response_code?: string | null
+          response_message?: string | null
+          subscription_id?: string | null
+          trx_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          created_at: string | null
+          cycle_days: number
+          description: string | null
+          display_price: string
+          id: string
+          name: string
+          price: number
+          trial_days: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          cycle_days: number
+          description?: string | null
+          display_price: string
+          id: string
+          name: string
+          price: number
+          trial_days?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          cycle_days?: number
+          description?: string | null
+          display_price?: string
+          id?: string
+          name?: string
+          price?: number
+          trial_days?: number | null
+        }
+        Relationships: []
+      }
       post_tags: {
         Row: {
           post_id: string
@@ -520,9 +603,12 @@ export type Database = {
         Row: {
           card_type: string | null
           created_at: string | null
+          failed_attempts: number | null
           id: string
           is_valid: boolean | null
           last_4_digits: string | null
+          last_payment_date: string | null
+          payment_status: string | null
           status: string
           token: string
           token_approval_number: string | null
@@ -533,9 +619,12 @@ export type Database = {
         Insert: {
           card_type?: string | null
           created_at?: string | null
+          failed_attempts?: number | null
           id?: string
           is_valid?: boolean | null
           last_4_digits?: string | null
+          last_payment_date?: string | null
+          payment_status?: string | null
           status?: string
           token: string
           token_approval_number?: string | null
@@ -546,9 +635,12 @@ export type Database = {
         Update: {
           card_type?: string | null
           created_at?: string | null
+          failed_attempts?: number | null
           id?: string
           is_valid?: boolean | null
           last_4_digits?: string | null
+          last_payment_date?: string | null
+          payment_status?: string | null
           status?: string
           token?: string
           token_approval_number?: string | null
@@ -566,12 +658,19 @@ export type Database = {
           contract_signed_location: string | null
           created_at: string | null
           current_period_ends_at: string | null
+          fail_count: number | null
           id: string
+          last_response_code: string | null
+          last_trx_id: string | null
+          next_charge_at: string | null
           next_charge_date: string | null
           payment_method: Json | null
           payment_token_id: string | null
+          plan_id: string | null
           plan_type: string
           status: string
+          token: string | null
+          token_expiry: string | null
           trial_ends_at: string | null
           updated_at: string | null
           user_id: string
@@ -583,12 +682,19 @@ export type Database = {
           contract_signed_location?: string | null
           created_at?: string | null
           current_period_ends_at?: string | null
+          fail_count?: number | null
           id?: string
+          last_response_code?: string | null
+          last_trx_id?: string | null
+          next_charge_at?: string | null
           next_charge_date?: string | null
           payment_method?: Json | null
           payment_token_id?: string | null
+          plan_id?: string | null
           plan_type?: string
           status?: string
+          token?: string | null
+          token_expiry?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
           user_id: string
@@ -600,17 +706,32 @@ export type Database = {
           contract_signed_location?: string | null
           created_at?: string | null
           current_period_ends_at?: string | null
+          fail_count?: number | null
           id?: string
+          last_response_code?: string | null
+          last_trx_id?: string | null
+          next_charge_at?: string | null
           next_charge_date?: string | null
           payment_method?: Json | null
           payment_token_id?: string | null
+          plan_id?: string | null
           plan_type?: string
           status?: string
+          token?: string | null
+          token_expiry?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       temp_registration_data: {
         Row: {
@@ -791,8 +912,16 @@ export type Database = {
         Args: { token_to_check: string }
         Returns: boolean
       }
+      update_expired_trials: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       validate_payment_session: {
         Args: { session_id: string }
+        Returns: boolean
+      }
+      validate_registration_step: {
+        Args: { registration_id: string; current_step: string }
         Returns: boolean
       }
     }

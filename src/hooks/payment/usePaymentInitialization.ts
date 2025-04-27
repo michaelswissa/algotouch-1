@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { useRegistrationHandler } from './useRegistrationHandler';
 import { useCardcomInitializer } from '../useCardcomInitializer';
@@ -23,9 +24,21 @@ export const usePaymentInitialization = ({
   const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
   const { initializePaymentSession } = usePaymentSession({ setState });
+  const [initializationAttempts, setInitializationAttempts] = useState<number>(0);
+  const MAX_ATTEMPTS = 2;
 
   const initializePayment = async () => {
     console.log('Starting payment initialization process');
+    
+    // Prevent multiple initialization attempts to avoid loops
+    if (initializationAttempts >= MAX_ATTEMPTS) {
+      console.error(`Payment initialization abandoned after ${MAX_ATTEMPTS} attempts`);
+      toast.error('לא ניתן לאתחל את התשלום לאחר מספר נסיונות. אנא רענן את הדף ונסה שנית.');
+      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+      return null;
+    }
+    
+    setInitializationAttempts(prev => prev + 1);
     setState(prev => ({ 
       ...prev, 
       paymentStatus: PaymentStatus.INITIALIZING 
@@ -93,7 +106,7 @@ export const usePaymentInitialization = ({
           }
           
           console.log('CardCom fields initialized successfully');
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error during CardCom field initialization:', error);
           setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
           toast.error(error.message || 'שגיאה באתחול שדות התשלום');
@@ -101,7 +114,7 @@ export const usePaymentInitialization = ({
       }, 500); // Short delay to ensure master frame is loaded
       
       return paymentData;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payment initialization error:', error);
       toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
