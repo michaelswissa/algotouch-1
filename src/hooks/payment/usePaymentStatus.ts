@@ -1,7 +1,15 @@
 
-import { useState } from 'react';
-import { PaymentState, PaymentStatus } from '@/components/payment/types/payment';
-import { toast } from 'sonner';
+import { useState, useCallback } from 'react';
+import { PaymentStatus, PaymentStatusType } from '@/types/payment';
+
+interface PaymentState {
+  paymentStatus: PaymentStatusType;
+  terminalNumber: string;
+  cardcomUrl: string;
+  lowProfileCode: string;
+  sessionId: string;
+  reference: string;
+}
 
 interface UsePaymentStatusProps {
   onPaymentComplete: () => void;
@@ -9,30 +17,23 @@ interface UsePaymentStatusProps {
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps) => {
   const [state, setState] = useState<PaymentState>({
+    paymentStatus: PaymentStatus.IDLE,
     terminalNumber: '',
     cardcomUrl: '',
-    paymentStatus: PaymentStatus.IDLE,
-    sessionId: '',
     lowProfileCode: '',
-    isFramesReady: false, // Added the missing property
+    sessionId: '',
+    reference: '',
   });
 
-  // Changed to match the expected signature (no parameters)
-  const handlePaymentSuccess = () => {
-    console.log('Payment successful');
+  const handlePaymentSuccess = useCallback(() => {
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
-    toast.success('התשלום בוצע בהצלחה!');
-    
-    setTimeout(() => {
-      onPaymentComplete();
-    }, 1000);
-  };
+    onPaymentComplete();
+  }, [onPaymentComplete]);
 
-  const handleError = (message: string) => {
+  const handleError = useCallback((message: string) => {
     console.error('Payment error:', message);
     setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-    toast.error(message || 'אירעה שגיאה בעיבוד התשלום');
-  };
+  }, []);
 
   return {
     state,

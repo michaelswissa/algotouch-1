@@ -486,7 +486,7 @@ export type Database = {
         Row: {
           code: string
           cycle_days: number | null
-          id: number
+          id: string
           name: string
           price: number
           trial_days: number | null
@@ -494,7 +494,7 @@ export type Database = {
         Insert: {
           code: string
           cycle_days?: number | null
-          id?: number
+          id?: string
           name: string
           price: number
           trial_days?: number | null
@@ -502,7 +502,7 @@ export type Database = {
         Update: {
           code?: string
           cycle_days?: number | null
-          id?: number
+          id?: string
           name?: string
           price?: number
           trial_days?: number | null
@@ -592,6 +592,7 @@ export type Database = {
           last_payment_date: string | null
           payment_status: string | null
           status: string
+          terminal_number: string | null
           token: string
           token_approval_number: string | null
           token_expiry: string
@@ -608,6 +609,7 @@ export type Database = {
           last_payment_date?: string | null
           payment_status?: string | null
           status?: string
+          terminal_number?: string | null
           token: string
           token_approval_number?: string | null
           token_expiry: string
@@ -624,6 +626,7 @@ export type Database = {
           last_payment_date?: string | null
           payment_status?: string | null
           status?: string
+          terminal_number?: string | null
           token?: string
           token_approval_number?: string | null
           token_expiry?: string
@@ -634,36 +637,51 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          cancelled_at: string | null
           created_at: string | null
+          current_period_ends_at: string | null
           fail_count: number | null
           id: string
           next_charge_at: string | null
-          plan_id: number | null
+          payment_method: Json | null
+          plan_id: string | null
+          plan_type: string | null
           status: string | null
           token: string | null
           token_expires_ym: string | null
+          trial_ends_at: string | null
           user_id: string | null
         }
         Insert: {
+          cancelled_at?: string | null
           created_at?: string | null
+          current_period_ends_at?: string | null
           fail_count?: number | null
           id?: string
           next_charge_at?: string | null
-          plan_id?: number | null
+          payment_method?: Json | null
+          plan_id?: string | null
+          plan_type?: string | null
           status?: string | null
           token?: string | null
           token_expires_ym?: string | null
+          trial_ends_at?: string | null
           user_id?: string | null
         }
         Update: {
+          cancelled_at?: string | null
           created_at?: string | null
+          current_period_ends_at?: string | null
           fail_count?: number | null
           id?: string
           next_charge_at?: string | null
-          plan_id?: number | null
+          payment_method?: Json | null
+          plan_id?: string | null
+          plan_type?: string | null
           status?: string | null
           token?: string | null
           token_expires_ym?: string | null
+          trial_ends_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -859,12 +877,24 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      update_subscription_after_payment: {
+        Args: {
+          subscription_id: string
+          transaction_id: string
+          response_code: string
+        }
+        Returns: undefined
+      }
       validate_payment_session: {
         Args: { session_id: string }
         Returns: boolean
       }
       validate_registration_step: {
         Args: { registration_id: string; current_step: string }
+        Returns: boolean
+      }
+      validate_token: {
+        Args: { token_id: string }
         Returns: boolean
       }
     }
