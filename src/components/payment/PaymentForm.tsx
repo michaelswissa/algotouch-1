@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -12,7 +12,6 @@ import PlanSummary from './PlanSummary';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import InitializingPayment from './states/InitializingPayment';
-import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
 
 interface PaymentFormProps {
   planId: string;
@@ -26,16 +25,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     paymentStatus, 
     isInitializing, 
     operationType,
-    resetPaymentState
+    resetPaymentState,
+    terminalNumber,
+    cardcomUrl,
+    submitPayment
   } = usePaymentContext();
   
-  const { 
-    formData, 
-    errors, 
-    isSubmitting, 
-    handleChange,
-    handleSubmitPayment 
-  } = usePaymentForm();
+  const masterFrameRef = useRef<HTMLIFrameElement>(null);
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -67,13 +63,24 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   }, [paymentStatus, onPaymentComplete]);
 
   const getButtonText = () => {
-    if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
+    if (paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
     
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
+  };
+
+  const handleSubmitClick = () => {
+    submitPayment({
+      cardOwnerName: '', // These values will be taken from the usePaymentForm hook inside PaymentDetails
+      cardOwnerId: '',
+      cardOwnerEmail: '',
+      cardOwnerPhone: '',
+      expirationMonth: '',
+      expirationYear: '',
+    });
   };
 
   return (
@@ -111,9 +118,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               freeTrialDays={plan.freeTrialDays}
             />
             <PaymentDetails 
-              formData={formData}
-              errors={errors}
-              handleChange={handleChange}
+              terminalNumber={terminalNumber}
+              cardcomUrl={cardcomUrl}
+              masterFrameRef={masterFrameRef}
+              isReady={!isInitializing && paymentStatus !== PaymentStatus.FAILED}
             />
           </>
         )}
@@ -125,8 +133,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             <Button 
               type="button" 
               className="w-full" 
-              onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
+              onClick={handleSubmitClick}
+              disabled={paymentStatus === PaymentStatus.PROCESSING}
             >
               {getButtonText()}
             </Button>
@@ -145,7 +153,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             variant="outline" 
             onClick={onBack} 
             className="absolute top-4 right-4"
-            disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING}
+            disabled={paymentStatus === PaymentStatus.PROCESSING}
           >
             חזור
           </Button>
