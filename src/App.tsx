@@ -16,40 +16,42 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
   return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/subscription" element={<Subscription />} />
-        <Route path="/subscription/success" element={<SubscriptionSuccess />} />
-        <Route path="/subscription/failed" element={<SubscriptionFailed />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-subscription"
-          element={
-            <ProtectedRoute>
-              <MySubscriptionPage />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-      <Toaster richColors position="top-center" />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/subscription" element={<Subscription />} />
+          <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+          <Route path="/subscription/failed" element={<SubscriptionFailed />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-subscription"
+            element={
+              <ProtectedRoute>
+                <MySubscriptionPage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+        <Toaster richColors position="top-center" />
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
