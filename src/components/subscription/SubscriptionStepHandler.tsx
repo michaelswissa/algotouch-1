@@ -1,10 +1,11 @@
+
 import React, { useEffect } from 'react';
 import { useParams, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useSubscriptionSteps } from '@/hooks/useSubscriptionSteps';
 import { useSubscriptionFlow } from '@/hooks/subscription/useSubscriptionFlow';
-import StorageService from '@/lib/subscription/storage-service';
+import { StorageService } from '@/services/storage/StorageService';
 import { validatePlanSelection, validateContractData } from '@/lib/subscription/step-validation';
 import SubscriptionLogger from '@/lib/subscription/logging-service';
 import SubscriptionSteps from './SubscriptionSteps';
@@ -12,6 +13,7 @@ import PlanSelectionStep from './PlanSelectionStep';
 import ContractSection from './ContractSection';
 import PaymentSection from './PaymentSection';
 import SubscriptionSuccess from './SubscriptionSuccess';
+import { PaymentProvider } from '@/contexts/payment/PaymentContext';
 
 const SubscriptionStepHandler: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -116,8 +118,8 @@ const SubscriptionStepHandler: React.FC = () => {
       {currentStep === 2 && selectedPlan && (
         <ContractSection
           selectedPlan={selectedPlan}
-          fullName={registrationData?.userData?.firstName && registrationData?.userData?.lastName 
-            ? `${registrationData.userData.firstName} ${registrationData.userData.lastName}` 
+          fullName={StorageService.getRegistrationData()?.userData?.firstName && StorageService.getRegistrationData()?.userData?.lastName 
+            ? `${StorageService.getRegistrationData().userData.firstName} ${StorageService.getRegistrationData().userData.lastName}` 
             : ''}
           onSign={onContractSign}
           onBack={() => setCurrentStep(1)}
@@ -125,11 +127,13 @@ const SubscriptionStepHandler: React.FC = () => {
       )}
       
       {currentStep === 3 && selectedPlan && (
-        <PaymentSection
-          planId={selectedPlan}
-          onPaymentComplete={onPaymentComplete}
-          onBack={() => setCurrentStep(2)}
-        />
+        <PaymentProvider>
+          <PaymentSection
+            planId={selectedPlan}
+            onPaymentComplete={onPaymentComplete}
+            onBack={() => setCurrentStep(2)}
+          />
+        </PaymentProvider>
       )}
       
       {currentStep === 4 && <SubscriptionSuccess />}
