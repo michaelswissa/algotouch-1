@@ -5,8 +5,8 @@ import PlanCard from './subscription/PlanCard';
 import { getPlansData } from './subscription/planData';
 
 interface SubscriptionPlansProps {
-  onSelectPlan?: (planId: number) => void;
-  selectedPlanId?: number;
+  onSelectPlan?: (planId: string) => void;
+  selectedPlanId?: string;
 }
 
 const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
@@ -18,8 +18,7 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
 
   const handlePlanClick = (planId: string) => {
     if (onSelectPlan) {
-      // Convert the string planId to number for compatibility
-      onSelectPlan(Number(planId));
+      onSelectPlan(planId);
     } else {
       navigate(`/subscription/${planId}`);
     }
@@ -37,7 +36,7 @@ const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
             key={plan.id}
             {...plan}
             onSelect={handlePlanClick}
-            isSelected={selectedPlanId === Number(plan.id)}
+            isSelected={selectedPlanId === plan.id}
           />
         ))}
       </div>

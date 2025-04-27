@@ -1,7 +1,6 @@
-
 import { useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentStatus, PaymentStatusType } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
 
 interface UsePaymentStatusCheckProps {

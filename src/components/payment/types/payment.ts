@@ -41,7 +41,7 @@ export interface InitConfig {
   operationType?: 'payment' | 'token_only';
   placeholder?: string;
   cvvPlaceholder?: string;
-  operation?: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken';
 }
 
 export interface PaymentState {
