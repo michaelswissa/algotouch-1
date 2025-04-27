@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { StorageService } from '@/services/storage/StorageService';
@@ -53,7 +52,14 @@ export class RegistrationService {
         // Try to get the user
         const { data: userData, error: getUserError } = await supabase.auth.getUser();
         if (userData?.user) {
-          return { success: true, user: userData.user };
+          // Make sure we're authenticated as this user
+          if (userData.user.id === registrationData.userId) {
+            return { success: true, user: userData.user };
+          } else {
+            PaymentLogger.warn('User ID mismatch, signing out and attempting to sign in with stored credentials');
+            await supabase.auth.signOut();
+            return await this.signInUser(registrationData.email, registrationData.password);
+          }
         }
         
         // If not authenticated, try to sign in
@@ -61,7 +67,31 @@ export class RegistrationService {
         return await this.signInUser(registrationData.email, registrationData.password);
       }
       
-      // Create the user
+      // Check if user already exists before creating
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: registrationData.email,
+        password: registrationData.password
+      });
+      
+      if (!signInError) {
+        // User already exists and we've signed them in
+        PaymentLogger.log('User already exists and signed in successfully');
+        
+        // Get the user data
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          // Update registration data to mark user as created
+          registrationData.userCreated = true;
+          registrationData.userId = userData.user.id;
+          
+          // Store updated registration data
+          StorageService.storeRegistrationData(registrationData);
+          
+          return { success: true, user: userData.user };
+        }
+      }
+      
+      // Create the user since they don't exist
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: registrationData.email,
         password: registrationData.password,
@@ -71,7 +101,9 @@ export class RegistrationService {
             last_name: registrationData.userData?.lastName,
             phone: registrationData.userData?.phone,
             full_name: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim()
-          }
+          },
+          // Disable email verification for now to simplify the flow
+          emailRedirectTo: `${window.location.origin}/subscription`
         }
       });
 

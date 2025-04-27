@@ -7,6 +7,8 @@ import { AuthContext } from './AuthContext';
 import { sendWelcomeEmail } from '@/lib/email-service';
 import { useUserRoles, DEFAULT_USER_ROLES } from '@/hooks/auth/useUserRoles';
 import { UserRoles } from './role-types';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { StorageService } from '@/services/storage/StorageService';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,12 +29,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, fetchUserRoles]);
 
   useEffect(() => {
-    console.log('Setting up auth state listener');
+    PaymentLogger.log('Setting up auth state listener');
     
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
-        console.log('Auth state changed:', event, newSession?.user?.email);
+        PaymentLogger.log('Auth state changed:', { event, email: newSession?.user?.email });
         
         // Only synchronous state updates here to prevent loops
         setSession(newSession);
@@ -58,18 +60,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         is_new_user: false,
                         welcome_email_sent: true
                       }
-                    }).catch(err => console.error('Error updating user metadata:', err));
+                    }).catch(err => PaymentLogger.error('Error updating user metadata:', err));
                   })
                   .catch(err => {
-                    console.error('Error sending welcome email:', err);
+                    PaymentLogger.error('Error sending welcome email:', err);
                     // Still mark as not new to prevent future attempts
                     supabase.auth.updateUser({
                       data: { is_new_user: false }
-                    }).catch(err => console.error('Error updating user metadata:', err));
+                    }).catch(err => PaymentLogger.error('Error updating user metadata:', err));
                   });
               }
             } catch (error) {
-              console.error('Error in welcome email logic:', error);
+              PaymentLogger.error('Error in welcome email logic:', error);
             }
           }, 500);
           
@@ -82,6 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'SIGNED_OUT') {
           // Reset roles when user signs out
           setUserRoles(DEFAULT_USER_ROLES);
+          // Clear registration data on sign out
+          StorageService.clearAllSubscriptionData();
         }
       }
     );
@@ -90,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         const { data: { session: existingSession } } = await supabase.auth.getSession();
-        console.log('Initial session check:', existingSession?.user?.email || 'No session');
+        PaymentLogger.log('Initial session check:', existingSession?.user?.email || 'No session');
         
         setSession(existingSession);
         setUser(existingSession?.user ?? null);
@@ -100,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await refreshUserRoles();
         }
       } catch (error) {
-        console.error('Error checking session:', error);
+        PaymentLogger.error('Error checking session:', error);
       } finally {
         setLoading(false);
         setInitialized(true);
@@ -110,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
 
     return () => {
-      console.log('Cleaning up auth listener');
+      PaymentLogger.log('Cleaning up auth listener');
       subscription.unsubscribe();
     };
   }, [refreshUserRoles]);
@@ -118,28 +122,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      PaymentLogger.log('Attempting to sign in user', { email });
+      
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
-        console.error('Sign in error:', error.message);
-        toast.error(error.message);
+        PaymentLogger.error('Sign in error:', error);
+        toast.error(error.message || 'שגיאה בתהליך ההתחברות');
         throw error;
       }
       
-      console.log('Sign in successful');
+      if (!data.session || !data.user) {
+        const errorMsg = 'ההתחברות נכשלה - לא התקבלה תגובה מהשרת';
+        PaymentLogger.error(errorMsg);
+        toast.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      PaymentLogger.log('Sign in successful', { userId: data.user.id });
       toast.success('התחברת בהצלחה!');
       
       // Check for contract data to determine where to navigate
       const contractData = sessionStorage.getItem('contract_data');
       if (contractData) {
-        console.log('Found contract data, redirecting to subscription');
+        PaymentLogger.log('Found contract data, redirecting to subscription');
         navigate('/subscription', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }
+      
+      return { success: true, session: data.session, user: data.user };
     } catch (error) {
-      console.error('Error signing in:', error);
-      throw error;
+      PaymentLogger.error('Error during sign in:', error);
+      return { 
+        success: false, 
+        session: null, 
+        user: null, 
+        error: error instanceof Error ? error.message : 'שגיאה בתהליך ההתחברות'
+      };
     } finally {
       setLoading(false);
     }

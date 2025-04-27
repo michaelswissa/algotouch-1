@@ -1,130 +1,153 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/auth';
-import { toast } from 'sonner';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth";
+import { Link, useNavigate } from "react-router-dom";
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { Loader2 } from 'lucide-react';
 
-interface LoginFormProps {
-  onLoginSuccess?: () => void;
-}
+const loginSchema = z.object({
+  email: z.string().email({ message: "כתובת אימייל לא תקינה" }),
+  password: z.string().min(6, { message: "סיסמא חייבת להיות באורך של 6 תווים לפחות" }),
+});
 
-const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
-  const { signIn, resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loggingIn, setLoggingIn] = useState(false);
-  const [resettingPassword, setResettingPassword] = useState(false);
-  const location = useLocation();
-  const state = location.state as { redirectToSubscription?: boolean };
+type LoginFormValues = z.infer<typeof loginSchema>;
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+const LoginForm: React.FC = () => {
+  const { signIn, loading, isAuthenticated } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  // Check for any payment redirect parameters
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const paymentResult = searchParams.get('payment_result');
+    const paymentError = searchParams.get('error');
     
-    if (!email || !password) {
-      toast.error('אנא הזן דוא"ל וסיסמה');
-      return;
+    if (paymentResult === 'failed' || paymentError) {
+      const errorMessage = paymentError || 'התשלום נכשל, אנא נסה שנית';
+      PaymentLogger.error('Login redirect after payment failure:', { paymentResult, paymentError });
+      toast.error(errorMessage);
+      
+      // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
+  }, []);
+
+  const onSubmit = async (values: LoginFormValues) => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    setAuthError(null);
     
     try {
-      setLoggingIn(true);
-      console.log('Attempting sign in with:', email);
-      await signIn(email, password);
+      PaymentLogger.log('Login form submitted', { email: values.email });
+      const result = await signIn(values.email, values.password);
       
-      console.log('Login successful, redirectToSubscription:', state?.redirectToSubscription);
-      
-      if (onLoginSuccess) {
-        onLoginSuccess();
+      if (!result.success) {
+        setAuthError(result.error || 'התחברות נכשלה. אנא בדוק את פרטי ההתחברות שלך ונסה שוב.');
       }
-    } catch (error: any) {
-      console.error('Login error:', error);
-      
-      // Show specific error messages for common errors
-      if (error.message.includes('Invalid login credentials')) {
-        toast.error('פרטי התחברות שגויים. אנא בדוק את הדוא"ל והסיסמה');
-      } else if (error.message.includes('Email not confirmed')) {
-        toast.error('הדוא"ל שלך לא אומת. אנא בדוק את תיבת הדואר הנכנס שלך');
-      } else {
-        toast.error('התחברות נכשלה. אנא בדוק את פרטי ההתחברות שלך ונסה שוב.');
-      }
+    } catch (error) {
+      PaymentLogger.error('Login error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'שגיאה בתהליך ההתחברות';
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
     } finally {
-      setLoggingIn(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handlePasswordReset = async () => {
-    if (!email) {
-      toast.error('אנא הזן דוא"ל לפני שתבקש איפוס סיסמה');
-      return;
+  // If user is already authenticated, redirect to dashboard
+  useEffect(() => {
+    if (isAuthenticated) {
+      PaymentLogger.log('User already authenticated, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
     }
-    
-    try {
-      setResettingPassword(true);
-      console.log('Requesting password reset for:', email);
-      
-      // Use the AuthContext resetPassword method
-      await resetPassword(email);
-      
-      console.log('Password reset email sent successfully');
-      toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      toast.error('אירעה שגיאה בעת איפוס הסיסמה. אנא נסה שוב מאוחר יותר.');
-    } finally {
-      setResettingPassword(false);
-    }
-  };
+  }, [isAuthenticated, navigate]);
 
   return (
-    <Card className="glass-card-2025">
+    <Card>
       <CardHeader>
         <CardTitle>התחברות</CardTitle>
         <CardDescription>הזן את פרטי ההתחברות שלך</CardDescription>
       </CardHeader>
-      <form onSubmit={handleLogin}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="login-email">דוא"ל</Label>
-            <Input 
-              id="login-email" 
-              type="email" 
-              placeholder="name@example.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>אימייל</FormLabel>
+                  <FormControl>
+                    <Input placeholder="your@email.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Button 
-                type="button" 
-                variant="link" 
-                className="text-sm text-primary hover:underline px-0"
-                onClick={handlePasswordReset}
-                disabled={resettingPassword || !email}
-              >
-                {resettingPassword ? 'שולח...' : '?שכחת סיסמה'}
-              </Button>
-              <Label htmlFor="login-password">סיסמה</Label>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>סיסמא</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="******" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {authError && (
+              <div className="text-sm font-medium text-red-500">{authError}</div>
+            )}
+            
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting || loading}
+            >
+              {(isSubmitting || loading) ? (
+                <span className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מתחבר...
+                </span>
+              ) : (
+                "התחבר"
+              )}
+            </Button>
+            
+            <div className="text-center text-sm text-muted-foreground">
+              <Link to="/auth?tab=signup" className="underline hover:text-primary">
+                עדיין אין לך חשבון? הירשם
+              </Link>
+              <div className="mt-2">
+                <Link to="/reset-password" className="underline hover:text-primary">
+                  שכחת את הסיסמא?
+                </Link>
+              </div>
             </div>
-            <Input 
-              id="login-password" 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={loggingIn}>
-            {loggingIn ? 'מתחבר...' : 'התחבר'}
-          </Button>
-        </CardFooter>
-      </form>
+          </form>
+        </Form>
+      </CardContent>
     </Card>
   );
 };

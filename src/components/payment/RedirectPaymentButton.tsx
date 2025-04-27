@@ -1,68 +1,93 @@
 
-import React, { useState, useCallback } from 'react';
-import { Button, ButtonProps } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
-import { useRedirectPayment } from '@/hooks/payment/useRedirectPayment';
-import { toast } from 'sonner';
+import React, { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { CardComRedirectService } from '@/services/payment/CardComRedirectService';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { RegistrationService } from '@/services/registration/RegistrationService';
 
-interface RedirectPaymentButtonProps extends ButtonProps {
+interface RedirectPaymentButtonProps {
   planId: string;
   amount: number;
-  userEmail: string;
-  fullName: string;
-  buttonText?: string;
-  loadingText?: string;
+  className?: string;
+  children?: React.ReactNode;
 }
 
 const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
   planId,
   amount,
-  userEmail,
-  fullName,
-  buttonText = 'עבור לתשלום',
-  loadingText = 'מכין את עמוד התשלום...',
-  ...buttonProps
+  className,
+  children
 }) => {
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
-  const { createRedirectPayment, redirectToPayment } = useRedirectPayment({
-    onSuccess: (data) => {
-      if (data?.url) {
-        redirectToPayment(data.url);
-      } else {
-        toast.error('לא התקבלה כתובת תשלום תקינה');
-        setIsProcessing(false);
+  const handleRedirectPayment = async () => {
+    if (isLoading) return;
+    
+    try {
+      setIsLoading(true);
+      PaymentLogger.log('Starting redirect payment process', { planId, amount });
+      
+      // Step 1: Get and validate registration data
+      const registrationData = RegistrationService.getValidRegistrationData();
+      if (!registrationData) {
+        toast.error('מידע הרשמה חסר או לא תקין');
+        throw new Error('מידע הרשמה חסר או לא תקין');
       }
-    },
-    onError: () => {
-      setIsProcessing(false);
+      
+      PaymentLogger.log('Registration data loaded', { 
+        email: registrationData.email,
+        hasUserData: !!registrationData.userData
+      });
+      
+      // Step 2: Create user account first
+      PaymentLogger.log('Creating/validating user account before payment');
+      const { success, user, error } = await RegistrationService.createUserAccount(registrationData);
+      
+      if (!success || !user) {
+        toast.error(error || 'שגיאה ביצירת חשבון המשתמש');
+        throw new Error(error || 'שגיאה ביצירת חשבון המשתמש');
+      }
+      
+      PaymentLogger.log('User account ready for payment', { userId: user.id });
+      
+      // Step 3: Initialize payment redirect
+      const fullName = `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
+      const email = registrationData.email;
+      
+      const { url } = await CardComRedirectService.initializeRedirect({
+        planId,
+        amount,
+        userEmail: email,
+        fullName,
+        userId: user.id
+      });
+      
+      // Step 4: Redirect to payment page
+      CardComRedirectService.redirectToPayment(url);
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
+      PaymentLogger.error('Payment redirect error:', error);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
-  });
-
-  const handlePaymentClick = useCallback(async () => {
-    if (!userEmail) {
-      toast.error('נדרשת כתובת דוא"ל לביצוע התשלום');
-      return;
-    }
-
-    setIsProcessing(true);
-    await createRedirectPayment({ planId, amount, userEmail, fullName });
-  }, [planId, amount, userEmail, fullName, createRedirectPayment]);
+  };
 
   return (
-    <Button
-      onClick={handlePaymentClick}
-      disabled={isProcessing}
-      className="w-full"
-      {...buttonProps}
+    <Button 
+      onClick={handleRedirectPayment} 
+      disabled={isLoading}
+      className={className}
     >
-      {isProcessing ? (
+      {isLoading ? (
         <span className="flex items-center">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {loadingText}
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד בקשה...
         </span>
       ) : (
-        buttonText
+        children || 'מעבר לעמוד התשלום'
       )}
     </Button>
   );
