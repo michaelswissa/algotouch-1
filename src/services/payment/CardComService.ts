@@ -18,20 +18,16 @@ export class CardComService {
     try {
       PaymentLogger.log('Initializing payment', { planId, userId, email, operationType });
       
-      // Determine amount based on plan
-      let amount = 0;
-      switch (planId) {
-        case 'monthly':
-          amount = 371;
-          break;
-        case 'annual':
-          amount = 3371;
-          break;
-        case 'vip':
-          amount = 13121;
-          break;
-        default:
-          throw new Error(`Unsupported plan: ${planId}`);
+      // Get plan details from database
+      const { data: plan, error: planError } = await supabase
+        .from('plans')
+        .select('price, code, cycle_days')
+        .eq('id', planId)
+        .single();
+      
+      if (planError || !plan) {
+        PaymentLogger.error("Error fetching plan details:", planError);
+        throw new Error(`שגיאה בטעינת פרטי התוכנית: ${planError?.message || 'Plan not found'}`);
       }
 
       // Determine operation based on plan and operationType
@@ -43,7 +39,7 @@ export class CardComService {
       const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
         body: {
           planId,
-          amount,
+          amount: plan.price,
           operation,
           invoiceInfo: {
             fullName: fullName || email,
@@ -224,7 +220,7 @@ export class CardComService {
     
     // Validate phone
     if (!cardInfo.cardOwnerPhone?.trim()) {
-      errors.cardOwnerPhone = 'מספר טלפון הוא שדה חובה';
+      errors.cardOwnerPhone = 'מספר טל��ון הוא שדה חובה';
     } else if (!/^0\d{8,9}$/.test(cardInfo.cardOwnerPhone)) {
       errors.cardOwnerPhone = 'יש להזין מספר טלפון ישראלי תקין';
     }
