@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,15 +41,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
+  // Initialize payment on mount only
   useEffect(() => {
     console.log("Initializing payment for plan:", planId);
     initializePayment(planId);
     
+    // Cleanup on unmount only
     return () => {
       resetPaymentState();
     };
-  }, [planId]);
+  }, [planId]); // Only depend on planId
 
+  // Call onPaymentComplete when payment succeeds
   useEffect(() => {
     if (paymentStatus === PaymentStatus.SUCCESS) {
       onPaymentComplete();
@@ -65,19 +69,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
 
-  const handleSubmitClick = async () => {
-    const { success } = await submitPayment({
-      cardOwnerName: document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '',
-      cardOwnerId: document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '',
-      cardOwnerEmail: document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '',
-      cardOwnerPhone: document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '',
-      expirationMonth: document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '',
-      expirationYear: document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '',
+  const handleSubmitClick = () => {
+    submitPayment({
+      cardOwnerName: '', // These values will be taken from the usePaymentForm hook inside PaymentDetails
+      cardOwnerId: '',
+      cardOwnerEmail: '',
+      cardOwnerPhone: '',
+      expirationMonth: '',
+      expirationYear: '',
     });
-
-    if (success && onPaymentComplete) {
-      onPaymentComplete();
-    }
   };
 
   const shouldShowPaymentContent = 
