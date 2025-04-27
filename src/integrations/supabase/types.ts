@@ -794,6 +794,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_streaks: {
         Row: {
           created_at: string
@@ -832,6 +856,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_role: {
+        Args: {
+          target_user_id: string
+          assigned_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
       check_duplicate_payment: {
         Args: { low_profile_id: string }
         Returns: boolean
@@ -852,6 +883,21 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: undefined
       }
+      create_initial_admin: {
+        Args: { admin_email: string }
+        Returns: boolean
+      }
+      get_user_roles: {
+        Args: { user_id?: string }
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
+      has_role: {
+        Args: {
+          user_id: string
+          requested_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
       increment: {
         Args: { row_id: string; table_name: string; column_name: string }
         Returns: undefined
@@ -866,11 +912,22 @@ export type Database = {
         Returns: boolean
       }
       is_admin: {
-        Args: { user_id: string }
+        Args: { user_id?: string }
+        Returns: boolean
+      }
+      is_moderator: {
+        Args: { user_id?: string }
         Returns: boolean
       }
       is_token_valid: {
         Args: { token_to_check: string }
+        Returns: boolean
+      }
+      remove_role: {
+        Args: {
+          target_user_id: string
+          removed_role: Database["public"]["Enums"]["app_role"]
+        }
         Returns: boolean
       }
       update_expired_trials: {
@@ -899,7 +956,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1014,6 +1071,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const

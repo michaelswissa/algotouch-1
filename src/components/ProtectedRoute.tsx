@@ -4,19 +4,22 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
+import { AppRole } from '@/contexts/auth/role-types';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAuth?: boolean;
+  requiredRole?: AppRole;
   publicPaths?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
+  requiredRole,
   publicPaths = ['/auth']
 }) => {
-  const { isAuthenticated, loading, initialized } = useAuth();
+  const { isAuthenticated, loading, initialized, checkUserRole } = useAuth();
   const location = useLocation();
   const [hasRegistrationData, setHasRegistrationData] = useState(false);
   const [hasValidFlow, setHasValidFlow] = useState(false);
@@ -91,12 +94,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
+  // Check authentication requirements
   if (requireAuth && !isAuthenticated) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // Role-based access control
+  if (requiredRole && isAuthenticated) {
+    if (!checkUserRole(requiredRole)) {
+      toast.error(`You need ${requiredRole} permissions to access this page`);
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return <>{children}</>;

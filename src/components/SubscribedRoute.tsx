@@ -5,17 +5,22 @@ import { useAuth } from '@/contexts/auth';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
+import { AppRole } from '@/contexts/auth/role-types';
 
 interface SubscribedRouteProps {
   children: React.ReactNode;
+  requiredRole?: AppRole;
 }
 
 /**
  * SubscribedRoute - A route wrapper that ensures users have an active subscription
  * Redirects unauthenticated users to login and non-subscribers to subscription page
  */
-const SubscribedRoute: React.FC<SubscribedRouteProps> = ({ children }) => {
-  const { user, isAuthenticated, initialized, loading } = useAuth();
+const SubscribedRoute: React.FC<SubscribedRouteProps> = ({ 
+  children,
+  requiredRole 
+}) => {
+  const { user, isAuthenticated, initialized, loading, checkUserRole } = useAuth();
   const location = useLocation();
   const { subscription, loading: subscriptionLoading, details, error, refetch } = useSubscription();
   const [isChecking, setIsChecking] = useState(true);
@@ -75,6 +80,12 @@ const SubscribedRoute: React.FC<SubscribedRouteProps> = ({ children }) => {
     return <Navigate to="/auth" state={{ from: location, redirectAfterAuth: true }} replace />;
   }
 
+  // Check if user has required role if specified
+  if (requiredRole && !checkUserRole(requiredRole)) {
+    toast.error(`You need ${requiredRole} permissions to access this page`);
+    return <Navigate to="/dashboard" replace />;
+  }
+
   // Check if user has an active subscription
   const hasActiveSubscription = subscription && 
     (subscription.status === 'active' || 
@@ -109,6 +120,12 @@ const SubscribedRoute: React.FC<SubscribedRouteProps> = ({ children }) => {
         onClick: () => window.location.href = '/subscription'
       }
     });
+  }
+
+  // If user is an admin, allow access regardless of subscription status
+  if (checkUserRole('admin')) {
+    console.log('Admin user detected, bypassing subscription check');
+    return <>{children}</>;
   }
 
   // If authenticated but no subscription, redirect to subscription page

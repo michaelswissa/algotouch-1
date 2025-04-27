@@ -1,11 +1,12 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContext } from './AuthContext';
 import { sendWelcomeEmail } from '@/lib/email-service';
+import { useUserRoles, DEFAULT_USER_ROLES } from '@/hooks/auth/useUserRoles';
+import { UserRoles } from './role-types';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -13,6 +14,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const navigate = useNavigate();
+  const { roles, fetchUserRoles } = useUserRoles();
+  const [userRoles, setUserRoles] = useState<UserRoles>(DEFAULT_USER_ROLES);
+
+  const refreshUserRoles = useCallback(async () => {
+    if (user) {
+      const fetchedRoles = await fetchUserRoles(user.id);
+      setUserRoles(fetchedRoles);
+    } else {
+      setUserRoles(DEFAULT_USER_ROLES);
+    }
+  }, [user, fetchUserRoles]);
 
   useEffect(() => {
     console.log('Setting up auth state listener');
@@ -60,6 +72,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.error('Error in welcome email logic:', error);
             }
           }, 500);
+          
+          // Fetch user roles after sign in
+          setTimeout(() => {
+            refreshUserRoles();
+          }, 800);
+        }
+        
+        if (event === 'SIGNED_OUT') {
+          // Reset roles when user signs out
+          setUserRoles(DEFAULT_USER_ROLES);
         }
       }
     );
@@ -72,6 +94,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setSession(existingSession);
         setUser(existingSession?.user ?? null);
+        
+        // If we have a user, fetch their roles
+        if (existingSession?.user) {
+          await refreshUserRoles();
+        }
       } catch (error) {
         console.error('Error checking session:', error);
       } finally {
@@ -86,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Cleaning up auth listener');
       subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshUserRoles]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -256,9 +283,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const checkUserRole = (role: string) => {
+    if (role === 'admin') return userRoles.isAdmin;
+    if (role === 'moderator') return userRoles.isModerator;
+    return userRoles.roles.includes(role as any);
+  };
+
   const value = {
     session,
     user,
+    userRoles,
     loading,
     isAuthenticated: !!user,
     initialized,
@@ -266,7 +300,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     updateProfile,
-    resetPassword
+    resetPassword,
+    checkUserRole,
+    refreshUserRoles
   };
 
   // Show a global loader when auth is initializing to prevent flashes of content
