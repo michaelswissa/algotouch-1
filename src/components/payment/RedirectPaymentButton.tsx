@@ -1,97 +1,78 @@
 
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { CardComRedirectService } from '@/services/payment/CardComRedirectService';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { StorageService } from '@/services/storage/StorageService';
-import { useAuth } from '@/contexts/auth';
+import { Button } from '@/components/ui/button';
+import { initializeCardcomRedirect, redirectToCardcomPayment } from '@/lib/payment/cardcom-service'; 
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface RedirectPaymentButtonProps {
   planId: string;
   amount: number;
+  userEmail?: string;
+  fullName?: string;
+  variant?: 'default' | 'outline' | 'secondary' | 'destructive' | 'ghost' | 'link';
   className?: string;
   children?: React.ReactNode;
 }
 
-const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
+export const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
   planId,
   amount,
-  className,
+  userEmail = '',
+  fullName = '',
+  variant = 'default',
+  className = '',
   children
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useAuth();
-  
-  const handleRedirectPayment = async () => {
-    if (isLoading) return;
-    
+
+  const handleClick = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      PaymentLogger.log('Starting redirect payment process', { planId, amount });
-      
-      // Get registration data without creating user
-      const registrationData = StorageService.getRegistrationData();
-      if (!registrationData || !registrationData.email) {
-        toast.error('מידע הרשמה חסר או לא תקין');
-        throw new Error('מידע הרשמה חסר או לא תקין');
-      }
-      
-      PaymentLogger.log('Registration data loaded', { 
-        email: registrationData.email,
-        hasUserData: !!registrationData.userData
-      });
-      
-      // Prepare user information for the payment without creating account
-      const fullName = `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
-      const email = registrationData.email;
-      
-      // Store registration intent in storage for later use after payment
-      StorageService.storeRegistrationIntent({ planId, amount });
-      
-      // Initialize payment redirect
-      const { url, lowProfileCode, reference } = await CardComRedirectService.initializeRedirect({
+      // Initialize CardCom redirect payment
+      const response = await initializeCardcomRedirect({
         planId,
         amount,
-        userEmail: email,
-        fullName,
-        // Pass userId if user is already created
-        userId: user?.id || registrationData.userId
+        userEmail,
+        fullName
       });
       
-      // Store payment session information
-      StorageService.updatePaymentData({
-        sessionId: reference,
-        lowProfileCode: lowProfileCode,
-        reference: reference,
-        status: 'pending'
-      });
-      
-      // Redirect to payment page
-      CardComRedirectService.redirectToPayment(url);
-      
+      // Store payment reference in session storage
+      sessionStorage.setItem('payment_data', JSON.stringify({
+        reference: response.reference,
+        lowProfileCode: response.lowProfileCode,
+        planId,
+        timestamp: new Date().toISOString(),
+        status: 'initialized'
+      }));
+
+      // Redirect to CardCom payment page
+      if (response.url) {
+        redirectToCardcomPayment(response.url);
+      } else {
+        throw new Error('חסרה כתובת מעבר לתשלום');
+      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
-      PaymentLogger.error('Payment redirect error:', error);
-      toast.error(errorMessage);
-    } finally {
+      console.error('Error initializing redirect payment:', error);
+      toast.error(error instanceof Error ? error.message : 'שגיאה באתחול תשלום');
       setIsLoading(false);
     }
   };
 
   return (
     <Button 
-      onClick={handleRedirectPayment} 
-      disabled={isLoading}
+      variant={variant} 
       className={className}
+      onClick={handleClick}
+      disabled={isLoading}
     >
       {isLoading ? (
-        <span className="flex items-center">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד בקשה...
-        </span>
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          מעבר לתשלום...
+        </>
       ) : (
-        children || 'מעבר לעמוד התשלום'
+        children || 'מעבר לתשלום'
       )}
     </Button>
   );

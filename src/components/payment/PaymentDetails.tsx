@@ -5,16 +5,12 @@ import { Loader2 } from 'lucide-react';
 interface PaymentDetailsProps {
   paymentUrl?: string;
   isReady?: boolean;
-  terminalNumber?: string;
-  cardcomUrl?: string;
   masterFrameRef?: React.RefObject<HTMLIFrameElement>;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   paymentUrl,
   isReady = false,
-  terminalNumber,
-  cardcomUrl,
   masterFrameRef
 }) => {
   const [isLoading, setIsLoading] = useState(true);

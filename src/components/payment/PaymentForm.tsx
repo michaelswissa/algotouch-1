@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -11,6 +11,7 @@ import PlanSummary from './PlanSummary';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import InitializingPayment from './states/InitializingPayment';
+import { initializeCardcomRedirect } from '@/lib/payment/cardcom-service';
 
 interface PaymentFormProps {
   planId: string;
@@ -21,6 +22,8 @@ interface PaymentFormProps {
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusType>(PaymentStatus.IDLE);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const masterFrameRef = React.useRef<HTMLIFrameElement>(null);
   
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
@@ -28,16 +31,90 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     : planId === 'vip' 
       ? planDetails.vip 
       : planDetails.monthly;
-      
-  // Direct CardCom URL construction
-  const cardcomUrl = 'https://secure.cardcom.solutions';
-  const terminalNumber = '160138'; // Your CardCom terminal number
-  const paymentUrl = `${cardcomUrl}/LowProfile/?LowProfileCode=${terminalNumber}`;
+
+  // Initialize payment when component mounts
+  useEffect(() => {
+    const initPayment = async () => {
+      setIsInitializing(true);
+      try {
+        // Get registration data from storage
+        const registrationDataStr = sessionStorage.getItem('registration_data');
+        const contractDataStr = sessionStorage.getItem('contract_data');
+        let email = '';
+        let fullName = '';
+        
+        // Try to get email and name from contract data first
+        if (contractDataStr) {
+          const contractData = JSON.parse(contractDataStr);
+          email = contractData.email || '';
+          fullName = contractData.fullName || '';
+        } 
+        // If not available, try registration data
+        else if (registrationDataStr) {
+          const regData = JSON.parse(registrationDataStr);
+          email = regData.email || '';
+          if (regData.userData) {
+            const { firstName, lastName } = regData.userData;
+            if (firstName && lastName) {
+              fullName = `${firstName} ${lastName}`;
+            }
+          }
+        }
+
+        // Calculate amount based on plan
+        let amount = 0;
+        switch (planId) {
+          case 'monthly':
+            amount = 371;
+            break;
+          case 'annual':
+            amount = 3371;
+            break;
+          case 'vip':
+            amount = 13121;
+            break;
+          default:
+            throw new Error(`Unsupported plan: ${planId}`);
+        }
+
+        // Initialize direct CardCom payment
+        const response = await initializeCardcomRedirect({
+          planId,
+          amount,
+          userEmail: email,
+          fullName,
+        });
+
+        console.log('Payment redirect initialized:', response);
+        
+        // Store the redirect URL
+        setRedirectUrl(response.url);
+        
+        // Store payment reference in session storage
+        sessionStorage.setItem('payment_data', JSON.stringify({
+          reference: response.reference,
+          lowProfileCode: response.lowProfileCode,
+          planId,
+          timestamp: new Date().toISOString(),
+          status: 'initialized'
+        }));
+
+      } catch (error) {
+        console.error('Error initializing payment:', error);
+        toast.error(error instanceof Error ? error.message : 'שגיאה באתחול תשלום');
+        setPaymentStatus(PaymentStatus.FAILED);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initPayment();
+  }, [planId]);
 
   // Check for iframe redirects (payment complete)
-  React.useEffect(() => {
+  useEffect(() => {
     const checkIframeStatus = () => {
-      const iframe = document.getElementById('cardcom-frame') as HTMLIFrameElement;
+      const iframe = masterFrameRef.current;
       
       if (!iframe || !iframe.contentWindow) return;
       
@@ -85,10 +162,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           freeTrialDays={plan.freeTrialDays}
         />
         <PaymentDetails 
-          paymentUrl={paymentUrl}
-          isReady={!isInitializing}
-          terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl}
+          paymentUrl={redirectUrl || ''}
+          isReady={!isInitializing && !!redirectUrl}
+          masterFrameRef={masterFrameRef}
         />
       </>
     );
