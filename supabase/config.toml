@@ -1,13 +1,11 @@
 
 project_id = "ndhakvhrrkczgylcmyoc"
-[api]
-enabled = true
-[auth]
-enabled = true
-[realtime]
-enabled = false
-[storage]
-enabled = false
-[edge_functions]
-[edge_functions.cardcom-status]
+
+[functions.cardcom-payment]
+verify_jwt = false
+
+[functions.cardcom-status]
+verify_jwt = false
+
+[functions.cardcom-webhook]
 verify_jwt = false

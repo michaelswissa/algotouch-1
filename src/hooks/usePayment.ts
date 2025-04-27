@@ -1,161 +1,158 @@
-
-import { useState, useCallback, useEffect } from 'react';
-import { PaymentStatus, PaymentStatusType } from '@/components/payment/types/payment';
+import { useRef, useEffect, useCallback, useState } from 'react';
+import { PaymentStatus } from '@/components/payment/types/payment';
+import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
+import { useFrameMessages } from './payment/useFrameMessages';
 import { toast } from 'sonner';
 
 interface UsePaymentProps {
   planId: string;
-  onPaymentComplete: (transactionId?: string) => void;
-}
-
-interface PaymentStateType {
-  paymentStatus: PaymentStatusType;
-  lowProfileCode: string;
-  sessionId: string;
-  terminalNumber: string;
-  cardcomUrl: string;
-  reference: string;
-  transactionId: string;
+  onPaymentComplete: () => void;
 }
 
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
-  const [state, setState] = useState<PaymentStateType>({
-    paymentStatus: PaymentStatus.INITIALIZING,
-    lowProfileCode: '',
-    sessionId: '',
-    terminalNumber: '',
-    cardcomUrl: 'https://secure.cardcom.solutions',
-    reference: '',
-    transactionId: ''
-  });
-
-  // Get operation type based on plan
-  const operationType = planId === 'monthly' ? 'token_only' : 'payment';
+  const masterFrameRef = useRef<HTMLIFrameElement>(null);
+  const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
   
-  // Initialize payment and CardCom fields
-  const { initializePayment } = usePaymentInitialization({
-    planId,
-    setState,
-    masterFrameRef: { current: null }, // This will be provided by PaymentForm
-    operationType: operationType as 'payment' | 'token_only'
-  });
-
-  // Handle payment status checks
-  usePaymentStatusCheck({
-    lowProfileCode: state.lowProfileCode,
-    setState,
-    paymentStatus: state.paymentStatus
-  });
-
-  // Handle payment submission
-  const submitPayment = useCallback(() => {
-    console.log(`Submitting payment for profile ${state.lowProfileCode}`);
-    
-    // Check if payment was already submitted
-    const sessionData = localStorage.getItem('payment_session');
-    if (sessionData) {
-      const session = JSON.parse(sessionData);
-      if (session.submitted) {
-        console.log('Payment was already submitted, not submitting again');
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-        return;
-      }
-    }
-
-    // Update localStorage to mark as submitted
-    if (sessionData) {
-      const session = JSON.parse(sessionData);
-      session.submitted = true;
-      localStorage.setItem('payment_session', JSON.stringify(session));
-    }
-
-    // Send the message to CardCom iframe to submit the payment
-    const submitEvent = {
-      action: 'submitForm'
-    };
-
-    const masterFrame = document.getElementById('CardComMasterFrame') as HTMLIFrameElement;
-    if (masterFrame && masterFrame.contentWindow) {
-      masterFrame.contentWindow.postMessage(submitEvent, '*');
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.PROCESSING }));
-      console.log('Payment submission message sent to CardCom iframe');
+  useEffect(() => {
+    if (planId === 'monthly') {
+      setOperationType('token_only');
     } else {
-      console.error('Master frame not found or not ready');
-      toast.error('שגיאה בהגשת התשלום: מסגרת המאסטר לא נמצאה או לא מוכנה');
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+      setOperationType('payment');
     }
-  }, [state.lowProfileCode]);
+  }, [planId]);
+  
+  const {
+    state,
+    setState,
+    handlePaymentSuccess,
+    handleError
+  } = usePaymentStatus({ onPaymentComplete });
 
-  // Handle retry functionality
+  const { initializePayment } = usePaymentInitialization({ 
+    planId, 
+    setState,
+    masterFrameRef,
+    operationType
+  });
+
+  const {
+    startStatusCheck,
+    checkPaymentStatus,
+    cleanupStatusCheck
+  } = usePaymentStatusCheck({ setState });
+
+  useFrameMessages({
+    handlePaymentSuccess: handlePaymentSuccess,
+    setState,
+    checkPaymentStatus,
+    lowProfileCode: state.lowProfileCode,
+    sessionId: state.sessionId,
+    operationType,
+    planType: planId
+  });
+
+  useEffect(() => {
+    return () => {
+      cleanupStatusCheck();
+    };
+  }, [cleanupStatusCheck]);
+
   const handleRetry = useCallback(() => {
     console.log('Retrying payment initialization');
-    
-    // Clear any existing payment session
-    localStorage.removeItem('payment_session');
-    
-    // Reset state
-    setState({
-      paymentStatus: PaymentStatus.INITIALIZING,
-      lowProfileCode: '',
-      sessionId: '',
-      terminalNumber: '',
-      cardcomUrl: 'https://secure.cardcom.solutions',
-      reference: '',
-      transactionId: ''
-    });
-    
-    // Re-initialize payment
-    setTimeout(() => {
-      initializePayment();
-    }, 500);
-  }, [initializePayment]);
+    setState(prev => ({
+      ...prev,
+      paymentStatus: PaymentStatus.IDLE
+    }));
+    initializePayment();
+  }, [initializePayment, setState]);
 
-  // Handle payment success
-  useEffect(() => {
-    if (state.paymentStatus === PaymentStatus.SUCCESS && onPaymentComplete) {
-      onPaymentComplete(state.transactionId);
+  const submitPayment = useCallback(() => {
+    if (paymentInProgress) {
+      console.log('Payment submission already in progress');
+      return;
     }
-  }, [state.paymentStatus, state.transactionId, onPaymentComplete]);
+    
+    if (!state.lowProfileCode) {
+      handleError("חסר מזהה יחודי לעסקה, אנא נסה/י שנית");
+      return;
+    }
+    
+    setPaymentInProgress(true);
+    console.log('Submitting payment transaction');
 
-  // Handle window messages from CardCom iframes
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Filter out messages from other sources
-      if (!event.data || !event.data.action) return;
+    if (!masterFrameRef.current?.contentWindow) {
+      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
+      setPaymentInProgress(false);
+      return;
+    }
+    
+    try {
+      const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
+      const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
+      const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
+      const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
+      const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
+      const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
       
-      console.log('Received message from iframe:', event.data);
+      const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
-      if (event.data.action === 'cardProcessResult') {
-        if (event.data.data && event.data.data.success) {
-          console.log('Card processing successful, transaction ID:', event.data.data.transactionId);
-          
-          // Record transaction ID and update status
-          setState(prev => ({
-            ...prev,
-            paymentStatus: PaymentStatus.SUCCESS,
-            transactionId: event.data.data.transactionId || 'token-created'
-          }));
-          
-          // Clear payment session from localStorage on success
-          localStorage.removeItem('payment_session');
-        } else {
-          console.error('Card processing failed:', event.data.data);
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(event.data.data?.errorMessage || 'אירעה שגיאה בעיבוד התשלום');
+      const formData = {
+        action: 'doTransaction',
+        cardOwnerName: cardholderName,
+        cardOwnerId,
+        cardOwnerEmail: email,
+        cardOwnerPhone: phone,
+        expirationMonth,
+        expirationYear,
+        numberOfPayments: "1",
+        ExternalUniqTranId: externalUniqTranId,
+        TerminalNumber: state.terminalNumber,
+        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
+        lowProfileCode: state.lowProfileCode,
+        LowProfileCode: state.lowProfileCode,
+        Document: {
+          Name: cardholderName || email,
+          Email: email,
+          TaxId: cardOwnerId,
+          Phone: phone,
+          DocumentTypeToCreate: "Receipt"
         }
-      }
-    };
+      };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+      console.log('Sending transaction data to CardCom:', formData);
+      masterFrameRef.current.contentWindow.postMessage(formData, '*');
+      
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatus.PROCESSING
+      }));
+      
+      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+      
+      setTimeout(() => {
+        setPaymentInProgress(false);
+      }, 5000);
+    } catch (error) {
+      console.error("Error submitting payment:", error);
+      handleError("שגיאה בשליחת פרטי התשלום");
+      setPaymentInProgress(false);
+    }
+  }, [
+    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, 
+    handleError, operationType, paymentInProgress, setState, startStatusCheck, planId
+  ]);
 
   return {
     ...state,
     operationType,
-    submitPayment,
-    handleRetry
+    masterFrameRef,
+    lowProfileCode: state.lowProfileCode,
+    sessionId: state.sessionId,
+    initializePayment,
+    handleRetry,
+    submitPayment
   };
 };

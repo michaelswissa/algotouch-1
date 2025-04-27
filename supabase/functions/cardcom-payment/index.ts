@@ -7,23 +7,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper logging function for enhanced debugging
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CARDCOM-PAYMENT] ${step}${detailsStr}`);
-};
-
 // CardCom Configuration
 const CARDCOM_CONFIG = {
-  terminalNumber: Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138",
-  apiName: Deno.env.get("CARDCOM_API_NAME") || "",
-  apiPassword: Deno.env.get("CARDCOM_API_PASSWORD") || "",
+  terminalNumber: "160138",
+  apiName: "bLaocQRMSnwphQRUVG3b",
+  apiPassword: "i9nr6caGbgheTdYfQbo6",
   endpoints: {
     master: "https://secure.cardcom.solutions/api/openfields/master",
     cardNumber: "https://secure.cardcom.solutions/api/openfields/cardNumber",
     cvv: "https://secure.cardcom.solutions/api/openfields/CVV",
     createLowProfile: "https://secure.cardcom.solutions/api/v11/LowProfile/Create"
   }
+};
+
+// Helper logging function for enhanced debugging
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CARDCOM-PAYMENT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -52,7 +52,6 @@ serve(async (req) => {
       invoiceInfo, 
       userId,
       registrationData,
-      operation = null,
       redirectUrls
     } = await req.json();
     
@@ -61,11 +60,10 @@ serve(async (req) => {
       amount, 
       currency,
       hasUserId: !!userId,
-      hasRegistrationData: !!registrationData,
-      operation
+      hasRegistrationData: !!registrationData
     });
 
-    if (!planId || !redirectUrls) {
+    if (!planId || !amount || !redirectUrls) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -104,25 +102,11 @@ serve(async (req) => {
       fullName
     });
 
-    // Determine operation based on plan type if not explicitly provided
-    let cardcomOperation = operation;
-    if (!cardcomOperation) {
-      if (planId === 'monthly') {
-        cardcomOperation = 'CreateTokenOnly'; // Monthly plan only validates card
-      } else if (planId === 'annual') {
-        cardcomOperation = 'ChargeAndCreateToken'; // Annual plan charges and creates token
-      } else {
-        cardcomOperation = 'ChargeOnly'; // VIP plan only charges once
-      }
-    }
-    
-    logStep("Using operation mode", { operation: cardcomOperation });
-
     // Create CardCom API request body for payment initialization
     const cardcomPayload = {
       TerminalNumber: CARDCOM_CONFIG.terminalNumber,
       ApiName: CARDCOM_CONFIG.apiName,
-      Operation: cardcomOperation,
+      Operation: planId === 'vip' ? 'ChargeOnly' : 'ChargeAndCreateToken', // For VIP we don't need a token
       ReturnValue: transactionRef,
       Amount: amount,
       WebHookUrl: webhookUrl,
@@ -154,11 +138,6 @@ serve(async (req) => {
       } : undefined
     };
     
-    // If this is a monthly plan (token only), add JValidateType for validation without charging
-    if (cardcomOperation === 'CreateTokenOnly') {
-      cardcomPayload['JValidateType'] = 2; // J2 - simple validation
-    }
-    
     logStep("Sending request to CardCom");
     
     // Initialize payment session with CardCom
@@ -179,7 +158,6 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           message: responseData.Description || "CardCom initialization failed",
-          cardcomError: responseData
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -194,46 +172,13 @@ serve(async (req) => {
       throw new Error("Invalid LowProfileId returned from CardCom");
     }
     
-    // First check for duplicate session to avoid creating multiple sessions
-    const { data: existingSession } = await supabaseAdmin
-      .from('payment_sessions')
-      .select('*')
-      .eq('low_profile_code', lowProfileId)
-      .limit(1);
-    
-    if (existingSession && existingSession.length > 0) {
-      logStep("Found existing payment session with this lowProfileCode", { 
-        sessionId: existingSession[0].id, 
-        status: existingSession[0].status 
-      });
-      
-      // Return the existing session data
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Reusing existing payment session",
-          data: {
-            sessionId: existingSession[0].id,
-            lowProfileCode: lowProfileId,
-            terminalNumber: CARDCOM_CONFIG.terminalNumber,
-            cardcomUrl: "https://secure.cardcom.solutions",
-            reference: transactionRef
-          }
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-    
     // Store payment session in database 
     const sessionData = {
       user_id: userId,
       low_profile_code: lowProfileId, // This matches the LowProfileId from CardCom response
       reference: transactionRef, // This matches the ReturnValue we sent to CardCom
       plan_id: planId,
-      amount: amount || 0,
+      amount: amount,
       currency: currency,
       status: 'initiated',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min expiry

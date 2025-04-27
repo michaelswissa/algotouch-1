@@ -84,33 +84,6 @@ serve(async (req) => {
       throw new Error("Missing required payment identification information");
     }
     
-    // First, check if we already processed this payment (idempotency)
-    if (TranzactionId) {
-      const { data: existingPayment } = await supabaseAdmin
-        .from('user_payment_logs')
-        .select('id, transaction_id')
-        .eq('transaction_id', TranzactionId.toString())
-        .limit(1);
-        
-      if (existingPayment && existingPayment.length > 0) {
-        logStep("Payment already processed", { 
-          transaction_id: TranzactionId, 
-          existing_log_id: existingPayment[0].id 
-        });
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: "Payment already processed" 
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-    }
-    
     // Find the corresponding payment session
     let paymentQuery = supabaseAdmin.from('payment_sessions').select('*');
     
@@ -205,47 +178,29 @@ serve(async (req) => {
       .eq('id', paymentSession.id);
     
     // If payment was successful and we have a token, we can update or create a subscription
-    if (paymentStatus === 'completed' && paymentSession.user_id) {
+    if (paymentStatus === 'completed' && paymentSession.user_id && paymentMethod?.token) {
       const userId = paymentSession.user_id;
       const planId = paymentSession.plan_id;
       const amount = paymentSession.amount;
       
-      logStep("Payment succeeded, processing subscription", { 
+      logStep("Payment succeeded with token, updating user subscription", { 
         userId, 
         planId, 
         hasToken: !!paymentMethod?.token 
       });
       
       // Create a new payment log entry
-      if (TranzactionId) {
-        await supabaseAdmin
-          .from('user_payment_logs')
-          .insert({
-            user_id: userId,
-            token: LowProfileId || ReturnValue,
-            transaction_id: TranzactionId.toString(),
-            amount: amount,
-            currency: paymentSession.currency || 'ILS',
-            status: 'payment_success',
-            payment_data: webhookData
-          });
-          
-        logStep("Created payment log entry", { transactionId: TranzactionId });
-      } else if (TokenInfo && TokenInfo.Token) {
-        // Log token creation even without transaction
-        await supabaseAdmin
-          .from('user_payment_logs')
-          .insert({
-            user_id: userId,
-            token: TokenInfo.Token,
-            amount: 0, // No charge for token creation
-            currency: paymentSession.currency || 'ILS',
-            status: 'token_created',
-            payment_data: webhookData
-          });
-          
-        logStep("Created token log entry", { token: TokenInfo.Token });
-      }
+      await supabaseAdmin
+        .from('payment_logs')
+        .insert({
+          user_id: userId,
+          transaction_id: TranzactionId?.toString() || '',
+          amount: amount,
+          currency: paymentSession.currency || 'ILS',
+          plan_id: planId,
+          payment_status: 'succeeded',
+          payment_data: webhookData
+        });
       
       // Check if user already has a subscription
       const { data: existingSubscriptions } = await supabaseAdmin
@@ -256,40 +211,35 @@ serve(async (req) => {
         .order('created_at', { ascending: false })
         .limit(1);
         
-      // Calculate subscription dates based on plan
+      // Calculate subscription dates
       const now = new Date();
       let trialEndsAt = null;
       let nextChargeDate = new Date();
       let currentPeriodEndsAt = new Date();
-      let status = 'active';
       
       if (planId === 'monthly') {
-        // For monthly subscriptions, add trial period
-        trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days trial
-        nextChargeDate = new Date(trialEndsAt);
-        currentPeriodEndsAt = new Date(trialEndsAt);
-        status = 'trial';
+        // For monthly subscriptions, add trial only if it's a new subscription
+        if (!existingSubscriptions || existingSubscriptions.length === 0) {
+          trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days trial
+        }
+        nextChargeDate = trialEndsAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+        currentPeriodEndsAt = trialEndsAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
       } else if (planId === 'annual') {
         // No trial for annual plans
         nextChargeDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-        currentPeriodEndsAt = new Date(nextChargeDate);
-      } else if (planId === 'vip') {
-        // VIP plans don't have next charge date
-        nextChargeDate = null;
-        currentPeriodEndsAt = null;
+        currentPeriodEndsAt = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
       }
       
       // Prepare subscription data
       const subscriptionData = {
         user_id: userId,
         plan_type: planId,
-        status: status,
-        next_charge_date: nextChargeDate ? nextChargeDate.toISOString() : null,
-        current_period_ends_at: currentPeriodEndsAt ? currentPeriodEndsAt.toISOString() : null,
+        status: trialEndsAt ? 'trial' : 'active',
+        next_charge_date: nextChargeDate.toISOString(),
+        current_period_ends_at: currentPeriodEndsAt.toISOString(),
         trial_ends_at: trialEndsAt ? trialEndsAt.toISOString() : null,
         payment_method: paymentMethod,
-        updated_at: now.toISOString(),
-        contract_signed: true // Assume contract was signed as part of the flow
+        updated_at: now.toISOString()
       };
       
       // Insert or update the subscription
@@ -319,52 +269,46 @@ serve(async (req) => {
         }
       }
       
-      // Also store the payment token for recurring payments if we have one
-      if (paymentMethod && paymentMethod.token) {
-        try {
-          // Check if we already have this token stored
-          const { data: existingToken } = await supabaseAdmin
-            .from('recurring_payments')
-            .select('id')
-            .eq('token', paymentMethod.token)
-            .eq('user_id', userId)
-            .limit(1);
-            
-          if (!existingToken || existingToken.length === 0) {
-            // Format token expiry date correctly from MM/YY to a proper date
-            let tokenExpiry = null;
-            if (paymentMethod.expiryMonth && paymentMethod.expiryYear) {
-              const month = parseInt(paymentMethod.expiryMonth);
-              const year = 2000 + parseInt(paymentMethod.expiryYear); // Assuming 2-digit year
-              tokenExpiry = new Date(year, month - 1, 1); // First day of the expiry month
-              
-              // Move to last day of month to ensure token works throughout the month
-              tokenExpiry.setMonth(tokenExpiry.getMonth() + 1);
-              tokenExpiry.setDate(0);
-            }
-            
-            // Store the token
-            await supabaseAdmin
-              .from('recurring_payments')
-              .insert({
-                user_id: userId,
-                token: paymentMethod.token,
-                token_expiry: tokenExpiry ? tokenExpiry.toISOString().split('T')[0] : null,
-                token_approval_number: paymentMethod.tokenApprovalNumber,
-                last_4_digits: paymentMethod.lastFourDigits,
-                card_type: paymentMethod.cardType || 'Unknown',
-                is_valid: true,
-                status: 'active'
-              });
-              
-            logStep("Stored recurring payment token");
-          } else {
-            logStep("Token already exists in system");
+      // Also store the payment token for recurring payments
+      try {
+        // Check if we already have this token stored
+        const { data: existingToken } = await supabaseAdmin
+          .from('recurring_payments')
+          .select('id')
+          .eq('token', paymentMethod.token)
+          .eq('user_id', userId)
+          .limit(1);
+          
+        if (!existingToken || existingToken.length === 0) {
+          // Format token expiry date correctly from MM/YY to a proper date
+          let tokenExpiry = null;
+          if (paymentMethod.expiryMonth && paymentMethod.expiryYear) {
+            const month = parseInt(paymentMethod.expiryMonth);
+            const year = 2000 + parseInt(paymentMethod.expiryYear); // Assuming 2-digit year
+            tokenExpiry = new Date(year, month - 1, 1); // First day of the expiry month
           }
-        } catch (tokenError) {
-          logStep("ERROR storing recurring token", { error: tokenError.message });
-          // Continue despite error - this is not critical to the payment flow
+          
+          // Store the token
+          await supabaseAdmin
+            .from('recurring_payments')
+            .insert({
+              user_id: userId,
+              token: paymentMethod.token,
+              token_expiry: tokenExpiry ? tokenExpiry.toISOString().split('T')[0] : null,
+              token_approval_number: paymentMethod.tokenApprovalNumber,
+              last_4_digits: paymentMethod.lastFourDigits,
+              card_type: paymentMethod.cardType || 'Unknown',
+              is_valid: true,
+              status: 'active'
+            });
+            
+          logStep("Stored recurring payment token");
+        } else {
+          logStep("Token already exists in system");
         }
+      } catch (tokenError) {
+        logStep("ERROR storing recurring token", { error: tokenError.message });
+        // Continue despite error - this is not critical to the payment flow
       }
     }
 

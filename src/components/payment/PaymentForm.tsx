@@ -1,33 +1,23 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { CreditCard, Loader2 } from 'lucide-react';
 import PaymentContent from './PaymentContent';
 import { usePayment } from '@/hooks/usePayment';
-import { PaymentStatus, PaymentStatusType } from './types/payment';
+import { PaymentStatus } from './types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
+import { toast } from 'sonner';
 import InitializingPayment from './states/InitializingPayment';
-import { usePaymentFlow } from '@/hooks/usePaymentFlow';
-import { PlanType } from '@/types/payment';
-import { useCardcomInitializer } from '@/hooks/useCardcomInitializer';
-import { usePaymentStatus } from '@/hooks/payment/usePaymentStatus';
-import { usePaymentInit } from '@/hooks/payment/usePaymentInit';
-import { usePaymentSubmission } from '@/hooks/payment/usePaymentSubmission';
-import PaymentHeader from './PaymentHeader';
 
 interface PaymentFormProps {
   planId: string;
-  onPaymentComplete: (transactionId?: string) => void;
+  onPaymentComplete: () => void;
   onBack?: () => void;
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, onBack }) => {
-  const { isInitializing, initializePayment } = usePaymentFlow();
-  const { initializeCardcomFields } = useCardcomInitializer();
-  const { setState } = usePaymentStatus({ onPaymentComplete });
-  const masterFrameRef = useRef<HTMLIFrameElement>(null);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -35,58 +25,23 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Determine the operation type based on plan
-  const getOperationType = (planType: string): 'payment' | 'token_only' => {
-    if (planType === 'monthly') {
-      return 'token_only'; // Monthly plan only creates token
-    }
-    return 'payment'; // Annual and VIP charge immediately
-  };
-
-  const operationType = getOperationType(planId);
-
   const {
     terminalNumber,
     cardcomUrl,
     paymentStatus,
+    masterFrameRef,
+    operationType,
+    initializePayment,
     handleRetry,
     submitPayment,
     lowProfileCode,
-    sessionId,
-    transactionId
+    sessionId
   } = usePayment({
     planId,
-    onPaymentComplete: (id?: string) => onPaymentComplete(id)
+    onPaymentComplete
   });
 
-  // Initialize payment
-  const { initialized } = usePaymentInit({
-    planId: planId as PlanType,
-    initializePayment,
-    initializeCardcomFields,
-    masterFrameRef,
-    operationType,
-    setState
-  });
-
-  // Handle payment submission
-  const { isSubmitting, hasSubmitted, handleSubmitPayment } = usePaymentSubmission({
-    submitPayment,
-    setState,
-    lowProfileCode,
-    planId
-  });
-
-  // When payment is successful, call onPaymentComplete with transactionId
-  useEffect(() => {
-    if (paymentStatus === PaymentStatus.SUCCESS && transactionId) {
-      onPaymentComplete(transactionId);
-      
-      // Clear payment session from localStorage on success
-      localStorage.removeItem('payment_session');
-    }
-  }, [paymentStatus, transactionId, onPaymentComplete]);
-
+  const [isInitializing, setIsInitializing] = useState(true);
   const [isMasterFrameLoaded, setIsMasterFrameLoaded] = useState(false);
 
   // Monitor when master frame is loaded
@@ -103,23 +58,65 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => masterFrame.removeEventListener('load', handleMasterLoad);
   }, [masterFrameRef]);
 
+  useEffect(() => {
+    console.log("Initializing payment for plan:", planId);
+    const initProcess = async () => {
+      setIsInitializing(true);
+      await initializePayment();
+      setIsInitializing(false);
+    };
+    
+    initProcess();
+  }, []); // Run only once on mount
+  
   const getButtonText = () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
     }
+    
     return operationType === 'token_only' ? 'אשר והפעל מנוי' : 'אשר תשלום';
   };
 
-  // Get description text based on plan type
-  const getDescriptionText = () => {
-    if (planId === 'monthly') {
-      return 'החיוב הראשון יבוצע בתום תקופת הניסיון של 30 יום';
-    } else if (planId === 'annual') {
-      return 'חיוב שנתי חד פעמי, החיוב הבא יתבצע בעוד שנה';
-    } else { // VIP
-      return 'חיוב חד פעמי, ללא חיובים נוספים בעתיד';
+  const handleSubmitPayment = () => {
+    const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value;
+    const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value;
+    
+    if (!cardholderName) {
+      toast.error('יש למלא את שם בעל הכרטיס');
+      return;
+    }
+
+    if (!cardOwnerId || !/^\d{9}$/.test(cardOwnerId)) {
+      toast.error('יש למלא תעודת זהות תקינה');
+      return;
+    }
+
+    const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value;
+    if (!email) {
+      toast.error('יש למלא כתובת דואר אלקטרוני');
+      return;
+    }
+
+    const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value;
+    if (!phone) {
+      toast.error('יש למלא מספר טלפון');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      submitPayment();
+      
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      toast.error('אירעה שגיאה בשליחת התשלום');
+      setIsSubmitting(false);
     }
   };
 
@@ -134,10 +131,22 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
-      <PaymentHeader planId={planId as PlanType} />
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-primary" />
+          <CardTitle>פרטי תשלום</CardTitle>
+        </div>
+        <CardDescription>
+          {paymentStatus === PaymentStatus.SUCCESS 
+            ? 'התשלום בוצע בהצלחה!'
+            : operationType === 'token_only'
+              ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
+              : 'הזן את פרטי כרטיס האשראי שלך לתשלום'}
+        </CardDescription>
+      </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Master iframe */}
+        {/* Master iframe is always loaded but hidden */}
         <iframe
           ref={masterFrameRef}
           id="CardComMasterFrame"
@@ -171,12 +180,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               type="button" 
               className="w-full" 
               onClick={handleSubmitPayment}
-              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !isContentReady || hasSubmitted}
+              disabled={isSubmitting || paymentStatus === PaymentStatus.PROCESSING || !isContentReady}
             >
               {getButtonText()}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              {getDescriptionText()}
+              {operationType === 'token_only' 
+                ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
+                : plan.hasTrial 
+                  ? 'לא יבוצע חיוב במהלך תקופת הניסיון' 
+                  : 'החיוב יבוצע מיידית'}
             </p>
           </>
         )}
