@@ -5,13 +5,16 @@ export const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-export const logStep = async (
+/**
+ * Log a step in the function execution with optional details
+ */
+export async function logStep(
   functionName: string,
   step: string, 
   details?: any, 
   level: 'info' | 'warn' | 'error' = 'info',
   supabaseAdmin?: any
-) => {
+) {
   const timestamp = new Date().toISOString();
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
@@ -33,17 +36,26 @@ export const logStep = async (
       console.error('Failed to log to database:', e);
     }
   }
-};
+}
 
-export const validateLowProfileId = (lowProfileId: string): boolean => {
+/**
+ * Validate if a string is a valid UUID for LowProfileId
+ */
+export function validateLowProfileId(lowProfileId: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lowProfileId);
-};
+}
 
-export const validateAmount = (amount: number): boolean => {
+/**
+ * Validate if amount is a valid positive number
+ */
+export function validateAmount(amount: number): boolean {
   return !isNaN(amount) && amount > 0;
-};
+}
 
-export const validateTransaction = async (supabaseAdmin: any, transactionRef: string) => {
+/**
+ * Check for duplicate transaction references
+ */
+export async function validateTransaction(supabaseAdmin: any, transactionRef: string) {
   const { data: existingTransaction } = await supabaseAdmin
     .from('payment_sessions')
     .select('id, status')
@@ -51,4 +63,4 @@ export const validateTransaction = async (supabaseAdmin: any, transactionRef: st
     .limit(1);
 
   return existingTransaction?.[0] || null;
-};
+}

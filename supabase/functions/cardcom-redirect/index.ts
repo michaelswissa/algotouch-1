@@ -1,10 +1,54 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders, logStep, validateAmount, validateTransaction } from "../cardcom-utils/index.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+async function logStep(
+  functionName: string,
+  step: string, 
+  details?: any, 
+  level: 'info' | 'warn' | 'error' = 'info',
+  supabaseAdmin?: any
+) {
+  const timestamp = new Date().toISOString();
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
+  
+  console.log(`${prefix} ${step}${detailsStr}`);
+  
+  if (level === 'error' && supabaseAdmin) {
+    try {
+      await supabaseAdmin.from('system_logs').insert({
+        function_name: `cardcom-${functionName}`,
+        level,
+        message: step,
+        details: details || {},
+        created_at: timestamp
+      });
+    } catch (e) {
+      console.error('Failed to log to database:', e);
+    }
+  }
+}
+
+function validateAmount(amount: number): boolean {
+  return !isNaN(amount) && amount > 0;
+}
+
+async function validateTransaction(supabaseAdmin: any, transactionRef: string) {
+  const { data: existingTransaction } = await supabaseAdmin
+    .from('payment_sessions')
+    .select('id, status')
+    .eq('reference', transactionRef)
+    .limit(1);
+
+  return existingTransaction?.[0] || null;
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -13,7 +57,6 @@ serve(async (req) => {
     const functionName = 'redirect';
     await logStep(functionName, "Function started");
     
-    // Create Supabase clients
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -33,16 +76,14 @@ serve(async (req) => {
       redirectUrls, 
       userId, 
       registrationData,
-      isIframePrefill = false // New flag to determine if this is an iframe prefill request
+      isIframePrefill = false
     } = await req.json();
 
-    // Validate inputs
     if (!validateAmount(amount)) {
       await logStep(functionName, "Invalid amount", { amount }, 'error', supabaseAdmin);
       throw new Error("Invalid amount");
     }
 
-    // Check for duplicate transaction
     const transactionRef = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const existingTransaction = await validateTransaction(supabaseAdmin, transactionRef);
     
@@ -70,7 +111,6 @@ serve(async (req) => {
       );
     }
 
-    // Store payment session
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .insert({
@@ -96,7 +136,6 @@ serve(async (req) => {
     const sessionId = sessionData.id;
     await logStep(functionName, "Payment session created", { sessionId });
 
-    // Get CardCom API configuration
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
     const apiName = Deno.env.get("CARDCOM_API_NAME");
     
@@ -105,9 +144,7 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
-    // Build response based on request type
     if (isIframePrefill) {
-      // Return data for iframe prefill without redirect
       return new Response(
         JSON.stringify({
           success: true,
@@ -126,7 +163,6 @@ serve(async (req) => {
       );
     }
 
-    // Construct the redirect URL for standard payment flow
     const cardcomUrl = "https://secure.cardcom.solutions";
     const fullRedirectUrl =
       `${cardcomUrl}/BillGoldLowProfile.aspx?terminalnumber=${terminalNumber}` +
