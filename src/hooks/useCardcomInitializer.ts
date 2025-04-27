@@ -1,4 +1,6 @@
-import { InitConfig } from '@/components/payment/types/payment';
+
+import React from 'react';
+import { PaymentSessionData } from '@/components/payment/types/payment';
 
 export const useCardcomInitializer = () => {
   const initializeCardcomFields = async (
