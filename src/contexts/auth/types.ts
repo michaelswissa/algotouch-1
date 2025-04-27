@@ -9,7 +9,12 @@ export interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   initialized: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{
+    success: boolean;
+    session: Session | null;
+    user: User | null;
+    error?: string;
+  }>;
   signUp: (userData: {
     email: string;
     password: string;
