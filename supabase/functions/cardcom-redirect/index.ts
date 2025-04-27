@@ -159,7 +159,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await logStep('redirect', "ERROR", { message: errorMessage }, 'error', supabaseAdmin);
+    console.error(`[CARDCOM-REDIRECT][ERROR] ${errorMessage}`);
     
     return new Response(
       JSON.stringify({

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, logStep, validateLowProfileId } from "../cardcom-utils/index.ts";
@@ -34,7 +35,7 @@ serve(async (req) => {
       throw new Error("Invalid lowProfileId format");
     }
 
-    logStep("Received request data", {
+    logStep(functionName, "Received request data", {
       lowProfileCode,
       terminalNumber,
       operation,
@@ -85,7 +86,7 @@ serve(async (req) => {
       .single();
       
     if (sessionError || !paymentSession) {
-      logStep("Payment session not found", { error: sessionError?.message });
+      logStep(functionName, "Payment session not found", { error: sessionError?.message });
       return new Response(
         JSON.stringify({
           success: false,
@@ -97,7 +98,7 @@ serve(async (req) => {
       );
     }
 
-    logStep("Found payment session", { sessionId: paymentSession.id });
+    logStep(functionName, "Found payment session", { sessionId: paymentSession.id });
     
     // In a real implementation, you would make an API call to CardCom to process the payment
     // This is a placeholder for the actual API call
@@ -117,7 +118,7 @@ serve(async (req) => {
       })
       .eq('id', paymentSession.id);
     
-    logStep("Updated payment session status to submitted");
+    logStep(functionName, "Updated payment session status to submitted");
     
     // Return success response
     return new Response(
@@ -136,7 +137,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await logStep('submit', "ERROR", { message: errorMessage }, 'error', supabaseAdmin);
+    console.error(`[CARDCOM-SUBMIT][ERROR] ${errorMessage}`);
     
     return new Response(
       JSON.stringify({
