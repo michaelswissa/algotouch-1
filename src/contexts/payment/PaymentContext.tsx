@@ -6,6 +6,7 @@ import { usePaymentSession } from '@/hooks/payment/usePaymentSession';
 import { CardComService } from '@/services/payment/CardComService';
 import { usePaymentStatusCheck } from '@/hooks/payment/usePaymentStatusCheck';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { StorageService } from '@/services/storage/StorageService';
 
 interface PaymentState {
   paymentStatus: PaymentStatusType;
@@ -97,29 +98,19 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       let fullName = '';
 
       // Try to get data from contract or registration
-      const contractData = sessionStorage.getItem('contract_data');
-      const registrationData = sessionStorage.getItem('registration_data');
+      const contractData = StorageService.getContractData();
+      const registrationData = StorageService.getRegistrationData();
       
       if (contractData) {
-        try {
-          const parsed = JSON.parse(contractData);
-          email = parsed.email || '';
-          fullName = parsed.fullName || '';
-        } catch (e) {
-          console.error('Error parsing contract data', e);
-        }
+        email = contractData.email || '';
+        fullName = contractData.fullName || '';
       } else if (registrationData) {
-        try {
-          const parsed = JSON.parse(registrationData);
-          email = parsed.email || '';
-          if (parsed.userData) {
-            const { firstName, lastName } = parsed.userData;
-            if (firstName && lastName) {
-              fullName = `${firstName} ${lastName}`;
-            }
+        email = registrationData.email || '';
+        if (registrationData.userData) {
+          const { firstName, lastName } = registrationData.userData;
+          if (firstName && lastName) {
+            fullName = `${firstName} ${lastName}`;
           }
-        } catch (e) {
-          console.error('Error parsing registration data', e);
         }
       }
 
@@ -128,7 +119,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
       
       // Get user ID if available (might not be if user is not logged in yet)
-      const userId = sessionStorage.getItem('userId') || null;
+      const userId = StorageService.getUserId();
 
       // Real payment initialization via CardCom
       const paymentSession = await initializePaymentSession(
@@ -137,6 +128,14 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         { email, fullName },
         operationType
       );
+      
+      // Save session data for potential recovery
+      StorageService.setPaymentSessionData({
+        lowProfileCode: paymentSession.lowProfileCode,
+        sessionId: paymentSession.sessionId,
+        planId,
+        operationType
+      });
       
       // Update state with real session data
       setState(prev => ({
@@ -192,6 +191,20 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         operationType: state.operationType
       });
 
+      // Use real CardCom service for submission
+      const result = await CardComService.submitPayment({
+        lowProfileCode: state.lowProfileCode,
+        terminalNumber: state.terminalNumber,
+        cardholderData: {
+          name: cardOwnerDetails.cardOwnerName,
+          email: cardOwnerDetails.cardOwnerEmail,
+          phone: cardOwnerDetails.cardOwnerPhone,
+          id: cardOwnerDetails.cardOwnerId
+        },
+        operationType: state.operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly',
+        planId: state.planId || undefined
+      });
+      
       // Start status check for payment completion
       startStatusCheck(
         state.lowProfileCode,
@@ -199,18 +212,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         state.operationType,
         state.planId || ''
       );
-      
-      // In real implementation, CardCom handles the submission through the iframe
-      // We just need to check the status after submission
-      
-      // Check payment status after a short delay to allow CardCom to process
-      setTimeout(async () => {
-        try {
-          await checkPaymentStatus(state.lowProfileCode);
-        } catch (e) {
-          PaymentLogger.error('Error during payment status check', e);
-        }
-      }, 3000);
       
       return true;
     } catch (error) {
@@ -228,6 +229,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const resetPaymentState = () => {
     // Clean up any status check in progress
     cleanupStatusCheck();
+    StorageService.clearPaymentData();
     setState(initialState);
   };
 

@@ -12,6 +12,9 @@ import PlanSummary from './PlanSummary';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';
 import InitializingPayment from './states/InitializingPayment';
+import { useCallback } from 'react';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { CardComService } from '@/services/payment/CardComService';
 
 interface PaymentFormProps {
   planId: string;
@@ -29,7 +32,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     terminalNumber,
     cardcomUrl,
     submitPayment,
-    lowProfileCode
+    lowProfileCode,
+    error
   } = usePaymentContext();
   
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
@@ -43,14 +47,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   // Initialize payment on mount only
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId);
+    PaymentLogger.log("Initializing payment for plan:", planId);
     initializePayment(planId);
     
     // Cleanup on unmount only
     return () => {
       resetPaymentState();
     };
-  }, [planId]); // Only depend on planId
+  }, [planId, initializePayment, resetPaymentState]);
 
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {
@@ -58,6 +62,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       onPaymentComplete();
     }
   }, [paymentStatus, onPaymentComplete]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   const getButtonText = () => {
     if (paymentStatus === PaymentStatus.PROCESSING) {
@@ -70,13 +80,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   };
 
   const handleSubmitClick = () => {
+    const cardOwnerName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
+    const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
+    const cardOwnerEmail = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
+    const cardOwnerPhone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
+    const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
+    const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
+    
     submitPayment({
-      cardOwnerName: '', // These values will be taken from the usePaymentForm hook inside PaymentDetails
-      cardOwnerId: '',
-      cardOwnerEmail: '',
-      cardOwnerPhone: '',
-      expirationMonth: '',
-      expirationYear: '',
+      cardOwnerName,
+      cardOwnerId,
+      cardOwnerEmail,
+      cardOwnerPhone,
+      expirationMonth,
+      expirationYear,
     });
   };
 

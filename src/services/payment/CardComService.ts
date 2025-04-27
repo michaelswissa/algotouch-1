@@ -1,5 +1,6 @@
 
 import { PaymentLogger } from './PaymentLogger';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface CardComPaymentOptions {
   lowProfileCode: string;
@@ -16,48 +17,50 @@ export interface CardComPaymentOptions {
 
 export class CardComService {
   private static readonly CARDCOM_API_BASE = 'https://secure.cardcom.solutions/api';
-  private static readonly SUBMIT_FUNCTION_URL = '/submit-payment';
   
   /**
    * Initialize a payment session with CardCom
    */
   static async initializePayment(options: {
-    terminalNumber: string;
-    apiName: string;
+    planId: string;
     amount: number;
-    currency?: string;
-    successUrl: string;
-    failureUrl: string;
+    userEmail: string;
+    fullName: string;
+    userId?: string | null;
     operationType?: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
-    language?: string;
-    planId?: string;
-    returnValue?: string;
   }): Promise<any> {
     try {
       PaymentLogger.log('Initializing CardCom payment', options);
       
       // Call the edge function for initializing the payment
-      const response = await fetch('/functions/v1/cardcom-redirect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(options),
+      const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
+        body: {
+          planId: options.planId,
+          amount: options.amount,
+          userId: options.userId,
+          invoiceInfo: {
+            fullName: options.fullName,
+            email: options.userEmail,
+          },
+          redirectUrls: {
+            success: `${window.location.origin}/subscription/success`,
+            failed: `${window.location.origin}/subscription/failed`
+          },
+          operation: options.operationType || (options.planId === 'monthly' ? 'ChargeAndCreateToken' : 'ChargeOnly')
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Payment initialization failed: ${response.statusText}`);
+      if (error) {
+        throw new Error(`Payment initialization failed: ${error.message}`);
       }
       
-      const result = await response.json();
+      PaymentLogger.log('Payment initialization response', data);
       
-      PaymentLogger.log('Payment initialization response', result);
-      
-      if (result.success === false) {
-        throw new Error(result.error || 'Payment initialization failed');
+      if (!data?.success) {
+        throw new Error(data?.message || 'Payment initialization failed');
       }
       
-      return result;
+      return data.data;
     } catch (error) {
       PaymentLogger.error('Error initializing payment with CardCom:', error);
       throw error;
@@ -75,35 +78,27 @@ export class CardComService {
       });
       
       // Call the edge function for submitting the payment
-      const response = await fetch('/functions/v1/cardcom-submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('cardcom-submit', {
+        body: {
           terminalNumber: options.terminalNumber,
-          apiName: 'bLaocQRMSnwphQRUVG3b', // This should ideally be in environment variables
-          cardcomUrl: 'https://secure.cardcom.solutions',
           lowProfileCode: options.lowProfileCode,
           cardholderData: options.cardholderData,
           operationType: options.operationType || 'ChargeOnly',
           planId: options.planId
-        }),
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Payment submission failed: ${response.statusText}`);
+      if (error) {
+        throw new Error(`Payment submission failed: ${error.message}`);
       }
       
-      const result = await response.json();
+      PaymentLogger.log('Payment submission response', data);
       
-      PaymentLogger.log('Payment submission response', result);
-      
-      if (result.success === false) {
-        throw new Error(result.error || 'Payment submission failed');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Payment submission failed');
       }
       
-      return result;
+      return data;
     } catch (error) {
       PaymentLogger.error('Error submitting payment to CardCom:', error);
       throw error;
@@ -117,29 +112,19 @@ export class CardComService {
     try {
       PaymentLogger.log('Checking payment status', { lowProfileCode });
       
-      const response = await fetch('/functions/v1/cardcom-status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('cardcom-status', {
+        body: {
           lowProfileCode
-        }),
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Status check failed: ${response.statusText}`);
+      if (error) {
+        throw new Error(`Status check failed: ${error.message}`);
       }
       
-      const result = await response.json();
+      PaymentLogger.log('Payment status response', data);
       
-      PaymentLogger.log('Payment status response', result);
-      
-      if (result.success === false) {
-        throw new Error(result.error || 'Status check failed');
-      }
-      
-      return result;
+      return data;
     } catch (error) {
       PaymentLogger.error('Error checking payment status:', error);
       throw error;

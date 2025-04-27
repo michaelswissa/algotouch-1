@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { PaymentSessionData } from '@/components/payment/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UsePaymentSessionProps {
   setState: React.Dispatch<React.SetStateAction<any>>;
@@ -20,26 +21,55 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       setIsInitializing(true);
       PaymentLogger.log('Initializing payment session', { planId, operationType });
       
-      // In a real implementation, this would call an edge function to initialize a session with CardCom
-      // For now, we'll use mock data
-      const sessionId = `session-${Date.now()}`;
-      const lowProfileCode = `profile-${Date.now()}`;
-      const reference = `ref-${Date.now()}`;
+      // Calculate amount based on plan
+      let amount = 0;
+      switch (planId) {
+        case 'monthly':
+          amount = 371;
+          break;
+        case 'annual':
+          amount = 3371;
+          break;
+        case 'vip':
+          amount = 13121;
+          break;
+        default:
+          throw new Error(`Unsupported plan: ${planId}`);
+      }
+
+      // Determine operation type based on plan
+      const operation = operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly';
       
-      // Simulate a delay like a real API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Call the real cardcom-redirect edge function
+      const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
+        body: {
+          planId,
+          amount,
+          userId,
+          invoiceInfo: {
+            fullName: userDetails.fullName,
+            email: userDetails.email,
+          },
+          redirectUrls: {
+            success: `${window.location.origin}/subscription/success`,
+            failed: `${window.location.origin}/subscription/failed`
+          }
+        }
+      });
       
-      const sessionData: PaymentSessionData = {
-        lowProfileCode,
-        sessionId,
-        terminalNumber: '160138', // This should come from config
-        reference,
-        cardcomUrl: 'https://secure.cardcom.solutions'
-      };
+      if (error) {
+        console.error('CardCom payment initialization error:', error);
+        throw new Error(error.message || 'שגיאה באתחול תהליך התשלום');
+      }
       
-      PaymentLogger.log('Payment session initialized successfully', sessionData);
+      if (!data?.success) {
+        console.error('CardCom payment initialization failed:', data?.message);
+        throw new Error(data?.message || 'שגיאה באתחול תהליך התשלום');
+      }
       
-      return sessionData;
+      PaymentLogger.log('Payment session initialized successfully', data.data);
+      
+      return data.data;
     } catch (error) {
       PaymentLogger.error('Error initializing payment session:', error);
       throw error;

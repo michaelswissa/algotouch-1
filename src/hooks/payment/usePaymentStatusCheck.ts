@@ -1,8 +1,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
-import { CardComService } from '@/services/payment/CardComService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UsePaymentStatusCheckProps {
   setState: React.Dispatch<React.SetStateAction<any>>;
@@ -32,12 +32,24 @@ export const usePaymentStatusCheck = ({ setState, onSuccess }: UsePaymentStatusC
     try {
       PaymentLogger.log('Checking payment status', { lowProfileCode, checkCount });
       
-      // Currently simulate a successful payment
-      // In a real implementation, this would call CardCom's API
-      const result = await CardComService.checkPaymentStatus(lowProfileCode);
+      // Real API call to cardcom-status edge function
+      const { data, error } = await supabase.functions.invoke('cardcom-status', {
+        body: { lowProfileCode }
+      });
+
+      if (error) {
+        PaymentLogger.error('Error checking payment status:', error);
+        throw new Error(error.message || 'שגיאה בבדיקת סטטוס התשלום');
+      }
       
-      if (result.success || result.status === 'completed') {
-        PaymentLogger.success('Payment completed successfully', result);
+      PaymentLogger.log('Payment status response:', data);
+      
+      if (!data) {
+        return false;
+      }
+      
+      if (data.success && data.data?.isComplete) {
+        PaymentLogger.success('Payment completed successfully', data);
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
         
         if (onSuccess) {
@@ -47,12 +59,12 @@ export const usePaymentStatusCheck = ({ setState, onSuccess }: UsePaymentStatusC
         return true;
       }
       
-      if (result.status === 'failed') {
-        PaymentLogger.error('Payment failed', result);
+      if (!data.success || data.data?.status === 'failed') {
+        PaymentLogger.error('Payment failed', data);
         setState(prev => ({ 
           ...prev, 
           paymentStatus: PaymentStatus.FAILED,
-          error: result.error || 'Payment processing failed'
+          error: data.data?.details || data.error || 'שגיאה בתהליך התשלום'
         }));
         return false;
       }
