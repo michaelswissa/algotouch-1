@@ -1,7 +1,52 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders, logStep, validateLowProfileId } from "../cardcom-utils/index.ts";
+
+// Include utility functions directly in this file to avoid import issues
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+/**
+ * Log a step in the function execution with optional details
+ */
+async function logStep(
+  functionName: string,
+  step: string, 
+  details?: any, 
+  level: 'info' | 'warn' | 'error' = 'info',
+  supabaseAdmin?: any
+) {
+  const timestamp = new Date().toISOString();
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
+  
+  console.log(`${prefix} ${step}${detailsStr}`);
+  
+  // Store critical logs in database
+  if (level === 'error' && supabaseAdmin) {
+    try {
+      await supabaseAdmin.from('system_logs').insert({
+        function_name: `cardcom-${functionName}`,
+        level,
+        message: step,
+        details: details || {},
+        created_at: timestamp
+      });
+    } catch (e) {
+      // Don't let logging errors affect main flow
+      console.error('Failed to log to database:', e);
+    }
+  }
+}
+
+/**
+ * Validate if a string is a valid UUID for LowProfileId
+ */
+function validateLowProfileId(lowProfileId: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lowProfileId);
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
