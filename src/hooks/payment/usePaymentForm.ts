@@ -11,6 +11,8 @@ interface PaymentFormData {
   cardOwnerPhone: string;
   cardMonth: string;
   cardYear: string;
+  expirationMonth: string; // Add this missing property
+  expirationYear: string;  // Add this missing property
 }
 
 interface PaymentFormErrors {
@@ -22,6 +24,8 @@ interface PaymentFormErrors {
   cardYear?: string;
   cardNumber?: string;
   cvv?: string;
+  expirationMonth?: string; // Add this missing property
+  expirationYear?: string;  // Add this missing property
 }
 
 export const usePaymentForm = () => {
@@ -31,7 +35,9 @@ export const usePaymentForm = () => {
     cardOwnerEmail: '',
     cardOwnerPhone: '',
     cardMonth: '',
-    cardYear: ''
+    cardYear: '',
+    expirationMonth: '', // Initialize the new property
+    expirationYear: ''   // Initialize the new property
   });
   
   const [errors, setErrors] = useState<PaymentFormErrors>({});
@@ -107,12 +113,16 @@ export const usePaymentForm = () => {
     const currentYear = currentDate.getFullYear() % 100;
     const currentMonth = currentDate.getMonth() + 1;
     
-    if (formData.cardYear && formData.cardMonth) {
-      const year = parseInt(formData.cardYear);
-      const month = parseInt(formData.cardMonth);
+    // Check both expirationMonth/Year and cardMonth/Year to maintain compatibility
+    const month = formData.expirationMonth || formData.cardMonth;
+    const year = formData.expirationYear || formData.cardYear;
+    
+    if (month && year) {
+      const monthNum = parseInt(month);
+      const yearNum = parseInt(year);
       
-      if (year < currentYear || (year === currentYear && month < currentMonth)) {
-        newErrors.cardMonth = 'כרטיס פג תוקף';
+      if (yearNum < currentYear || (yearNum === currentYear && monthNum < currentMonth)) {
+        newErrors.expirationMonth = 'כרטיס פג תוקף';
         isValid = false;
       }
     }
@@ -124,6 +134,13 @@ export const usePaymentForm = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // If the name is expirationMonth or expirationYear, also update the corresponding cardMonth/Year fields
+    if (name === 'expirationMonth') {
+      setFormData(prev => ({ ...prev, cardMonth: value }));
+    } else if (name === 'expirationYear') {
+      setFormData(prev => ({ ...prev, cardYear: value }));
+    }
     
     // Clear error for this field
     if (errors[name as keyof PaymentFormErrors]) {
@@ -142,8 +159,8 @@ export const usePaymentForm = () => {
       cardOwnerId: formData.cardOwnerId,
       cardOwnerEmail: formData.cardOwnerEmail,
       cardOwnerPhone: formData.cardOwnerPhone,
-      expirationMonth: formData.cardMonth,
-      expirationYear: formData.cardYear,
+      expirationMonth: formData.expirationMonth || formData.cardMonth,
+      expirationYear: formData.expirationYear || formData.cardYear,
     });
   };
   
