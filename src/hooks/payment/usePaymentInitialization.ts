@@ -1,10 +1,11 @@
 
 import { PaymentStatus } from '@/components/payment/types/payment';
-import { useRegistrationHandler } from './useRegistrationHandler';
-import { useCardcomInitializer } from '../useCardcomInitializer';
+import { RegistrationService } from '@/services/registration/RegistrationService';
+import { CardComService } from '@/services/payment/CardComService';
 import { useContractValidation } from './useContractValidation';
-import { usePaymentSession } from './usePaymentSession';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
+import { User } from '@supabase/supabase-js';
 
 interface UsePaymentInitializationProps {
   planId: string;
@@ -19,13 +20,11 @@ export const usePaymentInitialization = ({
   masterFrameRef,
   operationType = 'payment'
 }: UsePaymentInitializationProps) => {
-  const { handleRegistrationData } = useRegistrationHandler();
-  const { initializeCardcomFields } = useCardcomInitializer();
   const { validateContract } = useContractValidation();
-  const { initializePaymentSession } = usePaymentSession({ setState });
 
   const initializePayment = async () => {
-    console.log('Starting payment initialization process');
+    PaymentLogger.log('Starting payment initialization process', { planId, operationType });
+    
     setState(prev => ({ 
       ...prev, 
       paymentStatus: PaymentStatus.INITIALIZING 
@@ -33,77 +32,88 @@ export const usePaymentInitialization = ({
     
     try {
       // Step 1: Get and validate registration data
-      const { userId, userEmail, fullName } = await handleRegistrationData();
-      console.log('Registration data loaded:', { userId, userEmail });
+      const registrationData = RegistrationService.getValidRegistrationData();
       
-      if (!userEmail) {
-        console.error("No user email found for payment");
-        throw new Error('חסרים פרטי משתמש לביצוע התשלום');
+      if (!registrationData) {
+        throw new Error('מידע הרשמה חסר או לא תקין');
       }
-
-      // Step 2: Validate contract
+      
+      PaymentLogger.log('Registration data loaded', { 
+        email: registrationData.email,
+        hasUserData: !!registrationData.userData
+      });
+      
+      // Step 2: Create user if not already created
+      let user: User | null = null;
+      
+      if (!registrationData.userCreated) {
+        PaymentLogger.log('User not created yet, creating user account');
+        const { success, user: createdUser, error } = await RegistrationService.createUserAccount(registrationData);
+        
+        if (!success || !createdUser) {
+          throw new Error(error || 'שגיאה ביצירת חשבון המשתמש');
+        }
+        
+        user = createdUser;
+        PaymentLogger.log('User created successfully for payment', { userId: user.id });
+      } else {
+        // Get current user
+        user = await RegistrationService.getCurrentUser();
+        if (!user && registrationData.email && registrationData.password) {
+          PaymentLogger.log('User already created but not authenticated, attempting to sign in');
+          const { success, user: signedInUser, error } = 
+            await RegistrationService.createUserAccount(registrationData);
+          
+          if (success && signedInUser) {
+            user = signedInUser;
+          } else {
+            PaymentLogger.error('Failed to get authenticated user', { error });
+          }
+        }
+      }
+      
+      // Step 3: Validate contract
       const contractDetails = validateContract();
-      console.log('Contract validation:', Boolean(contractDetails));
       if (!contractDetails) {
-        console.error("Contract validation failed");
         throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
       }
-
-      // Step 3: Initialize payment session to get lowProfileCode
-      console.log('Initializing payment session with plan:', planId);
-      const paymentData = await initializePaymentSession(
+      
+      // Step 4: Initialize payment session
+      const fullName = contractDetails.fullName || 
+        `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
+      
+      const email = contractDetails.email || registrationData.email;
+      
+      const paymentData = await CardComService.initializePayment({
         planId,
-        userId,
-        { email: userEmail, fullName: fullName || userEmail },
+        userId: user?.id || null,
+        email,
+        fullName,
         operationType
-      );
-      
-      if (!paymentData || !paymentData.lowProfileCode) {
-        console.error("Failed to initialize payment session or missing lowProfileCode", paymentData);
-        throw new Error('שגיאה באתחול התשלום - חסר מזהה ייחודי לעסקה');
-      }
-      
-      console.log('Payment session initialized with lowProfileCode:', paymentData.lowProfileCode);
-
-      // Step 4: Master frame should be loaded by the parent component
-      // We must ensure the iframes are ready before initialization
+      });
       
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
+        lowProfileCode: paymentData.lowProfileCode,
+        sessionId: paymentData.sessionId,
+        terminalNumber: paymentData.terminalNumber,
+        cardcomUrl: paymentData.cardcomUrl,
+        reference: paymentData.reference,
         paymentStatus: PaymentStatus.IDLE
       }));
       
-      // Step 5: Initialize CardCom fields with the lowProfileCode
-      console.log('Setting up to initialize CardCom fields');
-      setTimeout(async () => {
-        console.log('Starting CardCom fields initialization');
-        try {
-          const initialized = await initializeCardcomFields(
-            masterFrameRef, 
-            paymentData.lowProfileCode, 
-            paymentData.sessionId,
-            paymentData.terminalNumber,
-            operationType
-          );
-          
-          if (!initialized) {
-            console.error("Failed to initialize CardCom fields");
-            throw new Error('שגיאה באתחול שדות התשלום');
-          }
-          
-          console.log('CardCom fields initialized successfully');
-        } catch (error) {
-          console.error('Error during CardCom field initialization:', error);
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
-          toast.error(error.message || 'שגיאה באתחול שדות התשלום');
-        }
-      }, 500); // Short delay to ensure master frame is loaded
+      // Ensure master frame is set up
+      if (!masterFrameRef.current) {
+        PaymentLogger.error('Master frame reference is not available');
+        throw new Error('שגיאה באתחול מסגרת התשלום');
+      }
       
       return paymentData;
     } catch (error) {
-      console.error('Payment initialization error:', error);
-      toast.error(error.message || 'אירעה שגיאה באתחול התשלום');
+      const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
+      PaymentLogger.error('Payment initialization error:', error);
+      toast.error(errorMessage);
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
     }

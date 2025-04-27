@@ -1,7 +1,10 @@
 
-import { useFormValidation } from '@/hooks/useFormValidation';
-import { usePaymentContext } from '@/contexts/payment/PaymentContext';
 import { useState, useEffect } from 'react';
+import { usePaymentContext } from '@/contexts/payment/PaymentContext';
+import { PaymentStatus } from '@/components/payment/types/payment';
+import { CardComService } from '@/services/payment/CardComService';
+import { useFormValidation } from '@/hooks/useFormValidation';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
 interface PaymentFormData {
@@ -24,35 +27,21 @@ export function usePaymentForm() {
   } = usePaymentContext();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cardValidationComplete, setCardValidationComplete] = useState(false);
   
-  // Define validation rules
-  const validationRules = {
-    cardOwnerName: (value: string) => 
-      !value ? 'שם בעל הכרטיס הוא שדה חובה' : null,
+  // Define validation rules using CardComService validators
+  const validate = (name: string, value: string) => {
+    const formData = {
+      cardOwnerName: name === 'cardOwnerName' ? value : formData.cardOwnerName,
+      cardOwnerId: name === 'cardOwnerId' ? value : formData.cardOwnerId,
+      cardOwnerEmail: name === 'cardOwnerEmail' ? value : formData.cardOwnerEmail,
+      cardOwnerPhone: name === 'cardOwnerPhone' ? value : formData.cardOwnerPhone,
+      expirationMonth: name === 'expirationMonth' ? value : formData.expirationMonth,
+      expirationYear: name === 'expirationYear' ? value : formData.expirationYear
+    };
     
-    cardOwnerId: (value: string) => {
-      if (!value) return 'תעודת זהות היא שדה חובה';
-      if (!/^\d{9}$/.test(value)) return 'תעודת זהות חייבת להכיל 9 ספרות בדיוק';
-      return null;
-    },
-    
-    cardOwnerEmail: (value: string) => {
-      if (!value) return 'דואר אלקטרוני הוא שדה חובה';
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'יש להזין כתובת דואר אלקטרוני תקינה';
-      return null;
-    },
-    
-    cardOwnerPhone: (value: string) => {
-      if (!value) return 'מספר טלפון הוא שדה חובה';
-      if (!/^0\d{8,9}$/.test(value)) return 'יש להזין מספר טלפון ישראלי תקין';
-      return null;
-    },
-    
-    expirationMonth: (value: string) => 
-      !value ? 'חודש תפוגה הוא שדה חובה' : null,
-    
-    expirationYear: (value: string) => 
-      !value ? 'שנת תפוגה היא שדה חובה' : null,
+    const { errors } = CardComService.validateCardInfo(formData);
+    return errors[name] || null;
   };
   
   // Initialize form validation
@@ -71,15 +60,84 @@ export function usePaymentForm() {
     errors,
     handleChange,
     validateForm,
-    setFormData
-  } = useFormValidation<PaymentFormData>(initialFormData, validationRules);
+    setFormData,
+    setFieldError
+  } = useFormValidation<PaymentFormData>(initialFormData, validate);
+  
+  // Monitor iframe messages for validation results
+  useEffect(() => {
+    const handleFrameMessages = (message: MessageEvent) => {
+      // Safety check for message origin
+      if (!message.origin.includes('cardcom.solutions') && 
+          !message.origin.includes('localhost') && 
+          !message.origin.includes(window.location.origin)) {
+        return;
+      }
+  
+      const data = message.data;
+      
+      if (!data || typeof data !== 'object' || data.action !== 'handleValidations') {
+        return;
+      }
+  
+      PaymentLogger.log('Received validation message:', data);
+  
+      if (data.field === 'cardNumber' && !data.isValid) {
+        // Set cardNumber validation error
+        setFieldError('cardNumber', data.message || 'מספר כרטיס לא תקין');
+      } else if (data.field === 'cvv' && !data.isValid) {
+        // Set cvv validation error
+        setFieldError('cvv', data.message || 'קוד אבטחה לא תקין');
+      }
+
+      if (data.field === 'reCaptcha' && data.isValid) {
+        setCardValidationComplete(true);
+      }
+    };
+    
+    window.addEventListener('message', handleFrameMessages);
+    return () => window.removeEventListener('message', handleFrameMessages);
+  }, [setFieldError]);
   
   // Pre-fill form data if available
   useEffect(() => {
-    const registrationData = sessionStorage.getItem('registration_data');
-    if (registrationData) {
-      try {
-        const data = JSON.parse(registrationData);
+    const registrationDataStr = sessionStorage.getItem('registration_data');
+    const contractDataStr = sessionStorage.getItem('contract_data');
+    
+    try {
+      if (contractDataStr) {
+        const contractData = JSON.parse(contractDataStr);
+        
+        if (contractData.email) {
+          setFormData(prev => ({
+            ...prev,
+            cardOwnerEmail: contractData.email
+          }));
+        }
+        
+        if (contractData.fullName) {
+          setFormData(prev => ({
+            ...prev,
+            cardOwnerName: contractData.fullName
+          }));
+        }
+        
+        if (contractData.phone) {
+          setFormData(prev => ({
+            ...prev,
+            cardOwnerPhone: contractData.phone
+          }));
+        }
+        
+        if (contractData.id_number) {
+          setFormData(prev => ({
+            ...prev,
+            cardOwnerId: contractData.id_number
+          }));
+        }
+        
+      } else if (registrationDataStr) {
+        const data = JSON.parse(registrationDataStr);
         if (data.email) {
           setFormData(prev => ({
             ...prev,
@@ -88,29 +146,61 @@ export function usePaymentForm() {
         }
         
         if (data.userData) {
-          const { firstName, lastName } = data.userData;
+          const { firstName, lastName, phone } = data.userData;
           if (firstName && lastName) {
             setFormData(prev => ({
               ...prev,
               cardOwnerName: `${firstName} ${lastName}`.trim()
             }));
           }
+          
+          if (phone) {
+            setFormData(prev => ({
+              ...prev,
+              cardOwnerPhone: phone
+            }));
+          }
         }
-      } catch (e) {
-        console.error('Failed to parse registration data', e);
       }
+    } catch (e) {
+      PaymentLogger.error('Failed to parse registration/contract data', e);
     }
   }, [setFormData]);
   
+  const validateCardFields = () => {
+    const validateCardNumber = () => {
+      const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ action: "validateCardNumber" }, '*');
+      }
+    };
+
+    const validateCvv = () => {
+      const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ action: "validateCvv" }, '*');
+      }
+    };
+    
+    // Trigger iframe validations
+    validateCardNumber();
+    validateCvv();
+  };
+  
   const handleSubmitPayment = async () => {
-    if (isSubmitting) {
+    if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return;
     }
     
-    if (!validateForm()) {
+    // Validate form
+    const isFormValid = validateForm();
+    if (!isFormValid) {
       toast.error('יש לתקן את השגיאות בטופס');
       return;
     }
+    
+    // Validate card fields via iframe
+    validateCardFields();
     
     if (!lowProfileCode) {
       toast.error('חסר מזהה יחודי לעסקה');
@@ -118,6 +208,10 @@ export function usePaymentForm() {
     }
     
     setIsSubmitting(true);
+    PaymentLogger.log('Submitting payment', { 
+      lowProfileCode,
+      operationType
+    });
     
     try {
       await submitPayment({
@@ -129,8 +223,8 @@ export function usePaymentForm() {
         expirationYear: formData.expirationYear,
       });
     } catch (error) {
-      console.error('Payment submission error:', error);
-      toast.error('אירעה שגיאה בשליחת התשלום');
+      PaymentLogger.error('Payment submission error:', error);
+      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה בשליחת התשלום');
     } finally {
       setIsSubmitting(false);
     }
@@ -141,6 +235,7 @@ export function usePaymentForm() {
     errors,
     isSubmitting,
     handleChange,
-    handleSubmitPayment
+    handleSubmitPayment,
+    validateCardFields
   };
 }

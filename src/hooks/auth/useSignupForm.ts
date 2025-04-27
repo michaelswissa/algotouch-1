@@ -1,7 +1,8 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/auth';
+import { StorageService } from '@/services/storage/StorageService';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
 interface SignupFormData {
@@ -18,7 +19,6 @@ interface ValidationErrors {
 
 export const useSignupForm = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
 
@@ -55,7 +55,13 @@ export const useSignupForm = () => {
     
     try {
       setIsProcessing(true);
-      console.log('Starting registration process for:', formData.email);
+      PaymentLogger.log('Starting registration process', { 
+        email: formData.email,
+        hasUserData: true,
+      });
+      
+      // First clear any existing registration data
+      StorageService.clearAllSubscriptionData();
       
       const registrationData = {
         email: formData.email,
@@ -65,19 +71,27 @@ export const useSignupForm = () => {
           lastName: formData.lastName,
           phone: formData.phone
         },
-        registrationTime: new Date().toISOString()
+        registrationTime: new Date().toISOString(),
+        userCreated: false,
       };
       
-      sessionStorage.removeItem('registration_data');
-      sessionStorage.removeItem('contract_data');
-      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
+      // Store registration data
+      const storedSuccessfully = StorageService.storeRegistrationData(registrationData);
       
-      console.log('Registration data saved, proceeding to subscription');
+      if (!storedSuccessfully) {
+        throw new Error('שגיאה בשמירת נתוני הרשמה');
+      }
+      
+      PaymentLogger.log('Registration data saved successfully');
       toast.success('הפרטים נשמרו בהצלחה');
       
-      navigate('/subscription', { replace: true, state: { isRegistering: true } });
+      // Redirect to subscription page
+      navigate('/subscription', { 
+        replace: true, 
+        state: { isRegistering: true } 
+      });
     } catch (error: any) {
-      console.error('Signup error:', error);
+      PaymentLogger.error('Signup error:', error);
       toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');
     } finally {
       setIsProcessing(false);

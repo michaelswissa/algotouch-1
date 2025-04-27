@@ -1,5 +1,6 @@
 
 import { toast } from 'sonner';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 export interface StorageData {
   planId?: string;
@@ -9,8 +10,11 @@ export interface StorageData {
   userData?: {
     firstName?: string;
     lastName?: string;
+    phone?: string;
     [key: string]: any;
   };
+  registrationTime?: string;
+  userCreated?: boolean;
   [key: string]: any;
 }
 
@@ -32,6 +36,7 @@ export interface PaymentData {
   status?: 'pending' | 'completed' | 'failed';
   cardLastFour?: string;
   cardExpiry?: string;
+  timestamp?: string;
 }
 
 export const StorageKeys = {
@@ -42,28 +47,27 @@ export const StorageKeys = {
 
 export class StorageService {
   /**
-   * Get data from session storage
+   * Get data from session storage with error handling
    */
   static get<T>(key: string): T | null {
     try {
       const data = sessionStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error(`Error reading from storage (${key}):`, error);
-      toast.error('אירעה שגיאה בטעינת הנתונים');
+      PaymentLogger.error(`Error reading from storage (${key}):`, error);
       return null;
     }
   }
 
   /**
-   * Set data in session storage
+   * Set data in session storage with error handling
    */
   static set<T>(key: string, data: T): boolean {
     try {
       sessionStorage.setItem(key, JSON.stringify(data));
       return true;
     } catch (error) {
-      console.error(`Error writing to storage (${key}):`, error);
+      PaymentLogger.error(`Error writing to storage (${key}):`, error);
       toast.error('אירעה שגיאה בשמירת הנתונים');
       return false;
     }
@@ -76,7 +80,7 @@ export class StorageService {
     try {
       sessionStorage.removeItem(key);
     } catch (error) {
-      console.error(`Error removing from storage (${key}):`, error);
+      PaymentLogger.error(`Error removing from storage (${key}):`, error);
     }
   }
 
@@ -84,15 +88,23 @@ export class StorageService {
    * Get registration data
    */
   static getRegistrationData(): StorageData {
-    return this.get<StorageData>(StorageKeys.REGISTRATION) || {};
+    const data = this.get<StorageData>(StorageKeys.REGISTRATION);
+    return data || {};
   }
 
   /**
-   * Update registration data
+   * Store registration data with timestamp
    */
-  static updateRegistrationData(data: Partial<StorageData>): boolean {
-    const current = this.getRegistrationData();
-    return this.set(StorageKeys.REGISTRATION, { ...current, ...data });
+  static storeRegistrationData(data: Partial<StorageData>): boolean {
+    const existingData = this.getRegistrationData();
+    const updatedData = { ...existingData, ...data };
+    
+    // Update timestamp if not set
+    if (!updatedData.registrationTime) {
+      updatedData.registrationTime = new Date().toISOString();
+    }
+    
+    return this.set(StorageKeys.REGISTRATION, updatedData);
   }
 
   /**
@@ -118,10 +130,16 @@ export class StorageService {
   }
 
   /**
-   * Update payment data
+   * Update payment data with timestamp
    */
   static updatePaymentData(data: Partial<PaymentData>): boolean {
     const current = this.getPaymentData() || {};
+    
+    // Add timestamp if updating status
+    if (data.status && data.status !== current.status) {
+      data.timestamp = new Date().toISOString();
+    }
+    
     return this.set(StorageKeys.PAYMENT, { ...current, ...data });
   }
 
@@ -132,5 +150,28 @@ export class StorageService {
     this.remove(StorageKeys.REGISTRATION);
     this.remove(StorageKeys.CONTRACT);
     this.remove(StorageKeys.PAYMENT);
+  }
+  
+  /**
+   * Check if registration data is valid and not expired
+   */
+  static isRegistrationValid(): boolean {
+    try {
+      const data = this.getRegistrationData();
+      
+      if (!data.registrationTime) {
+        return false;
+      }
+      
+      const registrationTime = new Date(data.registrationTime);
+      const now = new Date();
+      const timeDiffMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+      
+      // Registration expires after 30 minutes
+      return timeDiffMinutes <= 30;
+    } catch (error) {
+      PaymentLogger.error('Error checking registration validity:', error);
+      return false;
+    }
   }
 }

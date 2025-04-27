@@ -6,6 +6,8 @@ import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
+import { StorageService } from '@/services/storage/StorageService';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
 const Auth = () => {
@@ -13,7 +15,11 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as { from?: Location, redirectToSubscription?: boolean };
+  const state = location.state as { 
+    from?: Location, 
+    redirectToSubscription?: boolean,
+    isRegistering?: boolean
+  };
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -26,7 +32,7 @@ const Auth = () => {
 
   // Check if the state specifies to show the signup tab
   useEffect(() => {
-    if (state?.redirectToSubscription) {
+    if (state?.redirectToSubscription || state?.isRegistering) {
       setActiveTab('signup');
     }
   }, [state]);
@@ -34,43 +40,40 @@ const Auth = () => {
   // Check if there's valid registration data in session storage
   useEffect(() => {
     const checkSessionData = () => {
-      const contractData = sessionStorage.getItem('contract_data');
-      const registrationData = sessionStorage.getItem('registration_data');
-      
-      if (contractData || registrationData) {
-        try {
-          // If we have contract data, prioritize that
-          if (contractData) {
-            const data = JSON.parse(contractData);
-            if (data.selectedPlan) {
-              console.log("Auth: Valid contract data found, redirecting to subscription");
-              navigate('/subscription', { replace: true });
-              return;
-            }
+      try {
+        // First check if registration data is valid
+        if (StorageService.isRegistrationValid()) {
+          const registrationData = StorageService.getRegistrationData();
+          
+          // Check if we have a contract
+          const contractData = StorageService.getContractData();
+          
+          // If we have valid contract data with plan selection, redirect to subscription
+          if (contractData?.planId) {
+            PaymentLogger.log("Auth: Valid contract data found, redirecting to subscription");
+            navigate('/subscription', { replace: true });
+            return;
           }
           
-          // Otherwise check registration data
-          if (registrationData) {
-            const data = JSON.parse(registrationData);
-            const registrationTime = new Date(data.registrationTime);
-            const now = new Date();
-            const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
-            
-            if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
-              console.log("Auth: Valid registration data found, redirecting to subscription");
-              navigate('/subscription', { replace: true, state: { isRegistering: true } });
-            } else if (timeDiffInMinutes >= 30) {
-              console.log("Auth: Clearing stale registration data");
-              sessionStorage.removeItem('registration_data');
-              sessionStorage.removeItem('contract_data');
-              toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
-            }
+          // Otherwise check if we're in the registration flow
+          if (registrationData && location.state?.isRegistering) {
+            PaymentLogger.log("Auth: Valid registration data found, redirecting to subscription");
+            navigate('/subscription', { replace: true, state: { isRegistering: true } });
+            return;
           }
-        } catch (error) {
-          console.error("Error checking session data:", error);
-          sessionStorage.removeItem('registration_data');
-          sessionStorage.removeItem('contract_data');
+        } else {
+          // Clear expired registration data
+          const hasExpired = StorageService.getRegistrationData().registrationTime;
+          
+          if (hasExpired) {
+            PaymentLogger.log("Auth: Clearing expired registration data");
+            StorageService.clearAllSubscriptionData();
+            toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
+          }
         }
+      } catch (error) {
+        PaymentLogger.error("Error checking session data:", error);
+        StorageService.clearAllSubscriptionData();
       }
     };
     
@@ -88,10 +91,21 @@ const Auth = () => {
 
   // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
-    console.log("Auth page: User is authenticated, redirecting to appropriate page");
+    PaymentLogger.log("Auth page: User is authenticated, redirecting");
+    
     if (state?.redirectToSubscription) {
       return <Navigate to="/subscription" replace />;
     }
+    
+    // Check if we're in the middle of a registration flow
+    const registrationData = StorageService.getRegistrationData();
+    const contractData = StorageService.getContractData();
+    
+    if ((registrationData && StorageService.isRegistrationValid()) || contractData) {
+      PaymentLogger.log("Auth: User authenticated with registration data, redirecting to subscription");
+      return <Navigate to="/subscription" replace />;
+    }
+    
     return <Navigate to="/dashboard" replace />;
   }
 
