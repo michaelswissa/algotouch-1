@@ -23,6 +23,43 @@ export class StorageService {
   }
   
   /**
+   * Store registration data to storage
+   */
+  static storeRegistrationData(data: any): boolean {
+    try {
+      const existingData = this.getRegistrationData() || {};
+      const updatedData = { ...existingData, ...data };
+      sessionStorage.setItem(this.REGISTRATION_KEY, JSON.stringify(updatedData));
+      return true;
+    } catch (e) {
+      console.error('Error storing registration data', e);
+      return false;
+    }
+  }
+  
+  /**
+   * Check if registration data is valid (not expired)
+   */
+  static isRegistrationValid(): boolean {
+    try {
+      const data = this.getRegistrationData();
+      if (!data || !data.registrationTime) {
+        return false;
+      }
+      
+      // Check if registration is expired (30 minutes)
+      const registrationTime = new Date(data.registrationTime);
+      const now = new Date();
+      const timeDiffMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+      
+      return timeDiffMinutes <= 30;
+    } catch (e) {
+      console.error('Error checking registration validity', e);
+      return false;
+    }
+  }
+  
+  /**
    * Get contract data from storage
    */
   static getContractData(): any | null {
@@ -32,6 +69,21 @@ export class StorageService {
     } catch (e) {
       console.error('Error parsing contract data', e);
       return null;
+    }
+  }
+  
+  /**
+   * Store contract data to storage
+   */
+  static storeContractData(data: any): boolean {
+    try {
+      const existingData = this.getContractData() || {};
+      const updatedData = { ...existingData, ...data };
+      sessionStorage.setItem(this.CONTRACT_KEY, JSON.stringify(updatedData));
+      return true;
+    } catch (e) {
+      console.error('Error storing contract data', e);
+      return false;
     }
   }
   
@@ -79,6 +131,15 @@ export class StorageService {
    * Clear payment data from storage
    */
   static clearPaymentData(): void {
+    localStorage.removeItem(this.PAYMENT_KEY);
+  }
+  
+  /**
+   * Clear all subscription related data (registration, contract, payment)
+   */
+  static clearAllSubscriptionData(): void {
+    sessionStorage.removeItem(this.REGISTRATION_KEY);
+    sessionStorage.removeItem(this.CONTRACT_KEY);
     localStorage.removeItem(this.PAYMENT_KEY);
   }
 }
