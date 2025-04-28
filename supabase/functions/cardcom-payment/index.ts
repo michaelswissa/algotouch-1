@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -34,7 +33,7 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
-    // Important: Changed from const to let for operationType
+    // Using let instead of const for operationType to allow modification
     let { 
       planId, 
       userId, 
@@ -96,6 +95,9 @@ serve(async (req) => {
       }
     }
     
+    // Generate lowProfileId BEFORE database insert
+    const lowProfileId = crypto.randomUUID();
+
     // Create payment session
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
@@ -105,7 +107,7 @@ serve(async (req) => {
         amount: amount,
         currency: "ILS",
         status: 'initiated',
-        operation_type: operationType, // Using the new column
+        operation_type: operationType,
         reference: transactionRef,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         payment_details: { 
@@ -113,21 +115,16 @@ serve(async (req) => {
           email,
           isIframePrefill,
           planType: planId
-        }
+        },
+        low_profile_id: lowProfileId  // Include lowProfileId in the initial insert
       })
       .select('id')
       .single();
       
     if (sessionError) {
+      console.error("Database insert error:", sessionError);
       throw new Error("Failed to create payment session: " + sessionError.message);
     }
-
-    const lowProfileId = crypto.randomUUID();
-    
-    await supabaseAdmin
-      .from('payment_sessions')
-      .update({ low_profile_id: lowProfileId })
-      .eq('id', sessionData.id);
 
     await logStep(functionName, "Created payment session", { 
       sessionId: sessionData.id,

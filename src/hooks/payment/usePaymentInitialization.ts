@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PaymentStatus, PaymentStatusEnum } from '@/types/payment';
+import { PaymentStatusEnum } from '@/types/payment';
 import { RegistrationService } from '@/services/registration/RegistrationService';
 import { CardComService } from '@/services/payment/CardComService';
 import { useContractValidation } from './useContractValidation';
@@ -96,7 +96,7 @@ export const usePaymentInitialization = ({
       // Set initial payment state
       setState(prev => ({ 
         ...prev, 
-        lowProfileId: paymentData.lowProfileId,
+        lowProfileCode: paymentData.lowProfileId,
         sessionId: paymentData.sessionId,
         terminalNumber: paymentData.terminalNumber,
         cardcomUrl: paymentData.cardcomUrl,

@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus, PaymentStatusEnum } from '@/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
@@ -59,7 +58,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     planType: planId
   });
 
-  // Initialize CardCom fields once we have the necessary data
   useEffect(() => {
     if (
       masterFrameRef.current && 
@@ -70,7 +68,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     ) {
       console.log('Initializing CardCom fields');
       
-      // Allow some time for the iframe to load before initializing
       const timer = setTimeout(async () => {
         try {
           const success = await initializeCardcomFields(
@@ -98,7 +95,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
   }, [masterFrameRef, state.lowProfileCode, state.sessionId, state.terminalNumber, isCardcomInitialized, operationType, initializeCardcomFields, handleError]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanupStatusCheck();

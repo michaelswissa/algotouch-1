@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { PaymentStatus as PaymentStatusEnum } from '@/types/payment';
+import { PaymentStatus, PaymentStatusEnum } from '@/types/payment';
 import { toast } from 'sonner';
 
 interface UsePaymentStatusProps {
