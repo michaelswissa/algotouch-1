@@ -1,7 +1,14 @@
 
 import axios from 'axios';
-import { CardOwnerDetails, CardComPaymentResponse, PaymentSessionData, PaymentStatus } from '@/types/payment';
+import { CardOwnerDetails, CardComPaymentResponse, PaymentSessionData } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from './validators';
+
+// Define API response structure
+interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T;
+}
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -17,19 +24,19 @@ export class CardComService {
       console.log('Initializing payment with data:', requestData);
       console.log('Calling payment endpoint:', `${API_URL}/api/payment/initiate`);
       
-      const response = await axios.post<{data: PaymentSessionData}>(`${API_URL}/api/payment/initiate`, requestData);
+      // Specify the expected response structure
+      const response = await axios.post<ApiResponse<PaymentSessionData>>(`${API_URL}/api/payment/initiate`, requestData);
       
       console.log('Payment initialization response:', response.data);
       
-      // Extract the session data - handle both nested and direct response formats
-      const sessionData: PaymentSessionData = response.data.data || response.data as PaymentSessionData;
-      
-      if (!sessionData.lowProfileId) {
+      // Check if we have the data property in the response
+      if (!response.data.data || !response.data.data.lowProfileId) {
         console.error('Missing lowProfileId in response:', response.data);
         throw new Error('Initialization response missing lowProfileId');
       }
       
-      return sessionData;
+      // Return the data object from the response
+      return response.data.data;
     } catch (error: any) {
       console.error('Error initializing payment:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to initialize payment');
@@ -57,8 +64,8 @@ export class CardComService {
 
   static async processCardComResponse(data: any): Promise<CardComPaymentResponse> {
     try {
-      const response = await axios.post<CardComPaymentResponse>(`${API_URL}/api/payment/process-cardcom`, data);
-      return response.data;
+      const response = await axios.post<ApiResponse<CardComPaymentResponse>>(`${API_URL}/api/payment/process-cardcom`, data);
+      return response.data.data;
     } catch (error: any) {
       console.error('Error processing CardCom response:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to process CardCom response');
@@ -70,7 +77,7 @@ export class CardComService {
     try {
       console.log('Checking payment status for lowProfileCode:', lowProfileCode);
       
-      const response = await axios.post(`${API_URL}/api/payment/status`, { 
+      const response = await axios.post<ApiResponse<any>>(`${API_URL}/api/payment/status`, { 
         lowProfileCode 
       });
       

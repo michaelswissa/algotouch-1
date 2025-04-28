@@ -3,8 +3,17 @@ import axios from 'axios';
 import { CardOwnerDetails, CardComPaymentResponse, PaymentStatusType, PaymentStatus, PaymentSessionData } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from '@/lib/payment/validators';
 
+// Define API response structure
+interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T;
+}
+
 // Use the Supabase URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const PAYMENT_ENDPOINT = `${API_BASE_URL}/api/payment/initiate`;
+const STATUS_ENDPOINT = `${API_BASE_URL}/api/payment/status`;
 
 export class CardComService {
   static async initializePayment(data: { 
@@ -22,22 +31,21 @@ export class CardComService {
       };
       
       console.log('Initializing payment with data:', requestData);
-      console.log('Calling payment endpoint:', `${API_BASE_URL}/api/payment/initiate`);
+      console.log('Calling payment endpoint:', PAYMENT_ENDPOINT);
 
-      const response = await axios.post<{data: PaymentSessionData}>(`${API_BASE_URL}/api/payment/initiate`, requestData);
+      // Specify the expected response structure
+      const response = await axios.post<ApiResponse<PaymentSessionData>>(PAYMENT_ENDPOINT, requestData);
       
       console.log('Payment initialization response:', response.data);
 
-      // Extract the session data - handle both nested and direct response formats
-      const sessionData: PaymentSessionData = response.data.data || response.data as PaymentSessionData;
-      
-      // Check if the response contains the expected lowProfileId
-      if (!sessionData.lowProfileId) {
+      // Check if we have the data property in the response
+      if (!response.data.data || !response.data.data.lowProfileId) {
         console.error('Missing lowProfileId in response:', response.data);
         throw new Error('Initialization response missing lowProfileId');
       }
 
-      return sessionData;
+      // Return the data object from the response
+      return response.data.data;
     } catch (error: any) {
       console.error('Error initializing payment:', error);
       // Log more detailed error info if available
@@ -78,7 +86,7 @@ export class CardComService {
     try {
       console.log('Checking payment status for lowProfileCode:', lowProfileCode);
       
-      const response = await axios.post(`${API_BASE_URL}/api/payment/status`, { 
+      const response = await axios.post<ApiResponse<any>>(STATUS_ENDPOINT, { 
         lowProfileCode 
       });
       
