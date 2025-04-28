@@ -64,3 +64,27 @@ export async function validateTransaction(supabaseAdmin: any, transactionRef: st
 
   return existingTransaction?.[0] || null;
 }
+
+/**
+ * Check for duplicate payment
+ */
+export async function checkDuplicatePayment(supabaseAdmin: any, lowProfileId: string, transactionId: string | null): Promise<{ exists: boolean; sessionId?: string; transactionId?: string }> {
+  // Check if a payment session with the same LowProfileId and TransactionId already exists
+  const { data, error } = await supabaseAdmin
+    .from('payment_sessions')
+    .select('id, transaction_id')
+    .eq('low_profile_id', lowProfileId)
+    .eq('transaction_id', transactionId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error checking for duplicate payment:', error);
+    return { exists: false };
+  }
+
+  if (data) {
+    return { exists: true, sessionId: data.id, transactionId: data.transaction_id };
+  }
+
+  return { exists: false };
+}

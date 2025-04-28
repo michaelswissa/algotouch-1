@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { logStep } from "../cardcom-utils/index.ts";
+import { logStep, checkDuplicatePayment } from "../_shared/cardcom_utils.ts";
 
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
@@ -278,24 +278,3 @@ serve(async (req) => {
     );
   }
 });
-
-async function checkDuplicatePayment(supabaseAdmin: any, lowProfileId: string, transactionId: string | null): Promise<{ exists: boolean; sessionId?: string; transactionId?: string }> {
-  // Check if a payment session with the same LowProfileId and TransactionId already exists
-  const { data, error } = await supabaseAdmin
-    .from('payment_sessions')
-    .select('id, transaction_id')
-    .eq('low_profile_id', lowProfileId)
-    .eq('transaction_id', transactionId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error checking for duplicate payment:', error);
-    return { exists: false };
-  }
-
-  if (data) {
-    return { exists: true, sessionId: data.id, transactionId: data.transaction_id };
-  }
-
-  return { exists: false };
-}
