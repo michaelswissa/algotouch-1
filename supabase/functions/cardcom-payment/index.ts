@@ -1,65 +1,11 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-
-// CORS headers for browser requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Helper function for logging with database storage
-async function logStep(
-  functionName: string,
-  step: string, 
-  details?: any, 
-  level: 'info' | 'warn' | 'error' = 'info',
-  supabaseAdmin?: any
-) {
-  const timestamp = new Date().toISOString();
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
-  
-  console.log(`${prefix} ${step}${detailsStr}`);
-  
-  // Store critical logs in database
-  if (level === 'error' && supabaseAdmin) {
-    try {
-      await supabaseAdmin.from('system_logs').insert({
-        function_name: `cardcom-${functionName}`,
-        level,
-        message: step,
-        details: details || {},
-        created_at: timestamp
-      });
-    } catch (e) {
-      console.error('Failed to log to database:', e);
-    }
-  }
-}
-
-// Validate amount is positive number
-function validateAmount(amount: number): boolean {
-  return !isNaN(amount) && amount > 0;
-}
-
-// Validate if a string is a valid UUID/GUID
-function validateGuid(id: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-}
-
-// Check for duplicate transactions
-async function checkDuplicate(supabaseAdmin: any, transactionRef: string) {
-  const { data: existingTransaction } = await supabaseAdmin
-    .from('payment_sessions')
-    .select('id, status')
-    .eq('reference', transactionRef)
-    .limit(1);
-
-  return existingTransaction?.[0] || null;
-}
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
+  const requestOrigin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -277,10 +223,7 @@ serve(async (req) => {
     console.error(`[CARDCOM-PAYMENT][ERROR] ${errorMessage}`);
     
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: errorMessage,
-      }),
+      JSON.stringify({ success: false, message: errorMessage }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

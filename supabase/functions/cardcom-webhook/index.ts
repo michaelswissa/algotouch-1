@@ -1,104 +1,11 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
-// CORS headers for browser requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Helper function for logging
-async function logStep(
-  functionName: string,
-  step: string, 
-  details?: any, 
-  level: 'info' | 'warn' | 'error' = 'info',
-  supabaseAdmin?: any
-) {
-  const timestamp = new Date().toISOString();
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
-  
-  console.log(`${prefix} ${step}${detailsStr}`);
-  
-  if (level === 'error' && supabaseAdmin) {
-    try {
-      await supabaseAdmin.from('system_logs').insert({
-        function_name: `cardcom-${functionName}`,
-        level,
-        message: step,
-        details: details || {},
-        created_at: timestamp
-      });
-    } catch (e) {
-      console.error('Failed to log to database:', e);
-    }
-  }
-}
-
-// Check for duplicate payments to prevent double processing
-async function checkDuplicatePayment(supabaseAdmin: any, lowProfileId: string, transactionId?: string) {
-  try {
-    // First check payment_sessions table
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
-      .from('payment_sessions')
-      .select('id, status, transaction_id, created_at')
-      .eq('low_profile_id', lowProfileId)
-      .eq('status', 'completed')
-      .maybeSingle();
-    
-    if (sessionError) {
-      console.error('Error checking payment_sessions:', sessionError);
-      return { exists: false };
-    }
-    
-    if (sessionData) {
-      return {
-        exists: true,
-        source: 'payment_sessions',
-        sessionId: sessionData.id,
-        status: sessionData.status,
-        transactionId: sessionData.transaction_id,
-        createdAt: sessionData.created_at
-      };
-    }
-    
-    // Then check user_payment_logs table
-    if (transactionId) {
-      const { data: logData, error: logError } = await supabaseAdmin
-        .from('user_payment_logs')
-        .select('id, status, created_at')
-        .eq('token', lowProfileId)
-        .eq('status', 'payment_success')
-        .maybeSingle();
-      
-      if (logError) {
-        console.error('Error checking user_payment_logs:', logError);
-        return { exists: false };
-      }
-      
-      if (logData) {
-        return {
-          exists: true,
-          source: 'user_payment_logs',
-          logId: logData.id,
-          status: logData.status,
-          createdAt: logData.created_at
-        };
-      }
-    }
-    
-    return { exists: false };
-  } catch (error) {
-    console.error('Error in checkDuplicatePayment:', error);
-    return { exists: false };
-  }
-}
-
-// This function needs to be public to receive CardCom webhooks
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const requestOrigin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

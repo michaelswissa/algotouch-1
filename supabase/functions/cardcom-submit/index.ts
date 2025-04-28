@@ -1,9 +1,9 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 // Include utility functions directly in this file to avoid import issues
-const corsHeaders = {
+const corsHeadersOld = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
@@ -49,7 +49,9 @@ function validateLowProfileId(lowProfileId: string): boolean {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const requestOrigin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -201,17 +203,18 @@ serve(async (req) => {
         responseCode: cardcomResponse.ResponseCode
       });
       
+      const responseData = JSON.parse(JSON.stringify({
+        success: isSuccess,
+        message: isSuccess ? "Payment processed successfully" : cardcomResponse.Description || "Payment processing failed",
+        data: {
+          ...cardcomResponse,
+          status: newStatus,
+          sessionId: paymentSession.id,
+          lowProfileCode
+        }
+      }));
       return new Response(
-        JSON.stringify({
-          success: isSuccess,
-          message: isSuccess ? "Payment processed successfully" : cardcomResponse.Description || "Payment processing failed",
-          data: {
-            ...cardcomResponse,
-            status: newStatus,
-            sessionId: paymentSession.id,
-            lowProfileCode
-          }
-        }),
+        JSON.stringify(responseData),
         {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -230,11 +233,12 @@ serve(async (req) => {
         })
         .eq('id', paymentSession.id);
       
+      const responseData = JSON.parse(JSON.stringify({
+        success: false,
+        message: "Error processing payment with CardCom: " + apiError.message,
+      }));
       return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Error processing payment with CardCom: " + apiError.message,
-        }),
+        JSON.stringify(responseData),
         {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -245,11 +249,12 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[CARDCOM-SUBMIT][ERROR] ${errorMessage}`);
     
+    const responseData = JSON.parse(JSON.stringify({
+      success: false,
+      message: errorMessage,
+    }));
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: errorMessage,
-      }),
+      JSON.stringify(responseData),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

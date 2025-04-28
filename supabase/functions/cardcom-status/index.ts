@@ -1,45 +1,11 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-
-// CORS headers for browser requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Helper function for logging with database storage
-async function logStep(
-  functionName: string,
-  step: string, 
-  details?: any, 
-  level: 'info' | 'warn' | 'error' = 'info',
-  supabaseAdmin?: any
-) {
-  const timestamp = new Date().toISOString();
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
-  
-  console.log(`${prefix} ${step}${detailsStr}`);
-  
-  // Store critical logs in database
-  if (level === 'error' && supabaseAdmin) {
-    try {
-      await supabaseAdmin.from('system_logs').insert({
-        function_name: `cardcom-${functionName}`,
-        level,
-        message: step,
-        details: details || {},
-        created_at: timestamp
-      });
-    } catch (e) {
-      console.error('Failed to log to database:', e);
-    }
-  }
-}
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const requestOrigin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -134,36 +100,40 @@ serve(async (req) => {
           .eq('low_profile_id', lowProfileCode);
       }
       
+      const responseData = {
+        success: isSuccess,
+        message: isSuccess ? "Payment completed successfully" : cardcomData.Description || "Payment failed",
+        data: {
+          ...cardcomData,
+          sessionId: paymentSession.id,
+          status,
+          amount: paymentSession.amount,
+          currency: paymentSession.currency
+        }
+      };
+      
       return new Response(
-        JSON.stringify({
-          success: isSuccess,
-          message: isSuccess ? "Payment completed successfully" : cardcomData.Description || "Payment failed",
-          data: {
-            ...cardcomData,
-            sessionId: paymentSession.id,
-            status,
-            amount: paymentSession.amount,
-            currency: paymentSession.currency
-          }
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify(responseData),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } catch (apiError) {
       // If CardCom API call fails, return the current status from our database
       await logStep(functionName, "CardCom API call failed", { error: apiError.message }, 'error', supabaseAdmin);
       
+      const responseData = {
+        success: paymentSession.status === 'completed',
+        message: "Status based on local data only, CardCom API call failed",
+        data: {
+          status: paymentSession.status,
+          sessionId: paymentSession.id,
+          lowProfileId: lowProfileCode,
+          error: apiError.message
+        }
+      };
+      
       return new Response(
-        JSON.stringify({
-          success: paymentSession.status === 'completed',
-          message: "Status based on local data only, CardCom API call failed",
-          data: {
-            status: paymentSession.status,
-            sessionId: paymentSession.id,
-            lowProfileId: lowProfileCode,
-            error: apiError.message
-          }
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify(responseData),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   } catch (error) {
@@ -171,11 +141,8 @@ serve(async (req) => {
     console.error(`[CARDCOM-STATUS][ERROR] ${errorMessage}`);
     
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: errorMessage,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, message: errorMessage }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
