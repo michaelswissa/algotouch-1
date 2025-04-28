@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { usePaymentContext } from '@/contexts/payment/PaymentContext';
-import { PaymentStatus } from './types/payment';
+import { PaymentStatus } from '@/types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import PaymentDetails from './PaymentDetails';

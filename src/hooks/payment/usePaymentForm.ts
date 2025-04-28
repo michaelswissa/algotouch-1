@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { usePaymentContext } from '@/contexts/payment/PaymentContext';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/types/payment';
 import { CardComService } from '@/services/payment/CardComService';
 import { useFormValidation } from '@/hooks/useFormValidation';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';

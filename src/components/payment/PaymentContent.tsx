@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PaymentStatus, PaymentStatusType } from './types/payment';
+import { PaymentStatus, PaymentStatusType } from '@/types/payment';
 import { SubscriptionPlan } from './utils/paymentHelpers';
 import SuccessfulPayment from './states/SuccessfulPayment';
 import FailedPayment from './states/FailedPayment';

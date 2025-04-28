@@ -1,6 +1,5 @@
-
-import { useEffect } from 'react';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { useEffect, useCallback } from 'react';
+import { PaymentStatus } from '@/types/payment';
 import { toast } from 'sonner';
 
 interface UseFrameMessagesProps {
@@ -26,7 +25,7 @@ export const useFrameMessages = ({
   useEffect(() => {
     if (!lowProfileCode || !sessionId) return;
 
-    const handleFrameMessage = (event: MessageEvent) => {
+    const handleFrameMessage = useCallback((event: MessageEvent) => {
       // Check if the message is from CardCom (we cannot check origin as it's in an iframe)
       if (event.data && typeof event.data === 'object') {
         console.log('Received frame message:', event.data);
@@ -110,7 +109,7 @@ export const useFrameMessages = ({
           console.log('Other CardCom message:', event.data);
         }
       }
-    };
+    }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType]);
 
     window.addEventListener('message', handleFrameMessage);
     return () => {

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import React, { useEffect, useState, useCallback } from 'react';
+import { PaymentStatus } from '@/types/payment';
 import { RegistrationService } from '@/services/registration/RegistrationService';
 import { CardComService } from '@/services/payment/CardComService';
 import { useContractValidation } from './useContractValidation';
@@ -22,7 +22,7 @@ export const usePaymentInitialization = ({
 }: UsePaymentInitializationProps) => {
   const { validateContract } = useContractValidation();
 
-  const initializePayment = async () => {
+  const initializePayment = useCallback(async () => {
     PaymentLogger.log('Starting payment initialization process', { planId, operationType });
     
     setState(prev => ({ 
@@ -117,7 +117,7 @@ export const usePaymentInitialization = ({
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
     }
-  };
+  }, [setState, masterFrameRef]);
 
   return { initializePayment };
 };

@@ -1,144 +1,121 @@
+import { createClient } from '@supabase/supabase-js';
+import { PaymentStatusType, PaymentStatus, PaymentSessionData, CardOwnerDetails } from '@/types/payment';
 
-import { supabase } from '@/integrations/supabase/client';
-import { PaymentSessionData, CardComPaymentResponse, PaymentError, CardOwnerDetails } from '@/components/payment/types/payment';
-import { StorageService } from '@/services/storage/StorageService';
-import { PaymentLogger } from './PaymentLogger';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class PaymentService {
   /**
-   * Initialize a CardCom payment session for iframe-based payments
+   * Updates the payment status in the database.
+   *
+   * @param {string} lowProfileCode - The unique identifier for the payment session.
+   * @param {PaymentStatusType} status - The new status to set for the payment.
+   * @returns {Promise<boolean>} - A promise that resolves to true if the update was successful, false otherwise.
    */
-  static async initializePayment(planId: string): Promise<PaymentSessionData> {
+  static async updatePaymentStatus(lowProfileCode: string, status: PaymentStatusType): Promise<boolean> {
     try {
-      PaymentLogger.log('Initializing payment', { planId });
-      
-      // Get user information from storage
-      const registrationData = StorageService.getRegistrationData();
-      const contractData = StorageService.getContractData();
-      
-      if (!contractData) {
-        throw new Error('Contract data missing. Please complete the contract step first.');
-      }
-
-      // Calculate amount based on plan
-      let amount = 0;
-      switch (planId) {
-        case 'monthly':
-          amount = 371;
-          break;
-        case 'annual':
-          amount = 3371;
-          break;
-        case 'vip':
-          amount = 13121;
-          break;
-        default:
-          throw new Error(`Unsupported plan: ${planId}`);
-      }
-
-      // Determine operation type based on plan
-      const operation = planId === 'monthly' ? 'ChargeAndCreateToken' : 'ChargeOnly';
-
-      // Call Supabase Edge Function to initialize payment with isIframePrefill=true
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
-        body: {
-          planId,
-          amount,
-          operation,
-          invoiceInfo: {
-            fullName: contractData.fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName,
-            email: contractData.email || registrationData?.email,
-          },
-          redirectUrls: {
-            success: `${window.location.origin}/subscription/success`,
-            failed: `${window.location.origin}/subscription/failed`
-          },
-          userId: registrationData?.userId,
-          registrationData,
-          isIframePrefill: true // This is key to use OpenFields instead of redirect
-        }
-      });
+      const { data, error } = await supabase
+        .from('payment_sessions')
+        .update({ payment_status: status })
+        .eq('low_profile_id', lowProfileCode);
 
       if (error) {
-        PaymentLogger.error('Payment initialization error', error);
-        throw new Error(error.message || 'Failed to initialize payment session');
+        console.error('Error updating payment status:', error);
+        return false;
       }
 
-      if (!data?.success) {
-        PaymentLogger.error('Payment initialization failed', data?.message);
-        throw new Error(data?.message || 'Failed to initialize payment session');
-      }
-
-      PaymentLogger.log('Payment initialized successfully', data.data);
-      return data.data;
-    } catch (error) {
-      PaymentLogger.error('Exception during payment initialization', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Submit payment information to CardCom
-   */
-  static async submitPayment(params: {
-    lowProfileCode: string;
-    terminalNumber: string;
-    operationType: 'payment' | 'token_only';
-    cardOwnerDetails: CardOwnerDetails;
-  }): Promise<boolean> {
-    try {
-      PaymentLogger.log('Submitting payment', { 
-        lowProfileCode: params.lowProfileCode,
-        operationType: params.operationType 
-      });
-      
-      const { data, error } = await supabase.functions.invoke('cardcom-submit', {
-        body: {
-          lowProfileCode: params.lowProfileCode,
-          terminalNumber: params.terminalNumber,
-          operation: params.operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly',
-          cardOwnerDetails: params.cardOwnerDetails
-        }
-      });
-
-      if (error || !data?.success) {
-        PaymentLogger.error('Payment submission error', error || data?.message);
-        throw new Error(error?.message || data?.message || 'Failed to process payment');
-      }
-
-      PaymentLogger.log('Payment submitted successfully', data);
+      console.log(`Payment status updated to ${status} for lowProfileCode: ${lowProfileCode}`);
       return true;
     } catch (error) {
-      PaymentLogger.error('Exception during payment submission', error);
-      throw error;
+      console.error('Error updating payment status:', error);
+      return false;
     }
   }
 
   /**
-   * Check the status of a payment transaction
+   * Fetches payment session data from the database by session ID.
+   *
+   * @param {string} sessionId - The session ID to search for.
+   * @returns {Promise<PaymentSessionData | null>} - A promise that resolves to the payment session data if found, null otherwise.
    */
-  static async checkPaymentStatus(lowProfileCode: string): Promise<boolean> {
+  static async getPaymentSessionData(sessionId: string): Promise<PaymentSessionData | null> {
     try {
-      if (!lowProfileCode) {
-        PaymentLogger.error('Missing lowProfileCode for status check');
-        return false;
-      }
-
-      PaymentLogger.log('Checking payment status', { lowProfileCode });
-      
-      const { data, error } = await supabase.functions.invoke('cardcom-status', {
-        body: { lowProfileCode }
-      });
+      const { data, error } = await supabase
+        .from('payment_sessions')
+        .select('*')
+        .eq('session_id', sessionId)
+        .single();
 
       if (error) {
-        PaymentLogger.error('Error checking payment status', error);
+        console.error('Error fetching payment session data:', error);
+        return null;
+      }
+
+      return data ? data as PaymentSessionData : null;
+    } catch (error) {
+      console.error('Error fetching payment session data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Creates a new payment session in the database.
+   *
+   * @param {PaymentSessionData} sessionData - The data for the new payment session.
+   * @returns {Promise<boolean>} - A promise that resolves to true if the creation was successful, false otherwise.
+   */
+  static async createPaymentSession(sessionData: PaymentSessionData): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('payment_sessions')
+        .insert([
+          {
+            low_profile_id: sessionData.lowProfileId,
+            session_id: sessionData.sessionId,
+            terminal_number: sessionData.terminalNumber,
+            cardcom_url: sessionData.cardcomUrl,
+            reference: sessionData.reference,
+            payment_status: PaymentStatus.INITIALIZING,
+          },
+        ]);
+
+      if (error) {
+        console.error('Error creating payment session:', error);
         return false;
       }
 
-      PaymentLogger.log('Payment status check result', data);
-      return data?.success || false;
+      console.log('Payment session created successfully:', sessionData);
+      return true;
     } catch (error) {
-      PaymentLogger.error('Exception during payment status check', error);
+      console.error('Error creating payment session:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Updates the URL in the payment session data in the database.
+   *
+   * @param {string} sessionId - The session ID of the payment session to update.
+   * @param {string} url - The new URL to set for the payment session.
+   * @returns {Promise<boolean>} - A promise that resolves to true if the update was successful, false otherwise.
+   */
+  static async updatePaymentSessionUrl(sessionId: string, url: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('payment_sessions')
+        .update({ url: url })
+        .eq('session_id', sessionId);
+
+      if (error) {
+        console.error('Error updating payment session URL:', error);
+        return false;
+      }
+
+      console.log(`Payment session URL updated for sessionId: ${sessionId}`);
+      return true;
+    } catch (error) {
+      console.error('Error updating payment session URL:', error);
       return false;
     }
   }
