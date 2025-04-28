@@ -1,7 +1,7 @@
 
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { PaymentStatus } from '@/types/payment';
+import { PaymentStatusEnum } from '@/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { CardComService } from '@/services/payment/CardComService';
 
@@ -43,7 +43,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         terminalNumber: sessionData.terminalNumber,
         cardcomUrl: sessionData.cardcomUrl,
         reference: sessionData.reference || '',
-        paymentStatus: PaymentStatus.IDLE
+        paymentStatus: PaymentStatusEnum.IDLE
       }));
       
       return {

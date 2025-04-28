@@ -1,6 +1,6 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { PaymentStatus, PaymentStatusEnum } from '@/types/payment';
+import { PaymentStatusEnum } from '@/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
@@ -106,7 +106,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     console.log('Retrying payment initialization');
     setState(prev => ({
       ...prev,
-      paymentStatus: 'IDLE'
+      paymentStatus: PaymentStatusEnum.IDLE
     }));
     setIsCardcomInitialized(false);
     initializePayment();
@@ -175,7 +175,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       
       setState(prev => ({
         ...prev,
-        paymentStatus: 'PROCESSING'
+        paymentStatus: PaymentStatusEnum.PROCESSING
       }));
       
       startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);

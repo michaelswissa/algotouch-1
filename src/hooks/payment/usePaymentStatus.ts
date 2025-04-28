@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { PaymentStatus, PaymentStatusEnum } from '@/types/payment';
+import { PaymentStatusEnum } from '@/types/payment';
 import { toast } from 'sonner';
 
 interface UsePaymentStatusProps {
@@ -8,7 +8,7 @@ interface UsePaymentStatusProps {
 }
 
 interface PaymentState {
-  paymentStatus: keyof typeof PaymentStatusEnum;
+  paymentStatus: PaymentStatusEnum;
   sessionId: string;
   lowProfileCode: string;
   terminalNumber: string;
@@ -20,7 +20,7 @@ interface PaymentState {
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = {}) => {
   const [state, setState] = useState<PaymentState>({
-    paymentStatus: 'IDLE',
+    paymentStatus: PaymentStatusEnum.IDLE,
     sessionId: '',
     lowProfileCode: '',
     terminalNumber: '',
@@ -33,7 +33,7 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = 
   const handlePaymentSuccess = useCallback(() => {
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: 'SUCCESS'
+      paymentStatus: PaymentStatusEnum.SUCCESS
     }));
     
     toast.success('התשלום בוצע בהצלחה!');
@@ -46,7 +46,7 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = 
   const handleError = useCallback((errorMessage: string) => {
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: 'FAILED',
+      paymentStatus: PaymentStatusEnum.FAILED,
       error: errorMessage
     }));
     

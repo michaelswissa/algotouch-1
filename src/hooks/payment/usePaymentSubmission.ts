@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { PaymentStatus } from '@/types/payment';
+import { PaymentStatusEnum } from '@/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
@@ -78,7 +78,7 @@ export const usePaymentSubmission = ({
       
       setState(prev => ({
         ...prev,
-        paymentStatus: PaymentStatus.PROCESSING
+        paymentStatus: PaymentStatusEnum.PROCESSING
       }));
       
       setTimeout(() => {

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { usePaymentContext } from '@/contexts/payment/PaymentContext';
-import { PaymentStatus } from '@/types/payment';
+import { PaymentStatusEnum } from '@/types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import { toast } from 'sonner';
 import PaymentDetails from './PaymentDetails';
@@ -54,13 +54,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
 
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {
-    if (paymentStatus === PaymentStatus.SUCCESS) {
+    if (paymentStatus === PaymentStatusEnum.SUCCESS) {
       onPaymentComplete();
     }
   }, [paymentStatus, onPaymentComplete]);
 
   const getButtonText = () => {
-    if (paymentStatus === PaymentStatus.PROCESSING) {
+    if (paymentStatus === PaymentStatusEnum.PROCESSING) {
       return operationType === 'token_only' 
         ? <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מפעיל מנוי...</span>
         : <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד תשלום...</span>;
@@ -81,8 +81,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   };
 
   const shouldShowPaymentContent = 
-    paymentStatus !== PaymentStatus.SUCCESS && 
-    paymentStatus !== PaymentStatus.FAILED &&
+    paymentStatus !== PaymentStatusEnum.SUCCESS && 
+    paymentStatus !== PaymentStatusEnum.FAILED &&
     !isInitializing;
 
   return (
@@ -93,7 +93,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           <CardTitle>פרטי תשלום</CardTitle>
         </div>
         <CardDescription>
-          {paymentStatus === PaymentStatus.SUCCESS 
+          {paymentStatus === PaymentStatusEnum.SUCCESS 
             ? 'התשלום בוצע בהצלחה!'
             : operationType === 'token_only'
               ? 'הזן את פרטי כרטיס האשראי שלך להפעלת המנוי'
@@ -104,9 +104,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       <CardContent className="space-y-4">
         {isInitializing ? (
           <InitializingPayment />
-        ) : paymentStatus === PaymentStatus.SUCCESS ? (
+        ) : paymentStatus === PaymentStatusEnum.SUCCESS ? (
           <SuccessfulPayment plan={plan} onContinue={() => window.location.href = '/dashboard'} />
-        ) : paymentStatus === PaymentStatus.FAILED ? (
+        ) : paymentStatus === PaymentStatusEnum.FAILED ? (
           <FailedPayment onRetry={() => initializePayment(planId)} />
         ) : (
           <>
@@ -136,7 +136,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
               type="button" 
               className="w-full" 
               onClick={handleSubmitClick}
-              disabled={paymentStatus === PaymentStatus.PROCESSING}
+              disabled={paymentStatus === PaymentStatusEnum.PROCESSING}
             >
               {getButtonText()}
             </Button>
@@ -150,12 +150,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
           </>
         )}
         
-        {onBack && paymentStatus !== PaymentStatus.SUCCESS && (
+        {onBack && paymentStatus !== PaymentStatusEnum.SUCCESS && (
           <Button 
             variant="outline" 
             onClick={onBack} 
             className="absolute top-4 right-4"
-            disabled={paymentStatus === PaymentStatus.PROCESSING}
+            disabled={paymentStatus === PaymentStatusEnum.PROCESSING}
           >
             חזור
           </Button>
