@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
+import { PaymentService } from '@/services/payment/PaymentService';
 
 interface PaymentState {
   paymentStatus: PaymentStatusType;
@@ -27,7 +29,7 @@ interface PaymentContextType extends PaymentState {
 const initialState: PaymentState = {
   paymentStatus: PaymentStatus.IDLE,
   isInitializing: false,
-  terminalNumber: '160138',
+  terminalNumber: '',
   cardcomUrl: 'https://secure.cardcom.solutions',
   lowProfileCode: '',
   sessionId: '',
@@ -67,25 +69,21 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         planId
       }));
 
-      // Set operationType based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
       
-      // In a real implementation, we would make API calls here to initialize payment
-      // For now, let's simulate a successful initialization
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const sessionId = `session-${Date.now()}`;
-      const lowProfileCode = `profile-${Date.now()}`;
-      const reference = `ref-${Date.now()}`;
+      // Call actual PaymentService instead of simulation
+      const sessionData = await PaymentService.initializePayment(planId);
 
       setState(prev => ({
         ...prev,
         isInitializing: false,
         paymentStatus: PaymentStatus.IDLE,
         operationType,
-        sessionId,
-        lowProfileCode,
-        reference,
+        sessionId: sessionData.sessionId,
+        lowProfileCode: sessionData.lowProfileId,
+        reference: sessionData.reference,
+        terminalNumber: sessionData.terminalNumber,
+        cardcomUrl: sessionData.cardcomUrl || prev.cardcomUrl
       }));
 
       return true;
@@ -105,7 +103,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const submitPayment = async (cardOwnerDetails: CardOwnerDetails): Promise<boolean> => {
     try {
       if (state.paymentStatus === PaymentStatus.PROCESSING) {
-        return false; // Prevent duplicate submissions
+        return false;
       }
 
       if (!state.lowProfileCode) {
@@ -119,16 +117,24 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      // In a real implementation, we would make API calls here to process payment
-      // For now, let's simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call actual PaymentService.submitPayment instead of simulation
+      const success = await PaymentService.submitPayment({
+        lowProfileCode: state.lowProfileCode,
+        terminalNumber: state.terminalNumber,
+        operationType: state.operationType,
+        cardOwnerDetails
+      });
 
-      setState(prev => ({
-        ...prev,
-        paymentStatus: PaymentStatus.SUCCESS,
-      }));
+      if (success) {
+        setState(prev => ({
+          ...prev,
+          paymentStatus: PaymentStatus.SUCCESS,
+        }));
+      } else {
+        throw new Error('Payment submission failed');
+      }
       
-      return true;
+      return success;
     } catch (error) {
       console.error('Error submitting payment:', error);
       setState(prev => ({ 
