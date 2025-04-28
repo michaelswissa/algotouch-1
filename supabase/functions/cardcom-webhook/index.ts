@@ -1,17 +1,58 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
+
+// CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper logging function for enhanced debugging
-const logStep = (step: string, details?: any) => {
+// Helper function for logging
+async function logStep(
+  functionName: string,
+  step: string, 
+  details?: any, 
+  level: 'info' | 'warn' | 'error' = 'info',
+  supabaseAdmin?: any
+) {
+  const timestamp = new Date().toISOString();
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CARDCOM-WEBHOOK] ${step}${detailsStr}`);
-};
+  const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
+  
+  console.log(`${prefix} ${step}${detailsStr}`);
+  
+  // Store critical logs in database
+  if (level === 'error' && supabaseAdmin) {
+    try {
+      await supabaseAdmin.from('system_logs').insert({
+        function_name: `cardcom-${functionName}`,
+        level,
+        message: step,
+        details: details || {},
+        created_at: timestamp
+      });
+    } catch (e) {
+      console.error('Failed to log to database:', e);
+    }
+  }
+}
 
+// Check for duplicate payments to prevent double processing
+async function checkDuplicatePayment(supabaseAdmin: any, lowProfileId: string) {
+  try {
+    const { data } = await supabaseAdmin.rpc(
+      'check_duplicate_payment_extended',
+      { low_profile_id: lowProfileId }
+    );
+    return data || { exists: false };
+  } catch (error) {
+    console.error('Error checking for duplicate payment:', error);
+    return { exists: false };
+  }
+}
+
+// This function needs to be public to receive CardCom webhooks
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -19,331 +60,270 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Webhook called");
+    const functionName = 'webhook';
+    await logStep(functionName, "Webhook received");
 
-    // Create Supabase admin client for database operations that bypass RLS
+    // Create Supabase client with admin privileges
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error("Missing Supabase configuration");
     }
-
+    
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Parse the webhook data
-    let webhookData;
-    const contentType = req.headers.get('content-type') || '';
-
-    if (contentType.includes('application/json')) {
-      webhookData = await req.json();
-      logStep("Received JSON webhook data", webhookData);
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await req.formData();
-      webhookData = Object.fromEntries(formData.entries());
-      logStep("Received form webhook data", webhookData);
-    } else {
-      const text = await req.text();
-      logStep("Received unknown format webhook data", { text, contentType });
-      try {
-        // Try to parse as JSON as a fallback
-        webhookData = JSON.parse(text);
-        logStep("Successfully parsed text as JSON", webhookData);
-      } catch (e) {
-        logStep("Failed to parse webhook data", { error: e.message });
-        throw new Error(`Unsupported content type: ${contentType}`);
-      }
-    }
-
-    // Extract key fields from the webhook data
-    const {
-      ResponseCode,
-      Description,
-      LowProfileId, 
-      TranzactionId,
-      ReturnValue,
-      Operation,
-      TokenInfo,
-      TranzactionInfo
-    } = webhookData;
-    
-    logStep("Extracted webhook data fields", { 
-      ResponseCode, 
-      LowProfileId, 
-      TranzactionId,
-      ReturnValue,
-      Operation,
-      hasTokenInfo: !!TokenInfo,
-      hasTranzactionInfo: !!TranzactionInfo
-    });
-
-    // Return early if essential data is missing
-    if (!LowProfileId && !ReturnValue) {
-      logStep("ERROR: Missing LowProfileId and ReturnValue");
-      throw new Error("Missing required payment identification information");
-    }
-    
-    // Find the corresponding payment session
-    let paymentQuery = supabaseAdmin.from('payment_sessions').select('*');
-    
-    // First try to find by LowProfileId (as stored in low_profile_id)
-    if (LowProfileId) {
-      paymentQuery = paymentQuery.eq('low_profile_id', LowProfileId);
-    } 
-    // If no LowProfileId, try to find by ReturnValue (as stored in reference)
-    else if (ReturnValue) {
-      paymentQuery = paymentQuery.eq('reference', ReturnValue);
-    }
-    
-    // Find the most recent session that matches
-    const { data: paymentSessions, error: sessionsError } = await paymentQuery
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    if (sessionsError || !paymentSessions || paymentSessions.length === 0) {
-      logStep("ERROR: Payment session not found", { 
-        LowProfileId, 
-        ReturnValue,
-        error: sessionsError?.message || 'No matching payment session found' 
-      });
-      
-      // Log this error but don't throw an exception to return a 200 status to CardCom
+    // Parse webhook payload
+    let payload;
+    try {
+      payload = await req.json();
+      await logStep(functionName, "Received webhook data", payload);
+    } catch (e) {
+      await logStep(functionName, "Failed to parse webhook data", e, 'error', supabaseAdmin);
       return new Response(
-        JSON.stringify({ success: false, message: "Payment session not found" }),
-        {
-          status: 200, // Return 200 even for errors, as CardCom expects this
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ success: false, message: "Invalid webhook payload" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
     
-    const paymentSession = paymentSessions[0];
-    logStep("Found payment session", { 
-      sessionId: paymentSession.id, 
-      userId: paymentSession.user_id, 
-      status: paymentSession.status 
-    });
-    
-    // Check if payment was successful
-    let paymentStatus = 'failed';
-    if (ResponseCode === 0) {
-      paymentStatus = 'completed';
+    // Validate required fields
+    if (!payload?.LowProfileId || !payload?.ResponseCode) {
+      await logStep(functionName, "Missing required webhook fields", payload, 'error', supabaseAdmin);
+      return new Response(
+        JSON.stringify({ success: false, message: "Missing required fields" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
     
-    // Extract payment details
-    const paymentDetails = {
-      transaction_id: TranzactionId ? TranzactionId.toString() : null,
-      transaction_data: webhookData,
-      status: paymentStatus,
-      updated_at: new Date().toISOString(),
-    };
+    // Extract important values from webhook
+    const {
+      LowProfileId: lowProfileId,
+      ResponseCode: responseCode,
+      ReturnValue: reference,
+      TranzactionId: transactionId
+    } = payload;
     
-    // Extract token information if available
-    let paymentMethod = null;
-    if (TokenInfo && TokenInfo.Token) {
-      paymentMethod = {
-        token: TokenInfo.Token,
-        expiryMonth: TokenInfo.CardMonth?.toString() || '',
-        expiryYear: TokenInfo.CardYear?.toString() || '',
-        tokenApprovalNumber: TokenInfo.TokenApprovalNumber || '',
-        cardOwnerIdentityNumber: TokenInfo.CardOwnerIdentityNumber || '',
-        tokenExpiryDate: TokenInfo.TokenExDate || ''
-      };
+    // Check for duplicate processing
+    const duplicateCheck = await checkDuplicatePayment(supabaseAdmin, lowProfileId);
+    if (duplicateCheck && duplicateCheck.exists) {
+      await logStep(functionName, "Detected duplicate payment", duplicateCheck, 'warn');
       
-      if (TranzactionInfo && TranzactionInfo.Last4CardDigits) {
-        paymentMethod.lastFourDigits = TranzactionInfo.Last4CardDigits.toString();
-      } else if (TranzactionInfo && TranzactionInfo.Last4CardDigitsString) {
-        paymentMethod.lastFourDigits = TranzactionInfo.Last4CardDigitsString;
-      }
-      
-      if (TranzactionInfo && TranzactionInfo.CardInfo) {
-        paymentMethod.cardType = TranzactionInfo.CardInfo;
-      }
+      // Return 200 to acknowledge receipt even though it's a duplicate
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: "Duplicate payment webhook - already processed",
+          data: duplicateCheck 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
-    // Update the payment session with the results
-    logStep("Updating payment session", { 
-      sessionId: paymentSession.id, 
-      newStatus: paymentStatus,
-      hasToken: !!paymentMethod?.token
-    });
+    // Find the relevant payment session
+    const { data: paymentSession, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .select('*')
+      .eq('low_profile_id', lowProfileId)
+      .maybeSingle();
     
+    if (sessionError || !paymentSession) {
+      await logStep(functionName, "Payment session not found", { error: sessionError?.message, lowProfileId }, 'error', supabaseAdmin);
+      
+      // Log this unmatched transaction
+      await supabaseAdmin.from('payment_errors').insert({
+        error_code: 'SESSION_NOT_FOUND',
+        error_message: `No payment session found for LowProfileId: ${lowProfileId}`,
+        response_data: payload
+      });
+      
+      return new Response(
+        JSON.stringify({ success: false, message: "Payment session not found" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Check if the session is already completed
+    if (paymentSession.status === 'completed') {
+      await logStep(functionName, "Session already completed", { sessionId: paymentSession.id });
+      return new Response(
+        JSON.stringify({ success: true, message: "Payment already processed" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Determine success/failure based on response code
+    const isSuccess = responseCode === '0';
+    const newStatus = isSuccess ? 'completed' : 'failed';
+    
+    // Update payment session status
     await supabaseAdmin
       .from('payment_sessions')
       .update({
-        ...paymentDetails,
-        payment_details: paymentMethod ? { paymentMethod } : null
+        status: newStatus,
+        transaction_id: transactionId || null,
+        transaction_data: payload,
+        updated_at: new Date().toISOString()
       })
       .eq('id', paymentSession.id);
     
-    // If payment was successful and we have a token, we can update or create a subscription
-    if (paymentStatus === 'completed' && paymentSession.user_id && paymentMethod?.token) {
-      const userId = paymentSession.user_id;
-      const planId = paymentSession.plan_id;
-      const amount = paymentSession.amount;
-      
-      logStep("Payment succeeded with token, updating user subscription", { 
-        userId, 
-        planId, 
-        hasToken: !!paymentMethod?.token 
-      });
-      
-      // Create a new payment log entry
-      await supabaseAdmin
-        .from('payment_logs')
-        .insert({
-          user_id: userId,
-          transaction_id: TranzactionId?.toString() || '',
-          amount: amount,
-          currency: paymentSession.currency || 'ILS',
-          plan_id: planId,
-          payment_status: 'succeeded',
-          payment_data: webhookData
-        });
-      
-      // Check if user already has a subscription
-      const { data: existingSubscriptions } = await supabaseAdmin
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .in('status', ['active', 'trial'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-        
-      // Calculate subscription dates
-      const now = new Date();
-      let trialEndsAt = null;
-      let nextChargeDate = new Date();
-      let currentPeriodEndsAt = new Date();
-      
-      if (planId === 'monthly') {
-        // For monthly subscriptions, add trial only if it's a new subscription
-        if (!existingSubscriptions || existingSubscriptions.length === 0) {
-          trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days trial (updated from 14 to match planData.ts)
-        }
-        nextChargeDate = trialEndsAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
-        currentPeriodEndsAt = trialEndsAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      } else if (planId === 'annual') {
-        // No trial for annual plans
-        nextChargeDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-        currentPeriodEndsAt = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-      } else if (planId === 'vip') {
-        // VIP plan is lifetime, set dates far in the future (10 years)
-        const farFuture = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate());
-        nextChargeDate = farFuture;
-        currentPeriodEndsAt = farFuture;
-        
-        // Log special handling for VIP plan
-        logStep("Processing VIP lifetime plan", { userId });
-      }
-      
-      // Prepare subscription data
-      const subscriptionData = {
-        user_id: userId,
-        plan_type: planId,
-        status: trialEndsAt ? 'trial' : 'active',
-        next_charge_date: nextChargeDate.toISOString(),
-        current_period_ends_at: currentPeriodEndsAt.toISOString(),
-        trial_ends_at: trialEndsAt ? trialEndsAt.toISOString() : null,
-        payment_method: paymentMethod,
-        updated_at: now.toISOString()
-      };
-      
-      // Insert or update the subscription
-      if (existingSubscriptions && existingSubscriptions.length > 0) {
-        // Update existing subscription
-        await supabaseAdmin
-          .from('subscriptions')
-          .update(subscriptionData)
-          .eq('id', existingSubscriptions[0].id);
-          
-        logStep("Updated existing subscription", { subscriptionId: existingSubscriptions[0].id });
-      } else {
-        // Create new subscription
-        const { data: newSubscription, error: subscriptionError } = await supabaseAdmin
-          .from('subscriptions')
-          .insert({
-            ...subscriptionData,
-            created_at: now.toISOString()
-          })
-          .select('id')
+    await logStep(functionName, `Payment ${isSuccess ? 'succeeded' : 'failed'}`, {
+      lowProfileId,
+      sessionId: paymentSession.id,
+      transactionId,
+      responseCode
+    });
+    
+    // Create log entry
+    await supabaseAdmin.from('user_payment_logs').insert({
+      user_id: paymentSession.user_id,
+      token: lowProfileId,
+      transaction_id: transactionId,
+      amount: paymentSession.amount,
+      status: isSuccess ? 'payment_success' : 'payment_failed',
+      payment_data: payload,
+      currency: paymentSession.currency || 'ILS'
+    });
+    
+    // If successful payment, handle subscription creation or update
+    if (isSuccess && paymentSession.user_id && paymentSession.plan_id) {
+      try {
+        // Get the selected plan details from the database
+        const { data: planData } = await supabaseAdmin
+          .from('plans')
+          .select('*')
+          .eq('id', paymentSession.plan_id)
           .single();
           
-        if (subscriptionError) {
-          logStep("ERROR creating subscription", { error: subscriptionError.message });
-        } else {
-          logStep("Created new subscription", { subscriptionId: newSubscription.id });
-        }
-      }
-      
-      // Also store the payment token for recurring payments
-      try {
-        // Check if we already have this token stored
-        const { data: existingToken } = await supabaseAdmin
-          .from('recurring_payments')
-          .select('id')
-          .eq('token', paymentMethod.token)
-          .eq('user_id', userId)
-          .limit(1);
+        if (planData) {
+          // Check if user already has a subscription
+          const { data: existingSubscription } = await supabaseAdmin
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', paymentSession.user_id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          const now = new Date();
+          let trialEndsAt = null;
+          let nextChargeAt = null;
           
-        if (!existingToken || existingToken.length === 0) {
-          // Format token expiry date correctly from MM/YY to a proper date
-          let tokenExpiry = null;
-          if (paymentMethod.expiryMonth && paymentMethod.expiryYear) {
-            const month = parseInt(paymentMethod.expiryMonth);
-            const year = 2000 + parseInt(paymentMethod.expiryYear); // Assuming 2-digit year
-            tokenExpiry = new Date(year, month - 1, 1); // First day of the expiry month
+          // Calculate trial and next charge dates
+          if (planData.has_trial && planData.trial_days > 0 && planData.id !== 'vip') {
+            trialEndsAt = new Date(now);
+            trialEndsAt.setDate(trialEndsAt.getDate() + planData.trial_days);
+            nextChargeAt = new Date(trialEndsAt);
+          } else if (planData.id !== 'vip') {
+            // For non-VIP plans with no trial, set next charge date based on cycle_days
+            nextChargeAt = new Date(now);
+            nextChargeAt.setDate(nextChargeAt.getDate() + (planData.cycle_days || 30));
           }
           
-          // Store the token
-          await supabaseAdmin
-            .from('recurring_payments')
-            .insert({
-              user_id: userId,
-              token: paymentMethod.token,
-              token_expiry: tokenExpiry ? tokenExpiry.toISOString().split('T')[0] : null,
-              token_approval_number: paymentMethod.tokenApprovalNumber,
-              last_4_digits: paymentMethod.lastFourDigits,
-              card_type: paymentMethod.cardType || 'Unknown',
-              is_valid: true,
-              status: 'active'
+          // Extract token info for recurring payments
+          const tokenInfo = payload.TokenInfo || {};
+          const paymentMethod = payload.TranzactionInfo || {};
+          
+          let subscriptionData = {
+            user_id: paymentSession.user_id,
+            plan_id: paymentSession.plan_id,
+            status: planData.has_trial && planData.id !== 'vip' ? 'trial' : 'active',
+            plan_type: paymentSession.plan_id,
+            trial_ends_at: trialEndsAt ? trialEndsAt.toISOString() : null,
+            next_charge_at: nextChargeAt ? nextChargeAt.toISOString() : null,
+            token: tokenInfo.Token || null,
+            token_expires_ym: tokenInfo.TokenExDate ? 
+              tokenInfo.TokenExDate.substring(0, 6) : null,
+            payment_method: paymentMethod
+          };
+          
+          // VIP plans don't expire or have recurring charges
+          if (paymentSession.plan_id === 'vip') {
+            subscriptionData = {
+              ...subscriptionData,
+              status: 'active',
+              trial_ends_at: null,
+              next_charge_at: null
+            };
+          }
+          
+          if (existingSubscription && existingSubscription.length > 0) {
+            // Update existing subscription
+            await supabaseAdmin
+              .from('subscriptions')
+              .update(subscriptionData)
+              .eq('id', existingSubscription[0].id);
+              
+            await logStep(functionName, "Subscription updated", { 
+              subscriptionId: existingSubscription[0].id,
+              planId: paymentSession.plan_id
             });
+          } else {
+            // Create new subscription
+            const { data: newSubscription, error: subError } = await supabaseAdmin
+              .from('subscriptions')
+              .insert(subscriptionData)
+              .select()
+              .single();
+              
+            if (subError) {
+              await logStep(functionName, "Failed to create subscription", subError, 'error', supabaseAdmin);
+            } else {
+              await logStep(functionName, "New subscription created", { 
+                subscriptionId: newSubscription.id,
+                planId: paymentSession.plan_id
+              });
+            }
+          }
+          
+          // If token was created, store it for recurring payments
+          if (tokenInfo.Token && planData.id !== 'vip') {
+            const tokenExpiry = tokenInfo.TokenExDate ? 
+              new Date(`20${tokenInfo.TokenExDate.substring(0, 2)}-${tokenInfo.TokenExDate.substring(2, 4)}-01`) : 
+              new Date(now.getFullYear() + 2, now.getMonth());
+              
+            await supabaseAdmin.from('recurring_payments').insert({
+              user_id: paymentSession.user_id,
+              token: tokenInfo.Token,
+              status: 'active',
+              token_expiry: tokenExpiry.toISOString(),
+              last_4_digits: paymentMethod?.Last4CardDigits?.toString() || null,
+              card_type: paymentMethod?.CardName || null,
+              token_approval_number: tokenInfo.TokenApprovalNumber || null
+            }).onConflict('token').ignore();
             
-          logStep("Stored recurring payment token");
-        } else {
-          logStep("Token already exists in system");
+            await logStep(functionName, "Recurring payment token stored", { 
+              userId: paymentSession.user_id,
+              token: tokenInfo.Token
+            });
+          }
         }
-      } catch (tokenError) {
-        logStep("ERROR storing recurring token", { error: tokenError.message });
-        // Continue despite error - this is not critical to the payment flow
+      } catch (subscriptionError) {
+        await logStep(functionName, "Error handling subscription", subscriptionError, 'error', supabaseAdmin);
       }
     }
-
-    // Return success to CardCom
+    
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Payment ${paymentStatus}`,
+        message: `Payment ${isSuccess ? 'completed' : 'failed'} successfully`,
+        data: { 
+          status: newStatus,
+          sessionId: paymentSession.id,
+          lowProfileId,
+          transactionId
+        }
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in webhook processing", { message: errorMessage });
     
-    // Return a 200 status even for errors, as CardCom expects this response code
+  } catch (error) {
+    console.error(`[CARDCOM-WEBHOOK] Error: ${error instanceof Error ? error.message : String(error)}`);
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: errorMessage || "Error processing payment webhook",
+      JSON.stringify({ 
+        success: false, 
+        message: error instanceof Error ? error.message : String(error) 
       }),
-      {
-        status: 200, // Return 200 even for errors
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

@@ -4,10 +4,11 @@
  * Central place for CardCom-related configuration values
  */
 export const CARDCOM_CONFIG = {
-  // Terminal information
-  terminalNumber: "160138",
-  apiName: "bLaocQRMSnwphQRUVG3b",
-  apiPassword: "i9nr6caGbgheTdYfQbo6",
+  // Terminal information - using empty strings as defaults
+  // Terminal info will be retrieved from environment variables via edge functions
+  terminalNumber: "",  // Will be provided by the server
+  apiName: "",         // Will be provided by the server
+  apiPassword: "",     // Will be provided by the server
   
   // CardCom API endpoints
   endpoints: {

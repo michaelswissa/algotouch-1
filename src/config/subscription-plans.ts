@@ -1,3 +1,4 @@
+
 import { SubscriptionPlan } from '@/components/payment/types/payment';
 
 export const subscriptionPlans = {
@@ -6,18 +7,18 @@ export const subscriptionPlans = {
     name: 'Standard',
     price: 371,
     displayPrice: '371₪',
-    description: 'מנוי חודשי עם 14 ימי ניסיון בחינם',
+    description: 'מנוי חודשי עם 30 ימי ניסיון בחינם',
     hasTrial: true,
-    freeTrialDays: 14
+    freeTrialDays: 30
   },
   annual: {
     id: 'annual',
     name: 'Pro Annual',
     price: 3371,
     displayPrice: '3,371₪',
-    description: 'מנוי שנתי עם 14 ימי ניסיון בחינם',
+    description: 'מנוי שנתי עם 30 ימי ניסיון בחינם',
     hasTrial: true,
-    freeTrialDays: 14
+    freeTrialDays: 30
   },
   vip: {
     id: 'vip',

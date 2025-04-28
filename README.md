@@ -1,69 +1,65 @@
-# Welcome to your Lovable project
 
-## Project info
+# CardCom Payment Integration
 
-**URL**: https://lovable.dev/projects/943ea41c-32cf-4f38-9bf8-8a57a35db025
+This project implements a secure payment processing system using CardCom payment gateway.
 
-## How can I edit this code?
+## Key Components
 
-There are several ways of editing your application.
+### Edge Functions
 
-**Use Lovable**
+1. **cardcom-payment** - Centralized function for payment initialization
+   - Handles both redirect and iframe payment flows
+   - Creates payment sessions in the database
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/943ea41c-32cf-4f38-9bf8-8a57a35db025) and start prompting.
+2. **cardcom-webhook** - Processes payment callbacks from CardCom
+   - Updates payment status
+   - Creates subscriptions based on successful payments
 
-Changes made via Lovable will be committed automatically to this repo.
+3. **cardcom-recurring** - Handles recurring payments
+   - Processes due subscriptions
+   - Manages subscription cancellations
 
-**Use your preferred IDE**
+4. **cardcom-status** - Checks payment status
+   - Verifies transactions against CardCom API
+   - Updates local payment records
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+5. **cardcom-submit** - Submits payment details
+   - Handles CardCom form submissions
+   - Validates input data
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Database Tables
 
-Follow these steps:
+The system uses several tables to track payments and subscriptions:
+- `payment_sessions` - Tracks payment attempts
+- `user_payment_logs` - Stores payment history
+- `subscriptions` - Manages user subscription details
+- `recurring_payments` - Stores payment tokens for recurring billing
+- `plans` - Defines subscription plans
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Security Features
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- All API keys stored as environment variables
+- Input validation on all requests
+- Duplicate payment prevention
+- Error logging and monitoring
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Recurring Billing
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+The system includes a cron job that runs daily to:
+1. Process subscriptions due for renewal
+2. Update expired trial subscriptions
+3. Invalidate tokens after multiple failed payment attempts
 
-**Edit a file directly in GitHub**
+## Configuration
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The CardCom integration requires the following environment variables:
+- `CARDCOM_TERMINAL_NUMBER` - Terminal number from CardCom
+- `CARDCOM_API_NAME` - API username
+- `CARDCOM_API_PASSWORD` - API password (required for some operations)
 
-**Use GitHub Codespaces**
+## Subscription Plans
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/943ea41c-32cf-4f38-9bf8-8a57a35db025) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+Available subscription plans:
+1. **Monthly** - 371₪/month with 30-day free trial
+2. **Annual** - 3,371₪/year with 30-day free trial
+3. **VIP** - 13,121₪ one-time payment for lifetime access
