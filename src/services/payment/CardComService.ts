@@ -35,7 +35,11 @@ export class CardComService {
       console.log('Calling payment endpoint:', PAYMENT_ENDPOINT);
 
       // Specify the expected response structure
-      const response = await axios.post<ApiResponse<PaymentSessionData>>(PAYMENT_ENDPOINT, requestData);
+      const response = await axios.post<ApiResponse<PaymentSessionData>>(PAYMENT_ENDPOINT, requestData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       console.log('Payment initialization response:', response.data);
 
@@ -60,11 +64,14 @@ export class CardComService {
 
   static async submitPayment(data: { lowProfileCode: string; terminalNumber: string; operationType: string; cardOwnerDetails: CardOwnerDetails }): Promise<boolean> {
     try {
-      // No direct API call to CardCom here; the transaction is initiated via the iframe
-      // This method might be used for post-processing or status updates in the future
       console.log('Payment submission initiated for iframe flow:', { 
         lowProfileCode: data.lowProfileCode,
-        operationType: data.operationType
+        operationType: data.operationType,
+        cardOwnerDetails: {
+          ...data.cardOwnerDetails,
+          // Don't log any sensitive data
+          cardOwnerId: data.cardOwnerDetails.cardOwnerId ? '****' : undefined
+        }
       });
       return true;
     } catch (error: any) {

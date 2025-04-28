@@ -34,7 +34,8 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
-    const { 
+    // Important: Changed from const to let for operationType
+    let { 
       planId, 
       userId, 
       email, 
@@ -104,7 +105,7 @@ serve(async (req) => {
         amount: amount,
         currency: "ILS",
         status: 'initiated',
-        operation_type: operationType,
+        operation_type: operationType, // Using the new column
         reference: transactionRef,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         payment_details: { 

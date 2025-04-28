@@ -112,7 +112,8 @@ export const useCardcomInitializer = () => {
             
           const reCaptchaFieldCSS = 'body { margin: 0; padding:0; display: flex; justify-content: center; }';
           
-          const config = {
+          // Changed from const to let in case we need to modify it
+          let config = {
             action: 'init',
             lowProfileCode,
             LowProfileCode: lowProfileCode,

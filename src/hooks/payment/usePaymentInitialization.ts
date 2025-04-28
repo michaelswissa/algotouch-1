@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { PaymentStatus } from '@/types/payment';
 import { RegistrationService } from '@/services/registration/RegistrationService';
@@ -117,7 +118,7 @@ export const usePaymentInitialization = ({
       setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       return null;
     }
-  }, [setState, masterFrameRef]);
+  }, [setState, masterFrameRef, planId, operationType, validateContract]);
 
   return { initializePayment };
 };

@@ -399,6 +399,7 @@ export type Database = {
           expires_at: string
           id: string
           low_profile_id: string
+          operation_type: string | null
           payment_details: Json | null
           plan_id: string
           reference: string
@@ -416,6 +417,7 @@ export type Database = {
           expires_at: string
           id?: string
           low_profile_id: string
+          operation_type?: string | null
           payment_details?: Json | null
           plan_id: string
           reference: string
@@ -433,6 +435,7 @@ export type Database = {
           expires_at?: string
           id?: string
           low_profile_id?: string
+          operation_type?: string | null
           payment_details?: Json | null
           plan_id?: string
           reference?: string

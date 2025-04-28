@@ -34,8 +34,20 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   useEffect(() => {
     if (cardNumberLoaded && cvvLoaded && captchaLoaded && isReady) {
       setAllFramesLoaded(true);
+      console.log('All CardCom iframes loaded successfully!');
     }
   }, [cardNumberLoaded, cvvLoaded, captchaLoaded, isReady]);
+  
+  // Log for debugging
+  useEffect(() => {
+    if (isReady) {
+      console.log('PaymentDetails component is ready with:', {
+        terminalNumber,
+        cardcomUrl,
+        hasMasterFrameRef: !!masterFrameRef.current
+      });
+    }
+  }, [isReady, terminalNumber, cardcomUrl, masterFrameRef]);
   
   return (
     <div className="space-y-4" dir="rtl">
@@ -127,7 +139,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <CardNumberFrame
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => setCardNumberLoaded(true)}
+            onLoad={() => {
+              console.log('Card number iframe loaded');
+              setCardNumberLoaded(true);
+            }}
             isReady={isReady}
           />
           <div className="absolute top-0 right-0 h-full flex items-center pr-3 pointer-events-none">
@@ -168,7 +183,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           <CVVFrame
             terminalNumber={terminalNumber}
             cardcomUrl={cardcomUrl}
-            onLoad={() => setCvvLoaded(true)}
+            onLoad={() => {
+              console.log('CVV iframe loaded');
+              setCvvLoaded(true);
+            }}
             isReady={isReady}
           />
         </div>
@@ -179,7 +197,10 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <ReCaptchaFrame
           terminalNumber={terminalNumber}
           cardcomUrl={cardcomUrl}
-          onLoad={() => setCaptchaLoaded(true)}
+          onLoad={() => {
+            console.log('reCAPTCHA iframe loaded');
+            setCaptchaLoaded(true);
+          }}
         />
       </div>
 
@@ -191,6 +212,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
             title="CardCom Payment"
             className="w-full h-0"
             style={{ border: 'none' }}
+            onLoad={() => console.log('Master iframe loaded')}
           />
         </div>
       )}
