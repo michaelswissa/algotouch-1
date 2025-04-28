@@ -1,7 +1,8 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { logStep, validateAmount, validateTransaction } from "../_shared/cardcom_utils.ts";
+import { logStep, validateAmount } from "../_shared/cardcom_utils.ts";
 
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
@@ -15,7 +16,7 @@ serve(async (req) => {
     const functionName = 'payment';
     await logStep(functionName, "Function started");
     
-    // Create Supabase clients
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -33,7 +34,7 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
-    // Process the request body
+    // Process request body
     const { 
       planId, 
       amount: requestedAmount,
@@ -45,14 +46,13 @@ serve(async (req) => {
       webhook = null
     } = await req.json();
     
-    // Generate a unique reference
+    // Generate transaction reference
     const transactionRef = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Determine operation type and initial amount based on plan type
     let operationType = "ChargeOnly";
     let initialAmount = requestedAmount;
     
-    // If a plan ID is provided, fetch the plan details and set operation type
     if (planId) {
       const { data: plan, error: planError } = await supabaseAdmin
         .from('plans')
@@ -61,7 +61,7 @@ serve(async (req) => {
         .maybeSingle();
         
       if (planError) {
-        await logStep(functionName, "Error fetching plan details", planError, 'error', supabaseAdmin);
+        await logStep(functionName, "Error fetching plan details", planError, 'error');
         throw new Error("Error fetching plan details");
       }
       
@@ -69,7 +69,6 @@ serve(async (req) => {
         throw new Error(`Invalid plan ID: ${planId}`);
       }
 
-      // Set operation type and initial amount based on plan type
       switch (planId) {
         case 'monthly':
           operationType = "ChargeAndCreateToken";
@@ -94,36 +93,13 @@ serve(async (req) => {
       });
     }
     
-    // Validate the amount
+    // Validate amount
     if (!validateAmount(initialAmount)) {
-      await logStep(functionName, "Invalid amount", { initialAmount }, 'error', supabaseAdmin);
+      await logStep(functionName, "Invalid amount", { initialAmount }, 'error');
       throw new Error("Invalid amount");
     }
 
-    // Check for duplicate transactions
-    const existingTransaction = await validateTransaction(supabaseAdmin, transactionRef);
-    if (existingTransaction) {
-      await logStep(functionName, "Duplicate transaction reference detected", {
-        reference: transactionRef,
-        existingId: existingTransaction.id,
-        existingStatus: existingTransaction.status
-      }, 'warn', supabaseAdmin);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Using existing payment session",
-          data: {
-            sessionId: existingTransaction.id,
-            status: existingTransaction.status,
-            isDuplicate: true
-          }
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Create a payment session record
+    // Create payment session record
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .insert({
@@ -147,22 +123,20 @@ serve(async (req) => {
       .single();
       
     if (sessionError) {
-      await logStep(functionName, "Failed to create payment session", { error: sessionError.message }, 'error', supabaseAdmin);
+      await logStep(functionName, "Failed to create payment session", sessionError, 'error');
       throw new Error("Failed to create payment session");
     }
     
     const sessionId = sessionData.id;
     await logStep(functionName, "Payment session created", { sessionId, planId, amount: initialAmount });
     
-    // Generate LowProfile ID using a deterministic algorithm
+    // Generate LowProfile ID
     const lowProfileId = crypto.randomUUID();
     
-    // Update the session with the lowProfileId
+    // Update session with lowProfileId
     await supabaseAdmin
       .from('payment_sessions')
-      .update({
-        low_profile_id: lowProfileId
-      })
+      .update({ low_profile_id: lowProfileId })
       .eq('id', sessionId);
       
     await logStep(functionName, "LowProfile ID assigned", { sessionId, lowProfileId });
@@ -186,7 +160,7 @@ serve(async (req) => {
       );
     }
     
-    // Build WebHook URL for Cardcom callbacks
+    // Build WebHook URL
     let webHookUrl = webhook;
     
     if (!webHookUrl) {
@@ -194,7 +168,7 @@ serve(async (req) => {
       webHookUrl = `${baseUrl}/cardcom-webhook`;
     }
     
-    // Create the Cardcom LowProfile URL
+    // Create CardCom URL
     const cardcomUrl = "https://secure.cardcom.solutions";
     const successUrl = redirectUrls?.success || `${req.headers.get('Origin') || ''}/subscription/success`;
     const failedUrl = redirectUrls?.failed || `${req.headers.get('Origin') || ''}/subscription/failed`;
@@ -214,7 +188,7 @@ serve(async (req) => {
       (invoiceInfo?.email ? `&Email=${encodeURIComponent(invoiceInfo.email)}` : '') +
       (invoiceInfo?.phone ? `&PhoneNumber=${encodeURIComponent(invoiceInfo.phone)}` : '');
       
-    await logStep(functionName, "Redirect URL created", { url: fullRedirectUrl });
+    await logStep(functionName, "Redirect URL created");
     
     return new Response(
       JSON.stringify({
@@ -232,9 +206,10 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error(`[CARDCOM-PAYMENT][ERROR] ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    await logStep('payment', errorMessage, error, 'error');
     return new Response(
-      JSON.stringify({ success: false, message: error.message }),
+      JSON.stringify({ success: false, message: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
