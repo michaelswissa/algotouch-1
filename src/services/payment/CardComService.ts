@@ -52,6 +52,7 @@ export class CardComService {
       // Log more detailed error info if available
       if (axios.isAxiosError(error)) {
         console.error('API error details:', error.response?.data, error.response?.status);
+        console.error('Error request config:', error.config);
       }
       throw new Error(error.response?.data?.message || 'Failed to initialize payment');
     }
@@ -82,10 +83,12 @@ export class CardComService {
     return cardExpiryValidation;
   }
 
-  // Add the processCardComResponse method from the lib version
+  // Process CardCom webhook response
   static async processCardComResponse(data: any): Promise<CardComPaymentResponse> {
     try {
+      console.log('Processing CardCom response:', data);
       const response = await axios.post<ApiResponse<CardComPaymentResponse>>(WEBHOOK_ENDPOINT, data);
+      console.log('CardCom webhook response:', response.data);
       return response.data.data;
     } catch (error: any) {
       console.error('Error processing CardCom response:', error);
@@ -96,7 +99,7 @@ export class CardComService {
     }
   }
 
-  // The checkPaymentStatus function is already implemented in this file
+  // Check payment status
   static async checkPaymentStatus(lowProfileCode: string): Promise<{success: boolean; data?: any; message?: string}> {
     try {
       console.log('Checking payment status for lowProfileCode:', lowProfileCode);

@@ -1,27 +1,20 @@
 
-// Shared utility functions for CardCom edge functions
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-/**
- * Log a step in the function execution with optional details
- */
-export async function logStep(
+// Helper logging function for enhanced debugging
+export const logStep = async (
   functionName: string,
   step: string, 
   details?: any, 
   level: 'info' | 'warn' | 'error' = 'info',
   supabaseAdmin?: any
-) {
+) => {
   const timestamp = new Date().toISOString();
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   const prefix = `[CARDCOM-${functionName.toUpperCase()}][${level.toUpperCase()}][${timestamp}]`;
   
   console.log(`${prefix} ${step}${detailsStr}`);
   
-  // Store critical logs in database
   if (level === 'error' && supabaseAdmin) {
     try {
       await supabaseAdmin.from('system_logs').insert({
@@ -32,59 +25,46 @@ export async function logStep(
         created_at: timestamp
       });
     } catch (e) {
-      // Don't let logging errors affect main flow
       console.error('Failed to log to database:', e);
     }
   }
-}
+};
 
-/**
- * Validate if a string is a valid UUID for LowProfileId
- */
-export function validateLowProfileId(lowProfileId: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lowProfileId);
-}
+// Validate amount is not negative or NaN
+export const validateAmount = (amount: number): boolean => {
+  return !isNaN(amount) && amount >= 0;
+};
 
-/**
- * Validate if amount is a valid positive number
- */
-export function validateAmount(amount: number): boolean {
-  return !isNaN(amount) && amount > 0;
-}
+// Validate lowProfileId format (UUID)
+export const validateLowProfileId = (lowProfileId: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(lowProfileId);
+};
 
-/**
- * Check for duplicate transaction references
- */
-export async function validateTransaction(supabaseAdmin: any, transactionRef: string) {
-  const { data: existingTransaction } = await supabaseAdmin
+// Check for duplicate payments
+export const checkDuplicatePayment = async (
+  supabaseAdmin: any, 
+  lowProfileId: string
+): Promise<boolean> => {
+  // Check payment_sessions table first
+  const { data: sessionData } = await supabaseAdmin
     .from('payment_sessions')
-    .select('id, status')
-    .eq('reference', transactionRef)
-    .limit(1);
-
-  return existingTransaction?.[0] || null;
-}
-
-/**
- * Check for duplicate payment
- */
-export async function checkDuplicatePayment(supabaseAdmin: any, lowProfileId: string, transactionId: string | null): Promise<{ exists: boolean; sessionId?: string; transactionId?: string }> {
-  // Check if a payment session with the same LowProfileId and TransactionId already exists
-  const { data, error } = await supabaseAdmin
-    .from('payment_sessions')
-    .select('id, transaction_id')
+    .select('status')
     .eq('low_profile_id', lowProfileId)
-    .eq('transaction_id', transactionId)
+    .eq('status', 'completed')
     .maybeSingle();
-
-  if (error) {
-    console.error('Error checking for duplicate payment:', error);
-    return { exists: false };
+  
+  if (sessionData) {
+    return true;
   }
-
-  if (data) {
-    return { exists: true, sessionId: data.id, transactionId: data.transaction_id };
-  }
-
-  return { exists: false };
-}
+  
+  // Check payment logs as fallback
+  const { data: logsData } = await supabaseAdmin
+    .from('user_payment_logs')
+    .select('status')
+    .eq('token', lowProfileId)
+    .in('status', ['payment_success', 'token_created'])
+    .maybeSingle();
+    
+  return !!logsData;
+};

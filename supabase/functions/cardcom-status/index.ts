@@ -1,6 +1,8 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { logStep } from "../_shared/cardcom_utils.ts";
 
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
@@ -34,7 +36,21 @@ serve(async (req) => {
     }
 
     // Parse the request body for lowProfileCode
-    const { lowProfileCode } = await req.json();
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      await logStep(functionName, "Failed to parse request body", e, 'error', supabaseAdmin);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Invalid request format",
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const { lowProfileCode } = requestData;
     
     if (!lowProfileCode) {
       await logStep(functionName, "Missing lowProfileCode", {}, 'error', supabaseAdmin);
@@ -46,6 +62,8 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    await logStep(functionName, "Checking status for", { lowProfileCode });
     
     // Look up the payment session
     const { data: paymentSession, error: sessionError } = await supabaseAdmin

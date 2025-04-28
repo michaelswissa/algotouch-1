@@ -36,40 +36,104 @@ serve(async (req) => {
 
     const { 
       planId, 
-      amount: requestedAmount,
-      invoiceInfo, 
-      redirectUrls, 
-      userId,
-      registrationData,
-      isIframePrefill = false,
-      webhook = null
+      userId, 
+      email, 
+      fullName, 
+      operationType = "ChargeOnly",
+      isIframePrefill = false
     } = await req.json();
+
+    await logStep(functionName, "Received request data", { 
+      planId, 
+      userId, 
+      email,
+      fullName,
+      operationType,
+      isIframePrefill
+    });
 
     // Generate transaction reference
     const transactionRef = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Determine operation type and amount
-    const { operationType, initialAmount } = await determinePaymentParameters(
-      supabaseAdmin,
-      planId,
-      requestedAmount
-    );
+    // Calculate amount based on plan
+    let amount = 0;
+    
+    if (planId) {
+      const { data: plan, error: planError } = await supabaseAdmin
+        .from('plans')
+        .select('*')
+        .eq('id', planId)
+        .maybeSingle();
+        
+      if (planError) {
+        throw new Error("Error fetching plan details");
+      }
+      
+      if (!plan) {
+        throw new Error(`Invalid plan ID: ${planId}`);
+      }
+      
+      // Set operation type and amount based on plan type
+      switch (planId) {
+        case 'monthly':
+          // Monthly plan starts with free trial (amount=0)
+          operationType = "ChargeAndCreateToken";
+          amount = 0; 
+          break;
+        case 'annual':
+          // Annual plan charges immediately full amount
+          operationType = "ChargeAndCreateToken";
+          amount = plan.price || 0;
+          break;
+        case 'vip':
+          // VIP plan is one-time payment
+          operationType = "ChargeOnly";
+          amount = plan.price || 0;
+          break;
+        default:
+          throw new Error(`Unsupported plan type: ${planId}`);
+      }
+    }
     
     // Create payment session
-    const sessionData = await createPaymentSession(
-      supabaseAdmin,
-      {
-        userId,
-        planId,
-        initialAmount,
-        operationType,
-        transactionRef,
-        invoiceInfo,
-        registrationData,
-        redirectUrls,
-        isIframePrefill
-      }
-    );
+    const { data: sessionData, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        amount: amount,
+        currency: "ILS",
+        status: 'initiated',
+        operation_type: operationType,
+        reference: transactionRef,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        payment_details: { 
+          fullName, 
+          email,
+          isIframePrefill,
+          planType: planId
+        }
+      })
+      .select('id')
+      .single();
+      
+    if (sessionError) {
+      throw new Error("Failed to create payment session: " + sessionError.message);
+    }
+
+    const lowProfileId = crypto.randomUUID();
+    
+    await supabaseAdmin
+      .from('payment_sessions')
+      .update({ low_profile_id: lowProfileId })
+      .eq('id', sessionData.id);
+
+    await logStep(functionName, "Created payment session", { 
+      sessionId: sessionData.id,
+      lowProfileId,
+      operationType,
+      amount
+    });
 
     // For iFrame prefill mode, return early with session details
     if (isIframePrefill) {
@@ -79,7 +143,7 @@ serve(async (req) => {
           message: "Payment session initialized for iframe",
           data: {
             sessionId: sessionData.id,
-            lowProfileId: sessionData.lowProfileId,
+            lowProfileId: lowProfileId,
             reference: transactionRef,
             terminalNumber,
             cardcomUrl: "https://secure.cardcom.solutions",
@@ -90,21 +154,22 @@ serve(async (req) => {
       );
     }
     
-    // Build full redirect URL for standard payment flow
+    // Build redirect URL for standard payment flow
     const redirectUrl = buildRedirectUrl({
       cardcomUrl: "https://secure.cardcom.solutions",
       terminalNumber,
-      lowProfileId: sessionData.lowProfileId,
+      lowProfileId,
       transactionRef,
-      initialAmount,
-      successUrl: redirectUrls?.success || `${req.headers.get('Origin') || ''}/subscription/success`,
-      failedUrl: redirectUrls?.failed || `${req.headers.get('Origin') || ''}/subscription/failed`,
-      webHookUrl: webhook || `${Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`}/cardcom-webhook`,
+      amount,
+      successUrl: `${requestOrigin || 'https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com'}/subscription/success`,
+      failedUrl: `${requestOrigin || 'https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com'}/subscription/failed`,
+      webHookUrl: `${Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`}/cardcom-webhook`,
       operationType,
-      invoiceInfo
+      fullName,
+      email
     });
 
-    await logStep(functionName, "Redirect URL created");
+    await logStep(functionName, "Redirect URL created", { url: redirectUrl });
     
     return new Response(
       JSON.stringify({
@@ -113,7 +178,7 @@ serve(async (req) => {
         data: {
           url: redirectUrl,
           sessionId: sessionData.id,
-          lowProfileId: sessionData.lowProfileId,
+          lowProfileId: lowProfileId,
           reference: transactionRef,
           terminalNumber,
           cardcomUrl: "https://secure.cardcom.solutions"
@@ -123,7 +188,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    await logStep('payment', errorMessage, error, 'error');
+    console.error(`[CARDCOM-PAYMENT][ERROR] ${errorMessage}`);
     return new Response(
       JSON.stringify({ success: false, message: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -131,115 +196,24 @@ serve(async (req) => {
   }
 });
 
-async function determinePaymentParameters(supabaseAdmin: any, planId: string, requestedAmount: number) {
-  let operationType = "ChargeOnly";
-  let initialAmount = requestedAmount;
-  
-  if (planId) {
-    const { data: plan, error: planError } = await supabaseAdmin
-      .from('plans')
-      .select('*')
-      .eq('id', planId)
-      .maybeSingle();
-      
-    if (planError) {
-      throw new Error("Error fetching plan details");
-    }
-    
-    if (!plan) {
-      throw new Error(`Invalid plan ID: ${planId}`);
-    }
-
-    switch (planId) {
-      case 'monthly':
-        operationType = "ChargeAndCreateToken";
-        initialAmount = 0; // Free trial month
-        break;
-      case 'annual':
-        operationType = "ChargeAndCreateToken";
-        initialAmount = plan.price || requestedAmount;
-        break;
-      case 'vip':
-        operationType = "ChargeOnly";
-        initialAmount = plan.price || requestedAmount;
-        break;
-      default:
-        throw new Error(`Unsupported plan type: ${planId}`);
-    }
-  }
-  
-  // Validate amount
-  if (!validateAmount(initialAmount)) {
-    throw new Error("Invalid amount");
-  }
-
-  return { operationType, initialAmount };
-}
-
-async function createPaymentSession(supabaseAdmin: any, params: {
-  userId: string | null;
-  planId: string;
-  initialAmount: number;
-  operationType: string;
-  transactionRef: string;
-  invoiceInfo: any;
-  registrationData: any;
-  redirectUrls: any;
-  isIframePrefill: boolean;
-}) {
-  const { data: sessionData, error: sessionError } = await supabaseAdmin
-    .from('payment_sessions')
-    .insert({
-      user_id: params.userId,
-      plan_id: params.planId,
-      amount: params.initialAmount,
-      currency: "ILS",
-      status: 'initiated',
-      operation_type: params.operationType,
-      reference: params.transactionRef,
-      anonymous_data: !params.userId ? { invoiceInfo: params.invoiceInfo, registrationData: params.registrationData } : null,
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      payment_details: { 
-        invoiceInfo: params.invoiceInfo, 
-        redirectUrls: params.redirectUrls,
-        isIframePrefill: params.isIframePrefill,
-        planType: params.planId
-      }
-    })
-    .select('id')
-    .single();
-    
-  if (sessionError) {
-    throw new Error("Failed to create payment session");
-  }
-
-  const lowProfileId = crypto.randomUUID();
-  
-  await supabaseAdmin
-    .from('payment_sessions')
-    .update({ low_profile_id: lowProfileId })
-    .eq('id', sessionData.id);
-
-  return { ...sessionData, lowProfileId };
-}
-
 function buildRedirectUrl(params: {
   cardcomUrl: string;
   terminalNumber: string;
   lowProfileId: string;
   transactionRef: string;
-  initialAmount: number;
+  amount: number;
   successUrl: string;
   failedUrl: string;
   webHookUrl: string;
   operationType: string;
-  invoiceInfo: any;
+  fullName?: string;
+  email?: string;
 }) {
   const queryParams = new URLSearchParams({
     terminalnumber: params.terminalNumber,
     lowprofilecode: params.lowProfileId,
     ReturnValue: params.transactionRef,
-    sum: params.initialAmount.toString(),
+    sum: params.amount.toString(),
     coinid: '1',
     language: 'he',
     successredirecturl: params.successUrl,
@@ -248,14 +222,11 @@ function buildRedirectUrl(params: {
     operation: params.operationType
   });
 
-  if (params.invoiceInfo?.fullName) {
-    queryParams.append('FullName', params.invoiceInfo.fullName);
+  if (params.fullName) {
+    queryParams.append('FullName', params.fullName);
   }
-  if (params.invoiceInfo?.email) {
-    queryParams.append('Email', params.invoiceInfo.email);
-  }
-  if (params.invoiceInfo?.phone) {
-    queryParams.append('PhoneNumber', params.invoiceInfo.phone);
+  if (params.email) {
+    queryParams.append('Email', params.email);
   }
 
   return `${params.cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
