@@ -145,12 +145,16 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       });
 
       if (success) {
+        try {
+          StorageService.clearAllSubscriptionData();
+        } catch (cleanupError) {
+          PaymentLogger.error('Error cleaning up subscription data:', cleanupError);
+        }
+
         setState(prev => ({
           ...prev,
           paymentStatus: PaymentStatus.SUCCESS,
         }));
-        
-        StorageService.clearAllSubscriptionData();
         
         PaymentLogger.log('Payment submitted successfully');
         return true;

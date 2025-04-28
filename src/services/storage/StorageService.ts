@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
@@ -151,12 +150,24 @@ export class StorageService {
   }
 
   /**
-   * Clear all subscription data
+   * Clear all subscription-related data from storage
+   * Includes registration data, contract data, and payment data
    */
   static clearAllSubscriptionData(): void {
-    this.remove(StorageKeys.REGISTRATION);
-    this.remove(StorageKeys.CONTRACT);
-    this.remove(StorageKeys.PAYMENT);
+    try {
+      PaymentLogger.log('Clearing all subscription data from storage');
+      
+      // Clear all subscription-related storage keys
+      this.remove(StorageKeys.REGISTRATION);
+      this.remove(StorageKeys.CONTRACT);
+      this.remove(StorageKeys.PAYMENT);
+      
+      PaymentLogger.log('Successfully cleared all subscription data');
+    } catch (error) {
+      PaymentLogger.error('Error clearing subscription data:', error);
+      // Don't throw the error - we don't want to affect the payment flow
+      // But we'll log it for debugging purposes
+    }
   }
   
   /**
