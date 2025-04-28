@@ -142,7 +142,10 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ success: false, message: errorMessage }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
     );
   }
 });

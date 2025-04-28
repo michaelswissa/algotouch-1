@@ -274,7 +274,10 @@ serve(async (req) => {
         success: false, 
         message: error instanceof Error ? error.message : String(error) 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
     );
   }
 });

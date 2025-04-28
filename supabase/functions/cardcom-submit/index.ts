@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -169,50 +168,26 @@ serve(async (req) => {
           lowProfileCode
         }
       }));
-      return new Response(
-        JSON.stringify(responseData),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    } catch (apiError) {
-      logStep(functionName, "Error calling CardCom API", { error: apiError.message }, 'error', supabaseAdmin);
-      
-      // Update payment session to error state
-      await supabaseAdmin
-        .from('payment_sessions')
-        .update({
-          status: 'error',
-          error_message: apiError.message || "Error calling CardCom API",
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', paymentSession.id);
-      
-      const responseData = JSON.parse(JSON.stringify({
-        success: false,
-        message: "Error processing payment with CardCom: " + apiError.message,
-      }));
-      return new Response(
-        JSON.stringify(responseData),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[CARDCOM-SUBMIT][ERROR] ${errorMessage}`);
-    
-    const responseData = JSON.parse(JSON.stringify({
-      success: false,
-      message: errorMessage,
-    }));
+
     return new Response(
       JSON.stringify(responseData),
       {
         status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[CARDCOM-SUBMIT][ERROR] ${errorMessage}`);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: errorMessage,
+      }),
+      {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

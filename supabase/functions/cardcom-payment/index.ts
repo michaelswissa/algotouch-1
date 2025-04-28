@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -8,7 +7,6 @@ serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
 
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -218,7 +216,10 @@ serve(async (req) => {
           cardcomUrl
         }
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -226,7 +227,10 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ success: false, message: errorMessage }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

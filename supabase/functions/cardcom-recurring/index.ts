@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -209,6 +210,9 @@ async function processSubscription(subscription: any, supabaseAdmin: any) {
 }
 
 serve(async (req) => {
+  const requestOrigin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -387,19 +391,24 @@ serve(async (req) => {
           await logStep(functionName, "Error updating expired trials", trialError, 'error', supabaseAdmin);
         }
         
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: `Processed ${dueSubscriptions.length} subscriptions`,
-            data: {
-              processed: dueSubscriptions.length,
-              successful,
-              failed,
-              results
-            }
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    const responseData = {
+      success: true,
+      message: `Processed ${dueSubscriptions.length} subscriptions`,
+      data: {
+        processed: dueSubscriptions.length,
+        successful,
+        failed,
+        results
+      }
+    };
+    
+    return new Response(
+      JSON.stringify(responseData),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    );
       }
     }
   } catch (error) {
@@ -411,7 +420,10 @@ serve(async (req) => {
         success: false,
         message: errorMessage,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
     );
   }
 });
