@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { CardComFieldsInitConfig } from '@/types/payment';
 
 /**
  * Hook for initializing CardCom payment fields
@@ -23,7 +22,7 @@ export const useCardcomInitializer = () => {
     masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
-    terminalNumber: string = '160138',
+    terminalNumber: string,
     operationType: 'payment' | 'token_only' = 'payment'
   ): Promise<boolean> => {
     // Validate required parameters
@@ -71,24 +70,27 @@ export const useCardcomInitializer = () => {
         }
 
         try {
-          // Prepare CardCom configuration
-          const cardNumberFieldCSS = `
+          // Convert operation type to CardCom's expected format
+          const operation = operationType === 'token_only' ? '3' : '1'; // 3=CreateTokenOnly, 1=ChargeOnly
+          
+          // CSS styles for the iframe fields
+          const cardFieldCSS = `
             body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
             .cardNumberField {
-              border: 1px solid #ccc;
-              border-radius: 4px;
-              height: 40px;
-              width: 100%;
-              padding: 0 10px;
+              border: 1px solid #ccc; 
+              border-radius: 4px; 
+              height: 40px; 
+              width: 100%; 
+              padding: 0 10px; 
               font-size: 16px;
               box-sizing: border-box;
             }
-            .cardNumberField:focus {
-              border-color: #3498db;
-              outline: none;
+            .cardNumberField:focus { 
+              border-color: #3498db; 
+              outline: none; 
             }
-            .cardNumberField.invalid {
-              border-color: #e74c3c;
+            .cardNumberField.invalid { 
+              border-color: #e74c3c; 
             }`;
 
           const cvvFieldCSS = `
@@ -97,42 +99,55 @@ export const useCardcomInitializer = () => {
               border: 1px solid #ccc;
               border-radius: 3px;
               height: 39px;
-              margin: 0;
-              padding: 0 10px;
               width: 100%;
+              padding: 0 10px;
+              font-size: 16px;
               box-sizing: border-box;
             }
-            .cvvField:focus {
-              border-color: #3498db;
-              outline: none;
+            .cvvField:focus { 
+              border-color: #3498db; 
+              outline: none; 
             }
-            .cvvField.invalid {
-              border-color: #e74c3c;
+            .cvvField.invalid { 
+              border-color: #e74c3c; 
             }`;
             
-          const reCaptchaFieldCSS = 'body { margin: 0; padding:0; display: flex; justify-content: center; }';
+          const reCaptchaFieldCSS = 'body { margin: 0; padding: 0; display: flex; justify-content: center; }';
           
-          // Changed from const to let in case we need to modify it
-          let config = {
+          // Prepare the initialization data according to CardCom API spec
+          const initData = {
             action: 'init',
-            lowProfileCode,
-            LowProfileCode: lowProfileCode,
-            sessionId,
-            terminalNumber,
-            cardFieldCSS: cardNumberFieldCSS,
+            lowProfileCode: lowProfileCode,
+            LowProfileCode: lowProfileCode, // Duplicate for compatibility
+            sessionId: sessionId,
+            terminalNumber: terminalNumber,
+            cardFieldCSS: cardFieldCSS,
             cvvFieldCSS: cvvFieldCSS,
-            reCaptchaFieldCSS,
-            placeholder: "1111-2222-3333-4444",
-            cvvPlaceholder: "123",
+            reCaptchaFieldCSS: reCaptchaFieldCSS,
+            placeholder: 'מספר כרטיס',
+            cvvPlaceholder: 'CVV',
             language: 'he',
-            operation: operationType === 'token_only' ? 'ChargeAndCreateToken' : 'ChargeOnly'
+            operation: operation
           };
 
-          console.log('Sending initialization config to CardCom iframe:', config);
-          masterFrame.contentWindow.postMessage(config, '*');
+          console.log('Sending initialization data to CardCom:', {
+            lowProfileCode,
+            sessionId,
+            terminalNumber,
+            operation
+          });
+
+          // Post the initialization message to the master frame
+          masterFrame.contentWindow.postMessage(initData, '*');
           
+          // Add a delay to ensure the message is processed
           setTimeout(() => {
-            loadScript();
+            // Load the 3DS script for secure payments
+            const script = document.createElement('script');
+            const time = new Date().getTime();
+            script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
+            document.head.appendChild(script);
+            
             setIsInitialized(true);
             resolve(true);
           }, 1000);
@@ -145,16 +160,6 @@ export const useCardcomInitializer = () => {
             resolve(false);
           }
         }
-      };
-
-      // Load the 3DS script for secure payments
-      const loadScript = () => {
-        console.log('Loading 3DS script...');
-        const script = document.createElement('script');
-        const time = new Date().getTime();
-        script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
-        document.head.appendChild(script);
-        console.log('3DS script loaded');
       };
 
       // Start initialization with a slight delay to ensure frames are loaded

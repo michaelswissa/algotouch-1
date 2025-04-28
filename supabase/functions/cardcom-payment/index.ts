@@ -40,7 +40,7 @@ serve(async (req) => {
       userId, 
       email, 
       fullName, 
-      operationType = "ChargeOnly",
+      operationType = "1", // Default to ChargeOnly (1)
       isIframePrefill = false
     } = await req.json();
 
@@ -78,17 +78,17 @@ serve(async (req) => {
       switch (planId) {
         case 'monthly':
           // Monthly plan starts with free trial (amount=0)
-          operationType = "ChargeAndCreateToken";
+          operationType = "3"; // CreateTokenOnly
           amount = 0; 
           break;
         case 'annual':
           // Annual plan charges immediately full amount
-          operationType = "ChargeAndCreateToken";
+          operationType = "2"; // ChargeAndCreateToken
           amount = plan.price || 0;
           break;
         case 'vip':
           // VIP plan is one-time payment
-          operationType = "ChargeOnly";
+          operationType = "1"; // ChargeOnly
           amount = plan.price || 0;
           break;
         default:
@@ -209,23 +209,25 @@ function buildRedirectUrl(params: {
   email?: string;
 }) {
   const queryParams = new URLSearchParams({
-    terminalnumber: params.terminalNumber,
-    lowprofilecode: params.lowProfileId,
+    TerminalNumber: params.terminalNumber,
+    LowProfileCode: params.lowProfileId,
     ReturnValue: params.transactionRef,
-    sum: params.amount.toString(),
-    coinid: '1',
-    language: 'he',
-    successredirecturl: params.successUrl,
-    failureredirecturl: params.failedUrl,
-    WebHookUrl: params.webHookUrl,
-    operation: params.operationType
+    SumToBill: params.amount.toString(),
+    CoinId: '1',
+    Language: 'he',
+    SuccessRedirectUrl: params.successUrl,
+    ErrorRedirectUrl: params.failedUrl,
+    IndicatorUrl: params.webHookUrl,
+    Operation: params.operationType,
+    APILevel: '10',
+    Codepage: '65001'
   });
 
   if (params.fullName) {
-    queryParams.append('FullName', params.fullName);
+    queryParams.append('CardOwnerName', params.fullName);
   }
   if (params.email) {
-    queryParams.append('Email', params.email);
+    queryParams.append('CardOwnerEmail', params.email);
   }
 
   return `${params.cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;

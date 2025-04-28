@@ -12,7 +12,7 @@ const ReCaptchaFrame: React.FC<ReCaptchaFrameProps> = ({
   cardcomUrl,
   onLoad
 }) => {
-  const iframeSrc = `${cardcomUrl}/api/openfields/reCaptcha?terminalNumber=${terminalNumber}`;
+  const iframeSrc = `${cardcomUrl}/Interface/OpenFrame.aspx?TerminalNumber=${terminalNumber}&frame=recaptcha`;
   
   return (
     <div className="flex justify-start mt-2" style={{ minHeight: '78px' }}>

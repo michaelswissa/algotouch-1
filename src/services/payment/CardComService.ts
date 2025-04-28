@@ -43,8 +43,14 @@ export class CardComService {
       
       console.log('Payment initialization response:', response.data);
 
-      // Check if we have the data property in the response
-      if (!response.data.data || !response.data.data.lowProfileId) {
+      // Check if the response is successful
+      if (!response.data.success || !response.data.data) {
+        console.error('Failed payment initialization:', response.data);
+        throw new Error(response.data.message || 'Failed to initialize payment');
+      }
+
+      // Check if we have the lowProfileId property in the response
+      if (!response.data.data.lowProfileId) {
         console.error('Missing lowProfileId in response:', response.data);
         throw new Error('Initialization response missing lowProfileId');
       }

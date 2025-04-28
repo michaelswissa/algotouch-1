@@ -1,3 +1,4 @@
+
 import React from 'react';
 import '../styles/cardFields.css';
 
@@ -14,7 +15,7 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   isReady
 }) => {
-  const iframeSrc = isReady ? `${cardcomUrl}/api/openfields/CVV?terminalNumber=${terminalNumber}` : '';
+  const iframeSrc = isReady ? `${cardcomUrl}/Interface/OpenFrame.aspx?TerminalNumber=${terminalNumber}&frame=cvv` : '';
   
   return (
     <div className="credit-cvv-container">

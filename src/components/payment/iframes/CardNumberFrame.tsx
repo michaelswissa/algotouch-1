@@ -15,7 +15,7 @@ const CardNumberFrame: React.FC<CardNumberFrameProps> = ({
   onLoad,
   isReady
 }) => {
-  const iframeSrc = isReady ? `${cardcomUrl}/api/openfields/cardNumber?terminalNumber=${terminalNumber}` : '';
+  const iframeSrc = isReady ? `${cardcomUrl}/Interface/OpenFrame.aspx?TerminalNumber=${terminalNumber}&frame=cardNumber` : '';
   
   return (
     <div className="credit-card-field-container">
