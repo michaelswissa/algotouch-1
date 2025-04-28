@@ -99,11 +99,28 @@ serve(async (req) => {
     // Generate lowProfileId BEFORE database insert
     const lowProfileId = crypto.randomUUID();
 
+    // Prepare payment details
+    const paymentDetails = { 
+      fullName, 
+      email,
+      isIframePrefill,
+      planType: planId
+    };
+
+    // Prepare anonymous_data if userId is null
+    // This is critical to satisfy the check_user_or_anonymous constraint
+    const anonymousData = !userId ? {
+      email,
+      fullName,
+      createdAt: new Date().toISOString()
+    } : null;
+
     // Create payment session WITH lowProfileId included in the initial insert
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .insert({
         user_id: userId,
+        anonymous_data: anonymousData, // Add anonymous_data when userId is null
         plan_id: planId,
         amount: amount,
         currency: "ILS",
@@ -111,12 +128,7 @@ serve(async (req) => {
         operation_type: operationType,
         reference: transactionRef,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        payment_details: { 
-          fullName, 
-          email,
-          isIframePrefill,
-          planType: planId
-        },
+        payment_details: paymentDetails,
         low_profile_id: lowProfileId  // Include lowProfileId in the initial insert
       })
       .select('id')
