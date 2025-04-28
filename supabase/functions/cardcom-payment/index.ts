@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -98,7 +99,7 @@ serve(async (req) => {
     // Generate lowProfileId BEFORE database insert
     const lowProfileId = crypto.randomUUID();
 
-    // Create payment session
+    // Create payment session WITH lowProfileId included in the initial insert
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .insert({
