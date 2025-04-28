@@ -110,7 +110,13 @@ export class CardComService {
   static async checkPaymentStatus(lowProfileCode: string): Promise<{
     success: boolean;
     message: string;
-    data?: any;
+    data?: {
+      transactionId?: string;
+      transaction_id?: string;
+      status?: string;
+      amount?: number;
+      [key: string]: any;
+    };
   }> {
     try {
       if (!lowProfileCode) {

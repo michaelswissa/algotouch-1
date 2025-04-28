@@ -48,7 +48,7 @@ export const usePaymentStatusCheck = ({
         
         PaymentLogger.log('Payment confirmed successful', { 
           lowProfileCode,
-          transactionId: result.transactionId
+          transactionId: result.data?.transactionId || result.data?.transaction_id
         });
         
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
