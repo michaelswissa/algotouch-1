@@ -1,5 +1,4 @@
 
-// Fix imports to use the new path
 import axios from 'axios';
 import { CardOwnerDetails, CardComPaymentResponse, PaymentSessionData, PaymentStatus } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from './validators';
@@ -18,16 +17,18 @@ export class CardComService {
       console.log('Initializing payment with data:', requestData);
       console.log('Calling payment endpoint:', `${API_URL}/api/payment/initiate`);
       
-      const response = await axios.post<PaymentSessionData>(`${API_URL}/api/payment/initiate`, requestData);
+      const response = await axios.post<{data: PaymentSessionData}>(`${API_URL}/api/payment/initiate`, requestData);
       
       console.log('Payment initialization response:', response.data);
       
-      if (!response.data?.lowProfileId) {
+      const sessionData = response.data.data || response.data;
+      
+      if (!sessionData?.lowProfileId) {
         console.error('Missing lowProfileId in response:', response.data);
         throw new Error('Initialization response missing lowProfileId');
       }
       
-      return response.data;
+      return sessionData;
     } catch (error: any) {
       console.error('Error initializing payment:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to initialize payment');

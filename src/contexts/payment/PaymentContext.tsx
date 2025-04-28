@@ -85,6 +85,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
 
+      // The service now returns the data object directly
       const sessionData = await CardComService.initializePayment({
         planId,
         userId: user?.id || null,
@@ -93,6 +94,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         operationType
       });
 
+      // Update state using properties directly from sessionData
       setState(prev => ({
         ...prev,
         isInitializing: false,
