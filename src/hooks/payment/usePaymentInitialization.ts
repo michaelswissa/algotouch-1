@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PaymentStatus } from '@/types/payment';
+import { PaymentStatus, PaymentStatusEnum } from '@/types/payment';
 import { RegistrationService } from '@/services/registration/RegistrationService';
 import { CardComService } from '@/services/payment/CardComService';
 import { useContractValidation } from './useContractValidation';
@@ -28,7 +28,7 @@ export const usePaymentInitialization = ({
     
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatus.INITIALIZING 
+      paymentStatus: PaymentStatusEnum.INITIALIZING 
     }));
     
     try {
@@ -101,7 +101,7 @@ export const usePaymentInitialization = ({
         terminalNumber: paymentData.terminalNumber,
         cardcomUrl: paymentData.cardcomUrl,
         reference: paymentData.reference,
-        paymentStatus: PaymentStatus.IDLE
+        paymentStatus: PaymentStatusEnum.IDLE
       }));
       
       // Ensure master frame is set up
@@ -115,7 +115,7 @@ export const usePaymentInitialization = ({
       const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
       PaymentLogger.error('Payment initialization error:', error);
       toast.error(errorMessage);
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
+      setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
       return null;
     }
   }, [setState, masterFrameRef, planId, operationType, validateContract]);

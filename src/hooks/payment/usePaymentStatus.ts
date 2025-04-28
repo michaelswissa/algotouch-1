@@ -7,16 +7,27 @@ interface UsePaymentStatusProps {
   onPaymentComplete?: () => void;
 }
 
+interface PaymentState {
+  paymentStatus: PaymentStatusEnum;
+  sessionId: string;
+  lowProfileCode: string;
+  terminalNumber: string;
+  cardcomUrl: string;
+  reference: string;
+  operationType: 'payment' | 'token_only';
+  error: string | null;
+}
+
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = {}) => {
-  const [state, setState] = useState({
+  const [state, setState] = useState<PaymentState>({
     paymentStatus: PaymentStatusEnum.IDLE,
     sessionId: '',
     lowProfileCode: '',
     terminalNumber: '',
     cardcomUrl: 'https://secure.cardcom.solutions',
     reference: '',
-    operationType: 'payment' as 'payment' | 'token_only',
-    error: null as string | null
+    operationType: 'payment',
+    error: null
   });
 
   const handlePaymentSuccess = useCallback(() => {
