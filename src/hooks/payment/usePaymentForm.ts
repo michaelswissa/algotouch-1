@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { usePaymentContext } from '@/contexts/payment/PaymentContext';
 import { PaymentStatus } from '@/components/payment/types/payment';
@@ -27,10 +26,16 @@ export function usePaymentForm() {
   } = usePaymentContext();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [cardValidationComplete, setCardValidationComplete] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [validationState, setValidationState] = useState({
+    isCardNumberValid: false,
+    isCvvValid: false,
+    isReCaptchaValid: false,
+    validationInProgress: false
+  });
+  const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   
-  // Initialize form data with default empty values
+  // Initialize form data and validation
   const initialFormData: PaymentFormData = {
     cardOwnerName: '',
     cardOwnerId: '',
@@ -41,7 +46,6 @@ export function usePaymentForm() {
     numberOfPayments: '1',
   };
   
-  // Define validation rules using CardComService validators
   const validateField = (name: string, value: string, currentFormData: PaymentFormData): string | null => {
     const dataToValidate = {
       cardOwnerName: name === 'cardOwnerName' ? value : currentFormData.cardOwnerName,
@@ -56,7 +60,6 @@ export function usePaymentForm() {
     return errors[name] || null;
   };
   
-  // Initialize form validation
   const {
     formData,
     errors,
@@ -64,11 +67,8 @@ export function usePaymentForm() {
     validateForm,
     setFormData,
     setFieldValue
-  } = useFormValidation<PaymentFormData>(initialFormData, (name: string, value: any, formData?: PaymentFormData) => {
-    return validateField(name, value, formData || initialFormData);
-  });
+  } = useFormValidation<PaymentFormData>(initialFormData, validateField);
   
-  // Set a field error manually
   const setFieldError = (field: string, error: string | null) => {
     setFieldErrors(prev => ({
       ...prev,
@@ -76,10 +76,9 @@ export function usePaymentForm() {
     }));
   };
 
-  // Monitor iframe messages for validation results
+  // Enhanced iframe message handling with validation state
   useEffect(() => {
     const handleFrameMessages = (message: MessageEvent) => {
-      // Safety check for message origin
       if (!message.origin.includes('cardcom.solutions') && 
           !message.origin.includes('localhost') && 
           !message.origin.includes(window.location.origin)) {
@@ -94,16 +93,28 @@ export function usePaymentForm() {
   
       PaymentLogger.log('Received validation message:', data);
   
-      if (data.field === 'cardNumber' && !data.isValid) {
-        // Set cardNumber validation error
-        setFieldError('cardNumber', data.message || 'מספר כרטיס לא תקין');
-      } else if (data.field === 'cvv' && !data.isValid) {
-        // Set cvv validation error
-        setFieldError('cvv', data.message || 'קוד אבטחה לא תקין');
-      }
-
-      if (data.field === 'reCaptcha' && data.isValid) {
-        setCardValidationComplete(true);
+      switch (data.field) {
+        case 'cardNumber':
+          setValidationState(prev => ({ ...prev, isCardNumberValid: data.isValid }));
+          if (!data.isValid) {
+            setFieldError('cardNumber', data.message || 'מספר כרטיס לא תקין');
+          } else {
+            setFieldError('cardNumber', null);
+          }
+          break;
+          
+        case 'cvv':
+          setValidationState(prev => ({ ...prev, isCvvValid: data.isValid }));
+          if (!data.isValid) {
+            setFieldError('cvv', data.message || 'קוד אבטחה לא תקין');
+          } else {
+            setFieldError('cvv', null);
+          }
+          break;
+          
+        case 'reCaptcha':
+          setValidationState(prev => ({ ...prev, isReCaptchaValid: data.isValid }));
+          break;
       }
     };
     
@@ -111,7 +122,117 @@ export function usePaymentForm() {
     return () => window.removeEventListener('message', handleFrameMessages);
   }, []);
   
-  // Pre-fill form data if available
+  // Validation timeout handler
+  const startValidationTimeout = () => {
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      setValidationState(prev => ({ ...prev, validationInProgress: false }));
+      if (!validationState.isCardNumberValid || !validationState.isCvvValid) {
+        toast.error('לא התקבלה תשובה מאימות הכרטיס, אנא נסה שנית');
+      }
+    }, 10000); // 10 second timeout
+    
+    setValidationTimeout(timeout);
+  };
+  
+  // Enhanced card field validation
+  const validateCardFields = () => {
+    setValidationState(prev => ({ ...prev, validationInProgress: true }));
+    startValidationTimeout();
+    
+    const validateCardNumber = () => {
+      const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ action: "validateCardNumber" }, '*');
+      } else {
+        setFieldError('cardNumber', 'שגיאה בטעינת שדה מספר כרטיס');
+      }
+    };
+
+    const validateCvv = () => {
+      const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ action: "validateCvv" }, '*');
+      } else {
+        setFieldError('cvv', 'שגיאה בטעינת שדה קוד אבטחה');
+      }
+    };
+    
+    // Clear previous validation errors
+    setFieldErrors({});
+    validateCardNumber();
+    validateCvv();
+  };
+  
+  // Enhanced submission handler with validation checks
+  const handleSubmitPayment = async () => {
+    if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
+      return;
+    }
+    
+    // First validate regular form fields
+    const isFormValid = validateForm();
+    if (!isFormValid) {
+      const errorMessages = Object.values(errors).filter(e => e).join(', ');
+      toast.error(`יש לתקן את השגיאות בטופס: ${errorMessages}`);
+      PaymentLogger.warn('Form validation failed', errors);
+      return;
+    }
+    
+    // Trigger iframe validations
+    validateCardFields();
+    
+    // Wait for validation completion
+    setValidationState(prev => ({ ...prev, validationInProgress: true }));
+    
+    // Check for existing validation errors
+    if (fieldErrors.cardNumber || fieldErrors.cvv) {
+      const iframeErrors = [fieldErrors.cardNumber, fieldErrors.cvv].filter(Boolean).join(', ');
+      toast.error(`שגיאות באימות כרטיס: ${iframeErrors}`);
+      PaymentLogger.warn('Card validation failed', fieldErrors);
+      return;
+    }
+    
+    // Verify reCAPTCHA if required
+    if (!validationState.isReCaptchaValid) {
+      toast.error('אנא השלם את אימות האנושי');
+      return;
+    }
+    
+    if (!lowProfileCode) {
+      toast.error('חסר מזהה יחודי לעסקה');
+      PaymentLogger.error('Missing lowProfileCode on submit');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    PaymentLogger.log('Submitting payment', { lowProfileCode, operationType });
+    
+    try {
+      await submitPayment({
+        cardOwnerName: formData.cardOwnerName,
+        cardOwnerId: formData.cardOwnerId,
+        cardOwnerEmail: formData.cardOwnerEmail,
+        cardOwnerPhone: formData.cardOwnerPhone,
+        expirationMonth: formData.expirationMonth,
+        expirationYear: formData.expirationYear,
+      });
+    } catch (error) {
+      PaymentLogger.error('Payment submission error:', error);
+      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה בשליחת התשלום');
+    } finally {
+      setIsSubmitting(false);
+      // Clear validation timeout if it exists
+      if (validationTimeout) {
+        clearTimeout(validationTimeout);
+      }
+    }
+  };
+  
+  // Pre-fill form data from session storage (keep existing implementation)
   useEffect(() => {
     const registrationDataStr = sessionStorage.getItem('registration_data');
     const contractDataStr = sessionStorage.getItem('contract_data');
@@ -179,70 +300,6 @@ export function usePaymentForm() {
     }
   }, [setFormData]);
   
-  const validateCardFields = () => {
-    const validateCardNumber = () => {
-      const iframe = document.getElementById('CardComCardNumber') as HTMLIFrameElement;
-      if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage({ action: "validateCardNumber" }, '*');
-      }
-    };
-
-    const validateCvv = () => {
-      const iframe = document.getElementById('CardComCvv') as HTMLIFrameElement;
-      if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage({ action: "validateCvv" }, '*');
-      }
-    };
-    
-    // Trigger iframe validations
-    validateCardNumber();
-    validateCvv();
-  };
-  
-  const handleSubmitPayment = async () => {
-    if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
-      return;
-    }
-    
-    // Validate form
-    const isFormValid = validateForm();
-    if (!isFormValid) {
-      toast.error('יש לתקן את השגיאות בטופס');
-      return;
-    }
-    
-    // Validate card fields via iframe
-    validateCardFields();
-    
-    if (!lowProfileCode) {
-      toast.error('חסר מזהה יחודי לעסקה');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    PaymentLogger.log('Submitting payment', { 
-      lowProfileCode,
-      operationType 
-    });
-    
-    try {
-      await submitPayment({
-        cardOwnerName: formData.cardOwnerName,
-        cardOwnerId: formData.cardOwnerId,
-        cardOwnerEmail: formData.cardOwnerEmail,
-        cardOwnerPhone: formData.cardOwnerPhone,
-        expirationMonth: formData.expirationMonth,
-        expirationYear: formData.expirationYear,
-      });
-    } catch (error) {
-      PaymentLogger.error('Payment submission error:', error);
-      toast.error(error instanceof Error ? error.message : 'אירעה שגיאה בשליחת התשלום');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  // Merge the errors from form validation and field errors
   const combinedErrors = { ...errors, ...fieldErrors };
   
   return {
@@ -252,6 +309,7 @@ export function usePaymentForm() {
     handleChange,
     handleSubmitPayment,
     validateCardFields,
-    setFieldError
+    setFieldError,
+    validationState
   };
 }
