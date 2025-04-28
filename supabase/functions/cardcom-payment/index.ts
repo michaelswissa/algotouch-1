@@ -24,70 +24,82 @@ serve(async (req) => {
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    const supabase = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
     
-    // Get CardCom configuration from environment variables
+    // Get CardCom configuration
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
     const apiName = Deno.env.get("CARDCOM_API_NAME");
     
     if (!terminalNumber || !apiName) {
-      await logStep(functionName, "Missing CardCom API configuration", {}, 'error', supabaseAdmin);
       throw new Error("Missing CardCom API configuration");
     }
 
     // Process the request body
     const { 
       planId, 
-      amount: requestedAmount, 
-      operation = "ChargeOnly",
+      amount: requestedAmount,
       invoiceInfo, 
       redirectUrls, 
-      userId, 
+      userId,
       registrationData,
       isIframePrefill = false,
       webhook = null
     } = await req.json();
     
-    // Generate a unique reference for this transaction
+    // Generate a unique reference
     const transactionRef = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // If a plan ID is provided, fetch the plan details from the database
-    let amount = requestedAmount;
-    let planDetails = null;
+    // Determine operation type and initial amount based on plan type
+    let operationType = "ChargeOnly";
+    let initialAmount = requestedAmount;
     
+    // If a plan ID is provided, fetch the plan details and set operation type
     if (planId) {
-      try {
-        const { data: fetchedPlan, error: planError } = await supabaseAdmin
-          .from('plans')
-          .select('*')
-          .eq('id', planId)
-          .maybeSingle();
+      const { data: plan, error: planError } = await supabaseAdmin
+        .from('plans')
+        .select('*')
+        .eq('id', planId)
+        .maybeSingle();
         
-        if (planError) {
-          await logStep(functionName, "Error fetching plan details", planError, 'error', supabaseAdmin);
-        } else if (fetchedPlan) {
-          planDetails = fetchedPlan;
-          
-          // If amount is not explicitly provided, use the plan price
-          if (!requestedAmount && fetchedPlan.price) {
-            amount = fetchedPlan.price;
-          }
-        }
-      } catch (error) {
-        await logStep(functionName, "Exception fetching plan details", error, 'error', supabaseAdmin);
+      if (planError) {
+        await logStep(functionName, "Error fetching plan details", planError, 'error', supabaseAdmin);
+        throw new Error("Error fetching plan details");
       }
+      
+      if (!plan) {
+        throw new Error(`Invalid plan ID: ${planId}`);
+      }
+
+      // Set operation type and initial amount based on plan type
+      switch (planId) {
+        case 'monthly':
+          operationType = "ChargeAndCreateToken";
+          initialAmount = 0; // Free trial month
+          break;
+        case 'annual':
+          operationType = "ChargeAndCreateToken";
+          initialAmount = plan.price || requestedAmount;
+          break;
+        case 'vip':
+          operationType = "ChargeOnly";
+          initialAmount = plan.price || requestedAmount;
+          break;
+        default:
+          throw new Error(`Unsupported plan type: ${planId}`);
+      }
+      
+      await logStep(functionName, "Determined payment parameters", { 
+        planId, 
+        operationType, 
+        initialAmount 
+      });
     }
     
     // Validate the amount
-    if (!validateAmount(amount)) {
-      await logStep(functionName, "Invalid amount", { amount }, 'error', supabaseAdmin);
+    if (!validateAmount(initialAmount)) {
+      await logStep(functionName, "Invalid amount", { initialAmount }, 'error', supabaseAdmin);
       throw new Error("Invalid amount");
     }
-    
+
     // Check for duplicate transactions
     const existingTransaction = await validateTransaction(supabaseAdmin, transactionRef);
     if (existingTransaction) {
@@ -117,17 +129,18 @@ serve(async (req) => {
       .insert({
         user_id: userId || null,
         plan_id: planId,
-        amount: amount,
+        amount: initialAmount,
         currency: "ILS",
         status: 'initiated',
-        operation_type: operation,
+        operation_type: operationType,
         reference: transactionRef,
         anonymous_data: !userId ? { invoiceInfo, registrationData } : null,
-        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes expiry
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         payment_details: { 
           invoiceInfo, 
           redirectUrls,
-          isIframePrefill
+          isIframePrefill,
+          planType: planId
         }
       })
       .select('id')
@@ -139,7 +152,7 @@ serve(async (req) => {
     }
     
     const sessionId = sessionData.id;
-    await logStep(functionName, "Payment session created", { sessionId, planId, amount });
+    await logStep(functionName, "Payment session created", { sessionId, planId, amount: initialAmount });
     
     // Generate LowProfile ID using a deterministic algorithm
     const lowProfileId = crypto.randomUUID();
@@ -153,7 +166,7 @@ serve(async (req) => {
       .eq('id', sessionId);
       
     await logStep(functionName, "LowProfile ID assigned", { sessionId, lowProfileId });
-    
+
     // For iFrame prefill mode, return early with session details
     if (isIframePrefill) {
       return new Response(
@@ -161,7 +174,7 @@ serve(async (req) => {
           success: true,
           message: "Payment session initialized for iframe",
           data: {
-            sessionId,
+            sessionId: sessionData.id,
             lowProfileId,
             reference: transactionRef,
             terminalNumber,
@@ -190,13 +203,13 @@ serve(async (req) => {
       `${cardcomUrl}/Interface/LowProfile.aspx?terminalnumber=${terminalNumber}` +
       `&lowprofilecode=${lowProfileId}` +
       `&ReturnValue=${transactionRef}` +
-      `&sum=${amount}` +
+      `&sum=${initialAmount}` +
       `&coinid=1` +
       `&language=he` +
       `&successredirecturl=${encodeURIComponent(successUrl)}` +
       `&failureredirecturl=${encodeURIComponent(failedUrl)}` +
       (webHookUrl ? `&WebHookUrl=${encodeURIComponent(webHookUrl)}` : '') +
-      `&operation=${operation === "ChargeAndCreateToken" ? "ChargeAndCreateToken" : "ChargeOnly"}` +
+      `&operation=${operationType}` +
       (invoiceInfo?.fullName ? `&FullName=${encodeURIComponent(invoiceInfo.fullName)}` : '') +
       (invoiceInfo?.email ? `&Email=${encodeURIComponent(invoiceInfo.email)}` : '') +
       (invoiceInfo?.phone ? `&PhoneNumber=${encodeURIComponent(invoiceInfo.phone)}` : '');
@@ -209,28 +222,20 @@ serve(async (req) => {
         message: "Payment session created successfully",
         data: {
           url: fullRedirectUrl,
-          sessionId,
+          sessionId: sessionData.id,
           lowProfileId,
           reference: transactionRef,
           terminalNumber,
           cardcomUrl
         }
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[CARDCOM-PAYMENT][ERROR] ${errorMessage}`);
-    
+    console.error(`[CARDCOM-PAYMENT][ERROR] ${error.message}`);
     return new Response(
-      JSON.stringify({ success: false, message: errorMessage }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ success: false, message: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

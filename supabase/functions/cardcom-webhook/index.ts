@@ -47,30 +47,17 @@ serve(async (req) => {
       );
     }
     
-    // Extract important values from webhook
+    // Extract subscription data from webhook payload
     const {
       LowProfileId: lowProfileId,
       ResponseCode: responseCode,
       ReturnValue: reference,
-      TranzactionId: transactionId
+      TranzactionId: transactionId,
+      TokenInfo,
+      Operation: operation
     } = payload;
     
-    // Check for duplicate processing with new implementation
-    const duplicateCheck = await checkDuplicatePayment(supabaseAdmin, lowProfileId, transactionId);
-    if (duplicateCheck.exists) {
-      await logStep(functionName, "Detected duplicate payment", duplicateCheck, 'warn');
-      
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: "Duplicate payment webhook - already processed",
-          data: duplicateCheck 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Find the relevant payment session
+    // Find the payment session
     const { data: paymentSession, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .select('*')
@@ -106,6 +93,111 @@ serve(async (req) => {
     const isSuccess = responseCode === '0';
     const newStatus = isSuccess ? 'completed' : 'failed';
     
+    // If successful payment, handle subscription creation or update
+    if (isSuccess && paymentSession.user_id && paymentSession.plan_id) {
+      try {
+        // Get plan details
+        const { data: planData } = await supabaseAdmin
+          .from('plans')
+          .select('*')
+          .eq('id', paymentSession.plan_id)
+          .single();
+          
+        if (planData) {
+          const now = new Date();
+          let trialEndsAt = null;
+          let nextChargeAt = null;
+          
+          // Calculate next charge date based on plan type
+          switch (paymentSession.plan_id) {
+            case 'monthly':
+              if (operation === "ChargeAndCreateToken") {
+                // For monthly plans with free trial
+                trialEndsAt = new Date(now);
+                trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+                nextChargeAt = new Date(trialEndsAt);
+              } else {
+                // Regular monthly renewal
+                nextChargeAt = new Date(now);
+                nextChargeAt.setDate(nextChargeAt.getDate() + 30);
+              }
+              break;
+            case 'annual':
+              if (operation === "ChargeAndCreateToken") {
+                // Initial annual payment
+                nextChargeAt = new Date(now);
+                nextChargeAt.setFullYear(nextChargeAt.getFullYear() + 1);
+              }
+              break;
+            case 'vip':
+              // VIP plans don't have recurring charges
+              break;
+          }
+          
+          // Extract token info for recurring payments
+          const tokenInfo = TokenInfo || {};
+          const paymentMethod = payload.TranzactionInfo || {};
+          
+          const subscriptionData = {
+            user_id: paymentSession.user_id,
+            plan_id: paymentSession.plan_id,
+            status: paymentSession.plan_id === 'monthly' && operation === "ChargeAndCreateToken" ? 'trial' : 'active',
+            plan_type: paymentSession.plan_id,
+            trial_ends_at: trialEndsAt?.toISOString() || null,
+            next_charge_at: nextChargeAt?.toISOString() || null,
+            token: tokenInfo.Token || null,
+            token_expires_ym: tokenInfo.TokenExDate ? 
+              tokenInfo.TokenExDate.substring(0, 6) : null,
+            payment_method: paymentMethod
+          };
+
+          // Check for existing subscription
+          const { data: existingSubscription } = await supabaseAdmin
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', paymentSession.user_id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (existingSubscription && existingSubscription.length > 0) {
+            // Update existing subscription
+            await supabaseAdmin
+              .from('subscriptions')
+              .update(subscriptionData)
+              .eq('id', existingSubscription[0].id);
+          } else {
+            // Create new subscription
+            await supabaseAdmin
+              .from('subscriptions')
+              .insert(subscriptionData);
+          }
+          
+          // Store token for recurring payments if applicable
+          if (tokenInfo.Token && ['monthly', 'annual'].includes(paymentSession.plan_id)) {
+            const tokenExpiry = tokenInfo.TokenExDate ? 
+              new Date(`20${tokenInfo.TokenExDate.substring(0, 2)}-${tokenInfo.TokenExDate.substring(2, 4)}-01`) : 
+              new Date(now.getFullYear() + 2, now.getMonth());
+              
+            await supabaseAdmin
+              .from('recurring_payments')
+              .insert({
+                user_id: paymentSession.user_id,
+                token: tokenInfo.Token,
+                status: 'active',
+                token_expiry: tokenExpiry.toISOString(),
+                last_4_digits: paymentMethod?.Last4CardDigits?.toString() || null,
+                card_type: paymentMethod?.CardName || null,
+                token_approval_number: tokenInfo.TokenApprovalNumber || null
+              })
+              .onConflict('token')
+              .ignore();
+          }
+        }
+      } catch (error) {
+        await logStep(functionName, "Error handling subscription", error, 'error', supabaseAdmin);
+      }
+    }
+    
     // Update payment session status
     await supabaseAdmin
       .from('payment_sessions')
@@ -134,123 +226,6 @@ serve(async (req) => {
       payment_data: payload,
       currency: paymentSession.currency || 'ILS'
     });
-    
-    // If successful payment, handle subscription creation or update
-    if (isSuccess && paymentSession.user_id && paymentSession.plan_id) {
-      try {
-        // Get the selected plan details from the database
-        const { data: planData } = await supabaseAdmin
-          .from('plans')
-          .select('*')
-          .eq('id', paymentSession.plan_id)
-          .single();
-          
-        if (planData) {
-          // Check if user already has a subscription
-          const { data: existingSubscription } = await supabaseAdmin
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', paymentSession.user_id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-            
-          const now = new Date();
-          let trialEndsAt = null;
-          let nextChargeAt = null;
-          
-          // Calculate trial and next charge dates
-          if (planData.has_trial && planData.trial_days > 0 && planData.id !== 'vip') {
-            trialEndsAt = new Date(now);
-            trialEndsAt.setDate(trialEndsAt.getDate() + planData.trial_days);
-            nextChargeAt = new Date(trialEndsAt);
-          } else if (planData.id !== 'vip') {
-            // For non-VIP plans with no trial, set next charge date based on cycle_days
-            nextChargeAt = new Date(now);
-            nextChargeAt.setDate(nextChargeAt.getDate() + (planData.cycle_days || 30));
-          }
-          
-          // Extract token info for recurring payments
-          const tokenInfo = payload.TokenInfo || {};
-          const paymentMethod = payload.TranzactionInfo || {};
-          
-          let subscriptionData = {
-            user_id: paymentSession.user_id,
-            plan_id: paymentSession.plan_id,
-            status: planData.has_trial && planData.id !== 'vip' ? 'trial' : 'active',
-            plan_type: paymentSession.plan_id,
-            trial_ends_at: trialEndsAt ? trialEndsAt.toISOString() : null,
-            next_charge_at: nextChargeAt ? nextChargeAt.toISOString() : null,
-            token: tokenInfo.Token || null,
-            token_expires_ym: tokenInfo.TokenExDate ? 
-              tokenInfo.TokenExDate.substring(0, 6) : null,
-            payment_method: paymentMethod
-          };
-          
-          // VIP plans don't expire or have recurring charges
-          if (paymentSession.plan_id === 'vip') {
-            subscriptionData = {
-              ...subscriptionData,
-              status: 'active',
-              trial_ends_at: null,
-              next_charge_at: null
-            };
-          }
-          
-          if (existingSubscription && existingSubscription.length > 0) {
-            // Update existing subscription
-            await supabaseAdmin
-              .from('subscriptions')
-              .update(subscriptionData)
-              .eq('id', existingSubscription[0].id);
-              
-            await logStep(functionName, "Subscription updated", { 
-              subscriptionId: existingSubscription[0].id,
-              planId: paymentSession.plan_id
-            });
-          } else {
-            // Create new subscription
-            const { data: newSubscription, error: subError } = await supabaseAdmin
-              .from('subscriptions')
-              .insert(subscriptionData)
-              .select()
-              .single();
-              
-            if (subError) {
-              await logStep(functionName, "Failed to create subscription", subError, 'error', supabaseAdmin);
-            } else {
-              await logStep(functionName, "New subscription created", { 
-                subscriptionId: newSubscription.id,
-                planId: paymentSession.plan_id
-              });
-            }
-          }
-          
-          // If token was created, store it for recurring payments
-          if (tokenInfo.Token && planData.id !== 'vip') {
-            const tokenExpiry = tokenInfo.TokenExDate ? 
-              new Date(`20${tokenInfo.TokenExDate.substring(0, 2)}-${tokenInfo.TokenExDate.substring(2, 4)}-01`) : 
-              new Date(now.getFullYear() + 2, now.getMonth());
-              
-            await supabaseAdmin.from('recurring_payments').insert({
-              user_id: paymentSession.user_id,
-              token: tokenInfo.Token,
-              status: 'active',
-              token_expiry: tokenExpiry.toISOString(),
-              last_4_digits: paymentMethod?.Last4CardDigits?.toString() || null,
-              card_type: paymentMethod?.CardName || null,
-              token_approval_number: tokenInfo.TokenApprovalNumber || null
-            }).onConflict('token').ignore();
-            
-            await logStep(functionName, "Recurring payment token stored", { 
-              userId: paymentSession.user_id,
-              token: tokenInfo.Token
-            });
-          }
-        }
-      } catch (subscriptionError) {
-        await logStep(functionName, "Error handling subscription", subscriptionError, 'error', supabaseAdmin);
-      }
-    }
     
     return new Response(
       JSON.stringify({
