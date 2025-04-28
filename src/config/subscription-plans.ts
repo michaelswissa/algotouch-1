@@ -1,5 +1,5 @@
 
-import { SubscriptionPlan } from '@/components/payment/types/payment';
+import { SubscriptionPlan } from '@/components/payment/utils/paymentHelpers';
 
 export const subscriptionPlans = {
   monthly: {
