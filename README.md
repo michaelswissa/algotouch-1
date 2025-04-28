@@ -1,65 +1,82 @@
 
-# CardCom Payment Integration
+# AlgoTouch Trading Platform
 
-This project implements a secure payment processing system using CardCom payment gateway.
+A comprehensive platform for AlgoTouch traders, providing advanced trading tools, educational resources, and a vibrant community. The platform offers subscription-based access to premium features and content.
 
-## Key Components
+## Core Features
+
+### Trading Tools & Analytics
+- Performance tracking
+- Trade analysis
+- Emotional trading insights
+- Custom reporting
+
+### Educational Resources
+- Comprehensive trading courses
+- Live workshops
+- Trading strategies
+- Market analysis
+
+### Community Features
+- Trader discussions
+- Experience sharing
+- Achievement system
+- Progress tracking
+
+## Technical Infrastructure
+
+### Payment Processing
+Secure payment handling through CardCom gateway, supporting:
+- Subscription management
+- Recurring billing
+- Secure payment processing
+- Trial period handling
 
 ### Edge Functions
+1. **cardcom-payment** - Payment initialization
+2. **cardcom-webhook** - Payment status management
+3. **cardcom-recurring** - Subscription handling
+4. **cardcom-status** - Transaction verification
+5. **cardcom-submit** - Payment processing
+6. **process-recurring** - Automated billing
 
-1. **cardcom-payment** - Centralized function for payment initialization
-   - Handles both redirect and iframe payment flows
-   - Creates payment sessions in the database
+### Database Structure
+- User profiles and preferences
+- Trading data and analytics
+- Subscription management
+- Payment processing
+- Community interaction
 
-2. **cardcom-webhook** - Processes payment callbacks from CardCom
-   - Updates payment status
-   - Creates subscriptions based on successful payments
+### Security
+- Secure API key management
+- Input validation
+- Transaction verification
+- Error monitoring
+- Audit logging
 
-3. **cardcom-recurring** - Handles recurring payments
-   - Processes due subscriptions
-   - Manages subscription cancellations
-
-4. **cardcom-status** - Checks payment status
-   - Verifies transactions against CardCom API
-   - Updates local payment records
-
-5. **cardcom-submit** - Submits payment details
-   - Handles CardCom form submissions
-   - Validates input data
-
-### Database Tables
-
-The system uses several tables to track payments and subscriptions:
-- `payment_sessions` - Tracks payment attempts
-- `user_payment_logs` - Stores payment history
-- `subscriptions` - Manages user subscription details
-- `recurring_payments` - Stores payment tokens for recurring billing
-- `plans` - Defines subscription plans
-
-### Security Features
-
-- All API keys stored as environment variables
-- Input validation on all requests
-- Duplicate payment prevention
-- Error logging and monitoring
-
-### Recurring Billing
-
-The system includes a cron job that runs daily to:
-1. Process subscriptions due for renewal
-2. Update expired trial subscriptions
-3. Invalidate tokens after multiple failed payment attempts
-
-## Configuration
-
-The CardCom integration requires the following environment variables:
-- `CARDCOM_TERMINAL_NUMBER` - Terminal number from CardCom
-- `CARDCOM_API_NAME` - API username
-- `CARDCOM_API_PASSWORD` - API password (required for some operations)
+### Automated Processing
+Daily scheduled tasks:
+- Subscription renewals
+- Trial period management
+- Payment token validation
 
 ## Subscription Plans
 
-Available subscription plans:
-1. **Monthly** - 371₪/month with 30-day free trial
-2. **Annual** - 3,371₪/year with 30-day free trial
-3. **VIP** - 13,121₪ one-time payment for lifetime access
+Access to premium features through flexible subscription options:
+
+1. **Monthly Access**
+   - 371₪/month
+   - 30-day free trial
+   - Full platform access
+
+2. **Annual Access**
+   - 3,371₪/year
+   - 30-day free trial
+   - Full platform access
+   - Priority support
+
+3. **VIP Lifetime**
+   - 13,121₪ one-time
+   - Lifetime access
+   - All premium features
+   - Priority support
