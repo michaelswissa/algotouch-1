@@ -1,6 +1,11 @@
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
+import { CardComService } from '@/services/payment/CardComService';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { useAuth } from '@/contexts/auth/useAuth';
+import { StorageService } from '@/lib/subscription/storage-service';
 
 interface PaymentState {
   paymentStatus: PaymentStatusType;
@@ -27,7 +32,7 @@ interface PaymentContextType extends PaymentState {
 const initialState: PaymentState = {
   paymentStatus: PaymentStatus.IDLE,
   isInitializing: false,
-  terminalNumber: '160138',
+  terminalNumber: '',  // Will be set from API response
   cardcomUrl: 'https://secure.cardcom.solutions',
   lowProfileCode: '',
   sessionId: '',
@@ -51,10 +56,11 @@ export const usePaymentContext = () => useContext(PaymentContext);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PaymentState>(initialState);
+  const { user } = useAuth();
 
   const initializePayment = async (planId: string): Promise<boolean> => {
     if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
-      console.log('Payment already initialized with lowProfileCode:', state.lowProfileCode);
+      PaymentLogger.log('Payment already initialized with lowProfileCode:', state.lowProfileCode);
       return true;
     }
 
@@ -67,37 +73,47 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         planId
       }));
 
-      // Set operationType based on plan
-      const operationType = planId === 'monthly' ? 'token_only' : 'payment';
-      
-      // In a real implementation, we would make API calls here to initialize payment
-      // For now, let's simulate a successful initialization
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const contractData = StorageService.get('contract_data');
+      if (!contractData) {
+        throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
+      }
 
-      const sessionId = `session-${Date.now()}`;
-      const lowProfileCode = `profile-${Date.now()}`;
-      const reference = `ref-${Date.now()}`;
+      const email = contractData.email;
+      const fullName = contractData.fullName;
+      const operationType = planId === 'monthly' ? 'token_only' : 'payment';
+
+      const sessionData = await CardComService.initializePayment({
+        planId,
+        userId: user?.id || null,
+        email,
+        fullName,
+        operationType
+      });
 
       setState(prev => ({
         ...prev,
         isInitializing: false,
         paymentStatus: PaymentStatus.IDLE,
         operationType,
-        sessionId,
-        lowProfileCode,
-        reference,
+        sessionId: sessionData.sessionId,
+        lowProfileCode: sessionData.lowProfileId,
+        reference: sessionData.reference,
+        terminalNumber: sessionData.terminalNumber,
+        cardcomUrl: sessionData.cardcomUrl || prev.cardcomUrl,
       }));
 
+      PaymentLogger.log('Payment initialized successfully', sessionData);
       return true;
     } catch (error) {
       console.error('Error initializing payment:', error);
+      const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
       setState(prev => ({ 
         ...prev, 
         isInitializing: false,
         paymentStatus: PaymentStatus.FAILED,
-        error: error instanceof Error ? error.message : 'Failed to initialize payment'
+        error: errorMessage
       }));
-      toast.error('אירעה שגיאה באתחול התשלום');
+      toast.error(errorMessage);
       return false;
     }
   };
@@ -105,10 +121,10 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const submitPayment = async (cardOwnerDetails: CardOwnerDetails): Promise<boolean> => {
     try {
       if (state.paymentStatus === PaymentStatus.PROCESSING) {
-        return false; // Prevent duplicate submissions
+        return false;
       }
 
-      if (!state.lowProfileCode) {
+      if (!state.lowProfileCode || !state.terminalNumber) {
         toast.error('חסר מזהה ייחודי לעסקה, אנא נסה/י שנית');
         return false;
       }
@@ -119,24 +135,32 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      // In a real implementation, we would make API calls here to process payment
-      // For now, let's simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const success = await CardComService.submitPayment({
+        lowProfileCode: state.lowProfileCode,
+        terminalNumber: state.terminalNumber,
+        operationType: state.operationType,
+        cardOwnerDetails
+      });
 
-      setState(prev => ({
-        ...prev,
-        paymentStatus: PaymentStatus.SUCCESS,
-      }));
-      
-      return true;
+      if (success) {
+        setState(prev => ({
+          ...prev,
+          paymentStatus: PaymentStatus.SUCCESS,
+        }));
+        PaymentLogger.log('Payment submitted successfully');
+        return true;
+      } else {
+        throw new Error('שגיאה בשליחת פרטי התשלום');
+      }
     } catch (error) {
       console.error('Error submitting payment:', error);
+      const errorMessage = error instanceof Error ? error.message : 'שגיאה בתהליך התשלום';
       setState(prev => ({ 
         ...prev, 
         paymentStatus: PaymentStatus.FAILED,
-        error: error instanceof Error ? error.message : 'Failed to process payment'
+        error: errorMessage
       }));
-      toast.error('אירעה שגיאה בתהליך התשלום');
+      toast.error(errorMessage);
       return false;
     }
   };
