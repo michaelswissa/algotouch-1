@@ -8,7 +8,7 @@ interface UsePaymentStatusProps {
 }
 
 interface PaymentState {
-  paymentStatus: PaymentStatusEnum;
+  paymentStatus: keyof typeof PaymentStatusEnum;
   sessionId: string;
   lowProfileCode: string;
   terminalNumber: string;
