@@ -4,7 +4,7 @@ import axios from 'axios';
 import { CardOwnerDetails, CardComPaymentResponse, PaymentSessionData, PaymentStatus } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from './validators';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export class CardComService {
   static async initializePayment(data: { planId: string; userId: string | null; email: string; fullName: string; operationType: string }): Promise<PaymentSessionData> {
