@@ -9,7 +9,24 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 export class CardComService {
   static async initializePayment(data: { planId: string; userId: string | null; email: string; fullName: string; operationType: string }): Promise<PaymentSessionData> {
     try {
-      const response = await axios.post<PaymentSessionData>(`${API_URL}/api/payment/initiate`, data);
+      // Add isIframePrefill: true to the request body
+      const requestData = {
+        ...data,
+        isIframePrefill: true
+      };
+      
+      console.log('Initializing payment with data:', requestData);
+      console.log('Calling payment endpoint:', `${API_URL}/api/payment/initiate`);
+      
+      const response = await axios.post<PaymentSessionData>(`${API_URL}/api/payment/initiate`, requestData);
+      
+      console.log('Payment initialization response:', response.data);
+      
+      if (!response.data?.lowProfileId) {
+        console.error('Missing lowProfileId in response:', response.data);
+        throw new Error('Initialization response missing lowProfileId');
+      }
+      
       return response.data;
     } catch (error: any) {
       console.error('Error initializing payment:', error.response?.data || error.message);
@@ -49,9 +66,13 @@ export class CardComService {
   // Add checkPaymentStatus to this service as well to maintain compatibility
   static async checkPaymentStatus(lowProfileCode: string): Promise<{success: boolean; data?: any; message?: string}> {
     try {
+      console.log('Checking payment status for lowProfileCode:', lowProfileCode);
+      
       const response = await axios.post(`${API_URL}/api/payment/status`, { 
         lowProfileCode 
       });
+      
+      console.log('Payment status response:', response.data);
       
       return {
         success: response.data?.success || false,
