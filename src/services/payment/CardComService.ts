@@ -1,6 +1,6 @@
 
 import axios from 'axios';
-import { CardOwnerDetails, CardComPaymentResponse, PaymentStatusType, PaymentStatus } from '@/types/payment';
+import { CardOwnerDetails, CardComPaymentResponse, PaymentStatusType, PaymentStatus, PaymentSessionData } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from '@/lib/payment/validators';
 
 // Use the Supabase URL from environment variables
@@ -13,7 +13,7 @@ export class CardComService {
     email: string; 
     fullName: string; 
     operationType: string 
-  }): Promise<any> {
+  }): Promise<PaymentSessionData> {
     try {
       // Add isIframePrefill: true to the request body to get iframe parameters
       const requestData = {
@@ -24,17 +24,20 @@ export class CardComService {
       console.log('Initializing payment with data:', requestData);
       console.log('Calling payment endpoint:', `${API_BASE_URL}/api/payment/initiate`);
 
-      const response = await axios.post(`${API_BASE_URL}/api/payment/initiate`, requestData);
+      const response = await axios.post<{data: PaymentSessionData}>(`${API_BASE_URL}/api/payment/initiate`, requestData);
       
       console.log('Payment initialization response:', response.data);
 
+      // Extract the session data - handle both nested and direct response formats
+      const sessionData: PaymentSessionData = response.data.data || response.data as PaymentSessionData;
+      
       // Check if the response contains the expected lowProfileId
-      if (!response.data?.data?.lowProfileId) {
+      if (!sessionData.lowProfileId) {
         console.error('Missing lowProfileId in response:', response.data);
         throw new Error('Initialization response missing lowProfileId');
       }
 
-      return response.data.data; // Return the nested 'data' object containing lowProfileId, etc.
+      return sessionData;
     } catch (error: any) {
       console.error('Error initializing payment:', error);
       // Log more detailed error info if available

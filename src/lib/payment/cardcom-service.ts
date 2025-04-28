@@ -21,9 +21,10 @@ export class CardComService {
       
       console.log('Payment initialization response:', response.data);
       
-      const sessionData = response.data.data || response.data;
+      // Extract the session data - handle both nested and direct response formats
+      const sessionData: PaymentSessionData = response.data.data || response.data as PaymentSessionData;
       
-      if (!sessionData?.lowProfileId) {
+      if (!sessionData.lowProfileId) {
         console.error('Missing lowProfileId in response:', response.data);
         throw new Error('Initialization response missing lowProfileId');
       }
