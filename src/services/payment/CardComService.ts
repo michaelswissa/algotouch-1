@@ -1,5 +1,6 @@
+
 import axios from 'axios';
-import { CardOwnerDetails, CardComPaymentResponse } from '@/types/payment';
+import { CardOwnerDetails, CardComPaymentResponse, PaymentStatusType, PaymentStatus } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from '@/lib/payment/validators';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -34,5 +35,26 @@ export class CardComService {
   static validateExpiry(month?: string, year?: string) {
     const cardExpiryValidation = validateCardExpiry(month, year);
     return cardExpiryValidation;
+  }
+
+  // Add the checkPaymentStatus function that was missing
+  static async checkPaymentStatus(lowProfileCode: string): Promise<{success: boolean; data?: any; message?: string}> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/payment/status`, { 
+        lowProfileCode 
+      });
+      
+      return {
+        success: response.data?.success || false,
+        data: response.data?.data || {},
+        message: response.data?.message
+      };
+    } catch (error: any) {
+      console.error('Error checking payment status:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to check payment status'
+      };
+    }
   }
 }

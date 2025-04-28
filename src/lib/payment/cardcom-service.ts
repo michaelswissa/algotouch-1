@@ -1,6 +1,7 @@
+
 // Fix imports to use the new path
 import axios from 'axios';
-import { CardOwnerDetails, CardComPaymentResponse, PaymentSessionData } from '@/types/payment';
+import { CardOwnerDetails, CardComPaymentResponse, PaymentSessionData, PaymentStatus } from '@/types/payment';
 import { validateCardOwnerDetails, validateCardExpiry } from './validators';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -42,6 +43,27 @@ export class CardComService {
     } catch (error: any) {
       console.error('Error processing CardCom response:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to process CardCom response');
+    }
+  }
+
+  // Add checkPaymentStatus to this service as well to maintain compatibility
+  static async checkPaymentStatus(lowProfileCode: string): Promise<{success: boolean; data?: any; message?: string}> {
+    try {
+      const response = await axios.post(`${API_URL}/api/payment/status`, { 
+        lowProfileCode 
+      });
+      
+      return {
+        success: response.data?.success || false,
+        data: response.data?.data || {},
+        message: response.data?.message
+      };
+    } catch (error: any) {
+      console.error('Error checking payment status:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to check payment status'
+      };
     }
   }
 }
