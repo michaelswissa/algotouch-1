@@ -35,7 +35,6 @@ export function usePaymentForm() {
   });
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   
-  // Initialize form data and validation
   const initialFormData: PaymentFormData = {
     cardOwnerName: '',
     cardOwnerId: '',
@@ -76,7 +75,6 @@ export function usePaymentForm() {
     }));
   };
 
-  // Enhanced iframe message handling with validation state
   useEffect(() => {
     const handleFrameMessages = (message: MessageEvent) => {
       if (!message.origin.includes('cardcom.solutions') && 
@@ -106,7 +104,7 @@ export function usePaymentForm() {
         case 'cvv':
           setValidationState(prev => ({ ...prev, isCvvValid: data.isValid }));
           if (!data.isValid) {
-            setFieldError('cvv', data.message || 'קוד אבטחה לא תקין');
+            setFieldError('cvv', data.message || 'קוד אבטחה ��א תקין');
           } else {
             setFieldError('cvv', null);
           }
@@ -122,7 +120,6 @@ export function usePaymentForm() {
     return () => window.removeEventListener('message', handleFrameMessages);
   }, []);
   
-  // Validation timeout handler
   const startValidationTimeout = () => {
     if (validationTimeout) {
       clearTimeout(validationTimeout);
@@ -138,7 +135,6 @@ export function usePaymentForm() {
     setValidationTimeout(timeout);
   };
   
-  // Enhanced card field validation
   const validateCardFields = () => {
     setValidationState(prev => ({ ...prev, validationInProgress: true }));
     startValidationTimeout();
@@ -161,19 +157,16 @@ export function usePaymentForm() {
       }
     };
     
-    // Clear previous validation errors
     setFieldErrors({});
     validateCardNumber();
     validateCvv();
   };
   
-  // Enhanced submission handler with validation checks
   const handleSubmitPayment = async () => {
     if (isSubmitting || paymentStatus === PaymentStatus.PROCESSING) {
       return;
     }
     
-    // First validate regular form fields
     const isFormValid = validateForm();
     if (!isFormValid) {
       const errorMessages = Object.values(errors).filter(e => e).join(', ');
@@ -182,13 +175,6 @@ export function usePaymentForm() {
       return;
     }
     
-    // Trigger iframe validations
-    validateCardFields();
-    
-    // Wait for validation completion
-    setValidationState(prev => ({ ...prev, validationInProgress: true }));
-    
-    // Check for existing validation errors
     if (fieldErrors.cardNumber || fieldErrors.cvv) {
       const iframeErrors = [fieldErrors.cardNumber, fieldErrors.cvv].filter(Boolean).join(', ');
       toast.error(`שגיאות באימות כרטיס: ${iframeErrors}`);
@@ -196,7 +182,10 @@ export function usePaymentForm() {
       return;
     }
     
-    // Verify reCAPTCHA if required
+    validateCardFields();
+    
+    setValidationState(prev => ({ ...prev, validationInProgress: true }));
+    
     if (!validationState.isReCaptchaValid) {
       toast.error('אנא השלם את אימות האנושי');
       return;
@@ -225,14 +214,12 @@ export function usePaymentForm() {
       toast.error(error instanceof Error ? error.message : 'אירעה שגיאה בשליחת התשלום');
     } finally {
       setIsSubmitting(false);
-      // Clear validation timeout if it exists
       if (validationTimeout) {
         clearTimeout(validationTimeout);
       }
     }
   };
   
-  // Pre-fill form data from session storage (keep existing implementation)
   useEffect(() => {
     const registrationDataStr = sessionStorage.getItem('registration_data');
     const contractDataStr = sessionStorage.getItem('contract_data');
