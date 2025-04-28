@@ -1,6 +1,6 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { PaymentStatus } from '@/components/payment/types/payment';
+import { PaymentStatus } from '@/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';

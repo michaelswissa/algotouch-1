@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CardComFieldsInitConfig, PaymentSessionData } from '@/components/payment/types/payment';
+import { CardComFieldsInitConfig } from '@/types/payment';
 
 /**
  * Hook for initializing CardCom payment fields
