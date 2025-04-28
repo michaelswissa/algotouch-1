@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/components/payment/types/payment';
 import { toast } from 'sonner';
@@ -6,6 +5,7 @@ import { CardComService } from '@/services/payment/CardComService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { useAuth } from '@/contexts/auth/useAuth';
 import { StorageService } from '@/lib/subscription/storage-service';
+import type { ContractData } from '@/lib/contracts/contract-validation-service';
 
 interface PaymentState {
   paymentStatus: PaymentStatusType;
@@ -73,20 +73,22 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         planId
       }));
 
-      const contractData = StorageService.get('contract_data');
+      const contractData = StorageService.get<ContractData>('contract_data');
       if (!contractData) {
         throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
       }
 
-      const email = contractData.email;
-      const fullName = contractData.fullName;
+      if (!contractData.email || !contractData.fullName) {
+        throw new Error('חסרים פרטי לקוח בחוזה');
+      }
+
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
 
       const sessionData = await CardComService.initializePayment({
         planId,
         userId: user?.id || null,
-        email,
-        fullName,
+        email: contractData.email,
+        fullName: contractData.fullName,
         operationType
       });
 
