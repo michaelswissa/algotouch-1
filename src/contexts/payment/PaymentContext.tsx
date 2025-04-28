@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/types/payment';
 import { toast } from 'sonner';
+// Import from the services directory instead of lib/payment
 import { CardComService } from '@/services/payment/CardComService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { useAuth } from '@/contexts/auth/useAuth';

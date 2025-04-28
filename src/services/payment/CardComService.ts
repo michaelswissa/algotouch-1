@@ -14,6 +14,7 @@ interface ApiResponse<T> {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1';
 const PAYMENT_ENDPOINT = `${API_BASE_URL}/cardcom-payment`;
 const STATUS_ENDPOINT = `${API_BASE_URL}/cardcom-status`;
+const WEBHOOK_ENDPOINT = `${API_BASE_URL}/cardcom-webhook`;
 
 export class CardComService {
   static async initializePayment(data: { 
@@ -81,7 +82,21 @@ export class CardComService {
     return cardExpiryValidation;
   }
 
-  // Add the checkPaymentStatus function that was missing
+  // Add the processCardComResponse method from the lib version
+  static async processCardComResponse(data: any): Promise<CardComPaymentResponse> {
+    try {
+      const response = await axios.post<ApiResponse<CardComPaymentResponse>>(WEBHOOK_ENDPOINT, data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Error processing CardCom response:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('API error details:', error.response?.data, error.response?.status);
+      }
+      throw new Error(error.response?.data?.message || 'Failed to process CardCom response');
+    }
+  }
+
+  // The checkPaymentStatus function is already implemented in this file
   static async checkPaymentStatus(lowProfileCode: string): Promise<{success: boolean; data?: any; message?: string}> {
     try {
       console.log('Checking payment status for lowProfileCode:', lowProfileCode);
