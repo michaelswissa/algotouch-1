@@ -1,6 +1,4 @@
 
-# This file defines configuration for the edge functions
-
 # Project ID (required first line)
 project_id = "ndhakvhrrkczgylcmyoc"
 
@@ -20,3 +18,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.cardcom-status]
 verify_jwt = false
+[functions.process-recurring]
+verify_jwt = false
+
