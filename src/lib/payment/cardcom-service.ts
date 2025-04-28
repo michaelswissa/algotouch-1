@@ -10,7 +10,8 @@ interface ApiResponse<T> {
   data: T;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Use the Supabase URL from environment variables
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1';
 
 export class CardComService {
   static async initializePayment(data: { planId: string; userId: string | null; email: string; fullName: string; operationType: string }): Promise<PaymentSessionData> {
@@ -22,10 +23,10 @@ export class CardComService {
       };
       
       console.log('Initializing payment with data:', requestData);
-      console.log('Calling payment endpoint:', `${API_URL}/api/payment/initiate`);
+      console.log('Calling payment endpoint:', `${API_BASE_URL}/cardcom-payment`);
       
       // Specify the expected response structure
-      const response = await axios.post<ApiResponse<PaymentSessionData>>(`${API_URL}/api/payment/initiate`, requestData);
+      const response = await axios.post<ApiResponse<PaymentSessionData>>(`${API_BASE_URL}/cardcom-payment`, requestData);
       
       console.log('Payment initialization response:', response.data);
       
@@ -64,7 +65,7 @@ export class CardComService {
 
   static async processCardComResponse(data: any): Promise<CardComPaymentResponse> {
     try {
-      const response = await axios.post<ApiResponse<CardComPaymentResponse>>(`${API_URL}/api/payment/process-cardcom`, data);
+      const response = await axios.post<ApiResponse<CardComPaymentResponse>>(`${API_BASE_URL}/cardcom-webhook`, data);
       return response.data.data;
     } catch (error: any) {
       console.error('Error processing CardCom response:', error.response?.data || error.message);
@@ -77,7 +78,7 @@ export class CardComService {
     try {
       console.log('Checking payment status for lowProfileCode:', lowProfileCode);
       
-      const response = await axios.post<ApiResponse<any>>(`${API_URL}/api/payment/status`, { 
+      const response = await axios.post<ApiResponse<any>>(`${API_BASE_URL}/cardcom-status`, { 
         lowProfileCode 
       });
       

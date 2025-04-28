@@ -11,9 +11,9 @@ interface ApiResponse<T> {
 }
 
 // Use the Supabase URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const PAYMENT_ENDPOINT = `${API_BASE_URL}/api/payment/initiate`;
-const STATUS_ENDPOINT = `${API_BASE_URL}/api/payment/status`;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1';
+const PAYMENT_ENDPOINT = `${API_BASE_URL}/cardcom-payment`;
+const STATUS_ENDPOINT = `${API_BASE_URL}/cardcom-status`;
 
 export class CardComService {
   static async initializePayment(data: { 
