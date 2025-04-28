@@ -1,9 +1,11 @@
+
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PaymentStatus } from '@/components/payment/types/payment';
 import { usePaymentStatus } from './payment/usePaymentStatus';
 import { usePaymentInitialization } from './payment/usePaymentInitialization';
 import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
+import { useCardcomInitializer } from './useCardcomInitializer';
 import { toast } from 'sonner';
 
 interface UsePaymentProps {
@@ -15,6 +17,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [isCardcomInitialized, setIsCardcomInitialized] = useState(false);
   
   useEffect(() => {
     if (planId === 'monthly') {
@@ -38,6 +41,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     operationType
   });
 
+  const { initializeCardcomFields } = useCardcomInitializer();
+
   const {
     startStatusCheck,
     checkPaymentStatus,
@@ -54,6 +59,46 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     planType: planId
   });
 
+  // Initialize CardCom fields once we have the necessary data
+  useEffect(() => {
+    if (
+      masterFrameRef.current && 
+      state.lowProfileCode && 
+      state.sessionId && 
+      state.terminalNumber &&
+      !isCardcomInitialized
+    ) {
+      console.log('Initializing CardCom fields');
+      
+      // Allow some time for the iframe to load before initializing
+      const timer = setTimeout(async () => {
+        try {
+          const success = await initializeCardcomFields(
+            masterFrameRef,
+            state.lowProfileCode,
+            state.sessionId,
+            state.terminalNumber,
+            operationType
+          );
+          
+          if (success) {
+            console.log('CardCom fields initialized successfully');
+            setIsCardcomInitialized(true);
+          } else {
+            console.error('Failed to initialize CardCom fields');
+            handleError('שגיאה באתחול שדות התשלום');
+          }
+        } catch (error) {
+          console.error('Error initializing CardCom fields:', error);
+          handleError('שגיאה באתחול שדות התשלום');
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [masterFrameRef, state.lowProfileCode, state.sessionId, state.terminalNumber, isCardcomInitialized, operationType, initializeCardcomFields, handleError]);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanupStatusCheck();
@@ -66,6 +111,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       ...prev,
       paymentStatus: PaymentStatus.IDLE
     }));
+    setIsCardcomInitialized(false);
     initializePayment();
   }, [initializePayment, setState]);
 
@@ -77,6 +123,11 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     
     if (!state.lowProfileCode) {
       handleError("חסר מזהה יחודי לעסקה, אנא נסה/י שנית");
+      return;
+    }
+    
+    if (!isCardcomInitialized) {
+      handleError("שדות התשלום לא אותחלו כראוי, אנא רענן/י את העמוד");
       return;
     }
     
@@ -142,7 +193,8 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
   }, [
     masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, 
-    handleError, operationType, paymentInProgress, setState, startStatusCheck, planId
+    handleError, operationType, paymentInProgress, setState, startStatusCheck, planId,
+    isCardcomInitialized
   ]);
 
   return {
@@ -153,6 +205,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     sessionId: state.sessionId,
     initializePayment,
     handleRetry,
-    submitPayment
+    submitPayment,
+    isCardcomInitialized
   };
 };

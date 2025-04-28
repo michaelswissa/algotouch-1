@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -7,9 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-/**
- * Log a step in the function execution with optional details
- */
+// Helper function for logging with database storage
 async function logStep(
   functionName: string,
   step: string, 
@@ -34,17 +33,9 @@ async function logStep(
         created_at: timestamp
       });
     } catch (e) {
-      // Don't let logging errors affect main flow
       console.error('Failed to log to database:', e);
     }
   }
-}
-
-/**
- * Validate if a string is a valid UUID for LowProfileId
- */
-function validateLowProfileId(lowProfileId: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lowProfileId);
 }
 
 serve(async (req) => {
@@ -56,257 +47,123 @@ serve(async (req) => {
   try {
     const functionName = 'status';
     await logStep(functionName, "Function started");
-
-    // Create Supabase admin client for database operations that bypass RLS
+    
+    // Create Supabase admin client for database operations
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error("Missing Supabase configuration");
     }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Extract request parameters
-    const { lowProfileCode } = await req.json();
     
-    if (!lowProfileCode || !validateLowProfileId(lowProfileCode)) {
-      await logStep(functionName, "Invalid lowProfileCode format", { lowProfileCode }, 'error', supabaseAdmin);
-      throw new Error("Invalid lowProfileCode format");
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get CardCom API config
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
+    const apiName = Deno.env.get("CARDCOM_API_NAME");
+    
+    if (!terminalNumber || !apiName) {
+      await logStep(functionName, "Missing CardCom API configuration", {}, 'error', supabaseAdmin);
+      throw new Error("Missing CardCom API configuration");
     }
 
-    await logStep(functionName, "Checking payment status", { lowProfileCode });
-
-    // Check for transaction record in our database
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
+    // Parse the request body for lowProfileCode
+    const { lowProfileCode } = await req.json();
+    
+    if (!lowProfileCode) {
+      await logStep(functionName, "Missing lowProfileCode", {}, 'error', supabaseAdmin);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Missing lowProfileCode parameter",
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Look up the payment session
+    const { data: paymentSession, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .select('*')
       .eq('low_profile_id', lowProfileCode)
       .maybeSingle();
-
+    
     if (sessionError) {
-      await logStep(functionName, "Error fetching payment session", { error: sessionError.message }, 'error', supabaseAdmin);
-      throw new Error("Error fetching payment status");
+      await logStep(functionName, "Error finding payment session", sessionError, 'error', supabaseAdmin);
+      throw new Error("Error finding payment session");
     }
-
-    if (!sessionData) {
-      await logStep(functionName, "Payment session not found", { lowProfileCode }, 'warn');
+    
+    if (!paymentSession) {
+      await logStep(functionName, "Payment session not found", { lowProfileCode }, 'error', supabaseAdmin);
       return new Response(
         JSON.stringify({
           success: false,
           message: "Payment session not found",
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Check the status of the session
-    const isCompleted = sessionData.status === 'completed';
-    const isProcessing = sessionData.status === 'processing';
-    const isFailed = sessionData.status === 'failed';
-    const isExpired = sessionData.status === 'expired';
-
-    await logStep(functionName, `Found payment session with status: ${sessionData.status}`, {
-      sessionId: sessionData.id,
-      status: sessionData.status,
-      transactionId: sessionData.transaction_id
-    });
-
-    // For sessions that are not in a final state, fetch from CardCom if needed
-    if (!isCompleted && !isFailed && !isExpired && sessionData.transaction_id === null) {
-      try {
-        // Get CardCom API configuration
-        const cardcomTerminal = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
-        const cardcomApiName = Deno.env.get("CARDCOM_API_NAME");
-
-        if (!cardcomTerminal || !cardcomApiName) {
-          await logStep(functionName, "Missing CardCom API configuration", {}, 'error', supabaseAdmin);
-          throw new Error("Missing CardCom API configuration");
-        }
-
-        // Call CardCom API to check transaction status
-        const response = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/GetLowProfileResult', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            TerminalNumber: cardcomTerminal,
-            ApiName: cardcomApiName,
-            LowProfileId: lowProfileCode
+    
+    // Construct CardCom API URL for getting transaction status
+    const cardcomApiUrl = 'https://secure.cardcom.solutions/Interface/LowProfile.aspx';
+    const statusUrl = `${cardcomApiUrl}?terminalnumber=${terminalNumber}&lowprofilecode=${lowProfileCode}&operation=GetLowProfileResult&ApiName=${apiName}`;
+    
+    try {
+      await logStep(functionName, "Checking transaction status with CardCom", { lowProfileCode });
+      
+      // Call CardCom API to get transaction status
+      const response = await fetch(statusUrl, { method: 'GET' });
+      const cardcomData = await response.json();
+      
+      await logStep(functionName, "Received status from CardCom", cardcomData);
+      
+      // Determine payment success from CardCom response
+      const isSuccess = cardcomData.ResponseCode === 0 || cardcomData.ResponseCode === "0";
+      const status = isSuccess ? 'completed' : 'failed';
+      
+      // Update the payment session with the latest status
+      if (paymentSession.status !== 'completed') {
+        await supabaseAdmin
+          .from('payment_sessions')
+          .update({
+            status,
+            transaction_id: cardcomData.TranzactionId || cardcomData.TransactionId || null,
+            transaction_data: cardcomData,
+            updated_at: new Date().toISOString()
           })
-        });
-
-        if (!response.ok) {
-          throw new Error(`CardCom API returned ${response.status}: ${await response.text()}`);
-        }
-
-        const cardcomResult = await response.json();
-        await logStep(functionName, "CardCom API response", cardcomResult);
-
-        // Process the result from CardCom
-        if (cardcomResult.ResponseCode === 0 && cardcomResult.TranzactionInfo) {
-          // Success - update our session
-          await supabaseAdmin
-            .from('payment_sessions')
-            .update({
-              status: 'completed',
-              transaction_id: cardcomResult.TranzactionInfo.TranzactionId || cardcomResult.TranzactionId,
-              transaction_data: cardcomResult,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', sessionData.id);
-
-          // Create log entry
-          await supabaseAdmin.from('user_payment_logs').insert({
-            user_id: sessionData.user_id || null,
-            token: lowProfileCode,
-            transaction_id: cardcomResult.TranzactionInfo.TranzactionId || cardcomResult.TranzactionId,
-            amount: sessionData.amount,
-            status: 'payment_success',
-            payment_data: cardcomResult,
-            currency: sessionData.currency || 'ILS'
-          });
-
-          await logStep(functionName, "Updated payment status to completed", {
-            sessionId: sessionData.id,
-            transactionId: cardcomResult.TranzactionInfo.TranzactionId
-          });
-
-          // Success response
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: "Payment completed successfully",
-              data: {
-                sessionId: sessionData.id,
-                status: 'completed',
-                cardcomResponse: cardcomResult
-              }
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } else if (cardcomResult.ResponseCode !== 0) {
-          // Payment failed in CardCom
-          await supabaseAdmin
-            .from('payment_sessions')
-            .update({
-              status: 'failed',
-              transaction_data: cardcomResult,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', sessionData.id);
-
-          // Create log entry
-          await supabaseAdmin.from('user_payment_logs').insert({
-            user_id: sessionData.user_id || null,
-            token: lowProfileCode,
-            amount: sessionData.amount,
-            status: 'payment_failed',
-            payment_data: cardcomResult,
-            currency: sessionData.currency || 'ILS'
-          });
-
-          await logStep(functionName, "Updated payment status to failed", {
-            sessionId: sessionData.id,
-            responseCode: cardcomResult.ResponseCode,
-            description: cardcomResult.Description
-          }, 'warn');
-
-          // Failure response
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: cardcomResult.Description || "Payment failed",
-              data: {
-                sessionId: sessionData.id,
-                status: 'failed',
-                cardcomResponse: cardcomResult
-              }
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } else {
-          // Still processing
-          await logStep(functionName, "Payment still processing", { sessionId: sessionData.id });
-          
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: "Payment is still processing",
-              data: {
-                sessionId: sessionData.id,
-                status: 'processing'
-              }
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      } catch (cardcomError) {
-        await logStep(functionName, "Error checking with CardCom API", cardcomError, 'error', supabaseAdmin);
-        
-        // Don't change session status on API errors
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: "Error checking payment status with CardCom",
-            error: cardcomError instanceof Error ? cardcomError.message : String(cardcomError)
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+          .eq('low_profile_id', lowProfileCode);
       }
-    }
-
-    // Return the status based on our database state
-    if (isCompleted) {
+      
       return new Response(
         JSON.stringify({
-          success: true,
-          message: "Payment completed successfully",
+          success: isSuccess,
+          message: isSuccess ? "Payment completed successfully" : cardcomData.Description || "Payment failed",
           data: {
-            sessionId: sessionData.id,
-            status: sessionData.status,
-            transactionId: sessionData.transaction_id
+            ...cardcomData,
+            sessionId: paymentSession.id,
+            status,
+            amount: paymentSession.amount,
+            currency: paymentSession.currency
           }
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } else if (isFailed) {
+    } catch (apiError) {
+      // If CardCom API call fails, return the current status from our database
+      await logStep(functionName, "CardCom API call failed", { error: apiError.message }, 'error', supabaseAdmin);
+      
       return new Response(
         JSON.stringify({
-          success: false,
-          message: "Payment failed",
+          success: paymentSession.status === 'completed',
+          message: "Status based on local data only, CardCom API call failed",
           data: {
-            sessionId: sessionData.id,
-            status: sessionData.status
+            status: paymentSession.status,
+            sessionId: paymentSession.id,
+            lowProfileId: lowProfileCode,
+            error: apiError.message
           }
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else if (isExpired) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Payment session expired",
-          data: {
-            sessionId: sessionData.id,
-            status: sessionData.status
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else {
-      // Still processing or in another state
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Payment is still processing",
-          data: {
-            sessionId: sessionData.id,
-            status: sessionData.status
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   } catch (error) {
@@ -318,7 +175,7 @@ serve(async (req) => {
         success: false,
         message: errorMessage,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

@@ -39,7 +39,7 @@ export class PaymentService {
       // Determine operation type based on plan
       const operation = planId === 'monthly' ? 'ChargeAndCreateToken' : 'ChargeOnly';
 
-      // Call Supabase Edge Function to initialize payment
+      // Call Supabase Edge Function to initialize payment with isIframePrefill=true
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
@@ -54,7 +54,8 @@ export class PaymentService {
             failed: `${window.location.origin}/subscription/failed`
           },
           userId: registrationData?.userId,
-          registrationData
+          registrationData,
+          isIframePrefill: true // This is key to use OpenFields instead of redirect
         }
       });
 

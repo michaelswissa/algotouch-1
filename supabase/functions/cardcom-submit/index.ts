@@ -127,7 +127,7 @@ serve(async (req) => {
     const { data: paymentSession, error: sessionError } = await supabaseAdmin
       .from('payment_sessions')
       .select('*')
-      .eq('low_profile_code', lowProfileCode)
+      .eq('low_profile_id', lowProfileCode)
       .single();
       
     if (sessionError || !paymentSession) {
@@ -145,41 +145,102 @@ serve(async (req) => {
 
     logStep(functionName, "Found payment session", { sessionId: paymentSession.id });
     
-    // In a real implementation, you would make an API call to CardCom to process the payment
-    // This is a placeholder for the actual API call
+    // Now make an API call to CardCom to process the transaction using the LowProfile code
+    const cardcomApiUrl = "https://secure.cardcom.solutions/api/v11/Transactions/TransactionByLowProfileCode";
     
-    // For this implementation, we'll just mark the payment as submitted
-    await supabaseAdmin
-      .from('payment_sessions')
-      .update({
-        status: 'submitted',
-        payment_details: {
-          cardOwnerName: cardOwnerDetails.cardOwnerName,
-          cardOwnerEmail: cardOwnerDetails.cardOwnerEmail,
-          cardOwnerPhone: cardOwnerDetails.cardOwnerPhone,
-          submittedAt: new Date().toISOString()
+    const cardcomPayload = {
+      TerminalNumber: terminalNumber,
+      APIName: apiName,
+      APIPassword: apiPassword,
+      LowProfileCode: lowProfileCode,
+      CardOwnerName: cardOwnerDetails.cardOwnerName,
+      CardOwnerEmail: cardOwnerDetails.cardOwnerEmail,
+      CardOwnerPhone: cardOwnerDetails.cardOwnerPhone,
+      CardOwnerId: cardOwnerDetails.cardOwnerId || "",
+      CallbackUrl: paymentSession.webhook_url || null,
+      ExternalUniqTranId: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    };
+    
+    try {
+      logStep(functionName, "Sending transaction request to CardCom", { 
+        url: cardcomApiUrl,
+        lowProfileCode,
+        terminalNumber 
+      });
+      
+      const response = await fetch(cardcomApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', paymentSession.id);
-    
-    logStep(functionName, "Updated payment session status to submitted");
-    
-    // Return success response
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Payment details submitted successfully",
-        data: {
-          sessionId: paymentSession.id,
-          lowProfileCode
+        body: JSON.stringify(cardcomPayload),
+      });
+      
+      const cardcomResponse = await response.json();
+      
+      logStep(functionName, "Received response from CardCom", cardcomResponse);
+      
+      // Update payment session status based on CardCom response
+      const isSuccess = cardcomResponse.ResponseCode === 0 || cardcomResponse.ResponseCode === "0";
+      const newStatus = isSuccess ? 'completed' : 'failed';
+      
+      await supabaseAdmin
+        .from('payment_sessions')
+        .update({
+          status: newStatus,
+          transaction_id: cardcomResponse.TransactionId || null,
+          transaction_data: cardcomResponse,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentSession.id);
+      
+      logStep(functionName, `Payment ${isSuccess ? 'succeeded' : 'failed'}`, {
+        lowProfileCode,
+        sessionId: paymentSession.id,
+        transactionId: cardcomResponse.TransactionId,
+        responseCode: cardcomResponse.ResponseCode
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: isSuccess,
+          message: isSuccess ? "Payment processed successfully" : cardcomResponse.Description || "Payment processing failed",
+          data: {
+            ...cardcomResponse,
+            status: newStatus,
+            sessionId: paymentSession.id,
+            lowProfileCode
+          }
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+      );
+    } catch (apiError) {
+      logStep(functionName, "Error calling CardCom API", { error: apiError.message }, 'error', supabaseAdmin);
+      
+      // Update payment session to error state
+      await supabaseAdmin
+        .from('payment_sessions')
+        .update({
+          status: 'error',
+          error_message: apiError.message || "Error calling CardCom API",
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentSession.id);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Error processing payment with CardCom: " + apiError.message,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[CARDCOM-SUBMIT][ERROR] ${errorMessage}`);

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { CreditCard } from 'lucide-react';
@@ -8,6 +8,7 @@ import SecurityNote from './SecurityNote';
 import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
 import CardNumberFrame from './iframes/CardNumberFrame';
 import CVVFrame from './iframes/CVVFrame';
+import ReCaptchaFrame from './iframes/ReCaptchaFrame';
 
 interface PaymentDetailsProps {
   terminalNumber: string;
@@ -23,8 +24,18 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   isReady = false
 }) => {
   const { formData, errors, handleChange } = usePaymentForm();
-  const [cardNumberLoaded, setCardNumberLoaded] = React.useState(false);
-  const [cvvLoaded, setCvvLoaded] = React.useState(false);
+  const [cardNumberLoaded, setCardNumberLoaded] = useState(false);
+  const [cvvLoaded, setCvvLoaded] = useState(false);
+  const [captchaLoaded, setCaptchaLoaded] = useState(false);
+  
+  // Track when all frames are loaded
+  const [allFramesLoaded, setAllFramesLoaded] = useState(false);
+  
+  useEffect(() => {
+    if (cardNumberLoaded && cvvLoaded && captchaLoaded && isReady) {
+      setAllFramesLoaded(true);
+    }
+  }, [cardNumberLoaded, cvvLoaded, captchaLoaded, isReady]);
   
   return (
     <div className="space-y-4" dir="rtl">
@@ -162,9 +173,18 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           />
         </div>
       </div>
+      
+      {/* reCAPTCHA Frame */}
+      <div className="space-y-2">
+        <ReCaptchaFrame
+          terminalNumber={terminalNumber}
+          cardcomUrl={cardcomUrl}
+          onLoad={() => setCaptchaLoaded(true)}
+        />
+      </div>
 
       {isReady && (
-        <div className="mt-6">
+        <div className="hidden">
           <iframe 
             ref={masterFrameRef}
             src={`${cardcomUrl}/Interface/MasterPage.aspx?TerminalNumber=${terminalNumber}&nocss=true`}
