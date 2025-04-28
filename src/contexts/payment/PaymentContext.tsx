@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { CardComService } from '@/services/payment/CardComService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { useAuth } from '@/contexts/auth/useAuth';
-import { StorageService } from '@/lib/subscription/storage-service';
+import { StorageService } from '@/services/storage/StorageService';
 import type { ContractData } from '@/lib/contracts/contract-validation-service';
 
 interface PaymentState {
@@ -149,6 +149,9 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
           ...prev,
           paymentStatus: PaymentStatus.SUCCESS,
         }));
+        
+        StorageService.clearAllSubscriptionData();
+        
         PaymentLogger.log('Payment submitted successfully');
         return true;
       } else {
