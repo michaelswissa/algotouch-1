@@ -51,7 +51,7 @@ export const usePaymentStatusCheck = ({
           transactionId: result.data?.transactionId || result.data?.transaction_id
         });
         
-        setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.SUCCESS }));
+        setState(prev => ({ ...prev, paymentStatus: 'SUCCESS' }));
         cleanupStatusCheck();
         
         if (onSuccess) {
@@ -121,7 +121,7 @@ export const usePaymentStatusCheck = ({
           
           // Stop checking and show error
           cleanupStatusCheck();
-          setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
+          setState(prev => ({ ...prev, paymentStatus: 'FAILED' }));
           toast.error('עבר זמן רב מדי ולא התקבל אישור תשלום');
           
           // Update storage with failed payment status

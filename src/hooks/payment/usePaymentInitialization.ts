@@ -28,7 +28,7 @@ export const usePaymentInitialization = ({
     
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatusEnum.INITIALIZING 
+      paymentStatus: 'INITIALIZING' 
     }));
     
     try {
@@ -101,7 +101,7 @@ export const usePaymentInitialization = ({
         terminalNumber: paymentData.terminalNumber,
         cardcomUrl: paymentData.cardcomUrl,
         reference: paymentData.reference,
-        paymentStatus: PaymentStatusEnum.IDLE
+        paymentStatus: 'IDLE'
       }));
       
       // Ensure master frame is set up
@@ -115,7 +115,7 @@ export const usePaymentInitialization = ({
       const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
       PaymentLogger.error('Payment initialization error:', error);
       toast.error(errorMessage);
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
+      setState(prev => ({ ...prev, paymentStatus: 'FAILED' }));
       return null;
     }
   }, [setState, masterFrameRef, planId, operationType, validateContract]);

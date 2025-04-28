@@ -64,7 +64,7 @@ export const useFrameMessages = ({
           PaymentLogger.error('Transaction rejected', { data });
           setState(prev => ({ 
             ...prev, 
-            paymentStatus: PaymentStatusEnum.FAILED,
+            paymentStatus: 'FAILED',
             error: data.errorMessage || 'העסקה נדחתה על ידי חברת האשראי'
           }));
         }
@@ -77,7 +77,7 @@ export const useFrameMessages = ({
             PaymentLogger.error('CardCom initialization failed', { data });
             setState(prev => ({ 
               ...prev, 
-              paymentStatus: PaymentStatusEnum.FAILED,
+              paymentStatus: 'FAILED',
               error: 'שגיאה באתחול תהליך התשלום'
             }));
           }

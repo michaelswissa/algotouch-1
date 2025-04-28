@@ -20,7 +20,7 @@ interface PaymentState {
 
 export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = {}) => {
   const [state, setState] = useState<PaymentState>({
-    paymentStatus: PaymentStatusEnum.IDLE,
+    paymentStatus: 'IDLE',
     sessionId: '',
     lowProfileCode: '',
     terminalNumber: '',
@@ -33,7 +33,7 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = 
   const handlePaymentSuccess = useCallback(() => {
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatusEnum.SUCCESS 
+      paymentStatus: 'SUCCESS'
     }));
     
     toast.success('התשלום בוצע בהצלחה!');
@@ -46,7 +46,7 @@ export const usePaymentStatus = ({ onPaymentComplete }: UsePaymentStatusProps = 
   const handleError = useCallback((errorMessage: string) => {
     setState(prev => ({ 
       ...prev, 
-      paymentStatus: PaymentStatusEnum.FAILED,
+      paymentStatus: 'FAILED',
       error: errorMessage
     }));
     
