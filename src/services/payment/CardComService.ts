@@ -20,6 +20,8 @@ interface PaymentInitializationResult {
   url?: string;
 }
 
+const isLocalDevelopment = window.location.hostname === 'localhost';
+
 export class CardComService {
   static async initializePayment(params: PaymentInitializationParams): Promise<PaymentInitializationResult> {
     try {
@@ -27,7 +29,7 @@ export class CardComService {
       
       PaymentLogger.log('Initializing payment', { planId, operationType, email });
       
-      // Use Supabase Functions API to call the edge function
+      // Use Supabase Functions API to call the edge function instead of relative URLs
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,

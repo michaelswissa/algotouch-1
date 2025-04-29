@@ -3,9 +3,12 @@ import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { CreditCard } from 'lucide-react';
+import { useForm } from 'react-hook-form';
 import SecurityNote from './SecurityNote';
 
 const PaymentDetails: React.FC = () => {
+  const { register, formState: { errors } } = useForm();
+  
   return (
     <div className="space-y-4" dir="rtl">
       <p className="text-center text-muted-foreground">
