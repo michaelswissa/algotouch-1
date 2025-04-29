@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// CORS headers to ensure the API can be called from the frontend
+// CORS headers for cross-domain requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -31,25 +31,6 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body
-    const requestData = await req.json();
-    const { lowProfileCode, sessionId } = requestData;
-    
-    if (!lowProfileCode || !sessionId) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Missing required parameters' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    console.log(`[CARDCOM-STATUS] Checking payment status for session: ${sessionId}, lowProfileCode: ${lowProfileCode}`);
-    
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -59,27 +40,43 @@ serve(async (req) => {
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Parse request body
+    const { 
+      sessionId
+    } = await req.json();
     
-    // Check payment status in database
-    const { data: paymentSession, error: sessionError } = await supabaseAdmin
-      .from('payment_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .eq('low_profile_id', lowProfileCode)
-      .maybeSingle();
-    
-    if (sessionError) {
-      throw new Error(`Error fetching payment session: ${sessionError.message}`);
-    }
-    
-    if (!paymentSession) {
+    if (!sessionId) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Payment session not found',
-          data: {
-            status: 'not_found'
-          }
+          message: 'Missing session ID parameter' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log(`[CARDCOM-STATUS] Checking status for session ID: ${sessionId}`);
+
+    // Query the payment_sessions table to get the current status
+    const { data: sessionData, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .maybeSingle();
+      
+    if (sessionError) {
+      throw new Error("Error fetching session data: " + sessionError.message);
+    }
+    
+    if (!sessionData) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Session not found' 
         }),
         { 
           status: 404, 
@@ -88,47 +85,58 @@ serve(async (req) => {
       );
     }
 
-    // Check if there are any payment logs for this session
-    const { data: paymentLogs, error: logsError } = await supabaseAdmin
-      .from('user_payment_logs')
-      .select('*')
-      .eq('token', lowProfileCode)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (logsError) {
-      console.error(`Error fetching payment logs: ${logsError.message}`);
-    }
+    // Check if the payment has been processed
+    const status = sessionData.status;
+    const isExpired = new Date(sessionData.expires_at) < new Date();
     
-    // Determine payment status
-    let status = 'pending';
-    let message = 'Payment is being processed';
-    
-    if (paymentSession.status === 'completed' || (paymentLogs && paymentLogs[0]?.status === 'payment_success')) {
-      status = 'success';
-      message = 'Payment completed successfully';
-    } else if (paymentSession.status === 'failed' || (paymentLogs && paymentLogs[0]?.status === 'payment_failed')) {
-      status = 'failed';
-      message = 'Payment failed';
-    } else if (paymentSession.status === 'expired' || new Date(paymentSession.expires_at) < new Date()) {
-      status = 'expired';
-      message = 'Payment session expired';
-    }
-
-    console.log(`[CARDCOM-STATUS] Status determined: ${status} for session: ${sessionId}`);
-    
-    return new Response(
-      JSON.stringify({
+    let statusResponse;
+    if (status === 'completed') {
+      statusResponse = {
         success: true,
-        message,
+        message: 'Payment completed successfully',
         data: {
-          status,
-          lowProfileCode,
-          sessionId,
-          paymentDate: paymentLogs && paymentLogs[0] ? paymentLogs[0].created_at : null,
-          paymentStatus: paymentLogs && paymentLogs[0] ? paymentLogs[0].status : null
+          status: 'success',
+          sessionData
         }
-      }),
+      };
+    } else if (status === 'failed') {
+      statusResponse = {
+        success: true,
+        message: 'Payment failed',
+        data: {
+          status: 'failed',
+          sessionData
+        }
+      };
+    } else if (isExpired) {
+      // If the session is expired, mark it as failed in the database
+      await supabaseAdmin
+        .from('payment_sessions')
+        .update({ status: 'expired' })
+        .eq('id', sessionId);
+        
+      statusResponse = {
+        success: true,
+        message: 'Payment session has expired',
+        data: {
+          status: 'expired',
+          sessionData: { ...sessionData, status: 'expired' }
+        }
+      };
+    } else {
+      // Session is still active but payment is not yet completed
+      statusResponse = {
+        success: true,
+        message: 'Payment is still processing',
+        data: {
+          status: 'processing',
+          sessionData
+        }
+      };
+    }
+
+    return new Response(
+      JSON.stringify(statusResponse),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

@@ -7,6 +7,10 @@ import IframePaymentStep from './IframePaymentStep';
 import SubscriptionSuccess from './SubscriptionSuccess';
 import LoadingSkeleton from './LoadingSkeleton';
 
+interface PlanSelectionStepProps {
+  onPlanSelected: (planId: string | null) => void;
+}
+
 const SubscriptionStepHandler: React.FC = () => {
   const { 
     currentStep, 
@@ -24,9 +28,13 @@ const SubscriptionStepHandler: React.FC = () => {
 
     switch (currentStep) {
       case 'plan':
-        return <PlanSelectionStep onPlanSelected={handlePlanSelected} />;
+        return <PlanSelectionStep onSelectPlan={handlePlanSelected} selectedPlanId={selectedPlan} />;
       case 'contract':
-        return <ContractSection onContractSigned={handleContractSigned} onBack={() => handlePlanSelected(null)} />;
+        return (
+          <ContractSection 
+            onBack={() => handlePlanSelected(null)} 
+          />
+        );
       case 'payment':
         return (
           <IframePaymentStep 
@@ -38,7 +46,7 @@ const SubscriptionStepHandler: React.FC = () => {
       case 'success':
         return <SubscriptionSuccess />;
       default:
-        return <PlanSelectionStep onPlanSelected={handlePlanSelected} />;
+        return <PlanSelectionStep onSelectPlan={handlePlanSelected} selectedPlanId={selectedPlan} />;
     }
   }, [currentStep, selectedPlan, handlePlanSelected, handleContractSigned, handlePaymentComplete, loading]);
 

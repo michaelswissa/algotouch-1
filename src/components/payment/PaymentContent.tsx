@@ -17,6 +17,7 @@ interface PaymentContentProps {
   onCancel?: () => void;
   operationType?: 'payment' | 'token_only';
   isReady?: boolean;
+  onPaymentStatus?: (status: PaymentStatusEnum) => void;
 }
 
 const PaymentContent: React.FC<PaymentContentProps> = ({
@@ -26,8 +27,10 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
   cardcomUrl,
   onNavigateToDashboard,
   onRetry,
+  onCancel,
   operationType = 'payment',
-  isReady = false
+  isReady = false,
+  onPaymentStatus
 }) => {
   console.log('Current payment status:', paymentStatus, 'isReady:', isReady);
   
@@ -52,9 +55,11 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         freeTrialDays={plan.freeTrialDays}
       />
       <PaymentDetails 
+        planId={plan.id}
         terminalNumber={terminalNumber}
         cardcomUrl={cardcomUrl}
         isReady={isReady}
+        onPaymentStatus={onPaymentStatus}
       />
     </>
   );

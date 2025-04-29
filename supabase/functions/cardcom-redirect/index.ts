@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 // CORS headers for cross-domain requests
 const corsHeaders = {
@@ -39,6 +39,9 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
+    // Get frontend URL for redirect paths
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
+
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -72,58 +75,53 @@ serve(async (req) => {
       );
     }
     
-    // Get plan information
-    let amount = 0;
-    let operationType = "1"; // Default: ChargeOnly
+    // Get plan information from the database
+    const { data: plan, error: planError } = await supabaseAdmin
+      .from('plans')
+      .select('*')
+      .eq('id', planId)
+      .maybeSingle();
+      
+    if (planError) {
+      throw new Error("Error fetching plan details: " + planError.message);
+    }
     
-    // Determine operation type and amount based on plan
-    if (planId) {
-      const { data: plan, error: planError } = await supabaseAdmin
-        .from('plans')
-        .select('*')
-        .eq('id', planId)
-        .maybeSingle();
-        
-      if (planError) {
-        throw new Error("Error fetching plan details");
-      }
-      
-      if (!plan) {
-        throw new Error(`Invalid plan ID: ${planId}`);
-      }
-      
-      // Set operation type and amount based on plan type
-      switch (planId) {
-        case 'monthly':
-          // Monthly plan starts with free trial (amount=0)
-          operationType = "3"; // CreateTokenOnly
-          amount = 0; 
-          break;
-        case 'annual':
-          // Annual plan charges immediately full amount
-          operationType = "2"; // ChargeAndCreateToken
-          amount = plan.price || 0;
-          break;
-        case 'vip':
-          // VIP plan is one-time payment
-          operationType = "1"; // ChargeOnly
-          amount = plan.price || 0;
-          break;
-        default:
-          operationType = "1"; // Default to ChargeOnly
-          amount = plan.price || 0;
-      }
+    if (!plan) {
+      throw new Error(`Invalid plan ID: ${planId}`);
     }
 
     // Generate a unique session ID and LowProfile ID
     const sessionId = crypto.randomUUID();
-    const lowProfileId = crypto.randomUUID();
     const reference = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
+    // Determine operation type and amount based on plan
+    let operationType = "1"; // Default: ChargeOnly
+    let amount = plan.price || 0;
+
+    switch (planId) {
+      case 'monthly':
+        // Monthly plan starts with free trial (amount=0)
+        operationType = "3"; // CreateTokenOnly
+        amount = 0; 
+        break;
+      case 'annual':
+        // Annual plan charges immediately full amount
+        operationType = "2"; // ChargeAndCreateToken
+        amount = plan.price || 0;
+        break;
+      case 'vip':
+        // VIP plan is one-time payment
+        operationType = "1"; // ChargeOnly
+        amount = plan.price || 0;
+        break;
+      default:
+        throw new Error(`Unsupported plan type: ${planId}`);
+    }
+    
     // Create clean URLs (removing any double slashes except in http://)
-    const successRedirectUrl = successUrl || `${req.url.split('/api/')[0]}/payment/success`;
-    const errorRedirectUrl = errorUrl || `${req.url.split('/api/')[0]}/payment/error`;
-    const indicatorUrl = webhookUrl || `${req.url.split('/api/')[0]}/api/cardcom-webhook`;
+    const successRedirectUrl = successUrl || `${frontendUrl}/payment/success`;
+    const errorRedirectUrl = errorUrl || `${frontendUrl}/payment/error`;
+    const indicatorUrl = webhookUrl || `${frontendUrl}/api/cardcom-webhook`;
     
     console.log(`[CARDCOM-REDIRECT] URLs - success: ${successRedirectUrl}, error: ${errorRedirectUrl}, indicator: ${indicatorUrl}`);
 
@@ -137,7 +135,6 @@ serve(async (req) => {
         currency: "ILS",
         status: 'initiated',
         operation_type: operationType,
-        low_profile_id: lowProfileId,
         reference: reference,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         payment_details: { 
@@ -149,18 +146,19 @@ serve(async (req) => {
       
     if (sessionError) {
       console.error("Database error:", sessionError);
-      throw new Error("Failed to create payment session");
+      throw new Error("Failed to create payment session: " + sessionError.message);
     }
 
+    // Get product name based on plan ID
+    const productName = planId === 'monthly' ? 'מנוי חודשי' : 
+                       planId === 'annual' ? 'מנוי שנתי' : 
+                       'מנוי VIP';
+    
     // Build the CardCom LowProfile URL
     const cardcomUrl = "https://secure.cardcom.solutions";
-    const productName = planId === 'monthly' ? 'מנוי חודשי' : 
-                        planId === 'annual' ? 'מנוי שנתי' : 
-                        'מנוי VIP';
-    
-    const redirectUrl = `${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}&Operation=${operationType === '3' ? 3 : operationType === '2' ? 2 : 1}&SumToBill=${amount}&CoinId=1&Language=he&ProductName=${encodeURIComponent(productName)}&APILevel=10&SuccessRedirectUrl=${encodeURIComponent(successRedirectUrl)}&ErrorRedirectUrl=${encodeURIComponent(errorRedirectUrl)}&IndicatorUrl=${encodeURIComponent(indicatorUrl)}&ReturnValue=${encodeURIComponent(sessionId + '|' + lowProfileId)}`;
+    const redirectUrl = `${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}&Operation=${operationType === '3' ? 3 : operationType === '2' ? 2 : 1}&SumToBill=${amount}&CoinId=1&Language=he&ProductName=${encodeURIComponent(productName)}&APILevel=10&SuccessRedirectUrl=${encodeURIComponent(successRedirectUrl)}&ErrorRedirectUrl=${encodeURIComponent(errorRedirectUrl)}&IndicatorUrl=${encodeURIComponent(indicatorUrl)}&ReturnValue=${encodeURIComponent(sessionData.id)}`;
 
-    console.log(`[CARDCOM-REDIRECT] Created session with ID: ${sessionData.id}, lowProfileId: ${lowProfileId}`);
+    console.log(`[CARDCOM-REDIRECT] Created session with ID: ${sessionData.id} for plan ${planId} (operation: ${operationType}, amount: ${amount})`);
 
     // Return the result
     return new Response(
@@ -170,7 +168,9 @@ serve(async (req) => {
         data: {
           redirectUrl,
           sessionId: sessionData.id,
-          lowProfileId
+          planId,
+          operationType,
+          amount
         }
       }),
       { 

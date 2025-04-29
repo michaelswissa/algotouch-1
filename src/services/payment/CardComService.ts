@@ -12,15 +12,12 @@ interface PaymentInitializationParams {
 }
 
 interface PaymentInitializationResult {
-  lowProfileId: string;
   sessionId: string;
   reference: string;
   terminalNumber: string;
   cardcomUrl: string;
   url?: string;
 }
-
-const isLocalDevelopment = window.location.hostname === 'localhost';
 
 export class CardComService {
   static async initializePayment(params: PaymentInitializationParams): Promise<PaymentInitializationResult> {
@@ -36,8 +33,7 @@ export class CardComService {
           userId,
           email,
           fullName,
-          operationType: operationType === 'token_only' ? 'token_only' : 'payment',
-          isIframePrefill: true
+          operationType: operationType === 'token_only' ? 'token_only' : 'payment'
         }
       });
       
@@ -52,29 +48,19 @@ export class CardComService {
       
       PaymentLogger.log('Payment initialization response:', data);
       
-      const result = data;
-      
-      if (!result.success) {
-        const errorMessage = result.message || `API error (unknown)`;
+      if (!data.success) {
+        const errorMessage = data.message || `API error (unknown)`;
         throw new Error(errorMessage);
       }
       
-      PaymentLogger.log('Payment initialization success', result);
-      
-      // Validate that all required fields are present in the response
-      const { lowProfileId, sessionId, reference, terminalNumber, cardcomUrl } = result.data;
-      
-      if (!lowProfileId || !sessionId || !terminalNumber) {
-        throw new Error('Missing required payment details in server response');
-      }
+      PaymentLogger.log('Payment initialization success', data.data);
       
       return {
-        lowProfileId,
-        sessionId,
-        reference,
-        terminalNumber,
-        cardcomUrl: cardcomUrl || 'https://secure.cardcom.solutions',
-        url: result.data.url
+        sessionId: data.data.sessionId,
+        reference: data.data.reference,
+        terminalNumber: data.data.terminalNumber,
+        cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+        url: data.data.url
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error initializing payment';
@@ -84,7 +70,7 @@ export class CardComService {
     }
   }
 
-  static async checkPaymentStatus(lowProfileCode: string, sessionId: string): Promise<{
+  static async checkPaymentStatus(sessionId: string): Promise<{
     success: boolean;
     message: string;
     status: string;
@@ -93,7 +79,6 @@ export class CardComService {
       // Use Supabase Functions API to check payment status
       const { data, error } = await supabase.functions.invoke('cardcom-status', {
         body: {
-          lowProfileCode,
           sessionId
         }
       });

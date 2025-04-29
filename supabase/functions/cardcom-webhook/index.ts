@@ -1,12 +1,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// CORS headers
+// CORS headers for cross-domain requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json'
 };
 
@@ -15,9 +15,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
-  console.log("[CARDCOM-WEBHOOK] Received webhook request");
-  
+
   try {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -28,116 +26,168 @@ serve(async (req) => {
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Extract data from the webhook
-    // CardCom can send both GET and POST requests
-    let data: any;
-    
-    if (req.method === 'GET') {
-      // Extract data from URL parameters
-      const url = new URL(req.url);
-      const returnValue = url.searchParams.get('ReturnValue') || '';
-      const responseCode = url.searchParams.get('ResponseCode') || '';
-      
-      console.log(`[CARDCOM-WEBHOOK] GET webhook - ReturnValue: ${returnValue}, ResponseCode: ${responseCode}`);
-      
-      // Parse the return value which should be sessionId|lowProfileId
-      const [sessionId, lowProfileId] = (returnValue || '').split('|');
-      
-      data = {
-        sessionId,
-        lowProfileId,
-        responseCode
-      };
-    } else {
-      // Handle POST request
-      const bodyText = await req.text();
-      console.log(`[CARDCOM-WEBHOOK] POST webhook - Body: ${bodyText}`);
-      
-      try {
-        data = JSON.parse(bodyText);
-      } catch (e) {
-        // If not JSON, try to parse as form data or URL parameters
-        const formData = new URLSearchParams(bodyText);
-        data = {
-          responseCode: formData.get('ResponseCode'),
-          lowProfileId: formData.get('LowProfileId') || formData.get('lowProfileId'),
-          sessionId: formData.get('ReturnValue') || ''
-        };
-      }
-    }
-    
-    // Validate the required fields
-    if (!data.sessionId || !data.responseCode) {
-      console.error("[CARDCOM-WEBHOOK] Missing required fields in webhook data");
+
+    // Parse request body
+    let paymentData;
+    try {
+      paymentData = await req.json();
+    } catch (error) {
+      console.error("[CARDCOM-WEBHOOK] Error parsing request body:", error);
       return new Response(
-        JSON.stringify({ success: false, message: "Missing required fields" }),
-        { status: 400, headers: corsHeaders }
+        JSON.stringify({ 
+          success: false, 
+          message: 'Invalid JSON body' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
+
+    console.log("[CARDCOM-WEBHOOK] Received webhook notification:", JSON.stringify(paymentData));
     
-    // Extract sessionId if it's in the format "sessionId|lowProfileId"
-    let sessionId = data.sessionId;
-    let lowProfileId = data.lowProfileId;
+    // Extract key information
+    const responseCode = paymentData.ResponseCode;
+    const sessionId = paymentData.ReturnValue; // We stored the session ID in ReturnValue
     
-    if (sessionId && sessionId.includes('|')) {
-      const parts = sessionId.split('|');
-      sessionId = parts[0];
-      lowProfileId = lowProfileId || parts[1];
+    if (!sessionId) {
+      console.error("[CARDCOM-WEBHOOK] Missing session ID in webhook data");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Missing session ID in webhook data' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
-    
-    console.log(`[CARDCOM-WEBHOOK] Processing - SessionID: ${sessionId}, LowProfileID: ${lowProfileId}, ResponseCode: ${data.responseCode}`);
-    
-    // Update the payment session status
-    const status = data.responseCode === '0' ? 'completed' : 'failed';
+
+    // Update the payment session status based on the response code
+    const status = responseCode === 0 ? 'completed' : 'failed';
     
     const { error: updateError } = await supabaseAdmin
       .from('payment_sessions')
       .update({
         status,
-        transaction_id: data.TranzactionId || data.transactionId || null,
-        payment_details: {
-          ...data,
-          webhook_received_at: new Date().toISOString()
-        }
+        transaction_id: paymentData.TranzactionId?.toString(),
+        response_code: responseCode?.toString(),
+        updated_at: new Date().toISOString(),
+        payment_data: paymentData
       })
       .eq('id', sessionId);
     
     if (updateError) {
-      console.error(`[CARDCOM-WEBHOOK] Error updating payment session: ${updateError.message}`);
-      return new Response(
-        JSON.stringify({ success: false, message: "Error updating payment session" }),
-        { status: 500, headers: corsHeaders }
-      );
+      console.error("[CARDCOM-WEBHOOK] Error updating payment session:", updateError);
+      throw new Error(`Error updating payment session: ${updateError.message}`);
+    }
+
+    // If it was a successful payment and there's token info, save it
+    if (responseCode === 0 && paymentData.TokenInfo) {
+      const token = paymentData.TokenInfo.Token;
+      const tokenExpDate = paymentData.TokenInfo.TokenExDate;
+      
+      if (token) {
+        // Get the session data to find out which user and plan this is for
+        const { data: sessionData } = await supabaseAdmin
+          .from('payment_sessions')
+          .select('user_id, plan_id, payment_details')
+          .eq('id', sessionId)
+          .single();
+          
+        if (sessionData && (sessionData.user_id || sessionData.payment_details?.email)) {
+          // Save the token for future recurring payments
+          await supabaseAdmin
+            .from('recurring_payments')
+            .insert({
+              user_id: sessionData.user_id,
+              token,
+              token_expiry: tokenExpDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              plan_id: sessionData.plan_id,
+              is_valid: true,
+              status: 'active',
+              card_details: {
+                last4: paymentData.TranzactionInfo?.Last4CardDigits || '****',
+                card_type: paymentData.TranzactionInfo?.CardInfo || 'Unknown',
+                card_owner: paymentData.UIValues?.CardOwnerName || '',
+                email: paymentData.UIValues?.CardOwnerEmail || sessionData.payment_details?.email || '',
+                expiry_month: paymentData.TokenInfo?.CardMonth,
+                expiry_year: paymentData.TokenInfo?.CardYear
+              }
+            });
+            
+          // If a subscription doesn't exist yet, create it
+          const { data: existingSub } = await supabaseAdmin
+            .from('subscriptions')
+            .select('id')
+            .eq('user_id', sessionData.user_id)
+            .eq('plan_id', sessionData.plan_id)
+            .maybeSingle();
+            
+          if (!existingSub) {
+            // Determine subscription details based on plan
+            let status = 'active';
+            let trialEndDate = null;
+            
+            if (sessionData.plan_id === 'monthly') {
+              status = 'trial';
+              // Set trial end date to 30 days from now
+              trialEndDate = new Date();
+              trialEndDate.setDate(trialEndDate.getDate() + 30);
+            }
+            
+            await supabaseAdmin
+              .from('subscriptions')
+              .insert({
+                user_id: sessionData.user_id,
+                plan_id: sessionData.plan_id,
+                status,
+                payment_method: 'credit_card',
+                recurring_token: token,
+                trial_end: trialEndDate ? trialEndDate.toISOString() : null,
+                next_charge_at: trialEndDate ? trialEndDate.toISOString() : null
+              });
+          }
+        }
+      }
     }
     
-    // Log the payment
-    const { error: logError } = await supabaseAdmin
-      .from('user_payment_logs')
+    // Log the webhook event
+    await supabaseAdmin
+      .from('payment_logs')
       .insert({
-        token: lowProfileId,
-        transaction_id: data.TranzactionId || data.transactionId || null,
-        amount: data.Amount || data.amount || 0,
-        status: status === 'completed' ? 'payment_success' : 'payment_failed',
-        payment_data: data
+        session_id: sessionId,
+        event_type: 'webhook',
+        status,
+        data: paymentData
       });
-    
-    if (logError) {
-      console.error(`[CARDCOM-WEBHOOK] Error logging payment: ${logError.message}`);
-    }
-    
-    // Return success response
+
+    // Return success to CardCom
     return new Response(
-      JSON.stringify({ success: true, message: "Webhook processed successfully" }),
-      { status: 200, headers: corsHeaders }
+      JSON.stringify({
+        success: true,
+        message: 'Webhook processed successfully'
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error processing webhook';
     console.error(`[CARDCOM-WEBHOOK][ERROR] ${errorMessage}`);
     
     return new Response(
-      JSON.stringify({ success: false, message: errorMessage }),
-      { status: 500, headers: corsHeaders }
+      JSON.stringify({ 
+        success: false, 
+        message: errorMessage 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
