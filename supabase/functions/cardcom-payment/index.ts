@@ -165,6 +165,11 @@ serve(async (req) => {
       );
     }
     
+    // Get frontend URL from environment or use request origin or fallback
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || 'https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com';
+    // Get function URL from environment or construct from supabase URL
+    const functionUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
+    
     // Build redirect URL for standard payment flow
     const redirectUrl = buildRedirectUrl({
       cardcomUrl: "https://secure.cardcom.solutions",
@@ -172,9 +177,9 @@ serve(async (req) => {
       lowProfileId,
       transactionRef,
       amount,
-      successUrl: `${requestOrigin || 'https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com'}/subscription/success`,
-      failedUrl: `${requestOrigin || 'https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com'}/subscription/failed`,
-      webHookUrl: `${Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`}/cardcom-webhook`,
+      successUrl: `${frontendUrl}/subscription/success`,
+      failedUrl: `${frontendUrl}/subscription/failed`,
+      webHookUrl: `${functionUrl}/cardcom-webhook`,
       operationType,
       fullName,
       email

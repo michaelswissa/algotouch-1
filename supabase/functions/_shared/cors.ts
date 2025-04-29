@@ -6,6 +6,7 @@ export const getCorsHeaders = (requestOrigin: string | null) => {
   const allowedOrigins = [
     frontendUrl,
     "https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com",
+    "https://algotouch.lovable.app",
     "http://localhost:5173",
     "http://localhost:3000",
   ];

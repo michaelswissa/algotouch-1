@@ -116,7 +116,7 @@ export const useCardcomInitializer = () => {
           
           // Prepare the initialization data according to CardCom API spec
           const initData = {
-            action: 'init',
+            action: 'init', // IMPORTANT: Use 'init' instead of 'initFields'
             lowProfileCode: lowProfileCode,
             LowProfileCode: lowProfileCode, // Duplicate for compatibility
             sessionId: sessionId,
