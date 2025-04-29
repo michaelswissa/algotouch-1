@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails } from '@/types/payment';
 import { toast } from 'sonner';
 import { CardComService } from '@/services/payment/CardComService';
@@ -56,49 +56,62 @@ export const usePaymentContext = () => useContext(PaymentContext);
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PaymentState>(initialState);
   const { user } = useAuth();
+  const [scriptLoaded, setScriptLoaded] = useState(false);
   
-  // Use useEffect to ensure 3DS.js script is loaded
-  React.useEffect(() => {
-    const scriptId = 'cardcom-3ds-script';
-    
-    // Check if script is already loaded
-    if (document.getElementById(scriptId)) {
-      PaymentLogger.log('CardCom 3DS.js script already loaded');
-      return;
-    }
+  // Load the 3DS.js script once when the provider mounts
+  useEffect(() => {
+    const loadCardcom3DSScript = () => {
+      const scriptId = 'cardcom-3ds-script';
+      
+      // Check if script is already loaded
+      if (window.cardcom3DS) {
+        PaymentLogger.log('CardCom 3DS.js script already loaded and available');
+        setScriptLoaded(true);
+        return;
+      }
+      
+      // Check if script is already in the document but not yet fully loaded
+      if (document.getElementById(scriptId)) {
+        PaymentLogger.log('CardCom 3DS.js script already loading');
+        return;
+      }
 
-    PaymentLogger.log('Loading CardCom 3DS.js script');
-    
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${Date.now()}`;
-    script.async = true;
-    
-    script.onload = () => {
-      PaymentLogger.log('CardCom 3DS.js script loaded successfully');
+      PaymentLogger.log('Loading CardCom 3DS.js script');
+      
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${Date.now()}`;
+      script.async = true;
+      
+      script.onload = () => {
+        PaymentLogger.log('CardCom 3DS.js script loaded successfully');
+        setScriptLoaded(true);
+      };
+      
+      script.onerror = () => {
+        PaymentLogger.error('Failed to load CardCom 3DS.js script');
+        toast.error('שגיאה בטעינת מערכת התשלומים, אנא רענן את העמוד ונסה שוב');
+      };
+
+      document.body.appendChild(script);
     };
     
-    script.onerror = () => {
-      PaymentLogger.error('Failed to load CardCom 3DS.js script');
-      toast.error('שגיאה בטעינת מערכת התשלומים, אנא רענן את העמוד ונסה שוב');
-    };
-
-    document.body.appendChild(script);
+    loadCardcom3DSScript();
     
     // No cleanup needed for the script as it should persist for the entire application lifecycle
   }, []);
 
   const initializePayment = useCallback(async (planId: string): Promise<boolean> => {
-    // Check if payment is already initialized and successful to prevent loops
-    if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
-      PaymentLogger.log('Payment already initialized with lowProfileCode:', state.lowProfileCode);
-      return true;
-    }
-    
-    // Check if initialization is already in progress
+    // Guards to prevent initialization loops and duplicate initializations
     if (state.isInitializing) {
       PaymentLogger.log('Payment initialization already in progress');
       return false;
+    }
+    
+    // If already initialized successfully, don't reinitialize unless forced by FAILED status
+    if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
+      PaymentLogger.log('Payment already initialized with lowProfileCode:', state.lowProfileCode);
+      return true;
     }
 
     try {
@@ -155,7 +168,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       toast.error(errorMessage);
       return false;
     }
-  }, [state.lowProfileCode, state.paymentStatus, state.isInitializing, user?.id]);
+  }, [state.isInitializing, state.lowProfileCode, state.paymentStatus, user?.id]);
 
   const submitPayment = useCallback(() => {
     try {
@@ -216,6 +229,60 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
           // Process the payment using the cardcom3DS global object
           window.cardcom3DS.doPayment(state.lowProfileCode);
           PaymentLogger.log('Payment request sent to CardCom 3DS');
+          
+          // Start checking payment status in a polling manner
+          let checkCount = 0;
+          const maxChecks = 10;
+          const statusCheckInterval = setInterval(async () => {
+            checkCount++;
+            
+            try {
+              const statusResult = await CardComService.checkPaymentStatus(
+                state.lowProfileCode,
+                state.sessionId
+              );
+              
+              PaymentLogger.log(`Payment status check attempt ${checkCount}:`, statusResult);
+              
+              if (statusResult.success) {
+                clearInterval(statusCheckInterval);
+                setState(prev => ({ ...prev, paymentStatus: PaymentStatus.SUCCESS }));
+                toast.success('התשלום הושלם בהצלחה');
+              } else if (checkCount >= maxChecks) {
+                clearInterval(statusCheckInterval);
+                setState(prev => ({
+                  ...prev,
+                  paymentStatus: PaymentStatus.FAILED,
+                  error: 'לא ניתן לאמת את סטטוס התשלום לאחר מספר ניסיונות'
+                }));
+                toast.error('לא ניתן לאמת את סטטוס התשלום, אנא נסה שנית או צור קשר עם התמיכה');
+              }
+            } catch (error) {
+              PaymentLogger.error('Error checking payment status:', error);
+              if (checkCount >= maxChecks) {
+                clearInterval(statusCheckInterval);
+                setState(prev => ({
+                  ...prev,
+                  paymentStatus: PaymentStatus.FAILED,
+                  error: 'שגיאה בבדיקת סטטוס התשלום'
+                }));
+              }
+            }
+          }, 3000);
+          
+          // Set timeout to stop checking after 30 seconds
+          setTimeout(() => {
+            clearInterval(statusCheckInterval);
+            if (state.paymentStatus === PaymentStatus.PROCESSING) {
+              setState(prev => ({
+                ...prev,
+                paymentStatus: PaymentStatus.FAILED,
+                error: 'זמן עיבוד התשלום הסתיים, נסה שנית או בדוק את חשבונך'
+              }));
+              toast.error('זמן עיבוד התשלום הסתיים, נסה שנית או בדוק את חשבונך');
+            }
+          }, 30000);
+          
         } else {
           PaymentLogger.error('CardCom 3DS field validation failed');
           toast.error("אנא וודא שפרטי כרטיס האשראי הוזנו כראוי");
@@ -236,7 +303,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       }));
       toast.error(errorMessage);
     }
-  }, [state.paymentStatus, state.lowProfileCode]);
+  }, [state.paymentStatus, state.lowProfileCode, state.sessionId]);
 
   const resetPaymentState = useCallback(() => {
     setState(initialState);

@@ -47,24 +47,48 @@ export class CardComService {
         })
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error (${response.status}): ${errorText}`);
+      // Check if the response is valid JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // If the response is not JSON, read it as text and display a detailed error
+        const textResponse = await response.text();
+        PaymentLogger.error('Non-JSON response received:', textResponse.substring(0, 500)); // Log the first 500 chars
+        throw new Error(`Server communication error: Invalid response (${response.status})`);
       }
       
-      const result = await response.json();
+      // Now safely parse the JSON
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          // JSON parsing error
+          PaymentLogger.error('JSON parsing error:', error);
+          throw new Error('Error parsing server response');
+        }
+        throw error;
+      }
+      
+      if (!response.ok || !result.success) {
+        const errorMessage = result.message || `API error (${response.status})`;
+        throw new Error(errorMessage);
+      }
+      
       PaymentLogger.log('Payment initialization success', result);
       
-      if (!result.success) {
-        throw new Error(result.message || 'Unknown error initializing payment');
+      // Validate that all required fields are present in the response
+      const { lowProfileId, sessionId, reference, terminalNumber, cardcomUrl } = result.data;
+      
+      if (!lowProfileId || !sessionId || !terminalNumber) {
+        throw new Error('Missing required payment details in server response');
       }
       
       return {
-        lowProfileId: result.data.lowProfileId,
-        sessionId: result.data.sessionId,
-        reference: result.data.reference,
-        terminalNumber: result.data.terminalNumber,
-        cardcomUrl: result.data.cardcomUrl,
+        lowProfileId,
+        sessionId,
+        reference,
+        terminalNumber,
+        cardcomUrl: cardcomUrl || 'https://secure.cardcom.solutions',
         url: result.data.url
       };
     } catch (error) {
@@ -95,12 +119,27 @@ export class CardComService {
         })
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error (${response.status}): ${errorText}`);
+      // Check if the response is valid JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // If the response is not JSON, read it as text and log for debugging
+        const textResponse = await response.text();
+        PaymentLogger.error('Non-JSON response received from status check:', textResponse.substring(0, 500));
+        throw new Error(`Server communication error: Invalid status response (${response.status})`);
       }
       
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          // JSON parsing error
+          PaymentLogger.error('JSON parsing error in status check:', error);
+          throw new Error('Error parsing server status response');
+        }
+        throw error;
+      }
+      
       PaymentLogger.log('Payment status check result', result);
       
       return {

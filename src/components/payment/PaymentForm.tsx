@@ -39,16 +39,29 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
       ? planDetails.vip 
       : planDetails.monthly;
 
-  // Initialize payment on mount only
+  // Initialize payment on mount only, with proper guards to prevent infinite loop
   useEffect(() => {
-    console.log("Initializing payment for plan:", planId);
-    initializePayment(planId);
+    console.log("Payment form mounted, checking if initialization is needed:", {
+      planId,
+      isInitializing,
+      paymentStatus,
+      hasLowProfileCode: Boolean(lowProfileCode)
+    });
+    
+    // Only initialize if not already initializing and we don't have a lowProfileCode
+    // (unless we previously failed)
+    if (!isInitializing && 
+        paymentStatus !== PaymentStatusEnum.INITIALIZING && 
+        (!lowProfileCode || paymentStatus === PaymentStatusEnum.FAILED)) {
+      console.log("Initializing payment for plan:", planId);
+      initializePayment(planId);
+    }
     
     // Cleanup on unmount only
     return () => {
       resetPaymentState();
     };
-  }, [planId, initializePayment, resetPaymentState]);
+  }, [planId, paymentStatus, isInitializing, lowProfileCode]); // Remove initializePayment from dependency array
 
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {

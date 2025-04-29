@@ -150,22 +150,31 @@ serve(async (req) => {
     const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
     const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
 
-    // For iFrame prefill mode, return early with session details
+    // Prepare the response object with all necessary data
+    const responseData = {
+      success: true,
+      message: isIframePrefill ? "Payment session initialized for iframe" : "Payment session created successfully",
+      data: {
+        sessionId: sessionData.id,
+        lowProfileId,
+        reference: transactionRef,
+        terminalNumber,
+        cardcomUrl: "https://secure.cardcom.solutions",
+        apiName
+      }
+    };
+
+    // For iFrame prefill mode, return response with session details
     if (isIframePrefill) {
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Payment session initialized for iframe",
-          data: {
-            sessionId: sessionData.id,
-            lowProfileId: lowProfileId,
-            reference: transactionRef,
-            terminalNumber,
-            cardcomUrl: "https://secure.cardcom.solutions",
-            apiName
-          }
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify(responseData),
+        { 
+          status: 200, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
       );
     }
     
@@ -186,27 +195,34 @@ serve(async (req) => {
 
     await logStep(functionName, "Redirect URL created", { url: redirectUrl });
     
+    // Add the URL to the response for standard redirect flow
+    responseData.data.url = redirectUrl;
+    
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Payment session created successfully",
-        data: {
-          url: redirectUrl,
-          sessionId: sessionData.id,
-          lowProfileId: lowProfileId,
-          reference: transactionRef,
-          terminalNumber,
-          cardcomUrl: "https://secure.cardcom.solutions"
-        }
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(responseData),
+      { 
+        status: 200, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error(`[CARDCOM-PAYMENT][ERROR] ${errorMessage}`);
     return new Response(
-      JSON.stringify({ success: false, message: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        success: false, 
+        message: errorMessage 
+      }),
+      { 
+        status: 500, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
   }
 });
