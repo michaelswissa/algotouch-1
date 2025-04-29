@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -116,7 +117,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         )}
       </div>
 
-      {/* Card Number Frame */}
+      {/* Card Number Field */}
       <div className="space-y-2">
         <Label htmlFor="CardNumberFrame">מספר כרטיס</Label>
         <div className="relative">
@@ -156,7 +157,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         error={errors.expirationMonth || errors.expirationYear}
       />
 
-      {/* CVV Frame */}
+      {/* CVV Field */}
       <div className="space-y-2">
         <Label htmlFor="CVVFrame">קוד אבטחה (CVV)</Label>
         <div className="relative max-w-[188px]">
@@ -168,7 +169,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         </div>
       </div>
       
-      {/* reCAPTCHA Frame */}
+      {/* reCAPTCHA Field */}
       <div className="space-y-2">
         <div 
           id="ReCaptchaFrame"

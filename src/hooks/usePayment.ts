@@ -44,10 +44,16 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const { initializeCardcomFields } = useCardcomInitializer();
 
   const {
-    startStatusCheck,
     checkPaymentStatus,
-    cleanupStatusCheck
-  } = usePaymentStatusCheck({ setState });
+    startStatusCheck,
+    cleanupStatusCheck,
+    isChecking
+  } = usePaymentStatusCheck({ 
+    lowProfileCode: state.lowProfileCode,
+    sessionId: state.sessionId,
+    setState,
+    onPaymentSuccess: handlePaymentSuccess
+  });
 
   useFrameMessages({
     handlePaymentSuccess: handlePaymentSuccess,
@@ -131,54 +137,36 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     setPaymentInProgress(true);
     console.log('Submitting payment transaction');
 
-    if (!masterFrameRef.current?.contentWindow) {
-      handleError("מסגרת התשלום אינה זמינה, אנא טען מחדש את הדף ונסה שנית");
-      setPaymentInProgress(false);
-      return;
-    }
-    
     try {
-      const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
-      const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
-      const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
-      const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
-      const expirationMonth = document.querySelector<HTMLSelectElement>('select[name="expirationMonth"]')?.value || '';
-      const expirationYear = document.querySelector<HTMLSelectElement>('select[name="expirationYear"]')?.value || '';
-      
-      const externalUniqTranId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      
-      const formData = {
-        action: 'doTransaction',
-        cardOwnerName: cardholderName,
-        cardOwnerId,
-        cardOwnerEmail: email,
-        cardOwnerPhone: phone,
-        expirationMonth,
-        expirationYear,
-        numberOfPayments: "1",
-        ExternalUniqTranId: externalUniqTranId,
-        TerminalNumber: state.terminalNumber,
-        Operation: operationType === 'token_only' ? "ChargeAndCreateToken" : "ChargeOnly",
-        lowProfileCode: state.lowProfileCode,
-        LowProfileCode: state.lowProfileCode,
-        Document: {
-          Name: cardholderName || email,
-          Email: email,
-          TaxId: cardOwnerId,
-          Phone: phone,
-          DocumentTypeToCreate: "Receipt"
-        }
-      };
-
-      console.log('Sending transaction data to CardCom:', formData);
-      masterFrameRef.current.contentWindow.postMessage(formData, '*');
-      
       setState(prev => ({
         ...prev,
         paymentStatus: PaymentStatusEnum.PROCESSING
       }));
       
-      startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+      // Use the cardcom3DS global object to handle the payment
+      if (window.cardcom3DS) {
+        console.log('Using CardCom 3DS to process payment', { lowProfileCode: state.lowProfileCode });
+        
+        // Validate fields first
+        const isValid = window.cardcom3DS.validateFields();
+        
+        if (isValid) {
+          // Process the payment using the cardcom3DS global object
+          window.cardcom3DS.doPayment(state.lowProfileCode);
+          console.log('Payment request sent to CardCom 3DS');
+          
+          // Start checking payment status
+          startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
+        } else {
+          console.error('CardCom 3DS field validation failed');
+          handleError("אנא וודא שפרטי כרטיס האשראי הוזנו כראוי");
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.IDLE }));
+        }
+      } else {
+        console.error('CardCom 3DS script not available');
+        handleError("שגיאה בטעינת מערכת הסליקה, אנא רענן את הדף ונסה שנית");
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
+      }
       
       setTimeout(() => {
         setPaymentInProgress(false);
@@ -187,10 +175,17 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       console.error("Error submitting payment:", error);
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
+      setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
     }
   }, [
-    masterFrameRef, state.terminalNumber, state.lowProfileCode, state.sessionId, 
-    handleError, operationType, paymentInProgress, setState, startStatusCheck, planId,
+    state.lowProfileCode, 
+    state.sessionId, 
+    handleError, 
+    operationType, 
+    paymentInProgress, 
+    setState, 
+    startStatusCheck, 
+    planId,
     isCardcomInitialized
   ]);
 
