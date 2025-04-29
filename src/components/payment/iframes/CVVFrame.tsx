@@ -15,7 +15,7 @@ const CVVFrame: React.FC<CVVFrameProps> = ({
   onLoad,
   isReady
 }) => {
-  const iframeSrc = isReady ? `${cardcomUrl}/Interface/OpenFrame.aspx?TerminalNumber=${terminalNumber}&frame=cvv` : '';
+  const iframeSrc = isReady ? `${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}&frame=cvv` : '';
   
   return (
     <div className="credit-cvv-container">

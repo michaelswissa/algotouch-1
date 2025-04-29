@@ -208,7 +208,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
         <div className="hidden">
           <iframe 
             ref={masterFrameRef}
-            src={`${cardcomUrl}/Interface/OpenFrame.aspx?TerminalNumber=${terminalNumber}`}
+            src={`${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}`}
             title="CardCom Payment"
             className="w-full h-0"
             style={{ border: 'none' }}
