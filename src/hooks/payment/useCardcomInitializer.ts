@@ -16,18 +16,33 @@ export const useCardcomInitializer = () => {
     }
 
     try {
+      // Convert operation type to CardCom's numeric format
+      const operation = operationType === 'token_only' ? '3' : '1'; // Use '3' for token_only, '1' for charge
+      
+      // This is the correct format for CardCom OpenFields initialization
       const initData = {
-        action: 'initFields',
+        action: 'init', // Corrected: Use 'init' instead of 'initFields'
+        lowProfileCode: lowProfileCode,
+        LowProfileCode: lowProfileCode, // Duplicate for compatibility
+        sessionId: sessionId,
+        terminalNumber: terminalNumber,
+        cardFieldCSS: '.card-field { width: 100%; height: 40px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }',
+        cvvFieldCSS: '.cvv-field { width: 100%; height: 40px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }',
+        reCaptchaFieldCSS: '.recaptcha-field { width: 100%; }',
+        placeholder: 'מספר כרטיס',
+        cvvPlaceholder: 'CVV',
+        language: 'he',
+        operation: operation // Use the numeric operation value
+      };
+
+      console.log('Initializing CardCom fields with:', {
         lowProfileCode,
         sessionId,
         terminalNumber,
-        userInterface: {
-          language: 'he',
-          theme: 'light',
-          cssUrl: null,
-        }
-      };
+        operation
+      });
 
+      // Post the initialization message to the master frame
       masterFrameRef.current.contentWindow.postMessage(initData, '*');
       setIsInitialized(true);
       return true;
