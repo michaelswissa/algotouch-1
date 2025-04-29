@@ -4,16 +4,16 @@ import SubscriptionPlans from '@/components/SubscriptionPlans';
 
 interface PlanSelectionStepProps {
   selectedPlanId?: string;
-  onSelectPlan: (planId: string) => void;
+  onPlanSelected: (planId: string) => void;
 }
 
 const PlanSelectionStep: React.FC<PlanSelectionStepProps> = ({
   selectedPlanId,
-  onSelectPlan
+  onPlanSelected
 }) => {
   return (
     <SubscriptionPlans 
-      onSelectPlan={onSelectPlan} 
+      onSelectPlan={onPlanSelected} 
       selectedPlanId={selectedPlanId} 
     />
   );

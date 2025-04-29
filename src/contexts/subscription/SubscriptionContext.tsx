@@ -3,6 +3,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export type SubscriptionStep = 'plan' | 'contract' | 'payment' | 'success';
+
 interface SubscriptionContextType {
   hasActiveSubscription: boolean;
   isCheckingSubscription: boolean;
@@ -13,6 +15,13 @@ interface SubscriptionContextType {
   email: string;
   setEmail: (email: string) => void;
   resetSubscriptionState: () => void;
+  // Added properties for steps
+  currentStep: SubscriptionStep;
+  selectedPlan: string | null;
+  loading: boolean;
+  handlePlanSelected: (planId: string | null) => void;
+  handleContractSigned: (signed: boolean) => void;
+  handlePaymentComplete: () => void;
 }
 
 interface ProfileData {
@@ -28,6 +37,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [error, setError] = useState<Error | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  
+  // Add subscription step state
+  const [currentStep, setCurrentStep] = useState<SubscriptionStep>('plan');
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const checkUserSubscription = useCallback(async (userId: string) => {
     if (!userId) return;
@@ -94,6 +108,32 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
     setFullName('');
     setEmail('');
+    setCurrentStep('plan');
+    setSelectedPlan(null);
+    setLoading(false);
+  }, []);
+  
+  // Add step handlers
+  const handlePlanSelected = useCallback((planId: string | null) => {
+    if (planId) {
+      setSelectedPlan(planId);
+      setCurrentStep('contract');
+    } else {
+      setSelectedPlan(null);
+      setCurrentStep('plan');
+    }
+  }, []);
+
+  const handleContractSigned = useCallback((signed: boolean) => {
+    if (signed && selectedPlan) {
+      setCurrentStep('payment');
+    } else {
+      setCurrentStep('contract');
+    }
+  }, [selectedPlan]);
+
+  const handlePaymentComplete = useCallback(() => {
+    setCurrentStep('success');
   }, []);
 
   return (
@@ -106,7 +146,14 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setFullName,
       email,
       setEmail,
-      resetSubscriptionState
+      resetSubscriptionState,
+      // Add step state
+      currentStep,
+      selectedPlan,
+      loading,
+      handlePlanSelected,
+      handleContractSigned,
+      handlePaymentComplete
     }}>
       {children}
     </SubscriptionContext.Provider>

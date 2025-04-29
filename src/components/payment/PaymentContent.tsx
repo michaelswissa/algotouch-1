@@ -51,11 +51,7 @@ const PaymentContent: React.FC<PaymentContentProps> = ({
         hasTrial={plan.hasTrial}
         freeTrialDays={plan.freeTrialDays}
       />
-      <PaymentDetails 
-        terminalNumber={terminalNumber}
-        cardcomUrl={cardcomUrl}
-        isReady={isReady}
-      />
+      <PaymentDetails />
     </>
   );
 };
