@@ -92,7 +92,7 @@ export interface CardComTransactionRequest {
   };
 }
 
-// Adding the PlanDetails interface for subscription plans
+// Adding the missing PlanDetails interface for subscription plans
 export interface PlanDetails {
   id: string;
   name: string;
@@ -105,14 +105,4 @@ export interface PlanDetails {
   hasTrial?: boolean;
   freeTrialDays?: number;
   features?: string[];
-}
-
-export interface SubscriptionPlan {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  displayPrice: string;
-  hasTrial?: boolean;
-  freeTrialDays?: number;
 }

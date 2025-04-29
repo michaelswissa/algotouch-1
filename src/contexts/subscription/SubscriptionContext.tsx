@@ -13,14 +13,6 @@ interface SubscriptionContextType {
   email: string;
   setEmail: (email: string) => void;
   resetSubscriptionState: () => void;
-  
-  // Additional properties for subscription flow
-  currentStep: string;
-  selectedPlan: string | null;
-  handlePlanSelected: (planId: string | null) => void;
-  handleContractSigned: (signed: boolean) => void;
-  handlePaymentComplete: () => void;
-  loading: boolean;
 }
 
 interface ProfileData {
@@ -36,11 +28,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [error, setError] = useState<Error | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-
-  // Additional state for subscription flow
-  const [currentStep, setCurrentStep] = useState<string>('plan'); // Initial step
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const checkUserSubscription = useCallback(async (userId: string) => {
     if (!userId) return;
@@ -107,32 +94,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
     setFullName('');
     setEmail('');
-    setCurrentStep('plan');
-    setSelectedPlan(null);
-  }, []);
-
-  // Handle plan selection
-  const handlePlanSelected = useCallback((planId: string | null) => {
-    setSelectedPlan(planId);
-    if (planId) {
-      setCurrentStep('contract');
-    } else {
-      setCurrentStep('plan');
-    }
-  }, []);
-
-  // Handle contract signing
-  const handleContractSigned = useCallback((signed: boolean) => {
-    if (signed) {
-      setCurrentStep('payment');
-    } else {
-      setCurrentStep('contract');
-    }
-  }, []);
-
-  // Handle payment completion
-  const handlePaymentComplete = useCallback(() => {
-    setCurrentStep('success');
   }, []);
 
   return (
@@ -145,14 +106,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setFullName,
       email,
       setEmail,
-      resetSubscriptionState,
-      // Additional properties
-      currentStep,
-      selectedPlan,
-      handlePlanSelected,
-      handleContractSigned,
-      handlePaymentComplete,
-      loading
+      resetSubscriptionState
     }}>
       {children}
     </SubscriptionContext.Provider>
