@@ -6,7 +6,17 @@ import { CreditCard } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import SecurityNote from './SecurityNote';
 
-const PaymentDetails: React.FC = () => {
+interface PaymentDetailsProps {
+  terminalNumber: string;
+  cardcomUrl: string;
+  isReady?: boolean;
+}
+
+const PaymentDetails: React.FC<PaymentDetailsProps> = ({
+  terminalNumber,
+  cardcomUrl,
+  isReady = false
+}) => {
   const { register, formState: { errors } } = useForm();
   
   return (

@@ -14,7 +14,8 @@ const SubscriptionStepHandler: React.FC = () => {
     handlePlanSelected, 
     handleContractSigned, 
     handlePaymentComplete,
-    loading
+    loading,
+    fullName
   } = useSubscriptionContext();
 
   const renderStep = useCallback(() => {
@@ -24,9 +25,14 @@ const SubscriptionStepHandler: React.FC = () => {
 
     switch (currentStep) {
       case 'plan':
-        return <PlanSelectionStep onPlanSelected={handlePlanSelected} />;
+        return <PlanSelectionStep onSelectPlan={handlePlanSelected} selectedPlanId={selectedPlan || undefined} />;
       case 'contract':
-        return <ContractSection onContractSigned={handleContractSigned} onBack={() => handlePlanSelected(null)} />;
+        return <ContractSection 
+          selectedPlan={selectedPlan || 'monthly'} 
+          fullName={fullName} 
+          onSign={(data) => handleContractSigned(true)} 
+          onBack={() => handlePlanSelected(null)} 
+        />;
       case 'payment':
         return (
           <IframePaymentStep 
@@ -38,9 +44,9 @@ const SubscriptionStepHandler: React.FC = () => {
       case 'success':
         return <SubscriptionSuccess />;
       default:
-        return <PlanSelectionStep onPlanSelected={handlePlanSelected} />;
+        return <PlanSelectionStep onSelectPlan={handlePlanSelected} selectedPlanId={selectedPlan || undefined} />;
     }
-  }, [currentStep, selectedPlan, handlePlanSelected, handleContractSigned, handlePaymentComplete, loading]);
+  }, [currentStep, selectedPlan, handlePlanSelected, handleContractSigned, handlePaymentComplete, loading, fullName]);
 
   return <>{renderStep()}</>;
 };
