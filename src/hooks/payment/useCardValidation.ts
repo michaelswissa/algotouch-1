@@ -59,7 +59,9 @@ export const useCardValidation = () => {
   const handleValidationMessage = useCallback((message: MessageEvent) => {
     if (!message.origin.includes('cardcom.solutions') && 
         !message.origin.includes('localhost') && 
-        !message.origin.includes(window.location.origin)) {
+        !message.origin.includes(window.location.origin) &&
+        !message.origin.includes('lovableproject.com') &&
+        !message.origin.includes('lovable.app')) {
       return;
     }
 

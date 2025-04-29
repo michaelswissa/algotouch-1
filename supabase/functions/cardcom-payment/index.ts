@@ -146,6 +146,10 @@ serve(async (req) => {
       amount
     });
 
+    // Determine the base URL for redirects based on environment or request origin
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
+    const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
+
     // For iFrame prefill mode, return early with session details
     if (isIframePrefill) {
       return new Response(
@@ -165,21 +169,16 @@ serve(async (req) => {
       );
     }
     
-    // Get frontend URL from environment or use request origin or fallback
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || 'https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com';
-    // Get function URL from environment or construct from supabase URL
-    const functionUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
-    
-    // Build redirect URL for standard payment flow
+    // Build redirect URL for standard payment flow using dynamic base URLs
     const redirectUrl = buildRedirectUrl({
       cardcomUrl: "https://secure.cardcom.solutions",
       terminalNumber,
       lowProfileId,
       transactionRef,
       amount,
-      successUrl: `${frontendUrl}/subscription/success`,
-      failedUrl: `${frontendUrl}/subscription/failed`,
-      webHookUrl: `${functionUrl}/cardcom-webhook`,
+      successUrl: `${frontendBaseUrl}/subscription/success`,
+      failedUrl: `${frontendBaseUrl}/subscription/failed`,
+      webHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
       operationType,
       fullName,
       email

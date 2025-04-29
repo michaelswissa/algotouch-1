@@ -1,19 +1,26 @@
 
 // Secure CORS configuration with origin validation
 export const getCorsHeaders = (requestOrigin: string | null) => {
-  const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com";
+  // Ensure the production domain is always allowed, in addition to the env var and localhost
+  const productionDomain = "https://algotouch.lovable.app";
+  const frontendUrlFromEnv = Deno.env.get("FRONTEND_URL");
   
   const allowedOrigins = [
-    frontendUrl,
-    "https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com",
-    "https://algotouch.lovable.app",
+    productionDomain, // Explicitly allow production domain
+    "https://943ea41c-32cf-4f38-9bf8-8a57a35db025.lovableproject.com", // Keep Lovable dev env
     "http://localhost:5173",
     "http://localhost:3000",
   ];
+
+  // Add frontendUrlFromEnv if it exists and is not already in the list
+  if (frontendUrlFromEnv && !allowedOrigins.includes(frontendUrlFromEnv)) {
+    allowedOrigins.push(frontendUrlFromEnv);
+  }
   
   // Check if the request origin is in our allowed list
+  // Default to productionDomain if origin is not allowed or null
   const origin = allowedOrigins.includes(requestOrigin || "") ? 
-    requestOrigin : frontendUrl;
+    requestOrigin : productionDomain;
   
   console.log(`CORS: Request origin: ${requestOrigin}, Allowed origin: ${origin}`);
   
