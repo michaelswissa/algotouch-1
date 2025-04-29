@@ -1,69 +1,46 @@
 
 import React from 'react';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { CreditCard } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import SecurityNote from './SecurityNote';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
-const PaymentDetails: React.FC = () => {
-  const { register, formState: { errors } } = useForm();
-  
+interface PaymentDetailsProps {
+  terminalNumber: string;
+  cardcomUrl: string;
+  isReady?: boolean;
+}
+
+const PaymentDetails: React.FC<PaymentDetailsProps> = ({
+  terminalNumber,
+  cardcomUrl,
+  isReady = false
+}) => {
   return (
-    <div className="space-y-4" dir="rtl">
-      <p className="text-center text-muted-foreground">
-        זוהי גרסת תצוגה מקדימה של טופס התשלום. כדי להזין פרטי תשלום אמיתיים, 
-        אנא לחצו על הכפתור "מעבר לדף התשלום" למטה והשלימו את התשלום במערכת הסליקה המאובטחת.
-      </p>
-      
-      <div className="space-y-2">
-        <Label htmlFor="cardOwnerName">שם בעל הכרטיס</Label>
-        <Input
-          id="cardOwnerName"
-          placeholder="ישראל ישראלי"
-          disabled
-          className="bg-muted"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="cardNumber">מספר כרטיס</Label>
-        <div className="relative">
-          <Input 
-            id="cardNumber"
-            placeholder="XXXX-XXXX-XXXX-XXXX"
-            disabled
-            className="bg-muted"
-          />
-          <div className="absolute top-0 right-0 h-full flex items-center pr-3">
-            <CreditCard className="h-5 w-5 text-gray-400" />
-          </div>
+    <Card className="border-dashed">
+      <CardContent className="p-6">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">פרטי תשלום</h3>
+          <p className="text-muted-foreground text-sm">אנא מלא/י את פרטי התשלום הבאים</p>
+          
+          {!isReady ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mb-2" />
+              <p className="text-sm text-muted-foreground">טוען מערכת תשלום...</p>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1">
+                  מערכת התשלום מאובטחת על-ידי Cardcom
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  החיבור מאובטח ומוצפן SSL
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-
-      <div className="flex space-x-4 space-x-reverse">
-        <div className="space-y-2 w-1/2">
-          <Label htmlFor="expiry">תוקף</Label>
-          <Input
-            id="expiry"
-            placeholder="MM/YY"
-            disabled
-            className="bg-muted"
-          />
-        </div>
-        <div className="space-y-2 w-1/2">
-          <Label htmlFor="cvv">קוד אבטחה</Label>
-          <Input
-            id="cvv"
-            placeholder="CVV"
-            disabled
-            className="bg-muted"
-          />
-        </div>
-      </div>
-
-      <SecurityNote />
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 

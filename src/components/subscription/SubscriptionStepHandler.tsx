@@ -24,7 +24,7 @@ const SubscriptionStepHandler: React.FC = () => {
 
     switch (currentStep) {
       case 'plan':
-        return <PlanSelectionStep onPlanSelected={handlePlanSelected} />;
+        return <PlanSelectionStep onSelectPlan={handlePlanSelected} />;
       case 'contract':
         return <ContractSection onContractSigned={handleContractSigned} onBack={() => handlePlanSelected(null)} />;
       case 'payment':
@@ -38,7 +38,7 @@ const SubscriptionStepHandler: React.FC = () => {
       case 'success':
         return <SubscriptionSuccess />;
       default:
-        return <PlanSelectionStep onPlanSelected={handlePlanSelected} />;
+        return <PlanSelectionStep onSelectPlan={handlePlanSelected} />;
     }
   }, [currentStep, selectedPlan, handlePlanSelected, handleContractSigned, handlePaymentComplete, loading]);
 
