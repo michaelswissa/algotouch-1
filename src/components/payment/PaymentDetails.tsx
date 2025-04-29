@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { CreditCard } from 'lucide-react';
@@ -10,29 +10,25 @@ import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
 interface PaymentDetailsProps {
   terminalNumber: string;
   cardcomUrl: string;
-  masterFrameRef: React.RefObject<HTMLIFrameElement>;
   isReady?: boolean;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({ 
   terminalNumber, 
-  cardcomUrl, 
-  masterFrameRef,
+  cardcomUrl,
   isReady = false
 }) => {
   const { formData, errors, handleChange } = usePaymentForm();
-  const [allFramesLoaded, setAllFramesLoaded] = useState(false);
   
   // Log for debugging
   useEffect(() => {
     if (isReady) {
       console.log('PaymentDetails component is ready with:', {
         terminalNumber,
-        cardcomUrl,
-        hasMasterFrameRef: !!masterFrameRef.current
+        cardcomUrl
       });
     }
-  }, [isReady, terminalNumber, cardcomUrl, masterFrameRef]);
+  }, [isReady, terminalNumber, cardcomUrl]);
   
   return (
     <div className="space-y-4" dir="rtl">
@@ -177,20 +173,6 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
           style={{ minHeight: '78px' }}
         />
       </div>
-
-      {/* Master iframe - keep hidden but available for communication */}
-      {isReady && (
-        <div className="hidden">
-          <iframe 
-            id="CardComMasterFrame"
-            ref={masterFrameRef}
-            src={`${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}`}
-            title="CardCom Payment"
-            style={{ width: '1px', height: '1px', border: 'none', position: 'absolute', top: '-9999px' }}
-            onLoad={() => console.log('Master iframe loaded')}
-          />
-        </div>
-      )}
 
       <SecurityNote />
     </div>

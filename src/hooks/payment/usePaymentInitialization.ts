@@ -1,124 +1,84 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { PaymentStatusEnum } from '@/types/payment';
-import { RegistrationService } from '@/services/registration/RegistrationService';
-import { CardComService } from '@/services/payment/CardComService';
-import { useContractValidation } from './useContractValidation';
+import { useCallback } from 'react';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { CardComService } from '@/services/payment/CardComService';
+import { PaymentStatusEnum } from '@/types/payment';
 import { toast } from 'sonner';
-import { User } from '@supabase/supabase-js';
+import { useAuth } from '@/contexts/auth/useAuth';
+import { StorageService } from '@/services/storage/StorageService';
+import type { ContractData } from '@/lib/contracts/contract-validation-service';
 
 interface UsePaymentInitializationProps {
   planId: string;
-  setState: (updater: any) => void;
-  masterFrameRef: React.RefObject<HTMLIFrameElement>;
-  operationType?: 'payment' | 'token_only';
+  setState: (state: any) => void;
+  operationType: 'payment' | 'token_only';
 }
 
 export const usePaymentInitialization = ({
   planId,
   setState,
-  masterFrameRef,
-  operationType = 'payment'
+  operationType
 }: UsePaymentInitializationProps) => {
-  const { validateContract } = useContractValidation();
+  const { user } = useAuth();
 
   const initializePayment = useCallback(async () => {
-    PaymentLogger.log('Starting payment initialization process', { planId, operationType });
-    
-    setState(prev => ({ 
-      ...prev, 
-      paymentStatus: PaymentStatusEnum.INITIALIZING 
-    }));
-    
     try {
-      // Step 1: Get and validate registration data
-      const registrationData = RegistrationService.getValidRegistrationData();
+      PaymentLogger.log('Initializing payment', { planId, operationType });
       
-      if (!registrationData) {
-        throw new Error('מידע הרשמה חסר או לא תקין');
+      setState(prev => ({ 
+        ...prev, 
+        paymentStatus: PaymentStatusEnum.INITIALIZING 
+      }));
+      
+      const contractData = StorageService.get<ContractData>('contract_data');
+      if (!contractData) {
+        throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
+      }
+
+      if (!contractData.email || !contractData.fullName) {
+        throw new Error('חסרים פרטי לקוח בחוזה');
       }
       
-      PaymentLogger.log('Registration data loaded', { 
-        email: registrationData.email,
-        hasUserData: !!registrationData.userData
-      });
-      
-      // Step 2: Create user if not already created
-      let user: User | null = null;
-      
-      if (!registrationData.userCreated) {
-        PaymentLogger.log('User not created yet, creating user account');
-        const { success, user: createdUser, error } = await RegistrationService.createUserAccount(registrationData);
-        
-        if (!success || !createdUser) {
-          throw new Error(error || 'שגיאה ביצירת חשבון המשתמש');
-        }
-        
-        user = createdUser;
-        PaymentLogger.log('User created successfully for payment', { userId: user.id });
-      } else {
-        // Get current user
-        user = await RegistrationService.getCurrentUser();
-        if (!user && registrationData.email && registrationData.password) {
-          PaymentLogger.log('User already created but not authenticated, attempting to sign in');
-          const { success, user: signedInUser, error } = 
-            await RegistrationService.createUserAccount(registrationData);
-          
-          if (success && signedInUser) {
-            user = signedInUser;
-          } else {
-            PaymentLogger.error('Failed to get authenticated user', { error });
-          }
-        }
-      }
-      
-      // Step 3: Validate contract
-      const contractDetails = validateContract();
-      if (!contractDetails) {
-        throw new Error('נדרש לחתום על החוזה לפני ביצוע תשלום');
-      }
-      
-      // Step 4: Initialize payment session
-      const fullName = contractDetails.fullName || 
-        `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim();
-      
-      const email = contractDetails.email || registrationData.email;
-      
-      const paymentData = await CardComService.initializePayment({
+      const sessionData = await CardComService.initializePayment({
         planId,
         userId: user?.id || null,
-        email,
-        fullName,
+        email: contractData.email,
+        fullName: contractData.fullName,
         operationType
       });
       
-      // Set initial payment state
-      setState(prev => ({ 
-        ...prev, 
-        lowProfileCode: paymentData.lowProfileId,
-        sessionId: paymentData.sessionId,
-        terminalNumber: paymentData.terminalNumber,
-        cardcomUrl: paymentData.cardcomUrl,
-        reference: paymentData.reference,
-        paymentStatus: PaymentStatusEnum.IDLE
+      PaymentLogger.log('Payment initialized successfully', sessionData);
+      
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatusEnum.IDLE,
+        lowProfileCode: sessionData.lowProfileId,
+        sessionId: sessionData.sessionId,
+        reference: sessionData.reference,
+        terminalNumber: sessionData.terminalNumber,
+        cardcomUrl: sessionData.cardcomUrl || 'https://secure.cardcom.solutions'
       }));
       
-      // Ensure master frame is set up
-      if (!masterFrameRef.current) {
-        PaymentLogger.error('Master frame reference is not available');
-        throw new Error('שגיאה באתחול מסגרת התשלום');
-      }
-      
-      return paymentData;
+      return true;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
-      PaymentLogger.error('Payment initialization error:', error);
+      PaymentLogger.error('Error initializing payment:', error);
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'שגיאה לא ידועה באתחול תהליך התשלום';
+      
+      setState(prev => ({
+        ...prev,
+        paymentStatus: PaymentStatusEnum.FAILED,
+        error: errorMessage
+      }));
+      
       toast.error(errorMessage);
-      setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
-      return null;
+      return false;
     }
-  }, [setState, masterFrameRef, planId, operationType, validateContract]);
+  }, [planId, setState, operationType, user?.id]);
 
-  return { initializePayment };
+  return {
+    initializePayment
+  };
 };

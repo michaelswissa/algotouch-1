@@ -1,17 +1,16 @@
 
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 /**
- * Hook for initializing CardCom payment fields
- * Handles the initialization of CardCom fields in iframes
+ * Hook for initializing CardCom payment fields using the 3DS.js script
  */
 export const useCardcomInitializer = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   
   /**
-   * Initialize CardCom payment fields in iframes
+   * Initialize CardCom payment fields with the loaded 3DS.js script
    * 
-   * @param masterFrameRef - Reference to the master iframe
    * @param lowProfileCode - Unique code for this payment session
    * @param sessionId - Session ID for tracking
    * @param terminalNumber - CardCom terminal number
@@ -19,153 +18,92 @@ export const useCardcomInitializer = () => {
    * @returns Promise resolving to boolean indicating success
    */
   const initializeCardcomFields = async (
-    masterFrameRef: React.RefObject<HTMLIFrameElement>, 
     lowProfileCode: string, 
     sessionId: string,
     terminalNumber: string,
     operationType: 'payment' | 'token_only' = 'payment'
   ): Promise<boolean> => {
     // Validate required parameters
-    if (!lowProfileCode || !sessionId) {
-      console.error("Missing required parameters for CardCom initialization:", { 
+    if (!lowProfileCode || !sessionId || !terminalNumber) {
+      PaymentLogger.error("Missing required parameters for CardCom initialization:", { 
         hasLowProfileCode: Boolean(lowProfileCode), 
-        hasSessionId: Boolean(sessionId) 
+        hasSessionId: Boolean(sessionId),
+        hasTerminalNumber: Boolean(terminalNumber)
       });
       return false;
     }
     
-    // Validate master frame reference
-    if (!masterFrameRef.current) {
-      console.error("Master frame reference is not available");
+    if (!window.cardcom3DS) {
+      PaymentLogger.error("CardCom 3DS.js script not loaded");
       return false;
     }
-
-    console.log('Starting CardCom fields initialization with:', { 
-      lowProfileCode, 
-      sessionId,
-      terminalNumber,
-      operationType,
-      hasMasterFrame: Boolean(masterFrameRef.current)
-    });
-
-    let attempts = 0;
-    const maxAttempts = 5;
     
-    return new Promise<boolean>((resolve) => {
-      const checkFramesAndInitialize = () => {
-        attempts++;
-        
-        if (attempts > maxAttempts) {
-          console.error(`Failed to initialize CardCom after ${maxAttempts} attempts`);
-          resolve(false);
-          return;
-        }
-
-        const masterFrame = masterFrameRef.current;
-        
-        if (!masterFrame?.contentWindow) {
-          console.log(`Master frame not ready (attempt ${attempts}/${maxAttempts}), retrying in 500ms`);
-          setTimeout(checkFramesAndInitialize, 500);
-          return;
-        }
-
-        try {
-          // Convert operation type to CardCom's expected format
-          const operation = operationType === 'token_only' ? '3' : '1'; // 3=CreateTokenOnly, 1=ChargeOnly
-          
-          // CSS styles for the iframe fields
-          const cardFieldCSS = `
-            body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
-            .cardNumberField {
-              border: 1px solid #ccc; 
-              border-radius: 4px; 
-              height: 40px; 
-              width: 100%; 
-              padding: 0 10px; 
-              font-size: 16px;
-              box-sizing: border-box;
-            }
-            .cardNumberField:focus { 
-              border-color: #3498db; 
-              outline: none; 
-            }
-            .cardNumberField.invalid { 
-              border-color: #e74c3c; 
-            }`;
-
-          const cvvFieldCSS = `
-            body { margin: 0; padding: 0; box-sizing: border-box; direction: ltr; }
-            .cvvField {
-              border: 1px solid #ccc;
-              border-radius: 3px;
-              height: 39px;
-              width: 100%;
-              padding: 0 10px;
-              font-size: 16px;
-              box-sizing: border-box;
-            }
-            .cvvField:focus { 
-              border-color: #3498db; 
-              outline: none; 
-            }
-            .cvvField.invalid { 
-              border-color: #e74c3c; 
-            }`;
-            
-          const reCaptchaFieldCSS = 'body { margin: 0; padding: 0; display: flex; justify-content: center; }';
-          
-          // Prepare the initialization data according to CardCom API spec
-          const initData = {
-            action: 'init', // IMPORTANT: Use 'init' instead of 'initFields'
-            lowProfileCode: lowProfileCode,
-            LowProfileCode: lowProfileCode, // Duplicate for compatibility
-            sessionId: sessionId,
-            terminalNumber: terminalNumber,
-            cardFieldCSS: cardFieldCSS,
-            cvvFieldCSS: cvvFieldCSS,
-            reCaptchaFieldCSS: reCaptchaFieldCSS,
-            placeholder: 'מספר כרטיס',
-            cvvPlaceholder: 'CVV',
-            language: 'he',
-            operation: operation
-          };
-
-          console.log('Sending initialization data to CardCom:', {
-            lowProfileCode,
-            sessionId,
-            terminalNumber,
-            operation
-          });
-
-          // Post the initialization message to the master frame
-          masterFrame.contentWindow.postMessage(initData, '*');
-          
-          // Add a delay to ensure the message is processed
-          setTimeout(() => {
-            // Load the 3DS script for secure payments
-            const script = document.createElement('script');
-            const time = new Date().getTime();
-            script.src = 'https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=' + time;
-            document.head.appendChild(script);
-            
-            setIsInitialized(true);
-            resolve(true);
-          }, 1000);
-          
-        } catch (error) {
-          console.error('Error initializing CardCom fields:', error);
-          if (attempts < maxAttempts) {
-            setTimeout(checkFramesAndInitialize, 500);
-          } else {
-            resolve(false);
-          }
-        }
-      };
-
-      // Start initialization with a slight delay to ensure frames are loaded
-      setTimeout(checkFramesAndInitialize, 300);
-    });
+    try {
+      // Convert operation type to CardCom's expected format
+      const operation = operationType === 'token_only' ? '3' : '1'; // 3=CreateTokenOnly, 1=ChargeOnly
+      
+      PaymentLogger.log('Initializing CardCom fields with:', { 
+        lowProfileCode, 
+        sessionId,
+        terminalNumber,
+        operation
+      });
+      
+      // Initialize the CardCom 3DS fields
+      window.cardcom3DS.init({
+        LowProfileCode: lowProfileCode,
+        TerminalNumber: terminalNumber,
+        Operation: operation,
+        Language: 'he'
+      });
+      
+      // Allow a moment for fields to initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setIsInitialized(true);
+      PaymentLogger.log('CardCom fields initialized successfully');
+      return true;
+    } catch (error) {
+      PaymentLogger.error('Error initializing CardCom fields:', error);
+      return false;
+    }
   };
 
-  return { initializeCardcomFields, isInitialized };
+  // Load script on component mount
+  useEffect(() => {
+    const scriptId = 'cardcom-3ds-script';
+    
+    // Check if script is already loaded
+    if (document.getElementById(scriptId)) {
+      PaymentLogger.log('CardCom 3DS.js script already loaded');
+      return;
+    }
+
+    PaymentLogger.log('Loading CardCom 3DS.js script');
+    
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = `https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=${Date.now()}`;
+    script.async = true;
+    
+    script.onload = () => {
+      PaymentLogger.log('CardCom 3DS.js script loaded successfully');
+    };
+    
+    script.onerror = () => {
+      PaymentLogger.error('Failed to load CardCom 3DS.js script');
+    };
+
+    document.body.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      // We don't actually remove the script on cleanup as it may be used by other components
+    };
+  }, []);
+
+  return { 
+    initializeCardcomFields, 
+    isInitialized 
+  };
 };

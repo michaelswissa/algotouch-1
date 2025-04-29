@@ -6,7 +6,7 @@ import { PaymentLogger } from '@/services/payment/PaymentLogger';
 interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
   setState: (state: any) => void;
-  checkPaymentStatus: (lowProfileCode: string, sessionId: string) => void;
+  checkPaymentStatus: (lowProfileCode: string, sessionId: string) => Promise<void>;
   lowProfileCode: string;
   sessionId: string;
   operationType: 'payment' | 'token_only';
@@ -23,81 +23,84 @@ export const useFrameMessages = ({
   planType
 }: UseFrameMessagesProps) => {
   useEffect(() => {
-    if (!lowProfileCode || !sessionId) return;
-
-    const handleFrameMessages = (event: MessageEvent) => {
-      // Allow messages from CardCom domains or local development environment
+    if (!lowProfileCode || !sessionId) {
+      return;
+    }
+    
+    // Set up window message listener for the CardCom 3DS redirects and callbacks
+    const handleWindowMessage = (event: MessageEvent) => {
+      // Only process messages from CardCom domains
       if (!event.origin.includes('cardcom.solutions') && 
-          !event.origin.includes('localhost') && 
-          !event.origin.includes(window.location.origin) &&
-          !event.origin.includes('lovableproject.com') &&
-          !event.origin.includes('lovable.app')) {
+          !event.origin.includes('cardcom.co.il')) {
         return;
       }
-  
-      PaymentLogger.log('Received message from CardCom:', event.data);
-      
-      try {
-        const data = event.data;
 
-        // Handle different message types from CardCom
-        if (data) {
-          // Handle success message
-          if (data.action === 'approvedTransaction' || 
-              data.status === 'success' || 
-              data.action === 'success') {
-            PaymentLogger.log('Payment transaction approved:', data);
-            handlePaymentSuccess();
-          } 
-          // Handle payment form submission
-          else if (data.action === 'doTransaction') {
-            PaymentLogger.log('Processing payment transaction:', data);
-            
-            // Update UI status
-            setState(prev => ({
-              ...prev,
-              paymentStatus: PaymentStatusEnum.PROCESSING
-            }));
-            
-            // Start checking payment status
-            if (lowProfileCode && sessionId) {
-              setTimeout(() => {
-                checkPaymentStatus(lowProfileCode, sessionId);
-              }, 2000);
-            }
-          } 
-          // Handle initialization success
-          else if (data.action === 'init' && data.status === 'success') {
-            PaymentLogger.log('CardCom fields initialized successfully');
-          } 
-          // Handle validation messages
-          else if (data.action === 'validation') {
-            PaymentLogger.log('Field validation:', data);
-          } 
-          // Handle errors
-          else if (data.status === 'error' || data.action === 'error') {
-            PaymentLogger.error('Error from CardCom:', data);
-            
-            setState(prev => ({
-              ...prev,
-              paymentStatus: PaymentStatusEnum.FAILED,
-              error: data.message || 'שגיאה בביצוע התשלום'
-            }));
-          }
-          // Handle 3DS specific messages
-          else if (data.status === '3ds_challenge') {
-            PaymentLogger.log('3DS challenge initiated:', data);
-          }
-          else if (data.status === '3ds_complete') {
-            PaymentLogger.log('3DS verification completed:', data);
-          }
+      PaymentLogger.log('Received message from CardCom', {
+        origin: event.origin,
+        data: event.data
+      });
+
+      try {
+        // Handle different response formats from CardCom
+        const responseData = typeof event.data === 'string' 
+          ? JSON.parse(event.data) 
+          : event.data;
+        
+        // Success message from CardCom
+        if (responseData.success === true || 
+            responseData.Status === 'success' || 
+            responseData.Status === 'completed' ||
+            responseData.status === 'success' || 
+            responseData.status === 'completed') {
+          PaymentLogger.log('Payment successful', responseData);
+          
+          setState(prev => ({
+            ...prev,
+            paymentStatus: PaymentStatusEnum.SUCCESS
+          }));
+          
+          handlePaymentSuccess();
+        }
+        // Error message from CardCom
+        else if (responseData.error || 
+                responseData.Status === 'failed' || 
+                responseData.status === 'failed') {
+          PaymentLogger.error('Payment failed', responseData);
+          
+          setState(prev => ({
+            ...prev,
+            paymentStatus: PaymentStatusEnum.FAILED,
+            error: responseData.message || responseData.error || 'Payment failed'
+          }));
+        }
+        // If we get a message without a clear status, check status via API
+        else if (responseData.LowProfileCode || responseData.lowProfileCode) {
+          PaymentLogger.log('Received message without clear status, checking payment status');
+          
+          // Use the provided lowProfileCode or fall back to the one we have
+          const lpCode = responseData.LowProfileCode || responseData.lowProfileCode || lowProfileCode;
+          
+          // Check payment status via API
+          checkPaymentStatus(lpCode, sessionId);
         }
       } catch (error) {
-        PaymentLogger.error('Error processing frame message:', error);
+        PaymentLogger.error('Error processing CardCom message', error);
       }
     };
-  
-    window.addEventListener('message', handleFrameMessages);
-    return () => window.removeEventListener('message', handleFrameMessages);
+
+    window.addEventListener('message', handleWindowMessage);
+    
+    PaymentLogger.log('Set up CardCom message listener', {
+      lowProfileCode, 
+      sessionId,
+      operationType,
+      planType
+    });
+    
+    // Clean up event listener when component unmounts or dependencies change
+    return () => {
+      window.removeEventListener('message', handleWindowMessage);
+      PaymentLogger.log('Removed CardCom message listener');
+    };
   }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType]);
 };

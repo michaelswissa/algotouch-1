@@ -7,6 +7,7 @@ import { usePaymentStatusCheck } from './payment/usePaymentStatusCheck';
 import { useFrameMessages } from './payment/useFrameMessages';
 import { useCardcomInitializer } from './useCardcomInitializer';
 import { toast } from 'sonner';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 interface UsePaymentProps {
   planId: string;
@@ -14,7 +15,6 @@ interface UsePaymentProps {
 }
 
 export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
-  const masterFrameRef = useRef<HTMLIFrameElement>(null);
   const [operationType, setOperationType] = useState<'payment' | 'token_only'>('payment');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
   const [isCardcomInitialized, setIsCardcomInitialized] = useState(false);
@@ -37,7 +37,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   const { initializePayment } = usePaymentInitialization({ 
     planId, 
     setState,
-    masterFrameRef,
     operationType
   });
 
@@ -67,18 +66,16 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
   useEffect(() => {
     if (
-      masterFrameRef.current && 
       state.lowProfileCode && 
       state.sessionId && 
       state.terminalNumber &&
       !isCardcomInitialized
     ) {
-      console.log('Initializing CardCom fields');
+      PaymentLogger.log('Initializing CardCom fields');
       
       const timer = setTimeout(async () => {
         try {
           const success = await initializeCardcomFields(
-            masterFrameRef,
             state.lowProfileCode,
             state.sessionId,
             state.terminalNumber,
@@ -86,21 +83,21 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
           );
           
           if (success) {
-            console.log('CardCom fields initialized successfully');
+            PaymentLogger.log('CardCom fields initialized successfully');
             setIsCardcomInitialized(true);
           } else {
-            console.error('Failed to initialize CardCom fields');
+            PaymentLogger.error('Failed to initialize CardCom fields');
             handleError('שגיאה באתחול שדות התשלום');
           }
         } catch (error) {
-          console.error('Error initializing CardCom fields:', error);
+          PaymentLogger.error('Error initializing CardCom fields:', error);
           handleError('שגיאה באתחול שדות התשלום');
         }
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [masterFrameRef, state.lowProfileCode, state.sessionId, state.terminalNumber, isCardcomInitialized, operationType, initializeCardcomFields, handleError]);
+  }, [state.lowProfileCode, state.sessionId, state.terminalNumber, isCardcomInitialized, operationType, initializeCardcomFields, handleError]);
 
   useEffect(() => {
     return () => {
@@ -109,7 +106,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   }, [cleanupStatusCheck]);
 
   const handleRetry = useCallback(() => {
-    console.log('Retrying payment initialization');
+    PaymentLogger.log('Retrying payment initialization');
     setState(prev => ({
       ...prev,
       paymentStatus: PaymentStatusEnum.IDLE
@@ -120,7 +117,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
   const submitPayment = useCallback(() => {
     if (paymentInProgress) {
-      console.log('Payment submission already in progress');
+      PaymentLogger.log('Payment submission already in progress');
       return;
     }
     
@@ -135,7 +132,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
     
     setPaymentInProgress(true);
-    console.log('Submitting payment transaction');
+    PaymentLogger.log('Submitting payment transaction');
 
     try {
       setState(prev => ({
@@ -145,7 +142,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
       
       // Use the cardcom3DS global object to handle the payment
       if (window.cardcom3DS) {
-        console.log('Using CardCom 3DS to process payment', { lowProfileCode: state.lowProfileCode });
+        PaymentLogger.log('Using CardCom 3DS to process payment', { lowProfileCode: state.lowProfileCode });
         
         // Validate fields first
         const isValid = window.cardcom3DS.validateFields();
@@ -153,17 +150,17 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         if (isValid) {
           // Process the payment using the cardcom3DS global object
           window.cardcom3DS.doPayment(state.lowProfileCode);
-          console.log('Payment request sent to CardCom 3DS');
+          PaymentLogger.log('Payment request sent to CardCom 3DS');
           
           // Start checking payment status
           startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
         } else {
-          console.error('CardCom 3DS field validation failed');
+          PaymentLogger.error('CardCom 3DS field validation failed');
           handleError("אנא וודא שפרטי כרטיס האשראי הוזנו כראוי");
           setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.IDLE }));
         }
       } else {
-        console.error('CardCom 3DS script not available');
+        PaymentLogger.error('CardCom 3DS script not available');
         handleError("שגיאה בטעינת מערכת הסליקה, אנא רענן את הדף ונסה שנית");
         setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
       }
@@ -172,7 +169,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
         setPaymentInProgress(false);
       }, 5000);
     } catch (error) {
-      console.error("Error submitting payment:", error);
+      PaymentLogger.error("Error submitting payment:", error);
       handleError("שגיאה בשליחת פרטי התשלום");
       setPaymentInProgress(false);
       setState(prev => ({ ...prev, paymentStatus: PaymentStatusEnum.FAILED }));
@@ -192,7 +189,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
   return {
     ...state,
     operationType,
-    masterFrameRef,
     lowProfileCode: state.lowProfileCode,
     sessionId: state.sessionId,
     initializePayment,

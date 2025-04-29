@@ -1,55 +1,37 @@
 
-/**
- * Type definitions for CardCom 3DS.js
- */
+// Type definitions for CardCom 3DS.js client
+
+interface CardCom3DSInitOptions {
+  LowProfileCode: string;
+  TerminalNumber: string;
+  Operation?: string;
+  Language?: string;
+}
+
+interface CardCom3DS {
+  /**
+   * Initializes the CardCom 3DS payment fields
+   */
+  init(options: CardCom3DSInitOptions): void;
+  
+  /**
+   * Validates the payment fields (card number, CVV, etc)
+   * @returns boolean indicating if all fields are valid
+   */
+  validateFields(): boolean;
+  
+  /**
+   * Submits the payment with the given lowProfileCode
+   * @param lowProfileCode The unique low profile code for this payment session
+   */
+  doPayment(lowProfileCode: string): void;
+}
 
 declare global {
   interface Window {
-    cardcom3DS: {
-      /**
-       * Initialize the CardCom 3DS payment fields
-       * @param options Configuration options for CardCom 3DS
-       */
-      init: (options: CardCom3DSInitOptions) => void;
-      
-      /**
-       * Validate the payment form fields
-       * @returns Boolean indicating if all fields are valid
-       */
-      validateFields: () => boolean;
-      
-      /**
-       * Process the payment with the given low profile code
-       * @param lowProfileCode The unique code for the payment session
-       */
-      doPayment: (lowProfileCode: string) => void;
-    };
+    /**
+     * CardCom 3DS global object for managing payment fields and submission
+     */
+    cardcom3DS: CardCom3DS;
   }
 }
-
-interface CardCom3DSInitOptions {
-  /**
-   * The unique code for the payment session
-   */
-  lowProfileCode: string;
-  
-  /**
-   * The terminal number for the payment gateway
-   */
-  terminalNumber: string;
-  
-  /**
-   * The language for the payment form
-   */
-  language: string;
-  
-  /**
-   * The operation type: 
-   * - "1" for ChargeOnly
-   * - "2" for ChargeAndCreateToken
-   * - "3" for CreateTokenOnly
-   */
-  operation: string;
-}
-
-export {};
