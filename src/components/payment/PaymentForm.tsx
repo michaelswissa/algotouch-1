@@ -50,7 +50,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => {
       resetPaymentState();
     };
-  }, [planId]); // Only depend on planId
+  }, [planId, initializePayment, resetPaymentState]); // Add missing dependencies
 
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {

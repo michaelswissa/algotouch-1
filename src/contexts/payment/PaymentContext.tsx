@@ -1,8 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { PaymentStatus, PaymentStatusType, CardOwnerDetails, PaymentSessionData } from '@/types/payment';
+import { PaymentStatus, PaymentStatusType, CardOwnerDetails } from '@/types/payment';
 import { toast } from 'sonner';
-// Import from the services directory instead of lib/payment
 import { CardComService } from '@/services/payment/CardComService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { useAuth } from '@/contexts/auth/useAuth';
@@ -24,17 +23,16 @@ interface PaymentState {
 
 interface PaymentContextType extends PaymentState {
   initializePayment: (planId: string) => Promise<boolean>;
-  submitPayment: (cardOwnerDetails: CardOwnerDetails) => Promise<boolean>;
+  submitPayment: () => void;
   resetPaymentState: () => void;
   setPaymentStatus: (status: PaymentStatusType) => void;
   setError: (error: string | null) => void;
-  updateSessionData: (data: Partial<PaymentSessionData>) => void;
 }
 
 const initialState: PaymentState = {
   paymentStatus: PaymentStatus.IDLE,
   isInitializing: false,
-  terminalNumber: '',  // Will be set from API response
+  terminalNumber: '',
   cardcomUrl: 'https://secure.cardcom.solutions',
   lowProfileCode: '',
   sessionId: '',
@@ -47,11 +45,10 @@ const initialState: PaymentState = {
 export const PaymentContext = createContext<PaymentContextType>({
   ...initialState,
   initializePayment: async () => false,
-  submitPayment: async () => false,
+  submitPayment: () => {},
   resetPaymentState: () => {},
   setPaymentStatus: () => {},
   setError: () => {},
-  updateSessionData: () => {},
 });
 
 export const usePaymentContext = () => useContext(PaymentContext);
@@ -86,7 +83,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
 
-      // The service now returns the data object directly
       const sessionData = await CardComService.initializePayment({
         planId,
         userId: user?.id || null,
@@ -95,7 +91,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         operationType
       });
 
-      // Update state using properties directly from sessionData
       setState(prev => ({
         ...prev,
         isInitializing: false,
@@ -124,15 +119,16 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const submitPayment = async (cardOwnerDetails: CardOwnerDetails): Promise<boolean> => {
+  // Updated to use CardCom 3DS directly
+  const submitPayment = () => {
     try {
       if (state.paymentStatus === PaymentStatus.PROCESSING) {
-        return false;
+        return;
       }
 
-      if (!state.lowProfileCode || !state.terminalNumber) {
+      if (!state.lowProfileCode) {
         toast.error('חסר מזהה ייחודי לעסקה, אנא נסה/י שנית');
-        return false;
+        return;
       }
 
       setState(prev => ({ 
@@ -141,29 +137,57 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      const success = await CardComService.submitPayment({
-        lowProfileCode: state.lowProfileCode,
-        terminalNumber: state.terminalNumber,
-        operationType: state.operationType,
-        cardOwnerDetails
-      });
+      // Validate that required user fields are filled
+      const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
+      const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
+      const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
+      const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
+      
+      // Validate user input fields
+      if (!cardholderName) {
+        toast.error("נא להזין שם בעל כרטיס");
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
+        return;
+      }
+      
+      if (!cardOwnerId || cardOwnerId.length !== 9) {
+        toast.error("תעודת זהות חייבת להכיל 9 ספרות");
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
+        return;
+      }
+      
+      if (!email || !/\S+@\S+\.\S+/.test(email)) {
+        toast.error("נא להזין כתובת אימייל תקינה");
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
+        return;
+      }
+      
+      if (!phone || !/^0\d{8,9}$/.test(phone.replace(/[-\s]/g, ''))) {
+        toast.error("נא להזין מספר טלפון תקין");
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
+        return;
+      }
 
-      if (success) {
-        try {
-          StorageService.clearAllSubscriptionData();
-        } catch (cleanupError) {
-          PaymentLogger.error('Error cleaning up subscription data:', cleanupError);
-        }
-
-        setState(prev => ({
-          ...prev,
-          paymentStatus: PaymentStatus.SUCCESS,
-        }));
+      // Use the cardcom3DS global object to handle the payment
+      if (window.cardcom3DS) {
+        PaymentLogger.log('Using CardCom 3DS to process payment', { lowProfileCode: state.lowProfileCode });
         
-        PaymentLogger.log('Payment submitted successfully');
-        return true;
+        // Validate fields first
+        const isValid = window.cardcom3DS.validateFields();
+        
+        if (isValid) {
+          // Process the payment using the cardcom3DS global object
+          window.cardcom3DS.doPayment(state.lowProfileCode);
+          PaymentLogger.log('Payment request sent to CardCom 3DS');
+        } else {
+          PaymentLogger.error('CardCom 3DS field validation failed');
+          toast.error("אנא וודא שפרטי כרטיס האשראי הוזנו כראוי");
+          setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
+        }
       } else {
-        throw new Error('שגיאה בשליחת פרטי התשלום');
+        PaymentLogger.error('CardCom 3DS script not available');
+        toast.error("שגיאה בטעינת מערכת הסליקה, אנא רענן את הדף ונסה שנית");
+        setState(prev => ({ ...prev, paymentStatus: PaymentStatus.FAILED }));
       }
     } catch (error) {
       console.error('Error submitting payment:', error);
@@ -174,7 +198,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: errorMessage
       }));
       toast.error(errorMessage);
-      return false;
     }
   };
 
@@ -190,10 +213,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     setState(prev => ({ ...prev, error }));
   };
 
-  const updateSessionData = (data: Partial<PaymentSessionData>) => {
-    setState(prev => ({ ...prev, ...data }));
-  };
-
   const contextValue: PaymentContextType = {
     ...state,
     initializePayment,
@@ -201,7 +220,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     resetPaymentState,
     setPaymentStatus,
     setError,
-    updateSessionData,
   };
 
   return (
