@@ -1,64 +1,89 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
+import React, { useState } from 'react';
+import DigitalContractForm from '@/components/DigitalContractForm';
 import { Button } from '@/components/ui/button';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/auth';
+import { toast } from 'sonner';
 
 interface ContractSectionProps {
-  onContractSigned: (signed: boolean) => void;
-  onBack?: () => void;
+  selectedPlan: string;
+  fullName: string;
+  onSign: (contractData: any) => void;
+  onBack: () => void;
 }
 
 const ContractSection: React.FC<ContractSectionProps> = ({ 
-  onContractSigned, 
+  selectedPlan, 
+  fullName, 
+  onSign, 
   onBack 
 }) => {
-  const handleSignContract = () => {
-    onContractSigned(true);
-  };
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { isAuthenticated } = useAuth();
   
+  // Function to handle contract signing
+  const handleSignContract = async (contractData: any) => {
+    try {
+      setIsProcessing(true);
+      console.log('Contract signed, saving before payment');
+      
+      // Get existing registration data if available
+      const registrationData = sessionStorage.getItem('registration_data');
+      const parsedRegistrationData = registrationData ? JSON.parse(registrationData) : null;
+      
+      // Save contract data to session storage for use during payment
+      const contractStateData = {
+        ...contractData,
+        registrationData: parsedRegistrationData,
+        contractSignedAt: new Date().toISOString(),
+        isAuthenticated,
+        selectedPlan
+      };
+      
+      // Save contract state in session storage and ensure it persists
+      sessionStorage.setItem('contract_data', JSON.stringify(contractStateData));
+      
+      // Add a small delay to show the processing state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Pass the contract data up to the parent
+      onSign(contractStateData);
+    } catch (error) {
+      console.error('Error signing contract:', error);
+      toast.error('אירעה שגיאה בשמירת החוזה');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    <div className="max-w-2xl mx-auto px-4">
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>תנאי השירות</CardTitle>
-          <CardDescription>
-            אנא קרא/י בעיון את תנאי השירות וחתום/י במקום המיועד
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-muted p-4 rounded-md h-64 overflow-auto">
-            <h3 className="font-semibold mb-2">תנאים כלליים</h3>
-            <p className="text-sm mb-3">
-              זהו הסכם משפטי בין המשתמש לבין החברה. השימוש באתר ובשירותים כפוף לתנאים אלה.
-            </p>
-            {/* Additional contract terms would go here */}
+    <div className="space-y-6">
+      <Alert className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          אנא קרא את ההסכם בעיון וחתום במקום המיועד בתחתית העמוד
+        </AlertDescription>
+      </Alert>
+      
+      <DigitalContractForm 
+        onSign={handleSignContract}
+        planId={selectedPlan} 
+        fullName={fullName} 
+      />
+      
+      <div className="mt-6 flex justify-between">
+        <Button variant="outline" onClick={onBack} disabled={isProcessing}>
+          חזור
+        </Button>
+        
+        {isProcessing && (
+          <div className="flex items-center text-sm text-muted-foreground">
+            מעבד את החתימה...
           </div>
-
-          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-            <input 
-              type="checkbox" 
-              id="accept-terms" 
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <label htmlFor="accept-terms" className="text-sm font-medium">
-              אני מאשר/ת שקראתי והבנתי את התנאים וההגבלות
-            </label>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex justify-between">
-          {onBack && (
-            <Button 
-              variant="outline" 
-              onClick={onBack}
-            >
-              חזור
-            </Button>
-          )}
-          <Button onClick={handleSignContract}>
-            אישור והמשך
-          </Button>
-        </CardFooter>
-      </Card>
+        )}
+      </div>
     </div>
   );
 };
