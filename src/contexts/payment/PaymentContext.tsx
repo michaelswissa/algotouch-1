@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails } from '@/types/payment';
 import { toast } from 'sonner';
@@ -57,20 +56,18 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [state, setState] = useState<PaymentState>(initialState);
   const { user } = useAuth();
   const [scriptLoaded, setScriptLoaded] = useState(false);
-  
-  // Load the 3DS.js script once when the provider mounts
+  const [initializeAttempts, setInitializeAttempts] = useState(0);
+
   useEffect(() => {
     const loadCardcom3DSScript = () => {
       const scriptId = 'cardcom-3ds-script';
       
-      // Check if script is already loaded
       if (window.cardcom3DS) {
         PaymentLogger.log('CardCom 3DS.js script already loaded and available');
         setScriptLoaded(true);
         return;
       }
       
-      // Check if script is already in the document but not yet fully loaded
       if (document.getElementById(scriptId)) {
         PaymentLogger.log('CardCom 3DS.js script already loading');
         return;
@@ -102,17 +99,27 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, []);
 
   const initializePayment = useCallback(async (planId: string): Promise<boolean> => {
-    // Guards to prevent initialization loops and duplicate initializations
     if (state.isInitializing) {
       PaymentLogger.log('Payment initialization already in progress');
       return false;
     }
     
-    // If already initialized successfully, don't reinitialize unless forced by FAILED status
     if (state.lowProfileCode && state.paymentStatus !== PaymentStatus.FAILED) {
       PaymentLogger.log('Payment already initialized with lowProfileCode:', state.lowProfileCode);
       return true;
     }
+    
+    if (initializeAttempts >= 3) {
+      setState(prev => ({ 
+        ...prev, 
+        paymentStatus: PaymentStatus.FAILED,
+        error: 'נכשל באתחול התשלום לאחר מספר ניסיונות. אנא רענן את העמוד ונסה שוב.'
+      }));
+      toast.error('נכשל באתחול התשלום לאחר מספר ניסיונות. אנא רענן את העמוד ונסה שוב.');
+      return false;
+    }
+    
+    setInitializeAttempts(prev => prev + 1);
 
     try {
       setState(prev => ({ 
@@ -168,7 +175,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       toast.error(errorMessage);
       return false;
     }
-  }, [state.isInitializing, state.lowProfileCode, state.paymentStatus, user?.id]);
+  }, [state.isInitializing, state.lowProfileCode, state.paymentStatus, user?.id, initializeAttempts]);
 
   const submitPayment = useCallback(() => {
     try {
@@ -187,13 +194,11 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         error: null
       }));
       
-      // Validate that required user fields are filled
       const cardholderName = document.querySelector<HTMLInputElement>('#cardOwnerName')?.value || '';
       const cardOwnerId = document.querySelector<HTMLInputElement>('#cardOwnerId')?.value || '';
       const email = document.querySelector<HTMLInputElement>('#cardOwnerEmail')?.value || '';
       const phone = document.querySelector<HTMLInputElement>('#cardOwnerPhone')?.value || '';
       
-      // Validate user input fields
       if (!cardholderName) {
         toast.error("נא להזין שם בעל כרטיס");
         setState(prev => ({ ...prev, paymentStatus: PaymentStatus.IDLE }));
@@ -218,19 +223,15 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         return;
       }
 
-      // Use the cardcom3DS global object to handle the payment
       if (window.cardcom3DS) {
         PaymentLogger.log('Using CardCom 3DS to process payment', { lowProfileCode: state.lowProfileCode });
         
-        // Validate fields first
         const isValid = window.cardcom3DS.validateFields();
         
         if (isValid) {
-          // Process the payment using the cardcom3DS global object
           window.cardcom3DS.doPayment(state.lowProfileCode);
           PaymentLogger.log('Payment request sent to CardCom 3DS');
           
-          // Start checking payment status in a polling manner
           let checkCount = 0;
           const maxChecks = 10;
           const statusCheckInterval = setInterval(async () => {
@@ -270,7 +271,6 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
             }
           }, 3000);
           
-          // Set timeout to stop checking after 30 seconds
           setTimeout(() => {
             clearInterval(statusCheckInterval);
             if (state.paymentStatus === PaymentStatus.PROCESSING) {
@@ -307,6 +307,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const resetPaymentState = useCallback(() => {
     setState(initialState);
+    setInitializeAttempts(0);
   }, []);
 
   const setPaymentStatus = useCallback((paymentStatus: PaymentStatusType) => {

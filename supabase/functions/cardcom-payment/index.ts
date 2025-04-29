@@ -1,19 +1,38 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { getCorsHeaders } from "../_shared/cors.ts";
 import { logStep, validateAmount } from "../_shared/cardcom_utils.ts";
 
-serve(async (req) => {
-  const requestOrigin = req.headers.get("Origin");
-  const corsHeaders = getCorsHeaders(requestOrigin);
+// CORS headers to ensure the API can be called from the frontend
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Content-Type': 'application/json'
+};
 
+serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: 'Method not allowed' 
+      }),
+      { 
+        status: 405, 
+        headers: corsHeaders 
+      }
+    );
+  }
 
   try {
-    const functionName = 'payment';
+    const functionName = 'cardcom-payment';
     await logStep(functionName, "Function started");
     
     // Initialize Supabase client
@@ -146,10 +165,6 @@ serve(async (req) => {
       amount
     });
 
-    // Determine the base URL for redirects based on environment or request origin
-    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
-    const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
-
     // Prepare the response object with all necessary data
     const responseData = {
       success: true,
@@ -164,48 +179,11 @@ serve(async (req) => {
       }
     };
 
-    // For iFrame prefill mode, return response with session details
-    if (isIframePrefill) {
-      return new Response(
-        JSON.stringify(responseData),
-        { 
-          status: 200, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
-      );
-    }
-    
-    // Build redirect URL for standard payment flow using dynamic base URLs
-    const redirectUrl = buildRedirectUrl({
-      cardcomUrl: "https://secure.cardcom.solutions",
-      terminalNumber,
-      lowProfileId,
-      transactionRef,
-      amount,
-      successUrl: `${frontendBaseUrl}/subscription/success`,
-      failedUrl: `${frontendBaseUrl}/subscription/failed`,
-      webHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
-      operationType,
-      fullName,
-      email
-    });
-
-    await logStep(functionName, "Redirect URL created", { url: redirectUrl });
-    
-    // Add the URL to the response for standard redirect flow
-    responseData.data.url = redirectUrl;
-    
     return new Response(
       JSON.stringify(responseData),
       { 
         status: 200, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: corsHeaders
       }
     );
   } catch (error) {
@@ -218,49 +196,8 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: corsHeaders
       }
     );
   }
 });
-
-function buildRedirectUrl(params: {
-  cardcomUrl: string;
-  terminalNumber: string;
-  lowProfileId: string;
-  transactionRef: string;
-  amount: number;
-  successUrl: string;
-  failedUrl: string;
-  webHookUrl: string;
-  operationType: string;
-  fullName?: string;
-  email?: string;
-}) {
-  const queryParams = new URLSearchParams({
-    TerminalNumber: params.terminalNumber,
-    LowProfileCode: params.lowProfileId,
-    ReturnValue: params.transactionRef,
-    SumToBill: params.amount.toString(),
-    CoinId: '1',
-    Language: 'he',
-    SuccessRedirectUrl: params.successUrl,
-    ErrorRedirectUrl: params.failedUrl,
-    IndicatorUrl: params.webHookUrl,
-    Operation: params.operationType,
-    APILevel: '10',
-    Codepage: '65001'
-  });
-
-  if (params.fullName) {
-    queryParams.append('CardOwnerName', params.fullName);
-  }
-  if (params.email) {
-    queryParams.append('CardOwnerEmail', params.email);
-  }
-
-  return `${params.cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
-}
