@@ -1,12 +1,12 @@
 
 import { useEffect } from 'react';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { PaymentStatusEnum } from '@/types/payment';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 interface UseFrameMessagesProps {
   handlePaymentSuccess: () => void;
-  setState: (updater: any) => void;
-  checkPaymentStatus: (lowProfileCode: string) => Promise<boolean>;
+  setState: (state: any) => void;
+  checkPaymentStatus: (lowProfileCode: string, sessionId: string) => void;
   lowProfileCode: string;
   sessionId: string;
   operationType: 'payment' | 'token_only';
@@ -24,75 +24,80 @@ export const useFrameMessages = ({
 }: UseFrameMessagesProps) => {
   useEffect(() => {
     if (!lowProfileCode || !sessionId) return;
-    
-    const handleMessageEvent = async (event: MessageEvent) => {
-      if (!event.data) return;
+
+    const handleFrameMessages = (event: MessageEvent) => {
+      // Allow messages from CardCom domains or local development environment
+      if (!event.origin.includes('cardcom.solutions') && 
+          !event.origin.includes('localhost') && 
+          !event.origin.includes(window.location.origin) &&
+          !event.origin.includes('lovableproject.com') &&
+          !event.origin.includes('lovable.app')) {
+        return;
+      }
+  
+      PaymentLogger.log('Received message from CardCom:', event.data);
       
       try {
         const data = event.data;
-        console.log('Received message from iframe:', data);
-        
-        // Handle payment success message from CardCom
-        if (data.action === 'TransactionApproved' || data.status === 'approved') {
-          PaymentLogger.log('Transaction approved message received', { 
-            data,
-            operationType,
-            planType
-          });
-          
-          // Check if we should verify payment status with backend
-          if (lowProfileCode) {
-            PaymentLogger.log('Verifying payment status with backend', { lowProfileCode });
-            const verified = await checkPaymentStatus(lowProfileCode);
-            
-            if (verified) {
-              PaymentLogger.log('Payment verified with backend');
-              handlePaymentSuccess();
-            } else {
-              PaymentLogger.log('Payment not verified with backend, continuing to check');
-              // We'll continue to poll in the background
-            }
-          } else {
-            // If we don't have a lowProfileCode, trust the iframe message
-            PaymentLogger.log('No lowProfileCode to verify, trusting iframe message');
+
+        // Handle different message types from CardCom
+        if (data) {
+          // Handle success message
+          if (data.action === 'approvedTransaction' || 
+              data.status === 'success' || 
+              data.action === 'success') {
+            PaymentLogger.log('Payment transaction approved:', data);
             handlePaymentSuccess();
-          }
-        }
-        
-        // Handle transaction rejected message
-        if (data.action === 'TransactionRejected' || data.status === 'rejected') {
-          PaymentLogger.error('Transaction rejected', { data });
-          setState(prev => ({ 
-            ...prev, 
-            paymentStatus: PaymentStatusEnum.FAILED,
-            error: data.errorMessage || 'העסקה נדחתה על ידי חברת האשראי'
-          }));
-        }
-        
-        // Handle initialization response message
-        if (data.action === 'initResponse') {
-          if (data.success) {
-            PaymentLogger.log('CardCom initialization successful', { data });
-          } else {
-            PaymentLogger.error('CardCom initialization failed', { data });
-            setState(prev => ({ 
-              ...prev, 
-              paymentStatus: PaymentStatusEnum.FAILED,
-              error: 'שגיאה באתחול תהליך התשלום'
+          } 
+          // Handle payment form submission
+          else if (data.action === 'doTransaction') {
+            PaymentLogger.log('Processing payment transaction:', data);
+            
+            // Update UI status
+            setState(prev => ({
+              ...prev,
+              paymentStatus: PaymentStatusEnum.PROCESSING
             }));
+            
+            // Start checking payment status
+            if (lowProfileCode && sessionId) {
+              setTimeout(() => {
+                checkPaymentStatus(lowProfileCode, sessionId);
+              }, 2000);
+            }
+          } 
+          // Handle initialization success
+          else if (data.action === 'init' && data.status === 'success') {
+            PaymentLogger.log('CardCom fields initialized successfully');
+          } 
+          // Handle validation messages
+          else if (data.action === 'validation') {
+            PaymentLogger.log('Field validation:', data);
+          } 
+          // Handle errors
+          else if (data.status === 'error' || data.action === 'error') {
+            PaymentLogger.error('Error from CardCom:', data);
+            
+            setState(prev => ({
+              ...prev,
+              paymentStatus: PaymentStatusEnum.FAILED,
+              error: data.message || 'שגיאה בביצוע התשלום'
+            }));
+          }
+          // Handle 3DS specific messages
+          else if (data.status === '3ds_challenge') {
+            PaymentLogger.log('3DS challenge initiated:', data);
+          }
+          else if (data.status === '3ds_complete') {
+            PaymentLogger.log('3DS verification completed:', data);
           }
         }
       } catch (error) {
-        PaymentLogger.error('Error processing iframe message event', error);
+        PaymentLogger.error('Error processing frame message:', error);
       }
     };
-    
-    // Add event listener
-    window.addEventListener('message', handleMessageEvent);
-    
-    // Clean up
-    return () => {
-      window.removeEventListener('message', handleMessageEvent);
-    };
-  }, [lowProfileCode, sessionId, setState, handlePaymentSuccess, checkPaymentStatus, operationType, planType]);
+  
+    window.addEventListener('message', handleFrameMessages);
+    return () => window.removeEventListener('message', handleFrameMessages);
+  }, [lowProfileCode, sessionId, handlePaymentSuccess, setState, checkPaymentStatus, operationType, planType]);
 };

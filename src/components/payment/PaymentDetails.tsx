@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -6,9 +5,6 @@ import { CreditCard } from 'lucide-react';
 import CardExpiryInputs from './CardExpiryInputs';
 import SecurityNote from './SecurityNote';
 import { usePaymentForm } from '@/hooks/payment/usePaymentForm';
-import CardNumberFrame from './iframes/CardNumberFrame';
-import CVVFrame from './iframes/CVVFrame';
-import ReCaptchaFrame from './iframes/ReCaptchaFrame';
 
 interface PaymentDetailsProps {
   terminalNumber: string;
@@ -24,19 +20,7 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
   isReady = false
 }) => {
   const { formData, errors, handleChange } = usePaymentForm();
-  const [cardNumberLoaded, setCardNumberLoaded] = useState(false);
-  const [cvvLoaded, setCvvLoaded] = useState(false);
-  const [captchaLoaded, setCaptchaLoaded] = useState(false);
-  
-  // Track when all frames are loaded
   const [allFramesLoaded, setAllFramesLoaded] = useState(false);
-  
-  useEffect(() => {
-    if (cardNumberLoaded && cvvLoaded && captchaLoaded && isReady) {
-      setAllFramesLoaded(true);
-      console.log('All CardCom iframes loaded successfully!');
-    }
-  }, [cardNumberLoaded, cvvLoaded, captchaLoaded, isReady]);
   
   // Log for debugging
   useEffect(() => {
@@ -134,16 +118,12 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
       {/* Card Number Frame */}
       <div className="space-y-2">
-        <Label htmlFor="cardNumber">מספר כרטיס</Label>
+        <Label htmlFor="CardNumberFrame">מספר כרטיס</Label>
         <div className="relative">
-          <CardNumberFrame
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            onLoad={() => {
-              console.log('Card number iframe loaded');
-              setCardNumberLoaded(true);
-            }}
-            isReady={isReady}
+          <div 
+            id="CardNumberFrame" 
+            className="credit-card-field"
+            style={{ height: '40px', width: '100%' }}
           />
           <div className="absolute top-0 right-0 h-full flex items-center pr-3 pointer-events-none">
             <CreditCard className="h-5 w-5 text-gray-400" />
@@ -178,40 +158,34 @@ const PaymentDetails: React.FC<PaymentDetailsProps> = ({
 
       {/* CVV Frame */}
       <div className="space-y-2">
-        <Label htmlFor="cvv">קוד אבטחה (CVV)</Label>
+        <Label htmlFor="CVVFrame">קוד אבטחה (CVV)</Label>
         <div className="relative max-w-[188px]">
-          <CVVFrame
-            terminalNumber={terminalNumber}
-            cardcomUrl={cardcomUrl}
-            onLoad={() => {
-              console.log('CVV iframe loaded');
-              setCvvLoaded(true);
-            }}
-            isReady={isReady}
+          <div 
+            id="CVVFrame" 
+            className="credit-card-field"
+            style={{ height: '40px', width: '100%' }}
           />
         </div>
       </div>
       
       {/* reCAPTCHA Frame */}
       <div className="space-y-2">
-        <ReCaptchaFrame
-          terminalNumber={terminalNumber}
-          cardcomUrl={cardcomUrl}
-          onLoad={() => {
-            console.log('reCAPTCHA iframe loaded');
-            setCaptchaLoaded(true);
-          }}
+        <div 
+          id="ReCaptchaFrame"
+          className="flex justify-start mt-2" 
+          style={{ minHeight: '78px' }}
         />
       </div>
 
+      {/* Master iframe - keep hidden but available for communication */}
       {isReady && (
         <div className="hidden">
           <iframe 
+            id="CardComMasterFrame"
             ref={masterFrameRef}
             src={`${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}`}
             title="CardCom Payment"
-            className="w-full h-0"
-            style={{ border: 'none' }}
+            style={{ width: '1px', height: '1px', border: 'none', position: 'absolute', top: '-9999px' }}
             onLoad={() => console.log('Master iframe loaded')}
           />
         </div>

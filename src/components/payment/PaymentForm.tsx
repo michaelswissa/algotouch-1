@@ -70,14 +70,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
   };
 
   const handleSubmitClick = () => {
-    submitPayment({
-      cardOwnerName: '', // These values will be taken from the usePaymentForm hook inside PaymentDetails
-      cardOwnerId: '',
-      cardOwnerEmail: '',
-      cardOwnerPhone: '',
-      expirationMonth: '',
-      expirationYear: '',
-    });
+    submitPayment();
   };
 
   const shouldShowPaymentContent = 
