@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2 } from 'lucide-react';
@@ -32,8 +32,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     lowProfileCode
   } = usePaymentContext();
   
-  const masterFrameRef = useRef<HTMLIFrameElement>(null);
-  
   const planDetails = getSubscriptionPlans();
   const plan = planId === 'annual' 
     ? planDetails.annual 
@@ -50,7 +48,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => {
       resetPaymentState();
     };
-  }, [planId, initializePayment, resetPaymentState]); // Add missing dependencies
+  }, [planId, initializePayment, resetPaymentState]);
 
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {
@@ -115,7 +113,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
             <PaymentDetails 
               terminalNumber={terminalNumber}
               cardcomUrl={cardcomUrl}
-              masterFrameRef={masterFrameRef}
               isReady={!isInitializing && lowProfileCode !== ''}
             />
           </>
