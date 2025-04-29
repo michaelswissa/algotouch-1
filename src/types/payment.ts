@@ -91,3 +91,18 @@ export interface CardComTransactionRequest {
     DocumentTypeToCreate: string;
   };
 }
+
+// Adding the missing PlanDetails interface for subscription plans
+export interface PlanDetails {
+  id: string;
+  name: string;
+  displayName?: string;
+  description: string;
+  price: number;
+  displayPrice: string;
+  billingFrequency: 'monthly' | 'yearly' | 'one-time';
+  featured?: boolean;
+  hasTrial?: boolean;
+  freeTrialDays?: number;
+  features?: string[];
+}

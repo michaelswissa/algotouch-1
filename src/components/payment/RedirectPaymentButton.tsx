@@ -1,16 +1,20 @@
 
 import React, { useState, useCallback } from 'react';
-import { Button, ButtonProps } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import type { ButtonProps as UIButtonProps } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
-interface RedirectPaymentButtonProps extends ButtonProps {
+// Create a type that omits the onError prop from ButtonProps
+type ButtonPropsWithoutOnError = Omit<UIButtonProps, 'onError'>;
+
+interface RedirectPaymentButtonProps extends ButtonPropsWithoutOnError {
   planId: string;
   children: React.ReactNode;
   onSuccess?: (sessionId: string) => void;
-  onError?: (error: string) => void;
+  onError?: (error: string) => void; // Custom onError handler for payment errors
 }
 
 const RedirectPaymentButton: React.FC<RedirectPaymentButtonProps> = ({
