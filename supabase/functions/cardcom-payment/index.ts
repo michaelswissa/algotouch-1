@@ -26,7 +26,7 @@ serve(async (req) => {
       }),
       { 
         status: 405, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
@@ -183,7 +183,7 @@ serve(async (req) => {
       JSON.stringify(responseData),
       { 
         status: 200, 
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } catch (error) {
@@ -196,7 +196,7 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }

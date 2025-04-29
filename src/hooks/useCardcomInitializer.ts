@@ -118,7 +118,7 @@ export const useCardcomInitializer = () => {
         operation
       });
       
-      // Initialize the CardCom 3DS fields
+      // Initialize the CardCom 3DS fields with the proper parameters
       window.cardcom3DS.init({
         LowProfileCode: lowProfileCode,
         TerminalNumber: terminalNumber,

@@ -25,14 +25,15 @@ serve(async (req) => {
       }),
       { 
         status: 405, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }
 
   try {
     // Parse request body
-    const { lowProfileCode, sessionId } = await req.json();
+    const requestData = await req.json();
+    const { lowProfileCode, sessionId } = requestData;
     
     if (!lowProfileCode || !sessionId) {
       return new Response(
@@ -42,7 +43,7 @@ serve(async (req) => {
         }),
         { 
           status: 400, 
-          headers: corsHeaders 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
@@ -82,7 +83,7 @@ serve(async (req) => {
         }),
         { 
           status: 404, 
-          headers: corsHeaders 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
@@ -130,7 +131,7 @@ serve(async (req) => {
       }),
       { 
         status: 200, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   } catch (error) {
@@ -144,7 +145,7 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }

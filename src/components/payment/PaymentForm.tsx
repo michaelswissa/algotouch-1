@@ -61,8 +61,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete, on
     return () => {
       resetPaymentState();
     };
-  }, [planId, paymentStatus, isInitializing, lowProfileCode]); // Remove initializePayment from dependency array
-
+  }, [planId, paymentStatus, isInitializing, lowProfileCode, resetPaymentState]); // Removed initializePayment from deps
+  
   // Call onPaymentComplete when payment succeeds
   useEffect(() => {
     if (paymentStatus === PaymentStatusEnum.SUCCESS) {

@@ -1,6 +1,7 @@
 
 import { toast } from 'sonner';
 import { PaymentLogger } from './PaymentLogger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PaymentInitializationParams {
   planId: string;
@@ -28,49 +29,33 @@ export class CardComService {
       
       PaymentLogger.log('Initializing payment', { planId, operationType, email });
       
-      // Use Supabase Edge Function to initialize payment session
-      const apiUrl = '/api/cardcom-payment'; // Use relative URL
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      // Use Supabase Functions API to call the edge function instead of relative URLs
+      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+        body: {
           planId,
           userId,
           email,
           fullName,
           operationType: operationType === 'token_only' ? 'token_only' : 'payment',
-          // Setting this to true enables the iframe prefill mode for better user experience
           isIframePrefill: true
-        })
+        }
       });
       
-      // Check if the response is valid JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        // If the response is not JSON, read it as text and display a detailed error
-        const textResponse = await response.text();
-        PaymentLogger.error('Non-JSON response received:', textResponse.substring(0, 500)); // Log the first 500 chars
-        throw new Error(`Server communication error: Invalid response (${response.status})`);
+      if (error) {
+        PaymentLogger.error('Error from cardcom-payment function:', error);
+        throw new Error(`Payment initialization failed: ${error.message || 'Unknown error'}`);
       }
       
-      // Now safely parse the JSON
-      let result;
-      try {
-        result = await response.json();
-      } catch (error) {
-        if (error instanceof SyntaxError) {
-          // JSON parsing error
-          PaymentLogger.error('JSON parsing error:', error);
-          throw new Error('Error parsing server response');
-        }
-        throw error;
+      if (!data) {
+        throw new Error('No data received from payment service');
       }
       
-      if (!response.ok || !result.success) {
-        const errorMessage = result.message || `API error (${response.status})`;
+      PaymentLogger.log('Payment initialization response:', data);
+      
+      const result = data;
+      
+      if (!result.success) {
+        const errorMessage = result.message || `API error (unknown)`;
         throw new Error(errorMessage);
       }
       
@@ -105,47 +90,29 @@ export class CardComService {
     status: string;
   }> {
     try {
-      // Use Supabase Edge Function to check payment status
-      const apiUrl = '/api/cardcom-status';
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      // Use Supabase Functions API to check payment status
+      const { data, error } = await supabase.functions.invoke('cardcom-status', {
+        body: {
           lowProfileCode,
           sessionId
-        })
+        }
       });
       
-      // Check if the response is valid JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        // If the response is not JSON, read it as text and log for debugging
-        const textResponse = await response.text();
-        PaymentLogger.error('Non-JSON response received from status check:', textResponse.substring(0, 500));
-        throw new Error(`Server communication error: Invalid status response (${response.status})`);
+      if (error) {
+        PaymentLogger.error('Error checking payment status via function:', error);
+        throw new Error(`Status check failed: ${error.message || 'Unknown error'}`);
+      }
+
+      if (!data) {
+        throw new Error('No data received from status check');
       }
       
-      let result;
-      try {
-        result = await response.json();
-      } catch (error) {
-        if (error instanceof SyntaxError) {
-          // JSON parsing error
-          PaymentLogger.error('JSON parsing error in status check:', error);
-          throw new Error('Error parsing server status response');
-        }
-        throw error;
-      }
-      
-      PaymentLogger.log('Payment status check result', result);
+      PaymentLogger.log('Payment status check result', data);
       
       return {
-        success: result.success,
-        message: result.message || '',
-        status: result.data?.status || 'unknown'
+        success: data.success,
+        message: data.message || '',
+        status: data.data?.status || 'unknown'
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error checking payment status';
