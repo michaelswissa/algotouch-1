@@ -8,6 +8,8 @@ interface PaymentInitializationParams {
   userId: string | null;
   email: string;
   fullName: string;
+  phone: string;    // Added phone
+  idNumber: string; // Added idNumber
   operationType?: 'payment' | 'token_only';
 }
 
@@ -26,23 +28,31 @@ interface PaymentInitializationResult {
 export class CardComService {
   static async initializePayment(params: PaymentInitializationParams): Promise<PaymentInitializationResult> {
     try {
-      const { planId, userId, email, fullName, operationType = 'payment' } = params;
+      const { planId, userId, email, fullName, phone, idNumber, operationType = 'payment' } = params;
       
-      PaymentLogger.log('Initializing payment', { planId, operationType, email });
+      PaymentLogger.log('Initializing payment', { 
+        planId, 
+        operationType, 
+        email,
+        hasPhone: Boolean(phone),
+        hasIdNumber: Boolean(idNumber)
+      });
       
-      // Call our new cardcom-iframe function for proper iframe URL generation
-      const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
+      // Call our new JSON API Edge Function
+      const { data, error } = await supabase.functions.invoke('cardcom-json-create', {
         body: {
           planId,
           userId,
           email,
           fullName,
+          phone,       // Pass phone
+          idNumber,    // Pass idNumber
           operationType: operationType === 'token_only' ? '3' : '1' // Map to CardCom operation types
         }
       });
       
       if (error) {
-        PaymentLogger.error('Error from cardcom-iframe function:', error);
+        PaymentLogger.error('Error from cardcom-json-create function:', error);
         throw new Error(`Payment initialization failed: ${error.message || 'Unknown error'}`);
       }
       
@@ -65,12 +75,12 @@ export class CardComService {
       // Log the iframe URL we received
       PaymentLogger.log('Payment initialization success, iframe URL received:', data.data.iframeUrl);
       
-      const lowProfileId = data.data.lowProfileId || '';
+      const lowProfileId = data.data.lowProfileId || data.data.lowProfileCode || '';
       
       return {
         sessionId: data.data.sessionId,
         reference: data.data.reference,
-        terminalNumber: data.data.terminalNumber,
+        terminalNumber: data.data.terminalNumber || '',
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
         // Ensure iframe URL is prioritized and available in all expected properties
         redirectUrl: data.data.iframeUrl,

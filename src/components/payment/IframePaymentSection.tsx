@@ -101,7 +101,8 @@ const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
                 className="absolute top-0 left-0 w-full h-full"
                 src={iframeUrl}
                 title="CardCom Payment"
-                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                frameBorder="0"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
                 onLoad={handleIframeLoad}
                 onError={handleIframeError}
               />

@@ -45,21 +45,36 @@ export const usePaymentIframe = ({ planId, onPaymentComplete }: UsePaymentIframe
         throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
       }
 
-      if (!contractData.email || !contractData.fullName) {
-        throw new Error('חסרים פרטי לקוח בחוזה');
+      // Validate all required fields are present
+      if (!contractData.email || !contractData.fullName || !contractData.phone || !contractData.idNumber) {
+        PaymentLogger.error("Missing required contract fields from storage:", { 
+          hasEmail: Boolean(contractData.email), 
+          hasName: Boolean(contractData.fullName),
+          hasPhone: Boolean(contractData.phone),
+          hasId: Boolean(contractData.idNumber)
+        });
+        throw new Error('חסרים פרטי לקוח בחוזה (נדרש שם מלא, אימייל, טלפון ומספר ת.ז.)');
       }
       
       // Determine operation type based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
       
-      PaymentLogger.log('Initializing payment for plan', { planId, operationType });
+      PaymentLogger.log('Initializing payment for plan', { 
+        planId, 
+        operationType, 
+        email: contractData.email,
+        hasPhone: Boolean(contractData.phone),
+        hasIdNumber: Boolean(contractData.idNumber)
+      });
       
-      // Initialize payment session
+      // Initialize payment session with all required fields
       const result = await CardComService.initializePayment({
         planId,
         userId: user?.id || null,
         email: contractData.email,
         fullName: contractData.fullName,
+        phone: contractData.phone,       // Pass phone
+        idNumber: contractData.idNumber, // Pass ID number
         operationType
       });
       

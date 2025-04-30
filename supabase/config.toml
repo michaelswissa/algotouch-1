@@ -35,5 +35,8 @@ verify_jwt = false
 [functions.cardcom-iframe]
 verify_jwt = false
 
+[functions.cardcom-json-create]
+verify_jwt = false
+
 [auth]
 site_url = "http://localhost:3000"
