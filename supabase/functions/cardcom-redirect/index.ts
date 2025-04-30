@@ -1,8 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { logStep } from "../_shared/cardcom_utils.ts";
 
-// CORS headers for cross-domain requests
+// CORS headers to ensure the API can be called from the frontend
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -25,24 +26,33 @@ serve(async (req) => {
       }),
       { 
         status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 
   try {
-    // Get CardCom configuration from environment variables
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
-    const apiName = Deno.env.get("CARDCOM_API_NAME");
+    const functionName = 'cardcom-redirect';
+    await logStep(functionName, "Function started");
     
-    if (!terminalNumber || !apiName) {
-      throw new Error("Missing CardCom API configuration");
-    }
-
-    // Get frontend URL for redirect paths
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
-
-    // Initialize Supabase client
+    // Get request data
+    const {
+      planId,
+      successUrl = '',
+      errorUrl = '',
+      webhookUrl = ''
+    } = await req.json();
+    
+    await logStep(functionName, "Processing request for plan", { 
+      planId, 
+      successUrl, 
+      errorUrl 
+    });
+    
+    // Get request origin
+    const requestOrigin = req.headers.get("Origin") || '';
+    
+    // Get CardCom URL parameters by calling the cardcom-payment function
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -51,137 +61,79 @@ serve(async (req) => {
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Parse request body
-    const { 
-      planId,
-      successUrl = '',
-      errorUrl = '',
-      webhookUrl = ''
-    } = await req.json();
     
-    console.log(`[CARDCOM-REDIRECT] Processing request for plan: ${planId}, successUrl: ${successUrl}, errorUrl: ${errorUrl}`);
-
-    if (!planId) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Missing required parameters' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
+    // Get default URLs for redirects
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://ndhakvhrrkczgylcmyoc.supabase.co";
+    const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
     
-    // Get plan information from the database
-    const { data: plan, error: planError } = await supabaseAdmin
-      .from('plans')
-      .select('*')
-      .eq('id', planId)
-      .maybeSingle();
-      
-    if (planError) {
-      throw new Error("Error fetching plan details: " + planError.message);
-    }
+    const defaultSuccessUrl = `${frontendBaseUrl}/subscription/success`;
+    const defaultErrorUrl = `${frontendBaseUrl}/subscription/failed`;
+    const defaultWebhookUrl = `${publicFunctionsUrl}/cardcom-webhook`;
     
-    if (!plan) {
-      throw new Error(`Invalid plan ID: ${planId}`);
-    }
-
-    // Generate a unique session ID and LowProfile ID
-    const sessionId = crypto.randomUUID();
-    const reference = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Use provided URLs or defaults
+    const finalSuccessUrl = successUrl || defaultSuccessUrl;
+    const finalErrorUrl = errorUrl || defaultErrorUrl;
+    const finalWebhookUrl = webhookUrl || defaultWebhookUrl;
     
-    // Determine operation type and amount based on plan
-    let operationType = "1"; // Default: ChargeOnly
-    let amount = plan.price || 0;
-
-    switch (planId) {
-      case 'monthly':
-        // Monthly plan starts with free trial (amount=0)
-        operationType = "3"; // CreateTokenOnly
-        amount = 0; 
-        break;
-      case 'annual':
-        // Annual plan charges immediately full amount
-        operationType = "2"; // ChargeAndCreateToken
-        amount = plan.price || 0;
-        break;
-      case 'vip':
-        // VIP plan is one-time payment
-        operationType = "1"; // ChargeOnly
-        amount = plan.price || 0;
-        break;
-      default:
-        throw new Error(`Unsupported plan type: ${planId}`);
-    }
+    await logStep(functionName, "URLs", { 
+      success: finalSuccessUrl, 
+      error: finalErrorUrl, 
+      indicator: finalWebhookUrl 
+    });
     
-    // Create clean URLs (removing any double slashes except in http://)
-    const successRedirectUrl = successUrl || `${frontendUrl}/payment/success`;
-    const errorRedirectUrl = errorUrl || `${frontendUrl}/payment/error`;
-    const indicatorUrl = webhookUrl || `${frontendUrl}/api/cardcom-webhook`;
-    
-    console.log(`[CARDCOM-REDIRECT] URLs - success: ${successRedirectUrl}, error: ${errorRedirectUrl}, indicator: ${indicatorUrl}`);
-
-    // Store the payment session in the database
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
-      .from('payment_sessions')
-      .insert({
-        user_id: null, // Anonymous initially
-        plan_id: planId,
-        amount: amount,
-        currency: "ILS",
-        status: 'initiated',
-        operation_type: operationType,
-        reference: reference,
-        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        payment_details: { 
-          planType: planId
-        }
+    // Call the cardcom-payment function to get payment details
+    const response = await fetch(`${supabaseUrl}/functions/v1/cardcom-payment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify({
+        planId,
+        successUrl: finalSuccessUrl,
+        errorUrl: finalErrorUrl,
+        webhookUrl: finalWebhookUrl
       })
-      .select('id')
-      .single();
-      
-    if (sessionError) {
-      console.error("Database error:", sessionError);
-      throw new Error("Failed to create payment session: " + sessionError.message);
-    }
-
-    // Get product name based on plan ID
-    const productName = planId === 'monthly' ? 'מנוי חודשי' : 
-                       planId === 'annual' ? 'מנוי שנתי' : 
-                       'מנוי VIP';
+    });
     
-    // Build the CardCom LowProfile URL
-    const cardcomUrl = "https://secure.cardcom.solutions";
-    const redirectUrl = `${cardcomUrl}/Interface/LowProfile.aspx?TerminalNumber=${terminalNumber}&Operation=${operationType === '3' ? 3 : operationType === '2' ? 2 : 1}&SumToBill=${amount}&CoinId=1&Language=he&ProductName=${encodeURIComponent(productName)}&APILevel=10&SuccessRedirectUrl=${encodeURIComponent(successRedirectUrl)}&ErrorRedirectUrl=${encodeURIComponent(errorRedirectUrl)}&IndicatorUrl=${encodeURIComponent(indicatorUrl)}&ReturnValue=${encodeURIComponent(sessionData.id)}`;
-
-    console.log(`[CARDCOM-REDIRECT] Created session with ID: ${sessionData.id} for plan ${planId} (operation: ${operationType}, amount: ${amount})`);
-
-    // Return the result
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to initialize payment: ${error}`);
+    }
+    
+    const paymentData = await response.json();
+    
+    if (!paymentData.success) {
+      throw new Error(paymentData.message || "Failed to initialize payment");
+    }
+    
+    // Get redirect URL from the payment response
+    const redirectUrl = paymentData.data.iframeUrl || paymentData.data.redirectUrl || paymentData.data.url;
+    
+    if (!redirectUrl) {
+      throw new Error("No redirect URL found in payment response");
+    }
+    
+    // Return success response with redirect URL
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Payment redirect URL generated successfully",
+        message: "Redirect URL generated successfully",
         data: {
           redirectUrl,
-          sessionId: sessionData.id,
-          planId,
-          operationType,
-          amount
+          sessionId: paymentData.data.sessionId,
+          lowProfileId: paymentData.data.lowProfileId,
+          reference: paymentData.data.reference
         }
       }),
       { 
         status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error creating redirect URL';
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error(`[CARDCOM-REDIRECT][ERROR] ${errorMessage}`);
-    
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -189,7 +141,7 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { logStep, validateAmount } from "../_shared/cardcom_utils.ts";
@@ -59,7 +58,7 @@ serve(async (req) => {
       userId, 
       email, 
       fullName, 
-      operationType = "1", // Default to ChargeOnly (1)
+      operationType = "payment", // Default to ChargeOnly
       isIframePrefill = false
     } = await req.json();
 
@@ -77,6 +76,7 @@ serve(async (req) => {
     
     // Calculate amount based on plan
     let amount = 0;
+    let productName = "Subscription"; // Default product name
     
     if (planId) {
       const { data: plan, error: planError } = await supabaseAdmin
@@ -86,33 +86,48 @@ serve(async (req) => {
         .maybeSingle();
         
       if (planError) {
-        throw new Error("Error fetching plan details");
+        throw new Error(`Error fetching plan details: ${planError.message}`);
       }
       
       if (!plan) {
         throw new Error(`Invalid plan ID: ${planId}`);
       }
       
+      productName = plan.name || `Plan ${planId}`; // Use plan name if available
+      
       // Set operation type and amount based on plan type
+      let cardcomOperation = "1"; // Default to ChargeOnly
       switch (planId) {
         case 'monthly':
           // Monthly plan starts with free trial (amount=0)
-          operationType = "3"; // CreateTokenOnly
+          cardcomOperation = "3"; // CreateTokenOnly
           amount = 0; 
           break;
         case 'annual':
           // Annual plan charges immediately full amount
-          operationType = "2"; // ChargeAndCreateToken
+          cardcomOperation = "2"; // ChargeAndCreateToken
           amount = plan.price || 0;
           break;
         case 'vip':
           // VIP plan is one-time payment
-          operationType = "1"; // ChargeOnly
+          cardcomOperation = "1"; // ChargeOnly
           amount = plan.price || 0;
           break;
         default:
           throw new Error(`Unsupported plan type: ${planId}`);
       }
+      
+      // Map API operation type to CardCom operation type
+      if (operationType === "token_only") {
+        cardcomOperation = "3"; // CreateTokenOnly
+      } else if (operationType === "payment") {
+        // Keep the plan-specific operation type
+      }
+      
+      operationType = cardcomOperation;
+    } else {
+      // Handle cases where planId might not be provided
+      throw new Error("Plan ID is required for payment initialization");
     }
     
     // Generate lowProfileId BEFORE database insert
@@ -127,7 +142,6 @@ serve(async (req) => {
     };
 
     // Prepare anonymous_data if userId is null
-    // This is critical to satisfy the check_user_or_anonymous constraint
     const anonymousData = !userId ? {
       email,
       fullName,
@@ -165,6 +179,30 @@ serve(async (req) => {
       amount
     });
 
+    // Determine the base URL for redirects based on environment or request origin
+    const requestOrigin = req.headers.get("Origin") || '';
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://ndhakvhrrkczgylcmyoc.supabase.co";
+    const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
+
+    // For the iframe mode, build the full LowProfile URL
+    const redirectUrl = buildRedirectUrl({
+      cardcomUrl: "https://secure.cardcom.solutions",
+      terminalNumber,
+      userName: apiName, // Include UserName (apiName)
+      lowProfileId,
+      transactionRef,
+      amount,
+      productName, // Include product name
+      successUrl: `${frontendBaseUrl}/subscription/success`,
+      failedUrl: `${frontendBaseUrl}/subscription/failed`,
+      webHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
+      operationType,
+      fullName,
+      email
+    });
+
+    await logStep(functionName, "Redirect URL created", { url: redirectUrl });
+    
     // Prepare the response object with all necessary data
     const responseData = {
       success: true,
@@ -175,7 +213,10 @@ serve(async (req) => {
         reference: transactionRef,
         terminalNumber,
         cardcomUrl: "https://secure.cardcom.solutions",
-        apiName
+        apiName,
+        redirectUrl, // Include the full iframe URL
+        iframeUrl: redirectUrl, // Also include as iframeUrl for consistency
+        url: redirectUrl // Also include as url for backward compatibility
       }
     };
 
@@ -189,15 +230,65 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error(`[CARDCOM-PAYMENT][ERROR] ${errorMessage}`);
+    
+    // Return 400 for client errors, 500 for server errors
+    const status = errorMessage.includes("Invalid plan ID") || 
+                  errorMessage.includes("Plan ID is required") ? 400 : 500;
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
         message: errorMessage 
       }),
       { 
-        status: 500, 
+        status, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 });
+
+// Updated buildRedirectUrl function with userName parameter
+function buildRedirectUrl(params: {
+  cardcomUrl: string;
+  terminalNumber: string;
+  userName: string; // Added userName parameter
+  lowProfileId: string;
+  transactionRef: string;
+  amount: number;
+  productName: string; // Added productName parameter
+  successUrl: string;
+  failedUrl: string;
+  webHookUrl: string;
+  operationType: string;
+  fullName?: string;
+  email?: string;
+}) {
+  const queryParams = new URLSearchParams({
+    TerminalNumber: params.terminalNumber,
+    UserName: params.userName, // Include UserName parameter
+    LowProfileCode: params.lowProfileId,
+    ReturnValue: params.transactionRef,
+    SumToBill: params.amount.toString(),
+    CoinId: '1',
+    Language: 'he',
+    ProductName: params.productName, // Use dynamic product name
+    SuccessRedirectUrl: params.successUrl,
+    ErrorRedirectUrl: params.failedUrl,
+    IndicatorUrl: params.webHookUrl,
+    Operation: params.operationType,
+    APILevel: '10',
+    Codepage: '65001'
+  });
+
+  // Add optional parameters if provided
+  if (params.fullName) {
+    queryParams.append('CardOwnerName', params.fullName);
+  }
+  if (params.email) {
+    queryParams.append('CardOwnerEmail', params.email);
+  }
+
+  // Construct the final URL
+  return `${params.cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
+}

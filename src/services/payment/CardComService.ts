@@ -16,8 +16,11 @@ interface PaymentInitializationResult {
   reference: string;
   terminalNumber: string;
   cardcomUrl: string;
+  redirectUrl?: string;
+  iframeUrl?: string;
   url?: string;
-  lowProfileCode: string; // Consistent naming for lowProfileCode
+  lowProfileId: string;
+  lowProfileCode: string; // Keep for backward compatibility
 }
 
 export class CardComService {
@@ -27,14 +30,14 @@ export class CardComService {
       
       PaymentLogger.log('Initializing payment', { planId, operationType, email });
       
-      // Use Supabase Functions API to call the edge function instead of relative URLs
+      // Use Supabase Functions API to call the edge function
       const { data, error } = await supabase.functions.invoke('cardcom-payment', {
         body: {
           planId,
           userId,
           email,
           fullName,
-          operationType: operationType === 'token_only' ? 'token_only' : 'payment'
+          operationType
         }
       });
       
@@ -56,13 +59,19 @@ export class CardComService {
       
       PaymentLogger.log('Payment initialization success', data.data);
       
+      // Ensure all property names are consistent
+      const lowProfileId = data.data.lowProfileId || '';
+      
       return {
         sessionId: data.data.sessionId,
         reference: data.data.reference,
         terminalNumber: data.data.terminalNumber,
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
-        url: data.data.url,
-        lowProfileCode: data.data.lowProfileId || '' // Map lowProfileId to lowProfileCode
+        redirectUrl: data.data.redirectUrl || data.data.iframeUrl || data.data.url,
+        iframeUrl: data.data.iframeUrl || data.data.redirectUrl || data.data.url,
+        url: data.data.url || data.data.redirectUrl || data.data.iframeUrl,
+        lowProfileId: lowProfileId,
+        lowProfileCode: lowProfileId // Map lowProfileId to lowProfileCode for backward compatibility
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error initializing payment';
