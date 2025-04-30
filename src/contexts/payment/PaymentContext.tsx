@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails } from '@/types/payment';
 import { toast } from 'sonner';
@@ -139,6 +138,11 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (!contractData.email || !contractData.fullName) {
         throw new Error('חסרים פרטי לקוח בחוזה');
       }
+      
+      // Validate phone and idNumber are present
+      if (!contractData.phone || !contractData.idNumber) {
+        throw new Error('חסרים פרטי טלפון או תעודת זהות בחוזה');
+      }
 
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
 
@@ -147,6 +151,8 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         userId: user?.id || null,
         email: contractData.email,
         fullName: contractData.fullName,
+        phone: contractData.phone,       // Add phone parameter
+        idNumber: contractData.idNumber, // Add idNumber parameter
         operationType
       });
 

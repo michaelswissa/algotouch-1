@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { PaymentStatusEnum } from '@/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { CardComService } from '@/services/payment/CardComService';
+import { StorageService } from '@/services/storage/StorageService';
+import type { ContractData } from '@/lib/contracts/contract-validation-service';
 
 interface UsePaymentSessionProps {
   setState: (updater: any) => void;
@@ -24,11 +26,19 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     });
 
     try {
+      // Get contract data to retrieve phone and idNumber
+      const contractData = StorageService.get<ContractData>('contract_data');
+      if (!contractData || !contractData.phone || !contractData.idNumber) {
+        throw new Error('חסרים פרטי טלפון או תעודת זהות בחוזה');
+      }
+
       const sessionData = await CardComService.initializePayment({
         planId,
         userId,
         email: paymentUser.email,
         fullName: paymentUser.fullName,
+        phone: contractData.phone,       // Add phone parameter
+        idNumber: contractData.idNumber, // Add idNumber parameter
         operationType
       });
       

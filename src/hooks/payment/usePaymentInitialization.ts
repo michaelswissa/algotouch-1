@@ -39,11 +39,18 @@ export const usePaymentInitialization = ({
         throw new Error('חסרים פרטי לקוח בחוזה');
       }
       
+      // Validate phone and idNumber are present
+      if (!contractData.phone || !contractData.idNumber) {
+        throw new Error('חסרים פרטי טלפון או תעודת זהות בחוזה');
+      }
+      
       const sessionData = await CardComService.initializePayment({
         planId,
         userId: user?.id || null,
         email: contractData.email,
         fullName: contractData.fullName,
+        phone: contractData.phone,       // Add phone parameter
+        idNumber: contractData.idNumber, // Add idNumber parameter
         operationType
       });
       
