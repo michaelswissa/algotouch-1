@@ -15,7 +15,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
     userId: string | null,
     paymentUser: { email: string; fullName: string },
     operationType: 'payment' | 'token_only' = 'payment'
-  ): Promise<{ lowProfileId: string; sessionId: string; terminalNumber: string; reference: string }> => {
+  ): Promise<{ lowProfileCode: string; sessionId: string; terminalNumber: string; reference: string }> => {
     PaymentLogger.log("Initializing payment for:", {
       planId,
       email: paymentUser.email,
@@ -32,14 +32,14 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
         operationType
       });
       
-      if (!sessionData.lowProfileId || !sessionData.sessionId || !sessionData.terminalNumber) {
+      if (!sessionData.lowProfileCode || !sessionData.sessionId || !sessionData.terminalNumber) {
         throw new Error('חסרים פרטי תשלום בתגובה מהשרת');
       }
       
       setState(prev => ({
         ...prev,
         sessionId: sessionData.sessionId,
-        lowProfileId: sessionData.lowProfileId,
+        lowProfileCode: sessionData.lowProfileCode,
         terminalNumber: sessionData.terminalNumber,
         cardcomUrl: sessionData.cardcomUrl,
         reference: sessionData.reference || '',
@@ -47,7 +47,7 @@ export const usePaymentSession = ({ setState }: UsePaymentSessionProps) => {
       }));
       
       return {
-        lowProfileId: sessionData.lowProfileId,
+        lowProfileCode: sessionData.lowProfileCode,
         sessionId: sessionData.sessionId,
         terminalNumber: sessionData.terminalNumber,
         reference: sessionData.reference || ''

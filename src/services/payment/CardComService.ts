@@ -17,6 +17,7 @@ interface PaymentInitializationResult {
   terminalNumber: string;
   cardcomUrl: string;
   url?: string;
+  lowProfileCode: string; // Consistent naming for lowProfileCode
 }
 
 export class CardComService {
@@ -60,7 +61,8 @@ export class CardComService {
         reference: data.data.reference,
         terminalNumber: data.data.terminalNumber,
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
-        url: data.data.url
+        url: data.data.url,
+        lowProfileCode: data.data.lowProfileId || '' // Map lowProfileId to lowProfileCode
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error initializing payment';

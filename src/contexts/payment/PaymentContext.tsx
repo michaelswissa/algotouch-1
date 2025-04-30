@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { PaymentStatus, PaymentStatusType, CardOwnerDetails } from '@/types/payment';
 import { toast } from 'sonner';
@@ -155,7 +156,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         paymentStatus: PaymentStatus.IDLE,
         operationType,
         sessionId: sessionData.sessionId,
-        lowProfileCode: sessionData.lowProfileId,
+        lowProfileCode: sessionData.lowProfileCode,
         reference: sessionData.reference,
         terminalNumber: sessionData.terminalNumber,
         cardcomUrl: sessionData.cardcomUrl || prev.cardcomUrl,
@@ -238,10 +239,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
             checkCount++;
             
             try {
-              const statusResult = await CardComService.checkPaymentStatus(
-                state.lowProfileCode,
-                state.sessionId
-              );
+              const statusResult = await CardComService.checkPaymentStatus(state.sessionId);
               
               PaymentLogger.log(`Payment status check attempt ${checkCount}:`, statusResult);
               

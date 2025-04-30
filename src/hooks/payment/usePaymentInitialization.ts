@@ -52,7 +52,7 @@ export const usePaymentInitialization = ({
       setState(prev => ({
         ...prev,
         paymentStatus: PaymentStatusEnum.IDLE,
-        lowProfileCode: sessionData.lowProfileId,
+        lowProfileCode: sessionData.lowProfileCode,
         sessionId: sessionData.sessionId,
         reference: sessionData.reference,
         terminalNumber: sessionData.terminalNumber,

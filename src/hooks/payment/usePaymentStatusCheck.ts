@@ -36,13 +36,13 @@ export const usePaymentStatusCheck = ({
     
     // Set up a new interval for checking status
     const intervalId = window.setInterval(() => {
-      checkPaymentStatus(lowProfileCode, sessionId);
+      checkPaymentStatus(sessionId);
     }, 3000); // Check every 3 seconds
     
     setStatusCheckInterval(intervalId);
     
     // Do an immediate check
-    checkPaymentStatus(lowProfileCode, sessionId);
+    checkPaymentStatus(sessionId);
     
     PaymentLogger.log('Started payment status checking', {
       lowProfileCode,
@@ -70,7 +70,7 @@ export const usePaymentStatusCheck = ({
     };
   }, [statusCheckInterval]);
   
-  const checkPaymentStatus = useCallback(async (lowProfileCode: string, sessionId: string) => {
+  const checkPaymentStatus = useCallback(async (sessionId: string) => {
     if (!lowProfileCode || !sessionId || isChecking) {
       return;
     }
@@ -85,7 +85,7 @@ export const usePaymentStatusCheck = ({
         checkCount: checkCount + 1 
       });
       
-      const statusResult = await CardComService.checkPaymentStatus(lowProfileCode, sessionId);
+      const statusResult = await CardComService.checkPaymentStatus(sessionId);
       
       PaymentLogger.log('Payment status result', statusResult);
       
@@ -149,7 +149,7 @@ export const usePaymentStatusCheck = ({
     } finally {
       setIsChecking(false);
     }
-  }, [isChecking, checkCount, setState, onPaymentSuccess, cleanupStatusCheck]);
+  }, [isChecking, checkCount, setState, onPaymentSuccess, cleanupStatusCheck, lowProfileCode]);
 
   return { 
     checkPaymentStatus, 
