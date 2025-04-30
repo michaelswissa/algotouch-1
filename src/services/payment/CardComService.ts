@@ -30,19 +30,19 @@ export class CardComService {
       
       PaymentLogger.log('Initializing payment', { planId, operationType, email });
       
-      // Use Supabase Functions API to call the edge function
-      const { data, error } = await supabase.functions.invoke('cardcom-payment', {
+      // Call our new cardcom-iframe function for proper iframe URL generation
+      const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
         body: {
           planId,
           userId,
           email,
           fullName,
-          operationType
+          operationType: operationType === 'token_only' ? '3' : '1' // Map to CardCom operation types
         }
       });
       
       if (error) {
-        PaymentLogger.error('Error from cardcom-payment function:', error);
+        PaymentLogger.error('Error from cardcom-iframe function:', error);
         throw new Error(`Payment initialization failed: ${error.message || 'Unknown error'}`);
       }
       
@@ -57,9 +57,14 @@ export class CardComService {
         throw new Error(errorMessage);
       }
       
-      PaymentLogger.log('Payment initialization success', data.data);
+      // Check specifically for the iframeUrl in the response
+      if (!data.data.iframeUrl) {
+        throw new Error('No iframe URL provided in the response');
+      }
       
-      // Ensure all property names are consistent
+      // Log the iframe URL we received
+      PaymentLogger.log('Payment initialization success, iframe URL received:', data.data.iframeUrl);
+      
       const lowProfileId = data.data.lowProfileId || '';
       
       return {
@@ -67,9 +72,10 @@ export class CardComService {
         reference: data.data.reference,
         terminalNumber: data.data.terminalNumber,
         cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
-        redirectUrl: data.data.redirectUrl || data.data.iframeUrl || data.data.url,
-        iframeUrl: data.data.iframeUrl || data.data.redirectUrl || data.data.url,
-        url: data.data.url || data.data.redirectUrl || data.data.iframeUrl,
+        // Ensure iframe URL is prioritized and available in all expected properties
+        redirectUrl: data.data.iframeUrl,
+        iframeUrl: data.data.iframeUrl,
+        url: data.data.iframeUrl,
         lowProfileId: lowProfileId,
         lowProfileCode: lowProfileId // Map lowProfileId to lowProfileCode for backward compatibility
       };

@@ -52,6 +52,8 @@ export const usePaymentIframe = ({ planId, onPaymentComplete }: UsePaymentIframe
       // Determine operation type based on plan
       const operationType = planId === 'monthly' ? 'token_only' : 'payment';
       
+      PaymentLogger.log('Initializing payment for plan', { planId, operationType });
+      
       // Initialize payment session
       const result = await CardComService.initializePayment({
         planId,
@@ -61,9 +63,13 @@ export const usePaymentIframe = ({ planId, onPaymentComplete }: UsePaymentIframe
         operationType
       });
       
+      // Check and log iframe URL specifically
       if (!result.iframeUrl) {
+        PaymentLogger.error('No iframe URL received from CardComService');
         throw new Error('לא התקבלה כתובת URL לתשלום');
       }
+      
+      PaymentLogger.log('Received payment iframe URL:', result.iframeUrl);
       
       setState(prev => ({
         ...prev,

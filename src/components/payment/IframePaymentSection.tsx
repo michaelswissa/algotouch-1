@@ -1,13 +1,14 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { PaymentStatusEnum } from '@/types/payment';
 import { getSubscriptionPlans } from './utils/paymentHelpers';
 import PlanSummary from './PlanSummary';
 import SecurityNote from './SecurityNote';
 import { usePaymentIframe } from '@/hooks/payment/usePaymentIframe';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 interface IframePaymentSectionProps {
   planId: string;
@@ -38,6 +39,21 @@ const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
       ? plans.vip 
       : plans.monthly;
 
+  // Log when iframe URL changes
+  useEffect(() => {
+    if (iframeUrl) {
+      PaymentLogger.log('Iframe URL set in component:', iframeUrl);
+    }
+  }, [iframeUrl]);
+
+  const handleIframeLoad = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
+    PaymentLogger.log('Iframe loaded successfully');
+  };
+
+  const handleIframeError = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
+    PaymentLogger.error('Iframe loading error:', e);
+  };
+
   return (
     <Card className="max-w-lg mx-auto" dir="rtl">
       <CardHeader>
@@ -65,22 +81,35 @@ const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
+            <AlertCircle className="h-8 w-8 text-red-500 mb-4" />
             <p className="text-red-500 mb-4">{error}</p>
             <Button onClick={retryPayment} variant="outline">
               נסה שנית
             </Button>
           </div>
         ) : iframeUrl ? (
-          <div className="rounded-lg border overflow-hidden relative pt-[56.25%] w-full">
-            <iframe 
-              className="absolute top-0 left-0 w-full h-full"
-              src={iframeUrl}
-              title="CardCom Payment"
-              sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-            />
-          </div>
+          <>
+            {/* Development only - URL display for debugging */}
+            {import.meta.env.DEV && (
+              <div className="bg-slate-100 p-2 rounded text-xs mb-2 overflow-hidden">
+                <div className="font-semibold">Debug - Iframe URL:</div>
+                <div className="truncate">{iframeUrl}</div>
+              </div>
+            )}
+            <div className="rounded-lg border overflow-hidden relative pt-[56.25%] w-full">
+              <iframe 
+                className="absolute top-0 left-0 w-full h-full"
+                src={iframeUrl}
+                title="CardCom Payment"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+              />
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center p-8 text-center">
+            <AlertCircle className="h-8 w-8 text-amber-500 mb-4" />
             <p className="text-amber-500 mb-4">לא ניתן לטעון את טופס התשלום</p>
             <Button onClick={retryPayment} variant="outline">
               נסה שנית
