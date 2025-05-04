@@ -140,10 +140,6 @@ export default {
 				'rotate-slow': {
 					'0%': { transform: 'rotate(0deg)' },
 					'100%': { transform: 'rotate(360deg)' }
-				},
-				'aurora': {
-					'0%, 100%': { backgroundPosition: '0% 50%, 50% 50%' },
-					'50%': { backgroundPosition: '100% 50%, 50% 50%' }
 				}
 			},
 			animation: {
@@ -156,8 +152,7 @@ export default {
 				'glow': 'glow 3s infinite ease-in-out',
 				'neon-flicker': 'neon-flicker 2s infinite',
 				'sine-move': 'sine-wave 6s infinite ease-in-out',
-				'rotate-slow': 'rotate-slow 15s linear infinite',
-				'aurora': 'aurora 15s infinite linear'
+				'rotate-slow': 'rotate-slow 15s linear infinite'
 			},
       textDirection: {
         rtl: 'rtl',

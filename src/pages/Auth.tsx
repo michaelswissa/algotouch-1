@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,8 +9,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
-import { AuroraBackground } from '@/components/ui/aurora-background';
-import { motion } from 'framer-motion';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -113,34 +110,26 @@ const Auth = () => {
   }
 
   return (
-    <AuroraBackground>
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md space-y-6 p-4"
-        dir="rtl"
-      >
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
+      <div className="w-full max-w-md space-y-6">
         <AuthHeader />
         
-        <div className="bg-white/80 dark:bg-zinc-800/80 p-6 rounded-xl shadow-lg backdrop-blur-sm border border-white/20">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="signup">הרשמה</TabsTrigger>
-              <TabsTrigger value="login">התחברות</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <LoginForm />
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <SignupForm />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </motion.div>
-    </AuroraBackground>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="signup">הרשמה</TabsTrigger>
+            <TabsTrigger value="login">התחברות</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="login">
+            <LoginForm />
+          </TabsContent>
+          
+          <TabsContent value="signup">
+            <SignupForm />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
   );
 };
 
