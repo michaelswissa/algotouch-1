@@ -2,7 +2,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { logStep } from "../_shared/cardcom_utils.ts";
 
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
@@ -13,8 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const functionName = 'cardcom-iframe';
-    await logStep(functionName, "Function started");
+    console.log('[CARDCOM-IFRAME] Function started');
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -39,13 +37,21 @@ serve(async (req) => {
       userId, 
       email, 
       fullName, 
-      operationType = "1", 
-      isIframePrefill = false 
+      phone,
+      idNumber,
+      operationType = "1"
     } = await req.json();
 
-    await logStep(functionName, "Received request data", { 
-      planId, userId, email, fullName, operationType, isIframePrefill
-    });
+    console.log(`[CARDCOM-IFRAME] Received request data: planId=${planId}, email=${email}, fullName=${fullName}, operationType=${operationType}, hasPhone=${!!phone}, hasIdNumber=${!!idNumber}`);
+
+    // Validate required parameters
+    if (!email || !fullName) {
+      throw new Error("Missing required parameters: email and fullName are required");
+    }
+
+    if (!phone || !idNumber) {
+      throw new Error("Missing required parameters: phone and idNumber are required");
+    }
 
     // Generate transaction reference
     const transactionRef = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -87,14 +93,19 @@ serve(async (req) => {
       throw new Error("Plan ID is required for payment initialization");
     }
 
-    // Generate lowProfileId BEFORE database insert
+    // Generate unique ID for session
     const lowProfileId = crypto.randomUUID();
 
     // Prepare payment details for DB logging
-    const paymentDetails = { fullName, email, isIframePrefill, planType: planId };
+    const paymentDetails = { 
+      fullName, 
+      email, 
+      phone, 
+      idNumber 
+    };
 
     // Prepare anonymous_data if userId is null
-    const anonymousData = !userId ? { email, fullName, createdAt: new Date().toISOString() } : null;
+    const anonymousData = !userId ? { email, fullName, phone, idNumber, createdAt: new Date().toISOString() } : null;
 
     // Create payment session in DB
     const { data: sessionData, error: sessionError } = await supabaseAdmin
@@ -116,75 +127,80 @@ serve(async (req) => {
       .single();
 
     if (sessionError) {
-      console.error("Database insert error:", sessionError);
+      console.error("[CARDCOM-IFRAME] Database insert error:", sessionError);
       throw new Error("Failed to create payment session: " + sessionError.message);
     }
 
-    await logStep(functionName, "Created payment session in DB", { 
-      sessionId: sessionData.id, lowProfileId, operationType, amount
-    });
+    console.log(`[CARDCOM-IFRAME] Created payment session in DB: sessionId=${sessionData.id}, lowProfileId=${lowProfileId}, operationType=${operationType}, amount=${amount}`);
 
     // Determine base URLs for redirects
     const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
     const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
 
-    // Step 1: Build the initial request URL to CardCom
-    const initialCardcomUrl = buildInitialRequestUrl({
-      cardcomUrl: "https://secure.cardcom.solutions",
-      terminalNumber,
-      userName: apiName,
-      lowProfileId,
-      transactionRef,
-      amount,
-      productName,
-      successUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
-      failedUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
-      webHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
-      operationType,
-      fullName,
-      email
+    // Build CardCom request URL with all parameters
+    const cardcomUrl = "https://secure.cardcom.solutions";
+    
+    const queryParams = new URLSearchParams({
+      TerminalNumber: terminalNumber,
+      UserName: apiName,
+      LowProfileCode: lowProfileId,
+      ReturnValue: transactionRef,
+      SumToBill: amount.toString(),
+      CoinId: '1', // ILS
+      Language: 'he',
+      ProductName: productName,
+      SuccessRedirectUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
+      ErrorRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
+      IndicatorUrl: `${publicFunctionsUrl}/cardcom-webhook`,
+      Operation: operationType,
+      APILevel: '10',
+      Codepage: '65001'
     });
+    
+    // Add card owner details
+    queryParams.append('CardOwnerName', fullName);
+    queryParams.append('CardOwnerEmail', email);
+    queryParams.append('CardOwnerPhone', phone);
+    queryParams.append('CardOwnerId', idNumber);
+    
+    const initialCardcomUrl = `${cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
 
-    await logStep(functionName, "Initial CardCom URL built", { url: initialCardcomUrl });
+    console.log(`[CARDCOM-IFRAME] Built CardCom request URL: ${initialCardcomUrl}`);
 
-    // Step 2: Make the request to CardCom to get the actual iframe URL
+    // Make the request to CardCom to get the iframe URL
     const cardcomResponse = await fetch(initialCardcomUrl);
     const cardcomResponseText = await cardcomResponse.text();
 
-    await logStep(functionName, "Received response from CardCom", { 
-      status: cardcomResponse.status, 
-      text: cardcomResponseText 
-    });
+    console.log(`[CARDCOM-IFRAME] CardCom response status: ${cardcomResponse.status}`);
+    console.log(`[CARDCOM-IFRAME] CardCom response: ${cardcomResponseText}`);
 
     if (!cardcomResponse.ok) {
       throw new Error(`CardCom request failed with status ${cardcomResponse.status}: ${cardcomResponseText}`);
     }
 
-    // Step 3: Parse the response text from CardCom
+    // Parse the response from CardCom
     const responseParams = new URLSearchParams(cardcomResponseText);
     const responseCode = responseParams.get('ResponseCode');
     const description = responseParams.get('Description');
-    const finalIframeUrl = responseParams.get('url');
+    const iframeUrl = responseParams.get('url');
 
-    // Step 4: Check the response code from CardCom
     if (responseCode !== '0') {
       throw new Error(`CardCom returned an error: Code ${responseCode} - ${description}`);
     }
 
-    // Step 5: Ensure the final URL was received
-    if (!finalIframeUrl) {
-      throw new Error(`CardCom response successful (Code 0) but missing 'url' parameter.`);
+    if (!iframeUrl) {
+      throw new Error('CardCom response successful (Code 0) but missing URL parameter');
     }
 
-    await logStep(functionName, "Successfully obtained final iframe URL", { url: finalIframeUrl });
+    console.log(`[CARDCOM-IFRAME] CardCom iframe URL: ${iframeUrl}`);
 
-    // Step 6: Return the final iframe URL to the frontend
+    // Return success response with the iframe URL
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Payment session initialized successfully. Use iframeUrl for the iframe src.",
+        message: "Payment session initialized successfully",
         data: {
-          iframeUrl: finalIframeUrl,
+          iframeUrl: iframeUrl,
           sessionId: sessionData.id,
           lowProfileId: lowProfileId,
           reference: transactionRef,
@@ -195,56 +211,22 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    console.error(`[CARDCOM-IFRAME] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    console.error(`[CARDCOM-IFRAME][ERROR] ${errorMessage}`);
     
     const status = (errorMessage.includes("Invalid plan ID") || 
                    errorMessage.includes("Plan ID is required") || 
-                   errorMessage.startsWith("CardCom returned an error")) 
+                   errorMessage.includes("Missing required parameters") ||
+                   errorMessage.includes("CardCom returned an error")) 
                   ? 400 : 500;
     
     return new Response(
-      JSON.stringify({ success: false, message: errorMessage }),
+      JSON.stringify({ 
+        success: false, 
+        message: errorMessage 
+      }),
       { status: status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-
-// Helper function to build the initial URL for the server-side request to CardCom
-function buildInitialRequestUrl(params: {
-  cardcomUrl: string;
-  terminalNumber: string;
-  userName: string;
-  lowProfileId: string;
-  transactionRef: string;
-  amount: number;
-  productName: string;
-  successUrl: string;
-  failedUrl: string;
-  webHookUrl: string;
-  operationType: string;
-  fullName?: string;
-  email?: string;
-}) {
-  const queryParams = new URLSearchParams({
-    TerminalNumber: params.terminalNumber,
-    UserName: params.userName,
-    LowProfileCode: params.lowProfileId,
-    ReturnValue: params.transactionRef,
-    SumToBill: params.amount.toString(),
-    CoinId: '1',
-    Language: 'he',
-    ProductName: params.productName,
-    SuccessRedirectUrl: params.successUrl,
-    ErrorRedirectUrl: params.failedUrl,
-    IndicatorUrl: params.webHookUrl,
-    Operation: params.operationType,
-    APILevel: '10',
-    Codepage: '65001'
-  });
-
-  if (params.fullName) queryParams.append('CardOwnerName', params.fullName);
-  if (params.email) queryParams.append('CardOwnerEmail', params.email);
-
-  return `${params.cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
-}

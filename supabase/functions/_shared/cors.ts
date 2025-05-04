@@ -1,26 +1,33 @@
+
 /**
- * Get CORS headers for edge functions
- * @param requestOrigin The Origin header from the request
- * @returns Headers object with CORS headers
+ * Helper function to get CORS headers based on the origin
  */
 export function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
+  // List of allowed origins
   const allowedOrigins = [
+    'http://localhost:3000',
     'http://localhost:5173',
-    'http://localhost:4173',
-    'https://ndhakvhrrkczgylcmyoc.supabase.co',
+    'https://lovable.dev',
     'https://algotouch.lovable.app'
   ];
 
-  // If the request has an Origin header and it's in the allowed list, use that
-  // Otherwise use the wildcard *
-  const origin = requestOrigin && allowedOrigins.includes(requestOrigin)
-    ? requestOrigin
-    : '*';
-
-  return {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Content-Type': 'application/json'
+  // Default CORS headers
+  const corsHeaders = {
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-auth, cache-control, x-requested-with',
+    'Access-Control-Max-Age': '86400',
   };
+
+  // Add origin to CORS headers if it's in the allowed list, otherwise use *
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return {
+      ...corsHeaders,
+      'Access-Control-Allow-Origin': requestOrigin,
+    };
+  } else {
+    return {
+      ...corsHeaders,
+      'Access-Control-Allow-Origin': '*',
+    };
+  }
 }

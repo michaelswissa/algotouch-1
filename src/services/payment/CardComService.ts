@@ -8,8 +8,8 @@ interface PaymentInitializationParams {
   userId: string | null;
   email: string;
   fullName: string;
-  phone: string;    // Added phone
-  idNumber: string; // Added idNumber
+  phone: string;    // Required phone
+  idNumber: string; // Required idNumber
   operationType?: 'payment' | 'token_only';
 }
 
@@ -38,8 +38,14 @@ export class CardComService {
         hasIdNumber: Boolean(idNumber)
       });
       
-      // Call our new JSON API Edge Function
-      const { data, error } = await supabase.functions.invoke('cardcom-json-create', {
+      // Map operationType to CardCom operation types
+      let mappedOperationType = '1'; // Default: ChargeOnly
+      if (operationType === 'token_only') {
+        mappedOperationType = '3'; // CreateTokenOnly
+      }
+      
+      // Call our new iframe Edge Function
+      const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
         body: {
           planId,
           userId,
@@ -47,12 +53,12 @@ export class CardComService {
           fullName,
           phone,       // Pass phone
           idNumber,    // Pass idNumber
-          operationType: operationType === 'token_only' ? '3' : '1' // Map to CardCom operation types
+          operationType: mappedOperationType
         }
       });
       
       if (error) {
-        PaymentLogger.error('Error from cardcom-json-create function:', error);
+        PaymentLogger.error('Error from cardcom-iframe function:', error);
         throw new Error(`Payment initialization failed: ${error.message || 'Unknown error'}`);
       }
       
@@ -75,13 +81,13 @@ export class CardComService {
       // Log the iframe URL we received
       PaymentLogger.log('Payment initialization success, iframe URL received:', data.data.iframeUrl);
       
-      const lowProfileId = data.data.lowProfileId || data.data.lowProfileCode || '';
+      const lowProfileId = data.data.lowProfileId || '';
       
       return {
         sessionId: data.data.sessionId,
         reference: data.data.reference,
         terminalNumber: data.data.terminalNumber || '',
-        cardcomUrl: data.data.cardcomUrl || 'https://secure.cardcom.solutions',
+        cardcomUrl: 'https://secure.cardcom.solutions',
         // Ensure iframe URL is prioritized and available in all expected properties
         redirectUrl: data.data.iframeUrl,
         iframeUrl: data.data.iframeUrl,
