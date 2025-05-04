@@ -15,7 +15,7 @@ const TraderVueLogo = ({
       <img 
         alt="AlgoTouch Logo" 
         src="/lovable-uploads/f0cb042e-cccc-41b8-a548-8b9daae5810e.png" 
-        className="h-32 w-auto" 
+        className="h-96 w-auto" 
       />
     </div>
   );
