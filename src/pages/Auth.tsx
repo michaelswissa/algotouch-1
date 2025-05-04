@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
+import { BeamsBackground } from '@/components/ui/beams-background';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -110,26 +112,28 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
-      <div className="w-full max-w-md space-y-6">
-        <AuthHeader />
-        
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="signup">הרשמה</TabsTrigger>
-            <TabsTrigger value="login">התחברות</TabsTrigger>
-          </TabsList>
+    <BeamsBackground intensity="medium">
+      <div className="flex flex-col items-center justify-center gap-6 px-4 text-center" dir="rtl">
+        <div className="w-full max-w-md space-y-6 backdrop-blur-lg bg-black/30 p-6 rounded-xl border border-white/10">
+          <AuthHeader />
           
-          <TabsContent value="login">
-            <LoginForm />
-          </TabsContent>
-          
-          <TabsContent value="signup">
-            <SignupForm />
-          </TabsContent>
-        </Tabs>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="signup">הרשמה</TabsTrigger>
+              <TabsTrigger value="login">התחברות</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <LoginForm />
+            </TabsContent>
+            
+            <TabsContent value="signup">
+              <SignupForm />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </BeamsBackground>
   );
 };
 
