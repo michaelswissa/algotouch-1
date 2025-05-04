@@ -8,8 +8,8 @@ interface PaymentInitializationParams {
   userId: string | null;
   email: string;
   fullName: string;
-  phone: string;    // Required phone
-  idNumber: string; // Required idNumber
+  phone: string;
+  idNumber: string;
   operationType?: 'payment' | 'token_only';
 }
 
@@ -18,11 +18,11 @@ interface PaymentInitializationResult {
   reference: string;
   terminalNumber: string;
   cardcomUrl: string;
-  redirectUrl?: string;
-  iframeUrl?: string;
-  url?: string;
+  redirectUrl: string;
+  iframeUrl: string;
+  url: string; // For backward compatibility
   lowProfileId: string;
-  lowProfileCode: string; // Keep for backward compatibility
+  lowProfileCode: string; // For backward compatibility
 }
 
 export class CardComService {
@@ -39,9 +39,16 @@ export class CardComService {
       });
       
       // Map operationType to CardCom operation types
-      let mappedOperationType = '1'; // Default: ChargeOnly
-      if (operationType === 'token_only') {
-        mappedOperationType = '3'; // CreateTokenOnly
+      let mappedOperationType: string;
+      
+      switch (operationType) {
+        case 'token_only':
+          mappedOperationType = '3'; // CreateTokenOnly
+          break;
+        case 'payment':
+        default:
+          mappedOperationType = '1'; // ChargeOnly
+          break;
       }
       
       // Call our cardcom-iframe Edge Function
@@ -51,8 +58,8 @@ export class CardComService {
           userId,
           email,
           fullName,
-          phone,       // Pass phone
-          idNumber,    // Pass idNumber
+          phone,
+          idNumber,
           operationType: mappedOperationType
         }
       });
@@ -78,10 +85,11 @@ export class CardComService {
         throw new Error('No iframe URL provided in the response');
       }
       
-      // Log the iframe URL we received
-      PaymentLogger.log('Payment initialization success, iframe URL received:', data.data.iframeUrl);
-      
+      const iframeUrl = data.data.iframeUrl;
       const lowProfileId = data.data.lowProfileId || '';
+      
+      // Log the iframe URL we received
+      PaymentLogger.log('Payment initialization success, iframe URL received:', iframeUrl);
       
       return {
         sessionId: data.data.sessionId,
@@ -89,9 +97,9 @@ export class CardComService {
         terminalNumber: data.data.terminalNumber || '',
         cardcomUrl: 'https://secure.cardcom.solutions',
         // Ensure iframe URL is prioritized and available in all expected properties
-        redirectUrl: data.data.iframeUrl,
-        iframeUrl: data.data.iframeUrl,
-        url: data.data.iframeUrl,
+        redirectUrl: iframeUrl,
+        iframeUrl: iframeUrl,
+        url: iframeUrl,
         lowProfileId: lowProfileId,
         lowProfileCode: lowProfileId // Map lowProfileId to lowProfileCode for backward compatibility
       };

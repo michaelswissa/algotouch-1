@@ -1,33 +1,24 @@
 
 /**
- * Helper function to get CORS headers based on the origin
+ * Helper function to generate CORS headers
  */
-export function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
-  // List of allowed origins
+export function getCorsHeaders(requestOrigin: string | null): HeadersInit {
+  // Check if the origin is allowed
   const allowedOrigins = [
+    'https://algotouch.lovable.app',
+    'https://www.algotouch.co.il',
+    'https://algotouch.co.il',
     'http://localhost:3000',
     'http://localhost:5173',
-    'https://lovable.dev',
-    'https://algotouch.lovable.app'
   ];
-
-  // Default CORS headers
-  const corsHeaders = {
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-auth, cache-control, x-requested-with',
-    'Access-Control-Max-Age': '86400',
+  
+  const origin = requestOrigin && allowedOrigins.includes(requestOrigin)
+    ? requestOrigin
+    : '*';
+  
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   };
-
-  // Add origin to CORS headers if it's in the allowed list, otherwise use *
-  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-    return {
-      ...corsHeaders,
-      'Access-Control-Allow-Origin': requestOrigin,
-    };
-  } else {
-    return {
-      ...corsHeaders,
-      'Access-Control-Allow-Origin': '*',
-    };
-  }
 }

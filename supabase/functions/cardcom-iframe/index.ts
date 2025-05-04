@@ -4,6 +4,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { logStep } from "../_shared/cardcom_utils.ts";
 
+// Helper function to parse CardCom response
+function parseCardComResponse(text: string): { [key: string]: string } {
+  const params = new URLSearchParams(text);
+  const result: { [key: string]: string } = {};
+  
+  for (const [key, value] of params.entries()) {
+    result[key] = value;
+  }
+  
+  return result;
+}
+
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
@@ -63,12 +75,11 @@ serve(async (req) => {
     }
 
     // Generate transaction reference
-    const transactionRef = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const transactionRef = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    // Calculate amount and product name based on plan
+    // Calculate amount and determine operation type based on plan
     let amount = 0;
     let productName = "Subscription";
-    // Initialize with requestedOperationType but allow it to be changed based on plan
     let operationType = requestedOperationType;
 
     if (planId) {
@@ -106,6 +117,10 @@ serve(async (req) => {
 
     // Generate unique ID for session
     const lowProfileId = crypto.randomUUID();
+
+    // Determine base URLs for redirects
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
+    const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
 
     // Prepare payment details for DB logging
     const paymentDetails = { 
@@ -149,35 +164,37 @@ serve(async (req) => {
       amount
     });
 
-    // Determine base URLs for redirects
-    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
-    const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
-
     // Build CardCom request URL with all parameters
-    const cardcomUrl = "https://secure.cardcom.solutions";
+    const cardcomBaseUrl = "https://secure.cardcom.solutions";
     
-    const queryParams = new URLSearchParams({
-      TerminalNumber: terminalNumber,
-      ApiName: apiName,
-      LowProfileId: lowProfileId,
-      ReturnValue: transactionRef,
-      Amount: amount.toString(),
-      CoinId: '1', // ILS
-      Language: 'he',
-      ProductName: productName,
-      SuccessRedirectUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
-      FailedRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
-      WebHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
-      Operation: operationType,
-    });
+    // Create a URLSearchParams object to properly encode parameters
+    const queryParams = new URLSearchParams();
     
-    // Add card owner details
+    // Add required parameters
+    queryParams.append('TerminalNumber', terminalNumber);
+    queryParams.append('ApiName', apiName);
+    queryParams.append('ReturnValue', transactionRef);
+    queryParams.append('Amount', amount.toString());
+    queryParams.append('CoinId', '1'); // ILS
+    queryParams.append('Language', 'he');
+    queryParams.append('ProductName', productName);
+    queryParams.append('Operation', operationType);
+    
+    // Add redirect URLs
+    queryParams.append('SuccessRedirectUrl', 
+      `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`);
+    queryParams.append('FailedRedirectUrl', 
+      `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`);
+    queryParams.append('WebHookUrl', 
+      `${publicFunctionsUrl}/cardcom-webhook`);
+    
+    // Add cardholder details
     queryParams.append('CardOwnerName', fullName);
     queryParams.append('CardOwnerEmail', email);
     queryParams.append('CardOwnerPhone', phone);
     queryParams.append('CardOwnerId', idNumber);
     
-    // Add UI customization params
+    // Add UI customization params using proper syntax
     queryParams.append('UIDefinition.IsHideCardOwnerName', 'false');
     queryParams.append('UIDefinition.IsHideCardOwnerPhone', 'false');
     queryParams.append('UIDefinition.IsHideCardOwnerEmail', 'false');
@@ -187,12 +204,13 @@ serve(async (req) => {
     queryParams.append('UIDefinition.CardOwnerPhoneValue', phone);
     queryParams.append('UIDefinition.CardOwnerIdValue', idNumber);
     
-    const initialCardcomUrl = `${cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
-
+    // Generate the CardCom URL
+    const cardcomUrl = `${cardcomBaseUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
+    
     await logStep("CARDCOM-IFRAME", "Built CardCom request URL");
 
     // Make the request to CardCom to get the iframe URL
-    const cardcomResponse = await fetch(initialCardcomUrl);
+    const cardcomResponse = await fetch(cardcomUrl);
     const cardcomResponseText = await cardcomResponse.text();
 
     await logStep("CARDCOM-IFRAME", "CardCom response", {
@@ -205,10 +223,10 @@ serve(async (req) => {
     }
 
     // Parse the response from CardCom
-    const responseParams = new URLSearchParams(cardcomResponseText);
-    const responseCode = responseParams.get('ResponseCode');
-    const description = responseParams.get('Description');
-    const iframeUrl = responseParams.get('Url');
+    const parsedResponse = parseCardComResponse(cardcomResponseText);
+    const responseCode = parsedResponse.ResponseCode;
+    const description = parsedResponse.Description;
+    const iframeUrl = parsedResponse.Url;
 
     if (responseCode !== '0') {
       throw new Error(`CardCom returned an error: Code ${responseCode} - ${description}`);

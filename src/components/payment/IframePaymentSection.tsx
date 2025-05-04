@@ -223,7 +223,7 @@ const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           </div>
         ) : iframeUrl ? (
           <>
-            {/* Development only - URL display for debugging */}
+            {/* Debug info only shown in development */}
             {import.meta.env.DEV && (
               <div className="bg-slate-100 p-2 rounded text-xs mb-2 overflow-hidden">
                 <div className="font-semibold">Debug - Iframe URL:</div>
