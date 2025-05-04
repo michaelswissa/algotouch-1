@@ -9,7 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentStatusEnum } from '@/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { CardComService } from '@/services/payment/CardComService';
 import type { ContractData } from '@/lib/contracts/contract-validation-service';
+import { useSearchParams, useLocation } from 'react-router-dom';
 
 interface IframePaymentSectionProps {
   planId: string;
@@ -30,11 +32,61 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Determine if we're using token_only mode (for monthly plans)
-  const operationType = planId === 'monthly' ? 'token_only' : 'payment';
+  // בדיקת פרמטרים בכתובת אם הגענו מהפניה חיצונית
+  const searchParams = useSearchParams()[0];
+  const location = useLocation();
   
-  // Initialize the payment iframe when component mounts
+  // בדיקת פרמטרים מיד עם טעינת הקומפוננטה - לטיפול בהפניה מ-CardCom
   useEffect(() => {
+    if (location.search && searchParams) {
+      PaymentLogger.log('Detected URL parameters, checking if redirect from CardCom', { search: location.search });
+      
+      // טיפול בפרמטרים של ההפניה
+      const redirectParams = CardComService.handleRedirectParameters(searchParams);
+      
+      if (redirectParams.sessionId) {
+        setSessionId(redirectParams.sessionId);
+        
+        // אם יש קוד תגובה בהצלחה
+        if (redirectParams.status === 'success') {
+          PaymentLogger.log('Payment success detected from URL parameters');
+          setPaymentStatus(PaymentStatusEnum.SUCCESS);
+          
+          // עדכון הסטטוס במסד הנתונים
+          const updatePaymentStatus = async () => {
+            try {
+              await supabase.functions.invoke('cardcom-status', {
+                body: { 
+                  sessionId: redirectParams.sessionId,
+                  forceUpdate: true,
+                  status: 'success'
+                }
+              });
+            } catch (err) {
+              PaymentLogger.error('Failed to update payment status', err);
+            }
+          };
+          
+          updatePaymentStatus();
+          
+          if (onPaymentComplete) {
+            setTimeout(() => {
+              onPaymentComplete();
+            }, 1000);
+          }
+        } else if (redirectParams.status === 'failed') {
+          setError('התשלום נדחה');
+          setPaymentStatus(PaymentStatusEnum.FAILED);
+        }
+        
+        return; // לא ממשיכים ליצירת תשלום חדש אם זיהינו פרמטרים
+      }
+    }
+    
+    // Determine if we're using token_only mode (for monthly plans)
+    const operationType = planId === 'monthly' ? 'token_only' : 'payment';
+    
+    // Initialize the payment iframe when component mounts
     const initializePaymentIframe = async () => {
       try {
         setIsLoading(true);
@@ -119,7 +171,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     };
 
     initializePaymentIframe();
-  }, [planId, user?.id, operationType]);
+  }, [planId, user?.id, location.search, searchParams, onPaymentComplete]);
   
   // Handle iframe messages from CardCom
   useEffect(() => {

@@ -146,4 +146,44 @@ export class CardComService {
       };
     }
   }
+  
+  // חדש: מטפל בפרמטרים של ההפניה לאחר התשלום
+  static handleRedirectParameters(urlParams: URLSearchParams): {
+    sessionId: string | null;
+    reference: string | null;
+    status: 'success' | 'failed' | 'unknown';
+    lowProfileCode: string | null;
+    responseCode: number;
+  } {
+    const sessionId = urlParams.get('session_id');
+    const reference = urlParams.get('ref');
+    const terminalNumber = urlParams.get('terminalnumber');
+    const lowProfileCode = urlParams.get('lowprofilecode');
+    const responseCode = Number(urlParams.get('ResponseCode') || urlParams.get('ResponeCode') || '-1');
+    
+    PaymentLogger.log('Redirect parameters received:', {
+      sessionId,
+      reference,
+      terminalNumber,
+      lowProfileCode,
+      responseCode
+    });
+    
+    // בדיקת הסטטוס על פי קוד התגובה
+    let status: 'success' | 'failed' | 'unknown' = 'unknown';
+    
+    if (responseCode === 0) {
+      status = 'success';
+    } else if (responseCode > 0) {
+      status = 'failed';
+    }
+    
+    return {
+      sessionId,
+      reference,
+      status,
+      lowProfileCode,
+      responseCode
+    };
+  }
 }

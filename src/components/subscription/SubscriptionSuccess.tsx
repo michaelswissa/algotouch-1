@@ -1,11 +1,45 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CardComService } from '@/services/payment/CardComService';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { supabase } from '@/integrations/supabase/client';
 
 const SubscriptionSuccess: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // טיפול בפרמטרים של הפניה מCardCom בעת טעינת העמוד
+  useEffect(() => {
+    const processRedirectParams = async () => {
+      if (searchParams) {
+        const redirectParams = CardComService.handleRedirectParameters(searchParams);
+        
+        if (redirectParams.sessionId) {
+          PaymentLogger.log('Processing success page redirect params', redirectParams);
+          
+          // עדכון הסטטוס במסד הנתונים
+          try {
+            await supabase.functions.invoke('cardcom-status', {
+              body: { 
+                sessionId: redirectParams.sessionId,
+                forceUpdate: true,
+                status: redirectParams.status === 'success' ? 'success' : 'failed'
+              }
+            });
+            
+            PaymentLogger.log('Successfully updated payment status in database');
+          } catch (err) {
+            PaymentLogger.error('Failed to update payment status', err);
+          }
+        }
+      }
+    };
+    
+    processRedirectParams();
+  }, [searchParams]);
   
   return (
     <div className="max-w-md mx-auto bg-green-50 dark:bg-green-900/20 text-center p-8 rounded-xl border border-green-200 dark:border-green-800">

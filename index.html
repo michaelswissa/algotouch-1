@@ -17,16 +17,17 @@
     <meta name="twitter:site" content="@algotouch_ai" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
-    <!-- Add Content Security Policy meta tag to allow CSSStyleSheet access -->
-    <meta http-equiv="Content-Security-Policy" content="style-src 'self' 'unsafe-inline' https://secure.cardcom.solutions https://cdn.gpteng.co; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://secure.cardcom.solutions; frame-src https://secure.cardcom.solutions; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://secure.cardcom.solutions">
+    <!-- הרחבת Content Security Policy להחזרים מCardCom וכדי לתמוך ב-frame-ancestors -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://secure.cardcom.solutions https://cdn.gpteng.co; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://secure.cardcom.solutions; frame-src https://secure.cardcom.solutions; frame-ancestors 'self' https://secure.cardcom.solutions; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://secure.cardcom.solutions">
     
     <!-- CardCom 3DS script for payment processing with timestamp to prevent caching -->
     <script src="https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=20254290001"></script>
+    <!-- Enable gpteng script for the "Select" feature -->
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
   </head>
 
   <body>
     <div id="root"></div>
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
