@@ -8,7 +8,7 @@ const TraderVueLogo = ({
   collapsed = false
 }: TraderVueLogoProps) => {
   return <div className={`flex items-center gap-1 ${className}`}>
-      <img alt="AlgoTouch Logo" src="/lovable-uploads/f0cb042e-cccc-41b8-a548-8b9daae5810e.png" className="object-scale-down" />
+      <img alt="AlgoTouch Logo" src="/lovable-uploads/f0cb042e-cccc-41b8-a548-8b9daae5810e.png" className="MAKE IT SMALLER" />
     </div>;
 };
 export default TraderVueLogo;
