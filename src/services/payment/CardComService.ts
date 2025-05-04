@@ -44,7 +44,7 @@ export class CardComService {
         mappedOperationType = '3'; // CreateTokenOnly
       }
       
-      // Call our new iframe Edge Function
+      // Call our cardcom-iframe Edge Function
       const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
         body: {
           planId,

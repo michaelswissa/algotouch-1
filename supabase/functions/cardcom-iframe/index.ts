@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { logStep } from "../_shared/cardcom_utils.ts";
 
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
@@ -12,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[CARDCOM-IFRAME] Function started');
+    await logStep("CARDCOM-IFRAME", "Function started");
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -32,6 +33,7 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration (TerminalNumber or UserName)");
     }
 
+    const requestData = await req.json();
     const { 
       planId, 
       userId, 
@@ -39,10 +41,17 @@ serve(async (req) => {
       fullName, 
       phone,
       idNumber,
-      operationType = "1"
-    } = await req.json();
+      operationType: requestedOperationType = "1" // Default to ChargeOnly (1)
+    } = requestData;
 
-    console.log(`[CARDCOM-IFRAME] Received request data: planId=${planId}, email=${email}, fullName=${fullName}, operationType=${operationType}, hasPhone=${!!phone}, hasIdNumber=${!!idNumber}`);
+    await logStep("CARDCOM-IFRAME", "Received request data", { 
+      planId, 
+      email, 
+      fullName, 
+      operationType: requestedOperationType,
+      hasPhone: !!phone,
+      hasIdNumber: !!idNumber
+    });
 
     // Validate required parameters
     if (!email || !fullName) {
@@ -59,6 +68,8 @@ serve(async (req) => {
     // Calculate amount and product name based on plan
     let amount = 0;
     let productName = "Subscription";
+    // Initialize with requestedOperationType but allow it to be changed based on plan
+    let operationType = requestedOperationType;
 
     if (planId) {
       const { data: plan, error: planError } = await supabaseAdmin
@@ -131,7 +142,12 @@ serve(async (req) => {
       throw new Error("Failed to create payment session: " + sessionError.message);
     }
 
-    console.log(`[CARDCOM-IFRAME] Created payment session in DB: sessionId=${sessionData.id}, lowProfileId=${lowProfileId}, operationType=${operationType}, amount=${amount}`);
+    await logStep("CARDCOM-IFRAME", "Created payment session in DB", {
+      sessionId: sessionData.id,
+      lowProfileId,
+      operationType,
+      amount
+    });
 
     // Determine base URLs for redirects
     const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
@@ -142,19 +158,17 @@ serve(async (req) => {
     
     const queryParams = new URLSearchParams({
       TerminalNumber: terminalNumber,
-      UserName: apiName,
-      LowProfileCode: lowProfileId,
+      ApiName: apiName,
+      LowProfileId: lowProfileId,
       ReturnValue: transactionRef,
-      SumToBill: amount.toString(),
+      Amount: amount.toString(),
       CoinId: '1', // ILS
       Language: 'he',
       ProductName: productName,
       SuccessRedirectUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
-      ErrorRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
-      IndicatorUrl: `${publicFunctionsUrl}/cardcom-webhook`,
+      FailedRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
+      WebHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
       Operation: operationType,
-      APILevel: '10',
-      Codepage: '65001'
     });
     
     // Add card owner details
@@ -163,16 +177,28 @@ serve(async (req) => {
     queryParams.append('CardOwnerPhone', phone);
     queryParams.append('CardOwnerId', idNumber);
     
+    // Add UI customization params
+    queryParams.append('UIDefinition.IsHideCardOwnerName', 'false');
+    queryParams.append('UIDefinition.IsHideCardOwnerPhone', 'false');
+    queryParams.append('UIDefinition.IsHideCardOwnerEmail', 'false');
+    queryParams.append('UIDefinition.IsHideCardOwnerIdentityNumber', 'false');
+    queryParams.append('UIDefinition.CardOwnerNameValue', fullName);
+    queryParams.append('UIDefinition.CardOwnerEmailValue', email);
+    queryParams.append('UIDefinition.CardOwnerPhoneValue', phone);
+    queryParams.append('UIDefinition.CardOwnerIdValue', idNumber);
+    
     const initialCardcomUrl = `${cardcomUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
 
-    console.log(`[CARDCOM-IFRAME] Built CardCom request URL: ${initialCardcomUrl}`);
+    await logStep("CARDCOM-IFRAME", "Built CardCom request URL");
 
     // Make the request to CardCom to get the iframe URL
     const cardcomResponse = await fetch(initialCardcomUrl);
     const cardcomResponseText = await cardcomResponse.text();
 
-    console.log(`[CARDCOM-IFRAME] CardCom response status: ${cardcomResponse.status}`);
-    console.log(`[CARDCOM-IFRAME] CardCom response: ${cardcomResponseText}`);
+    await logStep("CARDCOM-IFRAME", "CardCom response", {
+      status: cardcomResponse.status,
+      response: cardcomResponseText
+    });
 
     if (!cardcomResponse.ok) {
       throw new Error(`CardCom request failed with status ${cardcomResponse.status}: ${cardcomResponseText}`);
@@ -182,7 +208,7 @@ serve(async (req) => {
     const responseParams = new URLSearchParams(cardcomResponseText);
     const responseCode = responseParams.get('ResponseCode');
     const description = responseParams.get('Description');
-    const iframeUrl = responseParams.get('url');
+    const iframeUrl = responseParams.get('Url');
 
     if (responseCode !== '0') {
       throw new Error(`CardCom returned an error: Code ${responseCode} - ${description}`);
@@ -192,7 +218,7 @@ serve(async (req) => {
       throw new Error('CardCom response successful (Code 0) but missing URL parameter');
     }
 
-    console.log(`[CARDCOM-IFRAME] CardCom iframe URL: ${iframeUrl}`);
+    await logStep("CARDCOM-IFRAME", "CardCom iframe URL", { iframeUrl });
 
     // Return success response with the iframe URL
     return new Response(

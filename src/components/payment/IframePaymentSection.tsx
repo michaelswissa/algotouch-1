@@ -113,7 +113,7 @@ const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
       });
       
       // Determine operation type based on plan
-      const operationType = planId === 'monthly' ? '3' : planId === 'annual' ? '2' : '1';
+      const operationType = planId === 'monthly' ? 'token_only' : 'payment';
       
       // Call our Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
