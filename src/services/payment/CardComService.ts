@@ -43,11 +43,11 @@ export class CardComService {
       
       switch (operationType) {
         case 'token_only':
-          mappedOperationType = 'CreateTokenOnly'; // Use the actual CardCom operation name
+          mappedOperationType = 'CreateTokenOnly';
           break;
         case 'payment':
         default:
-          mappedOperationType = 'ChargeOnly'; // Use the actual CardCom operation name
+          mappedOperationType = 'ChargeOnly';
           break;
       }
       
@@ -147,7 +147,7 @@ export class CardComService {
     }
   }
   
-  // חדש: מטפל בפרמטרים של ההפניה לאחר התשלום
+  // Updated method to handle redirect parameters more effectively
   static handleRedirectParameters(urlParams: URLSearchParams): {
     sessionId: string | null;
     reference: string | null;
@@ -158,8 +158,9 @@ export class CardComService {
     const sessionId = urlParams.get('session_id');
     const reference = urlParams.get('ref');
     const terminalNumber = urlParams.get('terminalnumber');
-    const lowProfileCode = urlParams.get('lowprofilecode');
-    const responseCode = Number(urlParams.get('ResponseCode') || urlParams.get('ResponeCode') || '-1');
+    const lowProfileCode = urlParams.get('lowprofilecode') || urlParams.get('LowProfileCode');
+    // Check for different possible response code parameter names
+    const responseCode = Number(urlParams.get('ResponseCode') || urlParams.get('responecode') || urlParams.get('Responsecode') || '-1');
     
     PaymentLogger.log('Redirect parameters received:', {
       sessionId,
@@ -169,7 +170,7 @@ export class CardComService {
       responseCode
     });
     
-    // בדיקת הסטטוס על פי קוד התגובה
+    // Improved status determination based on response code
     let status: 'success' | 'failed' | 'unknown' = 'unknown';
     
     if (responseCode === 0) {

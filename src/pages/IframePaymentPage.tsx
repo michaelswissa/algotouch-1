@@ -12,17 +12,23 @@ const IframePaymentPage: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   
-  // בדיקה אם הגענו מהפניה של קארדקום בטעינת הדף
+  // Check if we're receiving a redirect from CardCom when page loads
   useEffect(() => {
     if (location.search) {
       const redirectParams = CardComService.handleRedirectParameters(searchParams);
+      PaymentLogger.log('Detected URL parameters in IframePaymentPage', redirectParams);
       
-      // אם זוהה סטטוס הצלחה, נפנה את המשתמש לדף ההצלחה
+      // If success status is detected, redirect to success page
       if (redirectParams.status === 'success') {
         PaymentLogger.log('Success status detected from URL parameters, redirecting to success page');
         navigate('/subscription/success' + location.search, { replace: true });
       } 
-      // אם זוהה סטטוס כישלון, נישאר בדף התשלום והקומפוננטה תציג שגיאה
+      // If failed status is detected, redirect to failed page
+      else if (redirectParams.status === 'failed') {
+        PaymentLogger.log('Failed status detected from URL parameters, redirecting to failed page');
+        navigate('/subscription/failed' + location.search, { replace: true });
+      }
+      // If no clear status, we'll stay on this page and the component will handle displaying errors
     }
   }, [location.search, navigate, searchParams]);
   

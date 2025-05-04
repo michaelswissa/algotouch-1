@@ -29,9 +29,10 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get CardCom configuration
-    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
-    const apiName = Deno.env.get("CARDCOM_API_NAME");
+    // Get CardCom configuration - using updated correct terminal info
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
+    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD") || "i9nr6caGbgheTdYfQbo6";
 
     if (!terminalNumber || !apiName) {
       throw new Error("Missing CardCom API configuration");
@@ -113,8 +114,9 @@ serve(async (req) => {
     // Generate unique ID for session
     const lowProfileId = crypto.randomUUID();
 
-    // Determine base URLs for redirects
-    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin;
+    // Determine base URLs for redirects - fixed to avoid double slashes
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || 
+      (requestOrigin?.endsWith("/") ? requestOrigin.slice(0, -1) : requestOrigin || "https://algotouch.lovable.app");
     const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || 
       `${supabaseUrl}/functions/v1`;
 
@@ -160,51 +162,23 @@ serve(async (req) => {
       amount
     });
 
-    // Build CardCom direct URL to EA/LPC6 page for seamless iframe integration
-    // This avoids the redirect issue we were having with the LowProfile.aspx approach
-    const directLpcUrl = `https://secure.cardcom.solutions/EA/LPC6/${terminalNumber}/${lowProfileId}`;
-    
-    // Build traditional LowProfile.aspx URL as fallback
-    const lowProfileUrl = new URL("https://secure.cardcom.solutions/Interface/LowProfile.aspx");
-    
-    // Add required parameters
-    lowProfileUrl.searchParams.append('TerminalNumber', terminalNumber);
-    lowProfileUrl.searchParams.append('UserName', apiName); // Use ApiName as UserName
-    lowProfileUrl.searchParams.append('ReturnValue', transactionRef);
-    lowProfileUrl.searchParams.append('SumToBill', amount.toString());
-    lowProfileUrl.searchParams.append('CoinId', '1'); // ILS
-    lowProfileUrl.searchParams.append('Language', 'he');
-    lowProfileUrl.searchParams.append('ProductName', productName);
-    
-    // Add operation type
-    lowProfileUrl.searchParams.append('Operation', operation);
-    
-    // Add redirect URLs
-    lowProfileUrl.searchParams.append('SuccessRedirectUrl', 
-      `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`);
-    lowProfileUrl.searchParams.append('ErrorRedirectUrl', 
-      `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`);
-    lowProfileUrl.searchParams.append('IndicatorUrl', 
-      `${publicFunctionsUrl}/cardcom-webhook`);
-    
-    // Add customer details
-    lowProfileUrl.searchParams.append('CardOwnerName', fullName);
-    lowProfileUrl.searchParams.append('CardOwnerEmail', email);
-    lowProfileUrl.searchParams.append('CardOwnerPhone', phone);
-    lowProfileUrl.searchParams.append('CardOwnerId', idNumber);
+    // Cleaned up URLs to prevent double slashes
+    const successRedirectUrl = `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`;
+    const failedRedirectUrl = `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`;
+    const webhookUrl = `${publicFunctionsUrl}/cardcom-webhook`;
     
     // For the Low Profile Create API, need to create a proper URL
     const lowProfileApiUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
     
-    // Prepare the request body for the API
+    // Updated request body for CardCom API with correct terminal info
     const lowProfileApiBody = {
       TerminalNumber: parseInt(terminalNumber),
       ApiName: apiName,
       ReturnValue: transactionRef,
       Amount: amount,
-      SuccessRedirectUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
-      FailedRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
-      WebHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
+      SuccessRedirectUrl: successRedirectUrl,
+      FailedRedirectUrl: failedRedirectUrl,
+      WebHookUrl: webhookUrl,
       ProductName: productName,
       Language: "he",
       ISOCoinId: 1, // ILS
@@ -217,9 +191,13 @@ serve(async (req) => {
       }
     };
     
-    logStep("CARDCOM-IFRAME", "Created URL options", {
-      directUrl: directLpcUrl,
-      lowProfileUrl: lowProfileUrl.toString()
+    // Log the prepared request
+    logStep("CARDCOM-IFRAME", "Prepared request for CardCom API", {
+      terminalNumber,
+      operation,
+      amount,
+      successRedirectUrl,
+      failedRedirectUrl
     });
 
     // Now let's try using the CardCom API to create the LowProfile
@@ -237,7 +215,7 @@ serve(async (req) => {
       
       if (apiResult.ResponseCode === 0) {
         // Success - use the URL from the API response
-        const cardcomUrl = apiResult.url || apiResult.Url || directLpcUrl;
+        const cardcomUrl = apiResult.Url || apiResult.url;
         
         // Update the session with the LowProfileId from the API
         if (apiResult.LowProfileId) {
@@ -264,35 +242,6 @@ serve(async (req) => {
               sessionId: sessionData.id,
               lowProfileId: apiResult.LowProfileId || lowProfileId,
               reference: transactionRef,
-              terminalNumber,
-              LowProfileId: apiResult.LowProfileId || lowProfileId
-            }
-          }),
-          { 
-            status: 200, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
-          }
-        );
-      } else {
-        // API call failed, use the direct URL as fallback
-        logStep("CARDCOM-IFRAME", "API call failed, using direct URL", {
-          errorCode: apiResult.ResponseCode,
-          errorMessage: apiResult.Description
-        });
-        
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "Payment initialized with fallback URL",
-            data: {
-              iframeUrl: directLpcUrl,
-              url: directLpcUrl,
-              sessionId: sessionData.id,
-              lowProfileId: lowProfileId,
-              reference: transactionRef,
               terminalNumber
             }
           }),
@@ -304,36 +253,18 @@ serve(async (req) => {
             } 
           }
         );
+      } else {
+        // API call failed with error
+        throw new Error(`CardCom API Error: Code ${apiResult.ResponseCode}, ${apiResult.Description}`);
       }
     } catch (apiError) {
-      // API call threw an exception, use the low profile URL as fallback
-      logStep("CARDCOM-IFRAME", "API call exception, using low profile URL", {
+      // API call threw an exception
+      logStep("CARDCOM-IFRAME", "CardCom API Error", {
         error: apiError instanceof Error ? apiError.message : String(apiError)
       });
       
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Payment initialized with URL fallback",
-          data: {
-            iframeUrl: lowProfileUrl.toString(),
-            url: lowProfileUrl.toString(),
-            sessionId: sessionData.id,
-            lowProfileId: lowProfileId,
-            reference: transactionRef,
-            terminalNumber
-          }
-        }),
-        { 
-          status: 200, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
-      );
+      throw new Error(`Failed to initialize payment: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
     }
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error(`[CARDCOM-IFRAME] Error: ${errorMessage}`);

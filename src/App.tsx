@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './components/ui/theme-provider';
@@ -13,6 +14,8 @@ import Subscription from './pages/Subscription';
 import MySubscriptionPage from './pages/MySubscriptionPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import IframePaymentPage from './pages/IframePaymentPage';
+import SubscriptionSuccess from './components/subscription/SubscriptionSuccess';
+import SubscriptionFailed from './components/subscription/SubscriptionFailed';
 
 const queryClient = new QueryClient();
 
@@ -27,6 +30,8 @@ function App() {
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/subscription" element={<Subscription />} />
+                <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+                <Route path="/subscription/failed" element={<SubscriptionFailed />} />
                 <Route
                   path="/dashboard"
                   element={
