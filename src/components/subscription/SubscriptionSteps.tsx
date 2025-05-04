@@ -8,7 +8,7 @@ interface SubscriptionStepsProps {
 
 const SubscriptionSteps: React.FC<SubscriptionStepsProps> = ({ currentStep }) => {
   return (
-    <Steps currentStep={currentStep} className="mt-8">
+    <Steps currentStep={currentStep} className="mb-10">
       <Step title="בחירת תכנית" />
       <Step title="חתימה על הסכם" />
       <Step title="פרטי תשלום" />
