@@ -43,11 +43,11 @@ export class CardComService {
       
       switch (operationType) {
         case 'token_only':
-          mappedOperationType = 'token_only'; // CreateTokenOnly
+          mappedOperationType = 'CreateTokenOnly'; // Use the actual CardCom operation name
           break;
         case 'payment':
         default:
-          mappedOperationType = 'payment'; // ChargeOnly
+          mappedOperationType = 'ChargeOnly'; // Use the actual CardCom operation name
           break;
       }
       
@@ -80,13 +80,9 @@ export class CardComService {
         throw new Error(errorMessage);
       }
       
-      // Check specifically for the iframeUrl in the response
-      if (!data.data.iframeUrl) {
-        throw new Error('No iframe URL provided in the response');
-      }
-      
-      const iframeUrl = data.data.iframeUrl;
-      const lowProfileId = data.data.lowProfileId || '';
+      // Check for different URL formats in the response
+      const iframeUrl = data.data.url || data.data.iframeUrl || '';
+      const lowProfileId = data.data.lowProfileId || data.data.LowProfileId || '';
       
       // Log the iframe URL we received
       PaymentLogger.log('Payment initialization success, iframe URL received:', iframeUrl);

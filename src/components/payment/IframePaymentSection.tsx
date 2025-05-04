@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
@@ -28,6 +28,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusEnum>(PaymentStatusEnum.IDLE);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Determine if we're using token_only mode (for monthly plans)
   const operationType = planId === 'monthly' ? 'token_only' : 'payment';
@@ -60,8 +61,12 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           email: contractData.email,
           fullName: contractData.fullName,
           hasPhone: Boolean(contractData.phone),
-          hasIdNumber: Boolean(contractData.idNumber)
+          hasIdNumber: Boolean(contractData.idNumber),
+          operationType
         });
+        
+        // Map operation type to CardCom format
+        const cardcomOperation = operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly';
         
         // Call the CardCom iframe initialization edge function
         const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
@@ -72,7 +77,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
             fullName: contractData.fullName,
             phone: contractData.phone,
             idNumber: contractData.idNumber,
-            operationType
+            operationType: cardcomOperation
           }
         });
         
@@ -81,18 +86,26 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           throw new Error(`Failed to initialize payment: ${error.message}`);
         }
         
-        if (!data?.success || !data?.data?.iframeUrl) {
+        if (!data?.success || !data?.data) {
           throw new Error(data?.message || 'Invalid response from payment service');
         }
         
+        // Find the iframe URL from different possible properties
+        const url = data.data.url || data.data.iframeUrl || data.data.Url;
+        
+        if (!url) {
+          throw new Error('No iframe URL provided in the response');
+        }
+        
         // Set the iframe URL and session ID
-        setIframeUrl(data.data.iframeUrl);
+        setIframeUrl(url);
         setSessionId(data.data.sessionId);
         setPaymentStatus(PaymentStatusEnum.IDLE);
         
         PaymentLogger.log('Payment iframe initialized successfully', {
-          iframeUrl: data.data.iframeUrl,
-          sessionId: data.data.sessionId
+          iframeUrl: url,
+          sessionId: data.data.sessionId,
+          lowProfileId: data.data.lowProfileId || data.data.LowProfileId
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'אירעה שגיאה בהתחברות למערכת התשלומים';
@@ -107,6 +120,46 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
 
     initializePaymentIframe();
   }, [planId, user?.id, operationType]);
+  
+  // Handle iframe messages from CardCom
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Only process messages from CardCom domains
+      if (!event.origin.includes('cardcom.solutions')) {
+        return;
+      }
+      
+      PaymentLogger.log('Received message from iframe:', event.data);
+      
+      try {
+        // Try to parse the message if it's a string
+        const data = typeof event.data === 'string' 
+          ? JSON.parse(event.data) 
+          : event.data;
+          
+        if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
+          setPaymentStatus(PaymentStatusEnum.SUCCESS);
+          toast.success('התשלום בוצע בהצלחה!');
+          
+          if (onPaymentComplete) {
+            onPaymentComplete();
+          }
+        } else if (data.action === 'HandleError') {
+          setPaymentStatus(PaymentStatusEnum.FAILED);
+          setError(data.message || 'התשלום נכשל');
+          toast.error(data.message || 'התשלום נכשל');
+        }
+      } catch (err) {
+        PaymentLogger.error('Error processing iframe message:', err);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [onPaymentComplete]);
   
   // Poll for payment status updates
   useEffect(() => {
@@ -148,6 +201,19 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     
     return () => clearInterval(interval);
   }, [sessionId, paymentStatus, onPaymentComplete]);
+  
+  // Handle iframe load events
+  const handleIframeLoad = () => {
+    PaymentLogger.log('Iframe loaded successfully');
+    setIsLoading(false);
+  };
+  
+  // Handle iframe errors
+  const handleIframeError = () => {
+    PaymentLogger.error('Iframe failed to load');
+    setError('נכשל בטעינת טופס התשלום');
+    setIsLoading(false);
+  };
   
   // Handle retry button click
   const handleRetry = () => {
@@ -200,12 +266,15 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           <div className="space-y-4">
             <div className="rounded-lg border overflow-hidden relative w-full" style={{ height: '500px' }}>
               <iframe
+                ref={iframeRef}
                 src={iframeUrl}
                 title="CardCom Payment"
                 className="absolute top-0 left-0 w-full h-full"
                 style={{ border: 'none' }}
                 allow="payment"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
               ></iframe>
             </div>
             <div className="bg-muted/50 p-4 rounded-lg text-center text-sm text-muted-foreground">
