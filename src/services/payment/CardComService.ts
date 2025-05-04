@@ -43,11 +43,11 @@ export class CardComService {
       
       switch (operationType) {
         case 'token_only':
-          mappedOperationType = '3'; // CreateTokenOnly
+          mappedOperationType = 'token_only'; // CreateTokenOnly
           break;
         case 'payment':
         default:
-          mappedOperationType = '1'; // ChargeOnly
+          mappedOperationType = 'payment'; // ChargeOnly
           break;
       }
       

@@ -8,23 +8,6 @@ function logStep(functionName: string, step: string, data: any = {}) {
   console.log(`[${functionName}][${step}]`, JSON.stringify(data));
 }
 
-// Helper function to parse CardCom response
-function parseCardComResponse(responseText: string): Record<string, string> {
-  try {
-    const params = new URLSearchParams(responseText);
-    const result: Record<string, string> = {};
-    
-    for (const [key, value] of params.entries()) {
-      result[key] = value;
-    }
-    
-    return result;
-  } catch (error) {
-    console.error("Error parsing CardCom response:", error);
-    return { error: "Failed to parse response" };
-  }
-}
-
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
@@ -64,9 +47,17 @@ serve(async (req) => {
       email, 
       fullName, 
       phone,
-      idNumber,
-      operationType = "1" // Default to ChargeOnly (1)
+      idNumber
     } = requestData;
+
+    // Map operation type based on request (token_only -> 3, payment -> 1)
+    let operationType = "1"; // Default to ChargeOnly
+    if (requestData.operationType === "token_only") {
+      operationType = "3"; // CreateTokenOnly
+    } else if (planId === 'monthly') {
+      // For monthly plan, always use token only (initial registration without payment)
+      operationType = "3";
+    }
 
     if (!planId) {
       throw new Error("Missing required parameter: planId");
@@ -86,7 +77,6 @@ serve(async (req) => {
     // Get plan details from database
     let amount = 0;
     let productName = "Subscription";
-    let operation = operationType;
 
     // Map plan ID to appropriate operation and amount
     const { data: plan, error: planError } = await supabaseAdmin
@@ -106,36 +96,23 @@ serve(async (req) => {
     productName = plan.name || `Plan ${planId}`;
     amount = plan.price || 0;
 
-    // Determine operation based on plan
-    if (planId === 'monthly') {
-      // For monthly plan, use CreateTokenOnly (operation 3) with amount = 0
-      operation = "3";
+    // For monthly plan, amount should be 0 (token only)
+    if (planId === 'monthly' || operationType === "3") {
       amount = 0;
-    } else if (planId === 'annual') {
-      // For annual plan, use ChargeAndCreateToken (operation 2)
-      operation = "2";
-      amount = plan.price || 0;
-    } else {
-      // For other plans (like VIP), use ChargeOnly (operation 1)
-      operation = "1";
-      amount = plan.price || 0;
     }
 
     logStep("CARDCOM-IFRAME", "Plan details", { 
       planId, 
       productName,
       amount,
-      operation
+      operation: operationType
     });
 
     // Generate unique ID for session
     const lowProfileId = crypto.randomUUID();
 
     // Determine base URLs for redirects
-    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || 
-      requestOrigin || 
-      "https://algotouch.lovable.app";
-    
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin;
     const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || 
       `${supabaseUrl}/functions/v1`;
 
@@ -155,7 +132,7 @@ serve(async (req) => {
         amount: amount,
         currency: "ILS",
         status: 'initiated',
-        operation_type: operation,
+        operation_type: operationType,
         reference: transactionRef,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         payment_details: { 
@@ -177,89 +154,48 @@ serve(async (req) => {
     logStep("CARDCOM-IFRAME", "Created payment session", {
       sessionId: sessionData.id,
       lowProfileId,
-      operation,
+      operation: operationType,
       amount
     });
 
-    // Build CardCom request URL
-    const cardcomBaseUrl = "https://secure.cardcom.solutions";
-    const queryParams = new URLSearchParams();
+    // Build CardCom LowProfile URL - NOTE: this is the direct URL approach per CardCom documentation
+    const cardComUrl = new URL("https://secure.cardcom.solutions/Interface/LowProfile.aspx");
     
-    // Basic parameters
-    queryParams.append('TerminalNumber', terminalNumber);
-    queryParams.append('ApiName', apiName);
-    queryParams.append('ReturnValue', transactionRef);
-    queryParams.append('Amount', amount.toString());
-    queryParams.append('CoinId', '1'); // ILS
-    queryParams.append('Language', 'he');
-    queryParams.append('ProductName', productName);
-    queryParams.append('Operation', operation);
+    // Add required query parameters (note: key names are case-sensitive)
+    cardComUrl.searchParams.append('TerminalNumber', terminalNumber);
+    cardComUrl.searchParams.append('UserName', apiName); // Use the ApiName as UserName
+    cardComUrl.searchParams.append('ReturnValue', transactionRef);
+    cardComUrl.searchParams.append('SumToBill', amount.toString());
+    cardComUrl.searchParams.append('CoinId', '1'); // ILS
+    cardComUrl.searchParams.append('Language', 'he');
+    cardComUrl.searchParams.append('ProductName', productName);
     
-    // Redirect URLs
-    queryParams.append('SuccessRedirectUrl', 
+    // Add operation type
+    cardComUrl.searchParams.append('Operation', operationType);
+    
+    // Add redirect URLs
+    cardComUrl.searchParams.append('SuccessRedirectUrl', 
       `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`);
-    queryParams.append('FailedRedirectUrl', 
+    cardComUrl.searchParams.append('ErrorRedirectUrl', 
       `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`);
-    queryParams.append('WebHookUrl', 
+    cardComUrl.searchParams.append('IndicatorUrl', 
       `${publicFunctionsUrl}/cardcom-webhook`);
     
-    // Cardholder information
-    queryParams.append('CardOwnerName', fullName);
-    queryParams.append('CardOwnerEmail', email);
-    queryParams.append('CardOwnerPhone', phone);
-    queryParams.append('CardOwnerId', idNumber);
+    // Add customer details
+    cardComUrl.searchParams.append('CardOwnerName', fullName);
+    cardComUrl.searchParams.append('CardOwnerEmail', email);
+    cardComUrl.searchParams.append('CardOwnerPhone', phone);
+    cardComUrl.searchParams.append('CardOwnerId', idNumber);
     
-    // UI definition (pre-fill fields)
-    queryParams.append('UIDefinition.CardOwnerNameValue', fullName);
-    queryParams.append('UIDefinition.CardOwnerEmailValue', email);
-    queryParams.append('UIDefinition.CardOwnerPhoneValue', phone);
-    queryParams.append('UIDefinition.CardOwnerIdValue', idNumber);
-    
-    // Generate the CardCom LowProfile URL
-    const cardcomUrl = `${cardcomBaseUrl}/Interface/LowProfile.aspx?${queryParams.toString()}`;
-    
-    logStep("CARDCOM-IFRAME", "Making request to CardCom", { url: cardcomUrl });
+    logStep("CARDCOM-IFRAME", "Generated CardCom URL", { url: cardComUrl.toString() });
 
-    // Make the request to CardCom
-    const cardcomResponse = await fetch(cardcomUrl);
-    const cardcomResponseText = await cardcomResponse.text();
-    
-    logStep("CARDCOM-IFRAME", "CardCom response", {
-      status: cardcomResponse.status,
-      response: cardcomResponseText
-    });
-
-    // Parse the response
-    const parsedResponse = parseCardComResponse(cardcomResponseText);
-    
-    // Check if the request was successful
-    if (parsedResponse.ResponseCode !== '0') {
-      throw new Error(`CardCom returned an error: Code ${parsedResponse.ResponseCode} - ${parsedResponse.Description}`);
-    }
-    
-    // Check if we got a URL back
-    if (!parsedResponse.Url) {
-      throw new Error("CardCom response did not include iframe URL");
-    }
-    
-    // Update the payment session with the iframe URL
-    await supabaseAdmin
-      .from('payment_sessions')
-      .update({
-        payment_details: {
-          ...sessionData.payment_details,
-          iframeUrl: parsedResponse.Url
-        }
-      })
-      .eq('id', sessionData.id);
-
-    // Return success response with iframe URL
+    // Return the data directly without making additional API calls
     return new Response(
       JSON.stringify({
         success: true,
         message: "Payment initialized successfully",
         data: {
-          iframeUrl: parsedResponse.Url,
+          iframeUrl: cardComUrl.toString(),
           sessionId: sessionData.id,
           lowProfileId: lowProfileId,
           reference: transactionRef,
@@ -281,9 +217,7 @@ serve(async (req) => {
     
     const status = 
       errorMessage.includes("Invalid plan ID") || 
-      errorMessage.includes("Missing required") ||
-      errorMessage.includes("CardCom returned an error")
-        ? 400 : 500;
+      errorMessage.includes("Missing required") ? 400 : 500;
     
     return new Response(
       JSON.stringify({ 

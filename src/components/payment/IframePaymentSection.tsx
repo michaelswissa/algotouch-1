@@ -1,17 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
-import { PaymentStatusEnum } from '@/types/payment';
-import { getSubscriptionPlans } from './utils/paymentHelpers';
-import PlanSummary from './PlanSummary';
-import SecurityNote from './SecurityNote';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/auth';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/auth/useAuth'; 
 import { StorageService } from '@/services/storage/StorageService';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { PaymentStatusEnum } from '@/types/payment';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import type { ContractData } from '@/lib/contracts/contract-validation-service';
 
 interface IframePaymentSectionProps {
@@ -20,36 +17,104 @@ interface IframePaymentSectionProps {
   onBack?: () => void;
 }
 
-const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({ 
+export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({ 
   planId, 
-  onPaymentComplete, 
+  onPaymentComplete,
   onBack 
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusEnum>(PaymentStatusEnum.IDLE);
-  
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusEnum>(PaymentStatusEnum.IDLE);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Determine if we're using token_only mode (for monthly plans)
+  const operationType = planId === 'monthly' ? 'token_only' : 'payment';
   
-  const plans = getSubscriptionPlans();
-  const plan = planId === 'annual' 
-    ? plans.annual 
-    : planId === 'vip' 
-      ? plans.vip 
-      : plans.monthly;
-
-  // Initialize iframe when component mounts
+  // Initialize the payment iframe when component mounts
   useEffect(() => {
+    const initializePaymentIframe = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        setPaymentStatus(PaymentStatusEnum.INITIALIZING);
+        
+        // Get contract data from storage - contains customer info
+        const contractData = StorageService.get<ContractData>('contract_data');
+        if (!contractData) {
+          throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
+        }
+
+        if (!contractData.email || !contractData.fullName) {
+          throw new Error('חסרים פרטי לקוח בחוזה');
+        }
+
+        // Validate phone and idNumber are present
+        if (!contractData.phone || !contractData.idNumber) {
+          throw new Error('חסרים פרטי טלפון או תעודת זהות בחוזה');
+        }
+
+        PaymentLogger.log('Initializing payment iframe for plan', { 
+          planId, 
+          email: contractData.email,
+          fullName: contractData.fullName,
+          hasPhone: Boolean(contractData.phone),
+          hasIdNumber: Boolean(contractData.idNumber)
+        });
+        
+        // Call the CardCom iframe initialization edge function
+        const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
+          body: {
+            planId,
+            userId: user?.id || null,
+            email: contractData.email,
+            fullName: contractData.fullName,
+            phone: contractData.phone,
+            idNumber: contractData.idNumber,
+            operationType
+          }
+        });
+        
+        if (error) {
+          PaymentLogger.error('Error from cardcom-iframe function:', error);
+          throw new Error(`Failed to initialize payment: ${error.message}`);
+        }
+        
+        if (!data?.success || !data?.data?.iframeUrl) {
+          throw new Error(data?.message || 'Invalid response from payment service');
+        }
+        
+        // Set the iframe URL and session ID
+        setIframeUrl(data.data.iframeUrl);
+        setSessionId(data.data.sessionId);
+        setPaymentStatus(PaymentStatusEnum.IDLE);
+        
+        PaymentLogger.log('Payment iframe initialized successfully', {
+          iframeUrl: data.data.iframeUrl,
+          sessionId: data.data.sessionId
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'אירעה שגיאה בהתחברות למערכת התשלומים';
+        PaymentLogger.error('Payment iframe initialization error:', error);
+        setError(errorMessage);
+        setPaymentStatus(PaymentStatusEnum.FAILED);
+        toast.error(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     initializePaymentIframe();
-  }, []);
-
-  // Check payment status periodically
+  }, [planId, user?.id, operationType]);
+  
+  // Poll for payment status updates
   useEffect(() => {
-    if (!sessionId || paymentStatus !== PaymentStatusEnum.IDLE) return;
+    if (!sessionId || paymentStatus !== PaymentStatusEnum.IDLE) {
+      return;
+    }
     
-    const checkStatus = async () => {
+    const checkPaymentStatus = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('cardcom-status', {
           body: { sessionId }
@@ -61,217 +126,107 @@ const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
         }
         
         if (data?.data?.status === 'success') {
-          PaymentLogger.log('Payment completed successfully');
           setPaymentStatus(PaymentStatusEnum.SUCCESS);
-          toast.success('התשלום הושלם בהצלחה!');
+          toast.success('התשלום בוצע בהצלחה!');
           
           if (onPaymentComplete) {
             onPaymentComplete();
           }
         } else if (data?.data?.status === 'failed') {
-          PaymentLogger.log('Payment failed');
           setPaymentStatus(PaymentStatusEnum.FAILED);
-          setError('התשלום נכשל. אנא נסה שנית או צור קשר עם התמיכה.');
+          setError('התשלום נדחה');
+          toast.error('התשלום נכשל');
         }
-      } catch (e) {
-        PaymentLogger.error('Error in status check:', e);
+      } catch (err) {
+        PaymentLogger.error('Error in payment status check:', err);
       }
     };
     
-    const interval = setInterval(checkStatus, 5000);
+    // Check immediately and then every 5 seconds
+    checkPaymentStatus();
+    const interval = setInterval(checkPaymentStatus, 5000);
+    
     return () => clearInterval(interval);
   }, [sessionId, paymentStatus, onPaymentComplete]);
-
-  // Initialize payment iframe
-  const initializePaymentIframe = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setPaymentStatus(PaymentStatusEnum.INITIALIZING);
-      
-      // Get contract data from storage
-      const contractData = StorageService.get<ContractData>('contract_data');
-      if (!contractData) {
-        throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
-      }
-
-      // Validate all required fields
-      if (!contractData.email || !contractData.fullName) {
-        throw new Error('חסרים פרטי לקוח בחוזה (נדרש שם מלא ואימייל)');
-      }
-      
-      if (!contractData.phone || !contractData.idNumber) {
-        throw new Error('חסרים פרטי לקוח בחוזה (נדרש מספר טלפון ומספר ת.ז.)');
-      }
-      
-      PaymentLogger.log('Initializing payment iframe for plan', { 
-        planId,
-        email: contractData.email,
-        fullName: contractData.fullName,
-        hasPhone: Boolean(contractData.phone),
-        hasIdNumber: Boolean(contractData.idNumber)
-      });
-      
-      // Determine operation type based on plan
-      const operationType = planId === 'monthly' ? 'token_only' : 'payment';
-      
-      // Call our Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
-        body: {
-          planId,
-          userId: user?.id || null,
-          email: contractData.email,
-          fullName: contractData.fullName,
-          phone: contractData.phone,
-          idNumber: contractData.idNumber,
-          operationType
-        }
-      });
-      
-      if (error) {
-        PaymentLogger.error('Error from cardcom-iframe function:', error);
-        throw new Error(`Failed to initialize payment: ${error.message}`);
-      }
-      
-      if (!data || !data.success) {
-        const errorMessage = data?.message || 'Unknown error from payment service';
-        PaymentLogger.error('Payment initialization failed:', errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      // Check for required fields in response
-      if (!data.data?.iframeUrl) {
-        PaymentLogger.error('No iframe URL in response', data);
-        throw new Error('No iframe URL provided by payment service');
-      }
-      
-      if (!data.data?.sessionId) {
-        PaymentLogger.error('No session ID in response', data);
-        throw new Error('No session ID provided by payment service');
-      }
-      
-      // Store received data
-      setIframeUrl(data.data.iframeUrl);
-      setSessionId(data.data.sessionId);
-      setPaymentStatus(PaymentStatusEnum.IDLE);
-      
-      PaymentLogger.log('Payment iframe initialized successfully', { 
-        sessionId: data.data.sessionId,
-        iframeUrl: data.data.iframeUrl
-      });
-      
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'שגיאה באתחול התשלום';
-      PaymentLogger.error('Payment iframe initialization error:', error);
-      
-      setError(errorMessage);
-      setPaymentStatus(PaymentStatusEnum.FAILED);
-      toast.error(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
+  
+  // Handle retry button click
+  const handleRetry = () => {
+    setError(null);
+    setPaymentStatus(PaymentStatusEnum.IDLE);
+    setIsLoading(true);
+    window.location.reload();
   };
 
-  // Handle iframe loading
-  const handleIframeLoad = () => {
-    PaymentLogger.log('Iframe loaded successfully');
-  };
-
-  // Handle iframe error
-  const handleIframeError = () => {
-    PaymentLogger.error('Iframe loading error');
-    if (!error) {
-      setError('שגיאה בטעינת מסגרת התשלום');
-    }
-  };
+  // Render different states
+  if (paymentStatus === PaymentStatusEnum.SUCCESS) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>התשלום בוצע בהצלחה</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <CheckCircle className="h-16 w-16 text-green-500" />
+            <p className="text-xl font-medium">תודה!</p>
+            <p>התשלום שלך התקבל בהצלחה.</p>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-center">
+          <Button onClick={onPaymentComplete}>המשך</Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="max-w-lg mx-auto" dir="rtl">
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>תשלום עבור {plan.name}</CardTitle>
-        <CardDescription>
-          השלם את התשלום באמצעות כרטיס אשראי
-        </CardDescription>
+        <CardTitle>תשלום מאובטח</CardTitle>
+        <CardDescription>הזן את פרטי התשלום בטופס המאובטח</CardDescription>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        <PlanSummary 
-          planName={plan.name} 
-          planId={plan.id}
-          price={plan.price}
-          displayPrice={plan.displayPrice}
-          description={plan.description} 
-          hasTrial={plan.hasTrial}
-          freeTrialDays={plan.freeTrialDays}
-        />
-        
+      <CardContent>
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
-            <Loader2 className="h-8 w-8 animate-spin mb-4" />
-            <p>מתחבר למערכת התשלום...</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p>מתחבר למערכת התשלומים...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
-            <AlertCircle className="h-8 w-8 text-red-500 mb-4" />
-            <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={initializePaymentIframe} variant="outline">
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              נסה שנית
-            </Button>
+          <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+            <p className="text-destructive">{error}</p>
+            <Button onClick={handleRetry}>נסה שנית</Button>
           </div>
         ) : iframeUrl ? (
-          <>
-            {/* Debug info only shown in development */}
-            {import.meta.env.DEV && (
-              <div className="bg-slate-100 p-2 rounded text-xs mb-2 overflow-hidden">
-                <div className="font-semibold">Debug - Iframe URL:</div>
-                <div className="truncate">{iframeUrl}</div>
-              </div>
-            )}
-            
-            <div className="rounded-lg border overflow-hidden relative w-full pt-[120%] md:pt-[75%]">
-              <iframe 
+          <div className="space-y-4">
+            <div className="rounded-lg border overflow-hidden relative w-full" style={{ height: '500px' }}>
+              <iframe
                 src={iframeUrl}
-                className="absolute top-0 left-0 w-full h-full"
                 title="CardCom Payment"
-                frameBorder="0"
-                onLoad={handleIframeLoad}
-                onError={handleIframeError}
-                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                className="absolute top-0 left-0 w-full h-full"
+                style={{ border: 'none' }}
+                allow="payment"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
               ></iframe>
             </div>
-            
-            <SecurityNote />
-          </>
+            <div className="bg-muted/50 p-4 rounded-lg text-center text-sm text-muted-foreground">
+              <p>🔒 מערכת התשלום מאובטחת לחלוטין. פרטי כרטיס האשראי שלך אינם נשמרים במערכת.</p>
+            </div>
+          </div>
         ) : (
-          <div className="text-center p-4">
-            <p className="text-red-500">לא ניתן לטעון את ממשק התשלום</p>
-            <Button onClick={initializePaymentIframe} className="mt-2">
-              נסה שנית
-            </Button>
+          <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p>טוען את טופס התשלום...</p>
           </div>
         )}
       </CardContent>
       
-      <CardFooter className="flex flex-col gap-2">
-        {onBack && !isLoading && (
-          <Button 
-            variant="outline" 
-            onClick={onBack} 
-            disabled={isLoading || paymentStatus === PaymentStatusEnum.PROCESSING}
-            className="w-full"
-          >
-            חזור
+      <CardFooter className="flex justify-between">
+        {onBack && (
+          <Button variant="outline" onClick={onBack} disabled={isLoading || paymentStatus === PaymentStatusEnum.PROCESSING}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            חזרה
           </Button>
         )}
-        
-        <p className="text-xs text-center text-muted-foreground">
-          {plan.hasTrial 
-            ? 'החיוב הראשון יבוצע בתום תקופת הניסיון' 
-            : 'החיוב יבוצע מיידית עם השלמת הפרטים'}
-        </p>
       </CardFooter>
     </Card>
   );
