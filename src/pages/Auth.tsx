@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -128,10 +127,17 @@ const Auth = () => {
         <AuthHeader />
         
         <Tabs dir="rtl" value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} className="w-full">
-          <TabsList className="grid grid-cols-2 w-full mb-6">
-            <TabsTrigger value="signup">הרשמה</TabsTrigger>
-            <TabsTrigger value="login">התחברות</TabsTrigger>
-          </TabsList>
+          <div className="space-y-4">
+            <div className="text-right">
+              <h2 className="text-2xl font-semibold">התחברות</h2>
+              <p className="text-sm text-muted-foreground">הזן את פרטי ההתחברות שלך</p>
+            </div>
+            
+            <TabsList className="grid grid-cols-2 w-full mb-6 bg-background/60">
+              <TabsTrigger value="signup">הרשמה</TabsTrigger>
+              <TabsTrigger value="login">התחברות</TabsTrigger>
+            </TabsList>
+          </div>
           
           <TabsContent value="login">
             <LoginForm redirectTo={redirectTo} />

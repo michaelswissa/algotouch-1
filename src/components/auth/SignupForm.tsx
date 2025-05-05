@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { StorageService } from '@/services/storage/StorageService';
@@ -101,10 +100,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
 
   return (
     <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="text-right px-0">
-        <CardTitle>הרשמה</CardTitle>
-        <CardDescription>צור חשבון חדש</CardDescription>
-      </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} dir="rtl">
           <CardContent className="space-y-4 px-0">
