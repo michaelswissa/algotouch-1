@@ -10,7 +10,6 @@ import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 import BeamsBackground from '@/components/BeamsBackground';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -137,19 +136,10 @@ const Auth = () => {
         
         <Tabs dir="rtl" value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} className="w-full">
           <div className="space-y-4">
-            <AnimatePresence mode="wait">
-              <motion.div 
-                key={activeTab}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="text-right"
-              >
-                <h2 className="text-2xl font-semibold">{getTabTitle()}</h2>
-                <p className="text-sm text-muted-foreground">{getTabDescription()}</p>
-              </motion.div>
-            </AnimatePresence>
+            <div className="text-right">
+              <h2 className="text-2xl font-semibold">{getTabTitle()}</h2>
+              <p className="text-sm text-muted-foreground">{getTabDescription()}</p>
+            </div>
             
             <div className="relative">
               <TabsList className="grid grid-cols-2 w-full mb-8 bg-background/40 backdrop-blur-md relative z-10">
@@ -159,14 +149,7 @@ const Auth = () => {
                 >
                   הרשמה
                   {activeTab === 'signup' && (
-                    <motion.div 
-                      className="absolute inset-0 bg-primary rounded-sm -z-10"
-                      layoutId="tab-indicator"
-                      transition={{
-                        duration: 0.25,
-                        ease: "easeInOut"
-                      }}
-                    />
+                    <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
                   )}
                 </TabsTrigger>
                 <TabsTrigger 
@@ -175,40 +158,24 @@ const Auth = () => {
                 >
                   התחברות
                   {activeTab === 'login' && (
-                    <motion.div 
-                      className="absolute inset-0 bg-primary rounded-sm -z-10"
-                      layoutId="tab-indicator"
-                      transition={{
-                        duration: 0.25,
-                        ease: "easeInOut"
-                      }}
-                    />
+                    <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
                   )}
                 </TabsTrigger>
               </TabsList>
             </div>
           </div>
           
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="w-full"
-            >
-              {activeTab === 'login' ? (
-                <TabsContent value="login" className="mt-0">
-                  <LoginForm redirectTo={redirectTo} />
-                </TabsContent>
-              ) : (
-                <TabsContent value="signup" className="mt-0">
-                  <SignupForm redirectTo={redirectTo} />
-                </TabsContent>
-              )}
-            </motion.div>
-          </AnimatePresence>
+          <div className="w-full">
+            {activeTab === 'login' ? (
+              <TabsContent value="login" className="mt-0">
+                <LoginForm redirectTo={redirectTo} />
+              </TabsContent>
+            ) : (
+              <TabsContent value="signup" className="mt-0">
+                <SignupForm redirectTo={redirectTo} />
+              </TabsContent>
+            )}
+          </div>
         </Tabs>
       </div>
     </div>
