@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,9 +9,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
-
-// Import the beams background component
-import { BeamsBackground } from '@/components/ui/beams-background';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -114,28 +110,26 @@ const Auth = () => {
   }
 
   return (
-    <BeamsBackground>
-      <div className="flex min-h-screen w-full flex-col items-center justify-center p-4" dir="rtl">
-        <div className="w-full max-w-md space-y-6 bg-card/80 backdrop-blur-md p-6 rounded-lg shadow-lg">
-          <AuthHeader />
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
+      <div className="w-full max-w-md space-y-6">
+        <AuthHeader />
+        
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="signup">הרשמה</TabsTrigger>
+            <TabsTrigger value="login">התחברות</TabsTrigger>
+          </TabsList>
           
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="signup">הרשמה</TabsTrigger>
-              <TabsTrigger value="login">התחברות</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <LoginForm />
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <SignupForm />
-            </TabsContent>
-          </Tabs>
-        </div>
+          <TabsContent value="login">
+            <LoginForm />
+          </TabsContent>
+          
+          <TabsContent value="signup">
+            <SignupForm />
+          </TabsContent>
+        </Tabs>
       </div>
-    </BeamsBackground>
+    </div>
   );
 };
 

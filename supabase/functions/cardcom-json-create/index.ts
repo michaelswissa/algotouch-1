@@ -1,6 +1,4 @@
 
-// Note: Some parts of this file exist already - we're updating with production-ready settings
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -28,6 +26,27 @@ const logStep = async (functionName: string, step: string, details?: any) => {
   console.log(`[CARDCOM-${functionName.toUpperCase()}][INFO][${new Date().toISOString()}] ${step}${details ? ' - ' + JSON.stringify(details) : ''}`);
 };
 
+// Define the CardCom JSON API request interface
+interface CardComCreateRequest {
+  TerminalNumber: number;
+  ApiName: string;
+  Operation: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly";
+  Amount: number;
+  CoinId?: number; 
+  Language?: string;
+  ReturnValue?: string;
+  SuccessRedirectUrl: string;
+  FailedRedirectUrl: string;
+  WebHookUrl: string;
+  Customer?: {
+    Name?: string;
+    Email?: string;
+    Phone?: string;
+    IdentityNumber?: string;
+  };
+  // Add other fields if needed
+}
+
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
@@ -44,14 +63,17 @@ serve(async (req) => {
     // --- 1. Get Configuration ---
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const terminalNumber = 160138; // Production terminal number
-    const apiName = "bLaocQRMSnwphQRUVG3b"; // Production API username
+    const terminalNumberStr = Deno.env.get("CARDCOM_TERMINAL_NUMBER");
+    const apiName = Deno.env.get("CARDCOM_API_NAME");
     const cardComApiUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error("Missing Supabase configuration environment variables");
+    if (!supabaseUrl || !supabaseServiceKey || !terminalNumberStr || !apiName) {
+      throw new Error("Missing Supabase or CardCom configuration environment variables");
     }
-    
+    const terminalNumber = parseInt(terminalNumberStr, 10);
+    if (isNaN(terminalNumber)) {
+      throw new Error("Invalid CARDCOM_TERMINAL_NUMBER environment variable");
+    }
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // --- 2. Get Request Body & Card Owner Details ---
@@ -75,7 +97,7 @@ serve(async (req) => {
 
     // --- 3. Determine Plan Logic (Operation & Amount) ---
     let amount = 0;
-    let operation = "ChargeOnly"; // Production value, no test flags
+    let operation: CardComCreateRequest['Operation'];
 
     const { data: plan, error: planError } = await supabaseAdmin
       .from('plans')
@@ -88,17 +110,22 @@ serve(async (req) => {
 
     const planPrice = plan.price || 0;
     const productName = plan.name || `Plan ${planId}`;
-    
-    // PRODUCTION VALUES - no test flags
-    if (planId === 'monthly') {
-      operation = "ChargeAndCreateToken"; 
-      amount = planPrice;
-    } else if (planId === 'annual') {
-      operation = "ChargeOnly";
-      amount = planPrice;
-    } else {
-      operation = "ChargeOnly";
-      amount = planPrice;
+
+    switch (planId) {
+      case 'monthly':
+        operation = "CreateTokenOnly";
+        amount = 0;
+        break;
+      case 'annual':
+        operation = "ChargeAndCreateToken";
+        amount = planPrice;
+        break;
+      case 'vip':
+        operation = "ChargeOnly";
+        amount = planPrice;
+        break;
+      default:
+        throw new Error(`Unsupported plan type: ${planId}`);
     }
     
     await logStep(functionName, "Plan logic determined", { planId, operation, amount });
@@ -137,7 +164,7 @@ serve(async (req) => {
     const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin || "https://algotouch.lovable.app";
     const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || `${supabaseUrl}/functions/v1`;
 
-    const cardComPayload = {
+    const cardComPayload: CardComCreateRequest = {
       TerminalNumber: terminalNumber,
       ApiName: apiName,
       Operation: operation,
