@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -141,10 +140,10 @@ const Auth = () => {
             <AnimatePresence mode="wait">
               <motion.div 
                 key={activeTab}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
                 className="text-right"
               >
                 <h2 className="text-2xl font-semibold">{getTabTitle()}</h2>
@@ -164,9 +163,8 @@ const Auth = () => {
                       className="absolute inset-0 bg-primary rounded-sm -z-10"
                       layoutId="tab-indicator"
                       transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 30
+                        duration: 0.25,
+                        ease: "easeInOut"
                       }}
                     />
                   )}
@@ -181,9 +179,8 @@ const Auth = () => {
                       className="absolute inset-0 bg-primary rounded-sm -z-10"
                       layoutId="tab-indicator"
                       transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 30
+                        duration: 0.25,
+                        ease: "easeInOut"
                       }}
                     />
                   )}
@@ -195,10 +192,10 @@ const Auth = () => {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, x: activeTab === 'login' ? -20 : 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: activeTab === 'login' ? 20 : -20 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               className="w-full"
             >
               {activeTab === 'login' ? (

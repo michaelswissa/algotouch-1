@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -30,12 +29,11 @@ interface SignupFormProps {
 }
 
 const formAnimation = {
-  hidden: { opacity: 0, y: 10 },
+  hidden: { opacity: 0 },
   visible: { 
     opacity: 1, 
-    y: 0,
     transition: {
-      duration: 0.4,
+      duration: 0.3,
       staggerChildren: 0.07,
       when: "beforeChildren"
     }

@@ -26,12 +26,11 @@ interface LoginFormProps {
 }
 
 const formAnimation = {
-  hidden: { opacity: 0, y: 10 },
+  hidden: { opacity: 0 },
   visible: { 
-    opacity: 1, 
-    y: 0,
+    opacity: 1,
     transition: {
-      duration: 0.4,
+      duration: 0.3,
       staggerChildren: 0.1,
       when: "beforeChildren"
     }
