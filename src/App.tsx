@@ -14,6 +14,7 @@ import Subscription from './pages/Subscription';
 import MySubscriptionPage from './pages/MySubscriptionPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import IframePaymentPage from './pages/IframePaymentPage';
+import CardComRedirectPage from './pages/CardComRedirectPage';
 import SubscriptionSuccess from './components/subscription/SubscriptionSuccess';
 import SubscriptionFailed from './components/subscription/SubscriptionFailed';
 
@@ -57,6 +58,7 @@ function App() {
                   }
                 />
                 <Route path="/payment/iframe/:planId" element={<IframePaymentPage />} />
+                <Route path="/payment/redirect" element={<CardComRedirectPage />} />
               </Routes>
               <Toaster richColors position="top-center" />
             </AuthProvider>

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth';
 import AuthHeader from '@/components/auth/AuthHeader';
@@ -9,12 +10,14 @@ import { Spinner } from '@/components/ui/spinner';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
+import BeamsBackground from '@/components/BeamsBackground';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const state = location.state as { 
     from?: Location, 
     redirectToSubscription?: boolean,
@@ -36,6 +39,9 @@ const Auth = () => {
       setActiveTab('signup');
     }
   }, [state]);
+
+  // Handle redirect query parameter if present
+  const redirectTo = searchParams.get('redirect');
 
   // Check if there's valid registration data in session storage
   useEffect(() => {
@@ -89,9 +95,14 @@ const Auth = () => {
     );
   }
 
-  // If user is already authenticated, redirect to dashboard or subscription
+  // If user is already authenticated, redirect to appropriate page
   if (isAuthenticated) {
     PaymentLogger.log("Auth page: User is authenticated, redirecting");
+    
+    // If redirect parameter is present, use that
+    if (redirectTo) {
+      return <Navigate to={redirectTo} replace />;
+    }
     
     if (state?.redirectToSubscription) {
       return <Navigate to="/subscription" replace />;
@@ -110,8 +121,10 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
-      <div className="w-full max-w-md space-y-6">
+    <div className="relative flex min-h-screen w-full flex-col items-center justify-center p-4" dir="rtl">
+      <BeamsBackground />
+      
+      <div className="w-full max-w-md space-y-6 backdrop-blur-sm bg-background/80 p-6 rounded-lg shadow-lg">
         <AuthHeader />
         
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
@@ -121,11 +134,11 @@ const Auth = () => {
           </TabsList>
           
           <TabsContent value="login">
-            <LoginForm />
+            <LoginForm redirectTo={redirectTo} />
           </TabsContent>
           
           <TabsContent value="signup">
-            <SignupForm />
+            <SignupForm redirectTo={redirectTo} />
           </TabsContent>
         </Tabs>
       </div>

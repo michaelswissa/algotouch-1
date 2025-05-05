@@ -1,85 +1,73 @@
 
-import React, { useState, useEffect } from 'react';
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { useAuth } from "@/contexts/auth";
-import { Link, useNavigate } from "react-router-dom";
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-const loginSchema = z.object({
-  email: z.string().email({ message: "כתובת אימייל לא תקינה" }),
-  password: z.string().min(6, { message: "סיסמא חייבת להיות באורך של 6 תווים לפחות" }),
+// Login form schema
+const loginFormSchema = z.object({
+  email: z.string().email('נדרשת כתובת אימייל תקינה'),
+  password: z.string().min(6, 'הסיסמה חייבת להכיל לפחות 6 תווים'),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-const LoginForm: React.FC = () => {
-  const { signIn, loading, isAuthenticated } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+interface LoginFormProps {
+  redirectTo?: string | null;
+}
+
+const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
   const navigate = useNavigate();
-  
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: '',
+      password: '',
     },
   });
 
-  // Check for any payment redirect parameters
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const paymentResult = searchParams.get('payment_result');
-    const paymentError = searchParams.get('error');
-    
-    if (paymentResult === 'failed' || paymentError) {
-      const errorMessage = paymentError || 'התשלום נכשל, אנא נסה שנית';
-      PaymentLogger.error('Login redirect after payment failure:', { paymentResult, paymentError });
-      toast.error(errorMessage);
-      
-      // Clear the URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
-
   const onSubmit = async (values: LoginFormValues) => {
-    if (isSubmitting) return;
-    
-    setIsSubmitting(true);
-    setAuthError(null);
-    
+    setIsLoading(true);
     try {
-      PaymentLogger.log('Login form submitted', { email: values.email });
-      const result = await signIn(values.email, values.password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('פרטי התחברות שגויים');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      toast.success('התחברת בהצלחה!');
       
-      if (!result.success) {
-        setAuthError(result.error || 'התחברות נכשלה. אנא בדוק את פרטי ההתחברות שלך ונסה שוב.');
+      // Redirect to the specified path or dashboard
+      if (redirectTo) {
+        navigate(redirectTo, { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
       }
     } catch (error) {
-      PaymentLogger.error('Login error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'שגיאה בתהליך ההתחברות';
-      setAuthError(errorMessage);
-      toast.error(errorMessage);
+      console.error('Login error:', error);
+      toast.error('שגיאה בהתחברות');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
-
-  // If user is already authenticated, redirect to dashboard
-  useEffect(() => {
-    if (isAuthenticated) {
-      PaymentLogger.log('User already authenticated, redirecting to dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
 
   return (
     <Card>
@@ -87,17 +75,23 @@ const LoginForm: React.FC = () => {
         <CardTitle>התחברות</CardTitle>
         <CardDescription>הזן את פרטי ההתחברות שלך</CardDescription>
       </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>אימייל</FormLabel>
+                  <FormLabel>דואר אלקטרוני</FormLabel>
                   <FormControl>
-                    <Input placeholder="your@email.com" {...field} />
+                    <Input
+                      placeholder="name@example.com"
+                      type="email"
+                      autoComplete="email"
+                      disabled={isLoading}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -108,46 +102,34 @@ const LoginForm: React.FC = () => {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>סיסמא</FormLabel>
+                  <FormLabel>סיסמה</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <Input
+                      placeholder="******"
+                      type="password"
+                      autoComplete="current-password"
+                      disabled={isLoading}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
-            {authError && (
-              <div className="text-sm font-medium text-red-500">{authError}</div>
-            )}
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isSubmitting || loading}
-            >
-              {(isSubmitting || loading) ? (
-                <span className="flex items-center">
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מתחבר...
-                </span>
+                </>
               ) : (
-                "התחבר"
+                'התחבר'
               )}
             </Button>
-            
-            <div className="text-center text-sm text-muted-foreground">
-              <Link to="/auth?tab=signup" className="underline hover:text-primary">
-                עדיין אין לך חשבון? הירשם
-              </Link>
-              <div className="mt-2">
-                <Link to="/reset-password" className="underline hover:text-primary">
-                  שכחת את הסיסמא?
-                </Link>
-              </div>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 };

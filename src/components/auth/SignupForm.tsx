@@ -1,127 +1,221 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSignupForm } from '@/hooks/auth/useSignupForm';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { StorageService } from '@/services/storage/StorageService';
 
-const SignupForm: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  
-  const { handleSignup, errors, isProcessing } = useSignupForm();
+// Signup form schema
+const signupFormSchema = z.object({
+  firstName: z.string().min(2, 'שם פרטי חייב להכיל לפחות 2 תווים'),
+  lastName: z.string().min(2, 'שם משפחה חייב להכיל לפחות 2 תווים'),
+  email: z.string().email('נדרשת כתובת אימייל תקינה'),
+  password: z.string().min(6, 'הסיסמה חייבת להכיל לפחות 6 תווים'),
+  phone: z.string().min(9, 'מספר טלפון חייב להכיל לפחות 9 ספרות'),
+});
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (password !== passwordConfirm) {
-      return;
+type SignupFormValues = z.infer<typeof signupFormSchema>;
+
+interface SignupFormProps {
+  redirectTo?: string | null;
+}
+
+const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm<SignupFormValues>({
+    resolver: zodResolver(signupFormSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      phone: '',
+    },
+  });
+
+  const onSubmit = async (values: SignupFormValues) => {
+    setIsLoading(true);
+    try {
+      // Store registration data in session storage first
+      StorageService.storeRegistrationData({
+        email: values.email,
+        password: values.password,
+        userData: {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phone: values.phone,
+        },
+        registrationTime: new Date().toISOString(),
+      });
+
+      // Check if we have a redirect parameter for post-payment flow
+      if (redirectTo) {
+        // Sign up the user immediately if we're in post-payment flow
+        const { error } = await supabase.auth.signUp({
+          email: values.email,
+          password: values.password,
+          options: {
+            data: {
+              first_name: values.firstName,
+              last_name: values.lastName,
+              phone: values.phone,
+              full_name: `${values.firstName} ${values.lastName}`.trim(),
+            },
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        toast.success('נרשמת בהצלחה!');
+        navigate(redirectTo, { replace: true });
+      } else {
+        // Otherwise, redirect to subscription flow
+        navigate('/subscription', { 
+          state: { isRegistering: true } 
+        });
+      }
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      
+      if (error.message?.includes('already registered')) {
+        toast.error('משתמש עם כתובת האימייל הזו כבר קיים במערכת');
+      } else {
+        toast.error(error.message || 'שגיאה בהרשמה');
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-    handleSignup({
-      email,
-      password,
-      firstName,
-      lastName,
-      phone
-    });
   };
 
   return (
-    <Card className="glass-card-2025">
+    <Card>
       <CardHeader>
         <CardTitle>הרשמה</CardTitle>
-        <CardDescription>צור חשבון חדש כדי להתחיל</CardDescription>
+        <CardDescription>צור חשבון חדש</CardDescription>
       </CardHeader>
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="last-name">שם משפחה</Label>
-              <Input 
-                id="last-name" 
-                type="text" 
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className={errors.lastName ? "border-red-500" : ""}
-                required
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>שם פרטי</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="ישראל"
+                        autoComplete="given-name"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.lastName && <p className="text-xs text-red-500">{errors.lastName}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="first-name">שם פרטי</Label>
-              <Input 
-                id="first-name" 
-                type="text" 
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className={errors.firstName ? "border-red-500" : ""}
-                required
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>שם משפחה</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="ישראלי"
+                        autoComplete="family-name"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="signup-email">דוא"ל</Label>
-            <Input 
-              id="signup-email" 
-              type="email" 
-              placeholder="name@example.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={errors.email ? "border-red-500" : ""}
-              required
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>דואר אלקטרוני</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="name@example.com"
+                      type="email"
+                      autoComplete="email"
+                      disabled={isLoading}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">טלפון</Label>
-            <Input 
-              id="phone" 
-              type="tel" 
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="05XXXXXXXX"
-              className={errors.phone ? "border-red-500" : ""}
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>טלפון</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="050-1234567"
+                      type="tel"
+                      autoComplete="tel"
+                      disabled={isLoading}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="signup-password">סיסמה</Label>
-            <Input 
-              id="signup-password" 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className={errors.password ? "border-red-500" : ""}
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>סיסמה</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="******"
+                      type="password"
+                      autoComplete="new-password"
+                      disabled={isLoading}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password-confirm">אימות סיסמה</Label>
-            <Input 
-              id="password-confirm" 
-              type="password" 
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              required
-              className={errors.passwordConfirm ? "border-red-500" : ""}
-            />
-            {errors.passwordConfirm && <p className="text-xs text-red-500">{errors.passwordConfirm}</p>}
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={isProcessing}>
-            {isProcessing ? 'בודק פרטים...' : 'המשך לבחירת תכנית'}
-          </Button>
-        </CardFooter>
-      </form>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד...
+                </>
+              ) : (
+                'הירשם'
+              )}
+            </Button>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 };

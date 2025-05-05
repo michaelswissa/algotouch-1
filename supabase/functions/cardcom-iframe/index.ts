@@ -29,10 +29,9 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get CardCom configuration - using updated correct terminal info
+    // Get CardCom configuration - using production terminal info
     const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
     const apiName = Deno.env.get("CARDCOM_API_NAME") || "bLaocQRMSnwphQRUVG3b";
-    const apiPassword = Deno.env.get("CARDCOM_API_PASSWORD") || "i9nr6caGbgheTdYfQbo6";
 
     if (!terminalNumber || !apiName) {
       throw new Error("Missing CardCom API configuration");
@@ -162,9 +161,9 @@ serve(async (req) => {
       amount
     });
 
-    // Cleaned up URLs to prevent double slashes
-    const successRedirectUrl = `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`;
-    const failedRedirectUrl = `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`;
+    // Use our new redirect page instead of direct routes
+    const successRedirectUrl = `${frontendBaseUrl}/payment/redirect?session_id=${sessionData.id}&ref=${transactionRef}&status=success`;
+    const failedRedirectUrl = `${frontendBaseUrl}/payment/redirect?session_id=${sessionData.id}&ref=${transactionRef}&status=failed`;
     const webhookUrl = `${publicFunctionsUrl}/cardcom-webhook`;
     
     // For the Low Profile Create API, need to create a proper URL
