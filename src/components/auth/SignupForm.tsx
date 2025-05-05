@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -11,6 +12,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { StorageService } from '@/services/storage/StorageService';
+import { motion } from 'framer-motion';
 
 // Signup form schema
 const signupFormSchema = z.object({
@@ -26,6 +28,24 @@ type SignupFormValues = z.infer<typeof signupFormSchema>;
 interface SignupFormProps {
   redirectTo?: string | null;
 }
+
+const formAnimation = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.4,
+      staggerChildren: 0.07,
+      when: "beforeChildren"
+    }
+  }
+};
+
+const inputAnimation = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 }
+};
 
 const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
   const navigate = useNavigate();
@@ -101,9 +121,15 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
   return (
     <Card className="border-0 shadow-none bg-transparent">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} dir="rtl">
+        <motion.form 
+          onSubmit={form.handleSubmit(onSubmit)} 
+          dir="rtl"
+          variants={formAnimation}
+          initial="hidden"
+          animate="visible"
+        >
           <CardContent className="space-y-4 px-0">
-            <div className="grid grid-cols-2 gap-4">
+            <motion.div variants={inputAnimation} className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="firstName"
@@ -142,80 +168,96 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                   </FormItem>
                 )}
               />
-            </div>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem className="text-right">
-                  <FormLabel>דואר אלקטרוני</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="name@example.com"
-                      type="email"
-                      autoComplete="email"
-                      disabled={isLoading}
-                      className="text-right"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem className="text-right">
-                  <FormLabel>טלפון</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="050-1234567"
-                      type="tel"
-                      autoComplete="tel"
-                      disabled={isLoading}
-                      className="text-right"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem className="text-right">
-                  <FormLabel>סיסמה</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="******"
-                      type="password"
-                      autoComplete="new-password"
-                      disabled={isLoading}
-                      className="text-right"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            </motion.div>
+            
+            <motion.div variants={inputAnimation}>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className="text-right">
+                    <FormLabel>דואר אלקטרוני</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="name@example.com"
+                        type="email"
+                        autoComplete="email"
+                        disabled={isLoading}
+                        className="text-right"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </motion.div>
+            
+            <motion.div variants={inputAnimation}>
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem className="text-right">
+                    <FormLabel>טלפון</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="050-1234567"
+                        type="tel"
+                        autoComplete="tel"
+                        disabled={isLoading}
+                        className="text-right"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </motion.div>
+            
+            <motion.div variants={inputAnimation}>
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="text-right">
+                    <FormLabel>סיסמה</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="******"
+                        type="password"
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="text-right"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </motion.div>
           </CardContent>
           <CardFooter className="px-0">
-            <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" /> מעבד...
-                </>
-              ) : (
-                'הירשם'
-              )}
-            </Button>
+            <motion.div 
+              className="w-full"
+              variants={inputAnimation}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" /> מעבד...
+                  </>
+                ) : (
+                  'הירשם'
+                )}
+              </Button>
+            </motion.div>
           </CardFooter>
-        </form>
+        </motion.form>
       </Form>
     </Card>
   );

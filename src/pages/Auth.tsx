@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +11,7 @@ import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 import BeamsBackground from '@/components/BeamsBackground';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -119,33 +121,97 @@ const Auth = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const getTabTitle = () => {
+    return activeTab === 'login' ? 'התחברות' : 'הרשמה';
+  };
+  
+  const getTabDescription = () => {
+    return activeTab === 'login' ? 'הזן את פרטי ההתחברות שלך' : 'צור חשבון חדש';
+  };
+
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center p-4" dir="rtl">
       <BeamsBackground />
       
-      <div className="w-full max-w-md space-y-6 backdrop-blur-sm bg-background/80 p-6 rounded-lg shadow-lg">
+      <div className="w-full max-w-md space-y-6 backdrop-blur-sm bg-background/80 p-6 rounded-lg shadow-lg animate-fade-in">
         <AuthHeader />
         
         <Tabs dir="rtl" value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} className="w-full">
           <div className="space-y-4">
-            <div className="text-right">
-              <h2 className="text-2xl font-semibold">התחברות</h2>
-              <p className="text-sm text-muted-foreground">הזן את פרטי ההתחברות שלך</p>
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={activeTab}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={{ duration: 0.3 }}
+                className="text-right"
+              >
+                <h2 className="text-2xl font-semibold">{getTabTitle()}</h2>
+                <p className="text-sm text-muted-foreground">{getTabDescription()}</p>
+              </motion.div>
+            </AnimatePresence>
             
-            <TabsList className="grid grid-cols-2 w-full mb-6 bg-background/60">
-              <TabsTrigger value="signup">הרשמה</TabsTrigger>
-              <TabsTrigger value="login">התחברות</TabsTrigger>
-            </TabsList>
+            <div className="relative">
+              <TabsList className="grid grid-cols-2 w-full mb-8 bg-background/40 backdrop-blur-md relative z-10">
+                <TabsTrigger 
+                  value="signup" 
+                  className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
+                >
+                  הרשמה
+                  {activeTab === 'signup' && (
+                    <motion.div 
+                      className="absolute inset-0 bg-primary rounded-sm -z-10"
+                      layoutId="tab-indicator"
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30
+                      }}
+                    />
+                  )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="login" 
+                  className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
+                >
+                  התחברות
+                  {activeTab === 'login' && (
+                    <motion.div 
+                      className="absolute inset-0 bg-primary rounded-sm -z-10"
+                      layoutId="tab-indicator"
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30
+                      }}
+                    />
+                  )}
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
           
-          <TabsContent value="login">
-            <LoginForm redirectTo={redirectTo} />
-          </TabsContent>
-          
-          <TabsContent value="signup">
-            <SignupForm redirectTo={redirectTo} />
-          </TabsContent>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: activeTab === 'login' ? -20 : 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: activeTab === 'login' ? 20 : -20 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="w-full"
+            >
+              {activeTab === 'login' ? (
+                <TabsContent value="login" className="mt-0">
+                  <LoginForm redirectTo={redirectTo} />
+                </TabsContent>
+              ) : (
+                <TabsContent value="signup" className="mt-0">
+                  <SignupForm redirectTo={redirectTo} />
+                </TabsContent>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </Tabs>
       </div>
     </div>
