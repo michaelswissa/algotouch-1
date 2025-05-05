@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
@@ -65,7 +66,7 @@ const CardComRedirectPage: React.FC = () => {
                 PaymentLogger.error('Failed to create user account after payment', accountResult.error);
                 toast.error('התשלום הצליח, אך לא הצלחנו ליצור את חשבון המשתמש באופן אוטומטי');
               } else {
-                PaymentLogger.log('User account created successfully', { userId: accountResult.user?.id });
+                PaymentLogger.log('User account created successfully', { userId: accountResult.userId });
               }
             } catch (accountError) {
               PaymentLogger.error('Error creating user account', accountError);

@@ -77,7 +77,7 @@ export class RegistrationService {
           }
           
           // Update registration data to mark user as created
-          StorageService.updateRegistrationData({ userCreated: true });
+          StorageService.storeRegistrationData({ userCreated: true });
           
           return { success: true };
         }
@@ -86,7 +86,7 @@ export class RegistrationService {
       }
       
       // Update registration data to mark user as created
-      StorageService.updateRegistrationData({ userCreated: true });
+      StorageService.storeRegistrationData({ userCreated: true });
       
       return { 
         success: true,
