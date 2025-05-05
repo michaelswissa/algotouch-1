@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -99,26 +100,27 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-0 shadow-none bg-transparent">
+      <CardHeader className="text-right px-0">
         <CardTitle>הרשמה</CardTitle>
         <CardDescription>צור חשבון חדש</CardDescription>
       </CardHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} dir="rtl">
+          <CardContent className="space-y-4 px-0">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="firstName"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="text-right">
                     <FormLabel>שם פרטי</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="ישראל"
                         autoComplete="given-name"
                         disabled={isLoading}
+                        className="text-right"
                         {...field}
                       />
                     </FormControl>
@@ -130,13 +132,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                 control={form.control}
                 name="lastName"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="text-right">
                     <FormLabel>שם משפחה</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="ישראלי"
                         autoComplete="family-name"
                         disabled={isLoading}
+                        className="text-right"
                         {...field}
                       />
                     </FormControl>
@@ -149,7 +152,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
               control={form.control}
               name="email"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="text-right">
                   <FormLabel>דואר אלקטרוני</FormLabel>
                   <FormControl>
                     <Input
@@ -157,6 +160,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       type="email"
                       autoComplete="email"
                       disabled={isLoading}
+                      className="text-right"
                       {...field}
                     />
                   </FormControl>
@@ -168,7 +172,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
               control={form.control}
               name="phone"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="text-right">
                   <FormLabel>טלפון</FormLabel>
                   <FormControl>
                     <Input
@@ -176,6 +180,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       type="tel"
                       autoComplete="tel"
                       disabled={isLoading}
+                      className="text-right"
                       {...field}
                     />
                   </FormControl>
@@ -187,7 +192,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
               control={form.control}
               name="password"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="text-right">
                   <FormLabel>סיסמה</FormLabel>
                   <FormControl>
                     <Input
@@ -195,6 +200,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       type="password"
                       autoComplete="new-password"
                       disabled={isLoading}
+                      className="text-right"
                       {...field}
                     />
                   </FormControl>
@@ -203,11 +209,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
               )}
             />
           </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+          <CardFooter className="px-0">
+            <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מעבד...
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" /> מעבד...
                 </>
               ) : (
                 'הירשם'

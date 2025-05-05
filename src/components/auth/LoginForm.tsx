@@ -70,19 +70,19 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-0 shadow-none bg-transparent">
+      <CardHeader className="text-right px-0">
         <CardTitle>התחברות</CardTitle>
         <CardDescription>הזן את פרטי ההתחברות שלך</CardDescription>
       </CardHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} dir="rtl">
+          <CardContent className="space-y-4 px-0">
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="text-right">
                   <FormLabel>דואר אלקטרוני</FormLabel>
                   <FormControl>
                     <Input
@@ -90,6 +90,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
                       type="email"
                       autoComplete="email"
                       disabled={isLoading}
+                      className="text-right"
                       {...field}
                     />
                   </FormControl>
@@ -101,7 +102,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
               control={form.control}
               name="password"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="text-right">
                   <FormLabel>סיסמה</FormLabel>
                   <FormControl>
                     <Input
@@ -109,6 +110,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
                       type="password"
                       autoComplete="current-password"
                       disabled={isLoading}
+                      className="text-right"
                       {...field}
                     />
                   </FormControl>
@@ -117,11 +119,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
               )}
             />
           </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+          <CardFooter className="px-0">
+            <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> מתחבר...
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" /> מתחבר...
                 </>
               ) : (
                 'התחבר'

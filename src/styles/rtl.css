@@ -1,3 +1,4 @@
+
 @layer components {  
   /* Enhanced RTL menu specific styling */
   [dir="rtl"] .menu-icon {
@@ -97,6 +98,23 @@
     @apply mr-2 -ml-1;
   }
   
+  /* RTL input adjustments */
+  [dir="rtl"] input[type="text"],
+  [dir="rtl"] input[type="email"],
+  [dir="rtl"] input[type="password"],
+  [dir="rtl"] input[type="tel"],
+  [dir="rtl"] textarea {
+    text-align: right;
+  }
+
+  /* RTL form elements */
+  [dir="rtl"] .form-group, 
+  [dir="rtl"] .form-item,
+  [dir="rtl"] .form-label,
+  [dir="rtl"] .form-message {
+    text-align: right;
+  }
+
   /* RTL search input adjustments */
   [dir="rtl"] .search-input {
     @apply pr-10 pl-4;
@@ -134,6 +152,16 @@
   /* Form elements spacing for RTL */
   [dir="rtl"] .form-control {
     @apply text-right;
+  }
+
+  /* Auth page specific RTL fixes */
+  [dir="rtl"] .auth-form-container {
+    text-align: right;
+  }
+
+  [dir="rtl"] .rtl-button svg {
+    margin-right: 0;
+    margin-left: 0.5rem;
   }
 
   /* Tooltip RTL */

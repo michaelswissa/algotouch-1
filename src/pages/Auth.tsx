@@ -127,8 +127,8 @@ const Auth = () => {
       <div className="w-full max-w-md space-y-6 backdrop-blur-sm bg-background/80 p-6 rounded-lg shadow-lg">
         <AuthHeader />
         
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
-          <TabsList className="grid grid-cols-2 w-full">
+        <Tabs dir="rtl" value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} className="w-full">
+          <TabsList className="grid grid-cols-2 w-full mb-6">
             <TabsTrigger value="signup">הרשמה</TabsTrigger>
             <TabsTrigger value="login">התחברות</TabsTrigger>
           </TabsList>
