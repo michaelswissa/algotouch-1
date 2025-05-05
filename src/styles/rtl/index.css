@@ -1,0 +1,9 @@
+
+/* Import all RTL style modules */
+@import './layout.css';
+@import './navigation.css';
+@import './forms.css';
+@import './components.css';
+@import './charts.css';
+@import './questionnaire.css';
+@import './animations.css';

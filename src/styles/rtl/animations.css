@@ -1,0 +1,26 @@
+
+@layer components {
+  /* Fix for animation direction in RTL */
+  [dir="rtl"] .slide-in {
+    animation-direction: reverse;
+  }
+  
+  /* Animation direction overrides for RTL */
+  [dir="rtl"] .animate-slide-in-right {
+    animation-name: slide-in-right-rtl;
+  }
+
+  @keyframes slide-in-right-rtl {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(0); }
+  }
+
+  [dir="rtl"] .animate-slide-out-right {
+    animation-name: slide-out-right-rtl;
+  }
+
+  @keyframes slide-out-right-rtl {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+}

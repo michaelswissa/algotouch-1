@@ -1,0 +1,67 @@
+
+@layer components {
+  /* RTL blog card adjustments */
+  [dir="rtl"] .card-actions {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .card-badge {
+    @apply left-2 right-auto;
+  }
+
+  /* Card elements in RTL with forced center alignment */
+  [dir="rtl"] .card-header-center {
+    @apply flex flex-col items-center justify-center;
+  }
+  
+  [dir="rtl"] .card-title-center {
+    @apply flex justify-center items-center gap-2 w-full text-center;
+  }
+
+  /* Tooltip RTL */
+  [dir="rtl"] [data-popper-placement="left"] {
+    @apply right-8 left-auto;
+  }
+
+  /* Image flip for directional icons */
+  [dir="rtl"] .direction-icon {
+    transform: rotateY(180deg);
+  }
+
+  /* Slider RTL */
+  [dir="rtl"] .slider-value {
+    transform: translateX(50%);
+    right: 50%;
+    left: auto;
+  }
+
+  /* Card heading RTL adjustments */
+  [dir="rtl"] .card-title,
+  [dir="rtl"] h1, 
+  [dir="rtl"] h2, 
+  [dir="rtl"] h3, 
+  [dir="rtl"] h4, 
+  [dir="rtl"] h5, 
+  [dir="rtl"] h6,
+  [dir="rtl"] p {
+    text-align: right;
+  }
+
+  /* Upload components styles */
+  [dir="rtl"] .upload-container {
+    @apply flex flex-col items-center justify-center w-full;
+  }
+  
+  [dir="rtl"] .upload-text {
+    @apply text-center w-full;
+  }
+  
+  /* Footer always centered */
+  [dir="rtl"] .footer-centered {
+    @apply flex flex-col items-center justify-center w-full text-center;
+  }
+  
+  [dir="rtl"] .footer-text {
+    @apply text-center w-full;
+  }
+}

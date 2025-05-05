@@ -1,0 +1,61 @@
+
+@layer components {  
+  /* Enhanced RTL menu specific styling */
+  [dir="rtl"] .menu-icon {
+    @apply ml-2 -mr-1;
+  }
+  
+  [dir="rtl"] .dropdown-content {
+    @apply right-0 text-right;
+  }
+  
+  [dir="rtl"] .dropdown-item {
+    @apply flex flex-row-reverse text-right;
+  }
+  
+  [dir="rtl"] .dropdown-item-icon {
+    @apply ml-2 mr-0;
+  }
+
+  /* Icon spacing in RTL */
+  [dir="rtl"] .icon-ml {
+    @apply ml-0 mr-2;
+  }
+  
+  [dir="rtl"] .icon-mr {
+    @apply mr-0 ml-2;
+  }
+
+  /* Dropdown and menu positioning for RTL */
+  [dir="rtl"] .dropdown-menu,
+  [dir="rtl"] .popover-content {
+    @apply right-0 left-auto;
+  }
+  
+  /* Fix for button icons in RTL */
+  [dir="rtl"] button svg:first-child:not(:last-child),
+  [dir="rtl"] .button svg:first-child:not(:last-child) {
+    @apply ml-2 -mr-1;
+  }
+  
+  [dir="rtl"] button svg:last-child:not(:first-child),
+  [dir="rtl"] .button svg:last-child:not(:first-child) {
+    @apply mr-2 -ml-1;
+  }
+
+  /* RTL search input adjustments */
+  [dir="rtl"] .search-input {
+    @apply pr-10 pl-4;
+  }
+  
+  [dir="rtl"] .search-icon {
+    @apply right-3 left-auto;
+  }
+
+  /* Mobile RTL adjustments */
+  @media (max-width: 640px) {
+    [dir="rtl"] .mobile-nav {
+      @apply right-0 left-auto;
+    }
+  }
+}
