@@ -144,20 +144,20 @@ const Auth = () => {
             <div className="relative">
               <TabsList className="grid grid-cols-2 w-full mb-8 bg-background/40 backdrop-blur-md relative z-10">
                 <TabsTrigger 
-                  value="signup" 
-                  className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
-                >
-                  הרשמה
-                  {activeTab === 'signup' && (
-                    <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
-                  )}
-                </TabsTrigger>
-                <TabsTrigger 
                   value="login" 
                   className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
                 >
                   התחברות
                   {activeTab === 'login' && (
+                    <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
+                  )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="signup" 
+                  className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
+                >
+                  הרשמה
+                  {activeTab === 'signup' && (
                     <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
                   )}
                 </TabsTrigger>
