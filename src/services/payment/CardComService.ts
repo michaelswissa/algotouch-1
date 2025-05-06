@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
@@ -59,7 +58,7 @@ export class CardComService {
   }
 
   /**
-   * Initializes a payment session with CardCom
+   * Initializes a payment session with CardCom using the Low Profile API
    */
   static async initializePayment(params: CardComPaymentInitParams): Promise<{
     lowProfileCode: string;
@@ -79,8 +78,8 @@ export class CardComService {
       // Map operation type to CardCom format
       const cardcomOperation = params.operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly';
 
-      // Call the CardCom iframe initialization edge function
-      const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
+      // Call the CardCom Low Profile initialization edge function
+      const { data, error } = await supabase.functions.invoke('cardcom-lowprofile', {
         body: {
           planId: params.planId,
           userId: params.userId,
@@ -88,12 +87,12 @@ export class CardComService {
           fullName: params.fullName,
           phone: params.phone,
           idNumber: params.idNumber,
-          operationType: cardcomOperation
+          operation: cardcomOperation
         }
       });
 
       if (error) {
-        PaymentLogger.error('Error from cardcom-iframe function:', error);
+        PaymentLogger.error('Error from cardcom-lowprofile function:', error);
         throw new Error(`Failed to initialize payment: ${error.message}`);
       }
 
@@ -103,12 +102,11 @@ export class CardComService {
 
       // Extract data from response
       const responseData = data.data;
-      const lowProfileCode = responseData.lowProfileId || responseData.LowProfileId || '';
+      const lowProfileCode = responseData.lowProfileId || '';
       const sessionId = responseData.sessionId || '';
       const terminalNumber = responseData.terminalNumber || '0';
       const reference = responseData.reference || '';
-      const iframeUrl = responseData.url || responseData.iframeUrl || responseData.Url || '';
-      const cardcomUrl = responseData.cardcomUrl || 'https://secure.cardcom.solutions';
+      const iframeUrl = responseData.url || '';
 
       if (!lowProfileCode || !sessionId) {
         throw new Error('Missing required fields in payment initialization response');
@@ -117,8 +115,8 @@ export class CardComService {
       PaymentLogger.log('Payment initialized successfully', {
         lowProfileCode,
         sessionId,
-        terminalNumber,
-        reference
+        reference,
+        hasUrl: !!iframeUrl
       });
 
       return {
@@ -126,7 +124,6 @@ export class CardComService {
         sessionId,
         terminalNumber,
         reference,
-        cardcomUrl,
         iframeUrl
       };
     } catch (error) {
