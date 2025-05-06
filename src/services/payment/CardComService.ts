@@ -140,7 +140,7 @@ export class CardComService {
    */
   static async checkPaymentStatus(sessionId: string): Promise<{
     success: boolean;
-    status: 'success' | 'processing' | 'failed' | 'cancelled' | 'unknown';
+    status: 'success' | 'processing' | 'failed' | 'cancelled' | 'unknown' | 'completed' | 'approved' | 'pending';
     message?: string;
     data?: any;
   }> {
@@ -169,15 +169,17 @@ export class CardComService {
       }
 
       // Map the status from the API response
-      let status: 'success' | 'processing' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
+      let status: 'success' | 'processing' | 'failed' | 'cancelled' | 'unknown' | 'completed' | 'approved' | 'pending' = 'unknown';
       if (data.data?.status === 'success' || data.data?.status === 'completed') {
-        status = 'success';
+        status = data.data.status;
       } else if (data.data?.status === 'processing' || data.data?.status === 'pending') {
-        status = 'processing';
+        status = data.data.status;
       } else if (data.data?.status === 'failed') {
         status = 'failed';
       } else if (data.data?.status === 'cancelled') {
         status = 'cancelled';
+      } else if (data.data?.status === 'approved') {
+        status = 'approved';
       }
 
       return {

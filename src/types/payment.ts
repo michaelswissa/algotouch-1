@@ -42,7 +42,7 @@ export interface CardComPaymentResponse {
   data?: {
     transactionId?: string;
     sessionId?: string;
-    status?: string;
+    status?: 'success' | 'processing' | 'failed' | 'cancelled' | 'unknown' | 'completed' | 'approved' | 'pending';
     [key: string]: any;
   };
 }
