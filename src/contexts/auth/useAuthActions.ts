@@ -1,18 +1,18 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { sendWelcomeEmail } from '@/lib/email-service';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { SignupFormData, AuthResponse } from '@/types/auth';
-import { AuthStorageService } from '@/services/storage/AuthStorageService';
+import { StorageService } from '@/services/storage/StorageService';
 
 export const useAuthActions = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const signIn = async (email: string, password: string): Promise<AuthResponse> => {
+  const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
       PaymentLogger.log('Attempting to sign in user', { email });
@@ -21,28 +21,22 @@ export const useAuthActions = () => {
       
       if (error) {
         PaymentLogger.error('Sign in error:', error);
-        return { 
-          success: false, 
-          user: null, 
-          error: error.message 
-        };
+        toast.error(error.message || 'שגיאה בתהליך ההתחברות');
+        throw error;
       }
       
       if (!data.session || !data.user) {
         const errorMsg = 'ההתחברות נכשלה - לא התקבלה תגובה מהשרת';
         PaymentLogger.error(errorMsg);
-        return { 
-          success: false, 
-          user: null, 
-          error: errorMsg 
-        };
+        toast.error(errorMsg);
+        throw new Error(errorMsg);
       }
       
       PaymentLogger.log('Sign in successful', { userId: data.user.id });
       toast.success('התחברת בהצלחה!');
       
       // Check for contract data to determine where to navigate
-      const contractData = AuthStorageService.getContractData();
+      const contractData = sessionStorage.getItem('contract_data');
       if (contractData) {
         PaymentLogger.log('Found contract data, redirecting to subscription');
         navigate('/subscription', { replace: true });
@@ -50,15 +44,12 @@ export const useAuthActions = () => {
         navigate('/dashboard', { replace: true });
       }
       
-      return { 
-        success: true, 
-        user: data.user,
-        session: data.session
-      };
-    } catch (error: any) {
+      return { success: true, session: data.session, user: data.user };
+    } catch (error) {
       PaymentLogger.error('Error during sign in:', error);
       return { 
         success: false, 
+        session: null, 
         user: null, 
         error: error instanceof Error ? error.message : 'שגיאה בתהליך ההתחברות'
       };
@@ -67,80 +58,58 @@ export const useAuthActions = () => {
     }
   };
 
-  const signUp = async (formData: SignupFormData): Promise<AuthResponse> => {
+  const signUp = async (userData: {
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string,
+    phone?: string
+  }) => {
     try {
       setLoading(true);
-      PaymentLogger.log('Starting signup process', { email: formData.email });
       
-      // First check if we're in a subscription flow or direct signup
-      const contractData = AuthStorageService.getContractData();
-      const shouldProceedToSubscription = !contractData;
+      const { email, password, firstName, lastName, phone } = userData;
       
-      if (shouldProceedToSubscription) {
-        // Store registration data for subscription flow
-        const registrationData = {
-          email: formData.email,
-          password: formData.password,
-          userData: {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            phone: formData.phone
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone,
+            is_new_user: true
           },
-          registrationTime: new Date().toISOString(),
-          userCreated: false
-        };
-        
-        const stored = AuthStorageService.storeRegistrationData(registrationData);
-        if (!stored) {
-          return {
-            success: false,
-            user: null,
-            error: 'שגיאה בשמירת נתוני הרשמה'
-          };
+          // Remove emailRedirectTo to disable email verification
         }
-        
-        PaymentLogger.log('Registration data stored, redirecting to subscription');
-        toast.success('הפרטים נשמרו בהצלחה');
-        
-        navigate('/subscription', { replace: true, state: { isRegistering: true } });
-        return { success: true, user: null };
-      } else {
-        // Direct signup - create user immediately
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: {
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              phone: formData.phone,
-              full_name: `${formData.firstName} ${formData.lastName}`.trim(),
-              is_new_user: true
-            }
-          }
-        });
-        
-        if (error) {
-          PaymentLogger.error('Sign up error:', error);
-          return {
-            success: false,
-            user: null,
-            error: error.message
-          };
-        }
-        
-        PaymentLogger.log('Sign up successful');
-        toast.success('נרשמת בהצלחה!');
-        
-        return { success: true, user: data.user };
+      });
+      
+      if (error) {
+        console.error('Sign up error:', error.message);
+        toast.error(error.message);
+        throw error;
       }
-    } catch (error: any) {
-      PaymentLogger.error('Error signing up:', error);
-      return { 
-        success: false, 
-        user: null, 
-        error: error.message || 'שגיאה בתהליך ההרשמה'
+      
+      // Store registration data for subscription flow
+      const registrationData = {
+        email,
+        password,
+        userData: {
+          firstName,
+          lastName,
+          phone
+        },
+        registrationTime: new Date().toISOString()
       };
+      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
+      
+      console.log('Sign up successful, proceeding to subscription');
+      toast.success('נרשמת בהצלחה!');
+      
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Error signing up:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -159,9 +128,6 @@ export const useAuthActions = () => {
       
       console.log('Sign out successful');
       toast.success('התנתקת בהצלחה');
-      
-      // Clear any auth-related storage data
-      AuthStorageService.clearAllAuthData();
       
       // Use a longer timeout for sign out to ensure all state is cleared
       // before redirecting, preventing flash of protected content

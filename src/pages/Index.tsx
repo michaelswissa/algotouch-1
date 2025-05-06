@@ -1,17 +1,19 @@
 
 import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { AuthStorageService } from '@/services/storage/AuthStorageService';
 
 // The index page redirects to the auth page
 const Index = () => {
   // Clear any stale registration data when landing on the index page
   useEffect(() => {
-    // Clear stale registration data
-    AuthStorageService.clearRegistrationData();
+    // If there's stale registration data, clear it
+    const registrationData = sessionStorage.getItem('registration_data');
+    if (registrationData) {
+      sessionStorage.removeItem('registration_data');
+    }
   }, []);
   
-  // Redirect to auth page
+  // Make sure the redirection works properly
   return <Navigate to="/auth" replace />;
 };
 

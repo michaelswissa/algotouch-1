@@ -34,6 +34,8 @@ const Auth = () => {
     );
   }
 
+  // We don't need to check for isAuthenticated here anymore as it's handled by useAuthRedirect
+
   return (
     <AuthWrapper>
       <AuthContent redirectTo={redirectTo} />
