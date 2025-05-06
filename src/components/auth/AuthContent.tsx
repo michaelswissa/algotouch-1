@@ -1,14 +1,12 @@
 
-import React, { useState, useEffect, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Tabs } from '@/components/ui/tabs';
 import AuthHeader from '@/components/auth/AuthHeader';
 import TabNavigation from '@/components/auth/TabNavigation';
 import AuthFormContainer from '@/components/auth/AuthFormContainer';
-
-// Lazy load the forms
-const LoginForm = lazy(() => import('@/components/auth/LoginForm'));
-const SignupForm = lazy(() => import('@/components/auth/SignupForm'));
+import LoginForm from '@/components/auth/LoginForm';
+import SignupForm from '@/components/auth/SignupForm';
 
 interface AuthContentProps {
   redirectTo: string | null;
