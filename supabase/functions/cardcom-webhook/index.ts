@@ -84,6 +84,8 @@ serve(async (req) => {
       throw new Error(`Error updating payment session: ${updateError.message}`);
     }
 
+    console.log(`[CARDCOM-WEBHOOK] Session ${sessionId} updated with status: ${status}`);
+
     // If it was a successful payment and there's token info, save it
     if (responseCode === 0 && paymentData.TokenInfo) {
       const token = paymentData.TokenInfo.Token;
@@ -118,6 +120,8 @@ serve(async (req) => {
               }
             });
             
+          console.log(`[CARDCOM-WEBHOOK] Saved recurring payment token for user: ${sessionData.user_id}`);
+            
           // If a subscription doesn't exist yet, create it
           const { data: existingSub } = await supabaseAdmin
             .from('subscriptions')
@@ -149,6 +153,8 @@ serve(async (req) => {
                 trial_end: trialEndDate ? trialEndDate.toISOString() : null,
                 next_charge_at: trialEndDate ? trialEndDate.toISOString() : null
               });
+            
+            console.log(`[CARDCOM-WEBHOOK] Created new subscription for user: ${sessionData.user_id}`);
           }
         }
       }
@@ -163,6 +169,8 @@ serve(async (req) => {
         status,
         data: paymentData
       });
+
+    console.log(`[CARDCOM-WEBHOOK] Logged payment event for session: ${sessionId}`);
 
     // Return success to CardCom
     return new Response(

@@ -124,33 +124,63 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   // Handle iframe messages from CardCom
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Only process messages from CardCom domains
-      if (!event.origin.includes('cardcom.solutions')) {
-        return;
-      }
+      // Only process messages from CardCom domains or if it's from inside an iframe
+      const isFromCardCom = event.origin.includes('cardcom.solutions') || 
+                           event.origin.includes('cardcom.co.il');
       
-      PaymentLogger.log('Received message from iframe:', event.data);
+      PaymentLogger.log('Received message:', { 
+        origin: event.origin, 
+        data: typeof event.data === 'object' ? JSON.stringify(event.data) : event.data,
+        isFromCardCom 
+      });
       
-      try {
-        // Try to parse the message if it's a string
-        const data = typeof event.data === 'string' 
-          ? JSON.parse(event.data) 
-          : event.data;
+      // Handle payment success message
+      if (isFromCardCom || !event.origin) {
+        try {
+          const data = typeof event.data === 'string' 
+            ? JSON.parse(event.data) 
+            : event.data;
+            
+          PaymentLogger.log('Processed message data:', data);
           
-        if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
-          setPaymentStatus(PaymentStatusEnum.SUCCESS);
-          toast.success('התשלום בוצע בהצלחה!');
-          
-          if (onPaymentComplete) {
-            onPaymentComplete();
+          // Check for direct payment success message
+          if (data.type === 'paid' || data.action === 'payment_success' || 
+              data.Status === 'success' || data.status === 'success') {
+            
+            PaymentLogger.log('Payment success event received');
+            setPaymentStatus(PaymentStatusEnum.SUCCESS);
+            toast.success('התשלום בוצע בהצלחה!');
+            
+            if (onPaymentComplete) {
+              // Navigate to next step in subscription flow
+              onPaymentComplete();
+              // Use window.location for reliable navigation out of iframe context if needed
+              if (data.redirect) {
+                window.location.href = '/subscription/step4';
+              }
+            }
+            return;
           }
-        } else if (data.action === 'HandleError') {
-          setPaymentStatus(PaymentStatusEnum.FAILED);
-          setError(data.message || 'התשלום נכשל');
-          toast.error(data.message || 'התשלום נכשל');
+          
+          // Handle detailed CardCom response
+          if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
+            PaymentLogger.log('HandleSubmit success received');
+            setPaymentStatus(PaymentStatusEnum.SUCCESS);
+            toast.success('התשלום בוצע בהצלחה!');
+            
+            if (onPaymentComplete) {
+              onPaymentComplete();
+            }
+            return;
+          } else if (data.action === 'HandleError') {
+            PaymentLogger.error('Payment error from CardCom:', data);
+            setPaymentStatus(PaymentStatusEnum.FAILED);
+            setError(data.message || 'התשלום נכשל');
+            toast.error(data.message || 'התשלום נכשל');
+          }
+        } catch (err) {
+          PaymentLogger.error('Error processing iframe message:', err);
         }
-      } catch (err) {
-        PaymentLogger.error('Error processing iframe message:', err);
       }
     };
     
@@ -178,7 +208,8 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           return;
         }
         
-        if (data?.data?.status === 'success') {
+        if (data?.data?.status === 'success' || data?.data?.status === 'completed') {
+          PaymentLogger.log('Payment status check: success', data);
           setPaymentStatus(PaymentStatusEnum.SUCCESS);
           toast.success('התשלום בוצע בהצלחה!');
           
@@ -186,9 +217,12 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
             onPaymentComplete();
           }
         } else if (data?.data?.status === 'failed') {
+          PaymentLogger.log('Payment status check: failed', data);
           setPaymentStatus(PaymentStatusEnum.FAILED);
           setError('התשלום נדחה');
           toast.error('התשלום נכשל');
+        } else {
+          PaymentLogger.log('Payment status check: in progress', data);
         }
       } catch (err) {
         PaymentLogger.error('Error in payment status check:', err);
@@ -201,6 +235,47 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     
     return () => clearInterval(interval);
   }, [sessionId, paymentStatus, onPaymentComplete]);
+  
+  // Setup a Supabase realtime subscription for payment status
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    PaymentLogger.log('Setting up realtime subscription for session', { sessionId });
+    
+    const channel = supabase
+      .channel(`session-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'payment_sessions',
+          filter: `id=eq.${sessionId}`
+        },
+        (payload) => {
+          PaymentLogger.log('Realtime update received', payload);
+          
+          const newStatus = payload.new.status;
+          if (newStatus === 'completed') {
+            setPaymentStatus(PaymentStatusEnum.SUCCESS);
+            toast.success('התשלום בוצע בהצלחה!');
+            
+            if (onPaymentComplete) {
+              onPaymentComplete();
+            }
+          } else if (newStatus === 'failed') {
+            setPaymentStatus(PaymentStatusEnum.FAILED);
+            setError('התשלום נדחה');
+            toast.error('התשלום נכשל');
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, onPaymentComplete]);
   
   // Handle iframe load events
   const handleIframeLoad = () => {

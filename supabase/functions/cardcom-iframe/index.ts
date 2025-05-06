@@ -170,7 +170,7 @@ serve(async (req) => {
     // Add required parameters
     lowProfileUrl.searchParams.append('TerminalNumber', terminalNumber);
     lowProfileUrl.searchParams.append('UserName', apiName); // Use ApiName as UserName
-    lowProfileUrl.searchParams.append('ReturnValue', transactionRef);
+    lowProfileUrl.searchParams.append('ReturnValue', sessionData.id); // Use session ID as return value
     lowProfileUrl.searchParams.append('SumToBill', amount.toString());
     lowProfileUrl.searchParams.append('CoinId', '1'); // ILS
     lowProfileUrl.searchParams.append('Language', 'he');
@@ -179,11 +179,10 @@ serve(async (req) => {
     // Add operation type
     lowProfileUrl.searchParams.append('Operation', operation);
     
-    // Add redirect URLs
-    lowProfileUrl.searchParams.append('SuccessRedirectUrl', 
-      `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`);
-    lowProfileUrl.searchParams.append('ErrorRedirectUrl', 
-      `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`);
+    // Add redirect URLs - REMOVED to prevent CSP issues
+    // Instead rely on webhook notifications and postMessage communication
+    
+    // Add webhook URL only for backend notification
     lowProfileUrl.searchParams.append('IndicatorUrl', 
       `${publicFunctionsUrl}/cardcom-webhook`);
     
@@ -196,14 +195,12 @@ serve(async (req) => {
     // For the Low Profile Create API, need to create a proper URL
     const lowProfileApiUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
     
-    // Prepare the request body for the API
+    // Prepare the request body for the API - WITHOUT redirect URLs
     const lowProfileApiBody = {
       TerminalNumber: parseInt(terminalNumber),
       ApiName: apiName,
-      ReturnValue: transactionRef,
+      ReturnValue: sessionData.id, // Use session ID as return value for better tracking
       Amount: amount,
-      SuccessRedirectUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
-      FailedRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
       WebHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
       ProductName: productName,
       Language: "he",
@@ -219,7 +216,8 @@ serve(async (req) => {
     
     logStep("CARDCOM-IFRAME", "Created URL options", {
       directUrl: directLpcUrl,
-      lowProfileUrl: lowProfileUrl.toString()
+      lowProfileUrl: lowProfileUrl.toString(),
+      apiRequestBody: { ...lowProfileApiBody, TerminalNumber: "REDACTED", ApiName: "REDACTED" }
     });
 
     // Now let's try using the CardCom API to create the LowProfile
@@ -232,8 +230,27 @@ serve(async (req) => {
         body: JSON.stringify(lowProfileApiBody)
       });
       
-      const apiResult = await apiResponse.json();
-      logStep("CARDCOM-IFRAME", "CardCom API Response", apiResult);
+      // Log the raw response before trying to parse it as JSON
+      const responseText = await apiResponse.text();
+      logStep("CARDCOM-IFRAME", "CardCom API Raw Response", {
+        status: apiResponse.status,
+        statusText: apiResponse.statusText,
+        responseText
+      });
+      
+      let apiResult;
+      try {
+        // Try to parse the response as JSON
+        apiResult = JSON.parse(responseText);
+        logStep("CARDCOM-IFRAME", "CardCom API Response", apiResult);
+      } catch (error) {
+        logStep("CARDCOM-IFRAME", "Failed to parse CardCom response as JSON", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        
+        // If we can't parse as JSON, handle the error
+        throw new Error("CardCom API returned non-JSON response: " + responseText.substring(0, 100) + "...");
+      }
       
       if (apiResult.ResponseCode === 0) {
         // Success - use the URL from the API response
@@ -264,8 +281,7 @@ serve(async (req) => {
               sessionId: sessionData.id,
               lowProfileId: apiResult.LowProfileId || lowProfileId,
               reference: transactionRef,
-              terminalNumber,
-              LowProfileId: apiResult.LowProfileId || lowProfileId
+              terminalNumber
             }
           }),
           { 
