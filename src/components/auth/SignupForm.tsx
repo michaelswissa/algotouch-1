@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,10 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { StorageService } from '@/services/storage/StorageService';
+import { useSignupForm } from '@/hooks/auth/useSignupForm';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/auth';
 
 // Signup form schema
 const signupFormSchema = z.object({
@@ -46,8 +44,8 @@ const inputAnimation = {
 };
 
 const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const { signUp } = useAuth();
+  const { handleSignup, isProcessing } = useSignupForm();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
@@ -61,58 +59,26 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
   });
 
   const onSubmit = async (values: SignupFormValues) => {
-    setIsLoading(true);
-    try {
-      // Store registration data in session storage first
-      StorageService.storeRegistrationData({
-        email: values.email,
-        password: values.password,
-        userData: {
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phone,
-        },
-        registrationTime: new Date().toISOString(),
-      });
-
-      // Check if we have a redirect parameter for post-payment flow
-      if (redirectTo) {
-        // Sign up the user immediately if we're in post-payment flow
-        const { error } = await supabase.auth.signUp({
+    // If we have a redirect parameter for post-payment flow, use the direct signup
+    if (redirectTo) {
+      try {
+        const result = await signUp({
           email: values.email,
           password: values.password,
-          options: {
-            data: {
-              first_name: values.firstName,
-              last_name: values.lastName,
-              phone: values.phone,
-              full_name: `${values.firstName} ${values.lastName}`.trim(),
-            },
-          },
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phone: values.phone
         });
-
-        if (error) {
-          throw error;
+        
+        if (result.success && result.user) {
+          // Redirect handled in the signUp function
         }
-
-        toast.success('נרשמת בהצלחה!');
-        navigate(redirectTo, { replace: true });
-      } else {
-        // Otherwise, redirect to subscription flow
-        navigate('/subscription', { 
-          state: { isRegistering: true } 
-        });
+      } catch (error) {
+        console.error("Signup error in redirectTo flow:", error);
       }
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      
-      if (error.message?.includes('already registered')) {
-        toast.error('משתמש עם כתובת האימייל הזו כבר קיים במערכת');
-      } else {
-        toast.error(error.message || 'שגיאה בהרשמה');
-      }
-    } finally {
-      setIsLoading(false);
+    } else {
+      // Otherwise use our registration flow
+      await handleSignup(values);
     }
   };
 
@@ -138,7 +104,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       <Input
                         placeholder="ישראל"
                         autoComplete="given-name"
-                        disabled={isLoading}
+                        disabled={isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -157,7 +123,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       <Input
                         placeholder="ישראלי"
                         autoComplete="family-name"
-                        disabled={isLoading}
+                        disabled={isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -180,7 +146,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                         placeholder="name@example.com"
                         type="email"
                         autoComplete="email"
-                        disabled={isLoading}
+                        disabled={isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -203,7 +169,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                         placeholder="050-1234567"
                         type="tel"
                         autoComplete="tel"
-                        disabled={isLoading}
+                        disabled={isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -226,7 +192,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                         placeholder="******"
                         type="password"
                         autoComplete="new-password"
-                        disabled={isLoading}
+                        disabled={isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -244,8 +210,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
-                {isLoading ? (
+              <Button type="submit" className="w-full rtl-button" disabled={isProcessing}>
+                {isProcessing ? (
                   <>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" /> מעבד...
                   </>
