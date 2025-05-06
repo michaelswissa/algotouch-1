@@ -39,6 +39,11 @@
     @apply flex-row-reverse;
   }
   
+  /* RTL tab selection indicator fix */
+  [dir="rtl"] .rtl-tabs-list {
+    direction: ltr; /* Fixes tab indicator positioning */
+  }
+  
   [dir="rtl"] .rtl-button svg {
     margin-right: 0;
     margin-left: 0.5rem;
