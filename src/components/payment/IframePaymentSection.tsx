@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +29,6 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusEnum>(PaymentStatusEnum.IDLE);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const pollingIntervalRef = useRef<number | null>(null);
 
   // Determine if we're using token_only mode (for monthly plans)
   const operationType = planId === 'monthly' ? 'token_only' : 'payment';
@@ -43,26 +43,16 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
         
         // Get contract data from storage - contains customer info
         const contractData = StorageService.get<ContractData>('contract_data');
-        console.log('Contract data from storage:', contractData); // Debug log
-        
         if (!contractData) {
           throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
         }
 
         if (!contractData.email || !contractData.fullName) {
-          console.error('Missing required contract fields:', { 
-            email: contractData.email, 
-            fullName: contractData.fullName 
-          });
           throw new Error('חסרים פרטי לקוח בחוזה');
         }
 
         // Validate phone and idNumber are present
         if (!contractData.phone || !contractData.idNumber) {
-          console.error('Missing required contract fields:', { 
-            phone: contractData.phone, 
-            idNumber: contractData.idNumber 
-          });
           throw new Error('חסרים פרטי טלפון או תעודת זהות בחוזה');
         }
 
@@ -70,8 +60,8 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           planId, 
           email: contractData.email,
           fullName: contractData.fullName,
-          phone: contractData.phone,
-          idNumber: contractData.idNumber,
+          hasPhone: Boolean(contractData.phone),
+          hasIdNumber: Boolean(contractData.idNumber),
           operationType
         });
         
@@ -129,66 +119,49 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     };
 
     initializePaymentIframe();
-    
-    return () => {
-      // Clean up any polling intervals when unmounting
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
   }, [planId, user?.id, operationType]);
   
-  // Setup realtime subscription for payment status updates
+  // Handle iframe messages from CardCom
   useEffect(() => {
-    if (!sessionId) return;
-    
-    const channel = supabase
-      .channel('payment-updates')
-      .on(
-        'broadcast',
-        { event: 'payment_status_update' },
-        (payload) => {
-          if (payload.payload && payload.payload.session_id === sessionId) {
-            PaymentLogger.log('Received payment status update via realtime:', payload.payload);
-            
-            if (payload.payload.status === 'completed') {
-              setPaymentStatus(PaymentStatusEnum.SUCCESS);
-              toast.success('התשלום בוצע בהצלחה!');
-              
-              // Clean up polling if it's running
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-              
-              if (onPaymentComplete) {
-                onPaymentComplete();
-              }
-            } else if (payload.payload.status === 'failed') {
-              setPaymentStatus(PaymentStatusEnum.FAILED);
-              setError('התשלום נכשל');
-              toast.error('התשלום נכשל');
-              
-              // Clean up polling
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-            }
-          }
-        }
-      )
-      .subscribe();
+    const handleMessage = (event: MessageEvent) => {
+      // Only process messages from CardCom domains
+      if (!event.origin.includes('cardcom.solutions')) {
+        return;
+      }
       
-    PaymentLogger.log('Subscribed to payment status updates for session:', sessionId);
+      PaymentLogger.log('Received message from iframe:', event.data);
+      
+      try {
+        // Try to parse the message if it's a string
+        const data = typeof event.data === 'string' 
+          ? JSON.parse(event.data) 
+          : event.data;
+          
+        if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
+          setPaymentStatus(PaymentStatusEnum.SUCCESS);
+          toast.success('התשלום בוצע בהצלחה!');
+          
+          if (onPaymentComplete) {
+            onPaymentComplete();
+          }
+        } else if (data.action === 'HandleError') {
+          setPaymentStatus(PaymentStatusEnum.FAILED);
+          setError(data.message || 'התשלום נכשל');
+          toast.error(data.message || 'התשלום נכשל');
+        }
+      } catch (err) {
+        PaymentLogger.error('Error processing iframe message:', err);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
     
     return () => {
-      // Cleanup subscription
-      supabase.removeChannel(channel);
+      window.removeEventListener('message', handleMessage);
     };
-  }, [sessionId, onPaymentComplete]);
+  }, [onPaymentComplete]);
   
-  // Fallback polling mechanism for payment status updates (in case realtime doesn't work)
+  // Poll for payment status updates
   useEffect(() => {
     if (!sessionId || paymentStatus !== PaymentStatusEnum.IDLE) {
       return;
@@ -205,31 +178,17 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           return;
         }
         
-        if (data?.data?.status === 'success' || data?.data?.status === 'completed') {
-          PaymentLogger.log('Payment completed successfully (poll)');
+        if (data?.data?.status === 'success') {
           setPaymentStatus(PaymentStatusEnum.SUCCESS);
           toast.success('התשלום בוצע בהצלחה!');
           
           if (onPaymentComplete) {
             onPaymentComplete();
           }
-          
-          // Stop polling
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
         } else if (data?.data?.status === 'failed') {
-          PaymentLogger.log('Payment failed (poll)');
           setPaymentStatus(PaymentStatusEnum.FAILED);
           setError('התשלום נדחה');
           toast.error('התשלום נכשל');
-          
-          // Stop polling
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
         }
       } catch (err) {
         PaymentLogger.error('Error in payment status check:', err);
@@ -238,35 +197,9 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     
     // Check immediately and then every 5 seconds
     checkPaymentStatus();
+    const interval = setInterval(checkPaymentStatus, 5000);
     
-    // Polling interval - check every 6 seconds for a maximum of 2 minutes
-    const maxPolls = 20; // 2 minutes (20 * 6 seconds)
-    let pollCount = 0;
-    
-    pollingIntervalRef.current = window.setInterval(() => {
-      pollCount++;
-      checkPaymentStatus();
-      
-      // Stop polling after the maximum number of polls
-      if (pollCount >= maxPolls) {
-        clearInterval(pollingIntervalRef.current!);
-        pollingIntervalRef.current = null;
-        
-        // If still in IDLE state after 2 minutes, show a message
-        if (paymentStatus === PaymentStatusEnum.IDLE) {
-          PaymentLogger.log('Polling timed out, no payment status update received');
-          // Don't change status, let the user continue with the payment
-          toast.info('אנא השלם את התשלום או נסה שנית מאוחר יותר');
-        }
-      }
-    }, 6000);
-    
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
+    return () => clearInterval(interval);
   }, [sessionId, paymentStatus, onPaymentComplete]);
   
   // Handle iframe load events
@@ -339,7 +272,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
                 className="absolute top-0 left-0 w-full h-full"
                 style={{ border: 'none' }}
                 allow="payment"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
                 onLoad={handleIframeLoad}
                 onError={handleIframeError}
               ></iframe>

@@ -17,14 +17,6 @@ serve(async (req) => {
   }
 
   try {
-    // Log environment variables for debugging (redacted sensitive values in production)
-    console.log(JSON.stringify({
-      term: Deno.env.get('CARDCOM_TERMINAL_NUMBER') ? 'exists' : 'missing',
-      api: Deno.env.get('CARDCOM_API_NAME') ? 'exists' : 'missing',
-      supabaseUrl: Deno.env.get('SUPABASE_URL') ? 'exists' : 'missing',
-      serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'exists' : 'missing'
-    }));
-    
     logStep("CARDCOM-IFRAME", "Function started");
 
     // Initialize Supabase client
@@ -45,19 +37,8 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
-    // Log the request content type
-    logStep("CARDCOM-IFRAME", "Request headers", { 
-      contentType: req.headers.get("Content-Type") 
-    });
-
-    let requestData;
-    try {
-      requestData = await req.json();
-      logStep("CARDCOM-IFRAME", "Request data received", requestData);
-    } catch (parseError) {
-      logStep("CARDCOM-IFRAME", "JSON parse error", { error: parseError.message });
-      throw new Error(`Invalid JSON body: ${parseError.message}`);
-    }
+    const requestData = await req.json();
+    logStep("CARDCOM-IFRAME", "Request data received", requestData);
 
     // Validate required parameters
     const { 
@@ -68,16 +49,6 @@ serve(async (req) => {
       phone,
       idNumber
     } = requestData;
-
-    // Log validation for required fields
-    logStep("CARDCOM-IFRAME", "Validating required fields", {
-      hasPlanId: Boolean(planId),
-      hasUserId: Boolean(userId),
-      hasEmail: Boolean(email), 
-      hasFullName: Boolean(fullName),
-      hasPhone: Boolean(phone),
-      hasIdNumber: Boolean(idNumber)
-    });
 
     // Map operation type based on request
     let operation = "ChargeOnly"; // Default
@@ -110,8 +81,6 @@ serve(async (req) => {
     let productName = "Subscription";
 
     // Map plan ID to appropriate operation and amount
-    logStep("CARDCOM-IFRAME", "Fetching plan details", { planId });
-    
     const { data: plan, error: planError } = await supabaseAdmin
       .from('plans')
       .select('*')
@@ -119,12 +88,10 @@ serve(async (req) => {
       .maybeSingle();
 
     if (planError) {
-      logStep("CARDCOM-IFRAME", "Plan fetch error", { error: planError.message });
       throw new Error(`Error fetching plan details: ${planError.message}`);
     }
     
     if (!plan) {
-      logStep("CARDCOM-IFRAME", "Plan not found", { planId });
       throw new Error(`Invalid plan ID: ${planId}`);
     }
 
@@ -146,280 +113,230 @@ serve(async (req) => {
     // Generate unique ID for session
     const lowProfileId = crypto.randomUUID();
 
-    // Determine base URLs for webhooks
+    // Determine base URLs for redirects
+    const frontendBaseUrl = Deno.env.get("FRONTEND_URL") || requestOrigin;
     const publicFunctionsUrl = Deno.env.get("PUBLIC_FUNCTIONS_URL") || 
       `${supabaseUrl}/functions/v1`;
 
     // Create payment session in DB
-    logStep("CARDCOM-IFRAME", "Creating payment session", {
-      userId,
-      planId,
-      amount,
-      operation_type: operation
-    });
-    
-    try {
-      const { data: sessionData, error: sessionError } = await supabaseAdmin
-        .from('payment_sessions')
-        .insert({
-          user_id: userId,
-          anonymous_data: !userId ? { 
-            email, 
-            fullName, 
-            phone, 
-            idNumber, 
-            createdAt: new Date().toISOString() 
-          } : null,
-          plan_id: planId,
-          amount: amount,
-          currency: "ILS",
-          status: 'initiated',
-          operation_type: operation,
-          reference: transactionRef,
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          payment_details: { 
-            fullName, 
-            email, 
-            phone, 
-            idNumber 
-          },
-          low_profile_id: lowProfileId
-        })
-        .select('id')
-        .single();
+    const { data: sessionData, error: sessionError } = await supabaseAdmin
+      .from('payment_sessions')
+      .insert({
+        user_id: userId,
+        anonymous_data: !userId ? { 
+          email, 
+          fullName, 
+          phone, 
+          idNumber, 
+          createdAt: new Date().toISOString() 
+        } : null,
+        plan_id: planId,
+        amount: amount,
+        currency: "ILS",
+        status: 'initiated',
+        operation_type: operation,
+        reference: transactionRef,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        payment_details: { 
+          fullName, 
+          email, 
+          phone, 
+          idNumber 
+        },
+        low_profile_id: lowProfileId
+      })
+      .select('id')
+      .single();
 
-      if (sessionError) {
-        logStep("CARDCOM-IFRAME", "Database insert error", { error: sessionError.message });
-        throw new Error("Failed to create payment session: " + sessionError.message);
-      }
-      
-      logStep("CARDCOM-IFRAME", "Created payment session", {
-        sessionId: sessionData.id,
-        lowProfileId,
-        operation,
-        amount
-      });
-
-      // Prepare the request body for the CardCom API
-      // Following solution A - no redirect URLs, rely only on webhook
-      const lowProfileApiUrl = "https://secure.cardcom.solutions/Interface/LowProfile.aspx";
-      
-      // Convert operation to CardCom format
-      // ChargeOnly = 1, ChargeAndCreateToken = 2, CreateTokenOnly = 3
-      const cardcomOperationCode = operation === "CreateTokenOnly" ? 3 : 
-                                  operation === "ChargeAndCreateToken" ? 2 : 1;
-      
-      const lowProfileApiBody = {
-        TerminalNumber: parseInt(terminalNumber),
-        UserName: apiName,
-        ReturnValue: sessionData.id, // Store session ID in ReturnValue for webhook
-        Sum: amount * 100, // Amount in agorot/cents
-        CoinID: 1, // ILS
-        Language: "he",
-        ProductName: productName,
-        Operation: cardcomOperationCode,
-        createTokenJValidateType: 5, // Required in production, this creates a real authorization
-        // No JValidateOptionalFields by default - add only if Cardcom returns error 103
-        IndicatorUrl: `${publicFunctionsUrl}/cardcom-webhook`,
-        APILevel: 10,
-        UIDefinition: {
-          CardOwnerNameValue: fullName,
-          CardOwnerEmailValue: email,
-          CardOwnerPhoneValue: phone,
-          CardOwnerIdValue: idNumber
-        }
-      };
-      
-      logStep("CARDCOM-IFRAME", "CardCom API request", {
-        ...lowProfileApiBody,
-        TerminalNumber: "REDACTED",
-        UserName: "REDACTED"
-      });
-
-      // Call CardCom API to create LowProfile
-      try {
-        const apiResponse = await fetch(lowProfileApiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(lowProfileApiBody)
-        });
-        
-        // Log response status before parsing JSON
-        logStep("CARDCOM-IFRAME", "CardCom API Response Status", { 
-          status: apiResponse.status,
-          statusText: apiResponse.statusText
-        });
-        
-        // Get the raw response text first for logging
-        const responseText = await apiResponse.text();
-        logStep("CARDCOM-IFRAME", "CardCom API Raw Response", { 
-          responseText: responseText.substring(0, 1000) // Limit in case it's very large
-        });
-        
-        // Try to parse the response as JSON
-        let apiResult;
-        try {
-          apiResult = JSON.parse(responseText);
-          logStep("CARDCOM-IFRAME", "CardCom API Response Parsed", apiResult);
-        } catch (jsonError) {
-          logStep("CARDCOM-IFRAME", "Failed to parse CardCom response as JSON", { 
-            error: jsonError.message 
-          });
-          throw new Error(`CardCom API returned non-JSON response: ${responseText.substring(0, 200)}...`);
-        }
-        
-        if (apiResult.ResponseCode === 0) {
-          // Success - use the URL from the API response
-          const cardcomUrl = apiResult.url || apiResult.Url;
-          
-          // Update the session with the LowProfileId from the API
-          if (apiResult.LowProfileId) {
-            await supabaseAdmin
-              .from('payment_sessions')
-              .update({
-                low_profile_id: apiResult.LowProfileId,
-                payment_details: { 
-                  ...sessionData.payment_details,
-                  lowProfileId: apiResult.LowProfileId,
-                  url: cardcomUrl
-                }
-              })
-              .eq('id', sessionData.id);
-          }
-          
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: "Payment initialized successfully",
-              data: {
-                iframeUrl: cardcomUrl,
-                url: cardcomUrl,
-                sessionId: sessionData.id,
-                lowProfileId: apiResult.LowProfileId || lowProfileId,
-                reference: transactionRef,
-                terminalNumber,
-                LowProfileId: apiResult.LowProfileId || lowProfileId
-              }
-            }),
-            { 
-              status: 200, 
-              headers: { 
-                ...corsHeaders, 
-                'Content-Type': 'application/json' 
-              } 
-            }
-          );
-        } else if (apiResult.ResponseCode === 103 && !lowProfileApiBody.hasOwnProperty('JValidateOptionalFields')) {
-          // If we get error 103, try again with JValidateOptionalFields = 1
-          logStep("CARDCOM-IFRAME", "Received error 103, retrying with JValidateOptionalFields=1", apiResult);
-          
-          // Add JValidateOptionalFields and retry
-          lowProfileApiBody.JValidateOptionalFields = 1;
-          
-          logStep("CARDCOM-IFRAME", "Retry with JValidateOptionalFields=1", {
-            ...lowProfileApiBody,
-            TerminalNumber: "REDACTED",
-            UserName: "REDACTED"
-          });
-          
-          const retryResponse = await fetch(lowProfileApiUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(lowProfileApiBody)
-          });
-          
-          // Log retry response status before parsing JSON
-          logStep("CARDCOM-IFRAME", "Retry Response Status", { 
-            status: retryResponse.status,
-            statusText: retryResponse.statusText
-          });
-          
-          // Get the raw retry response text for logging
-          const retryResponseText = await retryResponse.text();
-          logStep("CARDCOM-IFRAME", "Retry Raw Response", { 
-            responseText: retryResponseText.substring(0, 1000)
-          });
-          
-          // Try to parse the retry response as JSON
-          let retryResult;
-          try {
-            retryResult = JSON.parse(retryResponseText);
-            logStep("CARDCOM-IFRAME", "Retry Response Parsed", retryResult);
-          } catch (jsonError) {
-            logStep("CARDCOM-IFRAME", "Failed to parse retry response as JSON", { 
-              error: jsonError.message 
-            });
-            throw new Error(`CardCom API returned non-JSON response on retry: ${retryResponseText.substring(0, 200)}...`);
-          }
-          
-          if (retryResult.ResponseCode === 0) {
-            const cardcomUrl = retryResult.url || retryResult.Url;
-            
-            // Update the session with the LowProfileId from the API
-            if (retryResult.LowProfileId) {
-              await supabaseAdmin
-                .from('payment_sessions')
-                .update({
-                  low_profile_id: retryResult.LowProfileId,
-                  payment_details: { 
-                    ...sessionData.payment_details,
-                    lowProfileId: retryResult.LowProfileId,
-                    url: cardcomUrl
-                  }
-                })
-                .eq('id', sessionData.id);
-            }
-            
-            return new Response(
-              JSON.stringify({
-                success: true,
-                message: "Payment initialized successfully (with JValidateOptionalFields=1)",
-                data: {
-                  iframeUrl: cardcomUrl,
-                  url: cardcomUrl,
-                  sessionId: sessionData.id,
-                  lowProfileId: retryResult.LowProfileId || lowProfileId,
-                  reference: transactionRef,
-                  terminalNumber,
-                  LowProfileId: retryResult.LowProfileId || lowProfileId
-                }
-              }),
-              { 
-                status: 200, 
-                headers: { 
-                  ...corsHeaders, 
-                  'Content-Type': 'application/json' 
-                } 
-              }
-            );
-          } else {
-            logStep("CARDCOM-IFRAME", "Retry failed", retryResult);
-            throw new Error(`CardCom API error on retry: ${retryResult.Description || "Unknown error"} (code: ${retryResult.ResponseCode})`);
-          }
-        } else {
-          logStep("CARDCOM-IFRAME", "CardCom API error", apiResult);
-          throw new Error(`CardCom API error: ${apiResult.Description || "Unknown error"} (code: ${apiResult.ResponseCode})`);
-        }
-      } catch (apiError) {
-        logStep("CARDCOM-IFRAME", "API call exception", {
-          error: apiError instanceof Error ? apiError.message : String(apiError)
-        });
-        
-        throw apiError;
-      }
-    } catch (dbError) {
-      logStep("CARDCOM-IFRAME", "Database operation error", {
-        error: dbError instanceof Error ? dbError.message : String(dbError)
-      });
-      throw dbError;
+    if (sessionError) {
+      console.error("Database insert error:", sessionError);
+      throw new Error("Failed to create payment session: " + sessionError.message);
     }
+
+    logStep("CARDCOM-IFRAME", "Created payment session", {
+      sessionId: sessionData.id,
+      lowProfileId,
+      operation,
+      amount
+    });
+
+    // Build CardCom direct URL to EA/LPC6 page for seamless iframe integration
+    // This avoids the redirect issue we were having with the LowProfile.aspx approach
+    const directLpcUrl = `https://secure.cardcom.solutions/EA/LPC6/${terminalNumber}/${lowProfileId}`;
+    
+    // Build traditional LowProfile.aspx URL as fallback
+    const lowProfileUrl = new URL("https://secure.cardcom.solutions/Interface/LowProfile.aspx");
+    
+    // Add required parameters
+    lowProfileUrl.searchParams.append('TerminalNumber', terminalNumber);
+    lowProfileUrl.searchParams.append('UserName', apiName); // Use ApiName as UserName
+    lowProfileUrl.searchParams.append('ReturnValue', transactionRef);
+    lowProfileUrl.searchParams.append('SumToBill', amount.toString());
+    lowProfileUrl.searchParams.append('CoinId', '1'); // ILS
+    lowProfileUrl.searchParams.append('Language', 'he');
+    lowProfileUrl.searchParams.append('ProductName', productName);
+    
+    // Add operation type
+    lowProfileUrl.searchParams.append('Operation', operation);
+    
+    // Add redirect URLs
+    lowProfileUrl.searchParams.append('SuccessRedirectUrl', 
+      `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`);
+    lowProfileUrl.searchParams.append('ErrorRedirectUrl', 
+      `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`);
+    lowProfileUrl.searchParams.append('IndicatorUrl', 
+      `${publicFunctionsUrl}/cardcom-webhook`);
+    
+    // Add customer details
+    lowProfileUrl.searchParams.append('CardOwnerName', fullName);
+    lowProfileUrl.searchParams.append('CardOwnerEmail', email);
+    lowProfileUrl.searchParams.append('CardOwnerPhone', phone);
+    lowProfileUrl.searchParams.append('CardOwnerId', idNumber);
+    
+    // For the Low Profile Create API, need to create a proper URL
+    const lowProfileApiUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
+    
+    // Prepare the request body for the API
+    const lowProfileApiBody = {
+      TerminalNumber: parseInt(terminalNumber),
+      ApiName: apiName,
+      ReturnValue: transactionRef,
+      Amount: amount,
+      SuccessRedirectUrl: `${frontendBaseUrl}/subscription/success?session_id=${sessionData.id}&ref=${transactionRef}`,
+      FailedRedirectUrl: `${frontendBaseUrl}/subscription/failed?session_id=${sessionData.id}&ref=${transactionRef}`,
+      WebHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
+      ProductName: productName,
+      Language: "he",
+      ISOCoinId: 1, // ILS
+      Operation: operation,
+      UIDefinition: {
+        CardOwnerNameValue: fullName,
+        CardOwnerEmailValue: email,
+        CardOwnerPhoneValue: phone,
+        CardOwnerIdValue: idNumber
+      }
+    };
+    
+    logStep("CARDCOM-IFRAME", "Created URL options", {
+      directUrl: directLpcUrl,
+      lowProfileUrl: lowProfileUrl.toString()
+    });
+
+    // Now let's try using the CardCom API to create the LowProfile
+    try {
+      const apiResponse = await fetch(lowProfileApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(lowProfileApiBody)
+      });
+      
+      const apiResult = await apiResponse.json();
+      logStep("CARDCOM-IFRAME", "CardCom API Response", apiResult);
+      
+      if (apiResult.ResponseCode === 0) {
+        // Success - use the URL from the API response
+        const cardcomUrl = apiResult.url || apiResult.Url || directLpcUrl;
+        
+        // Update the session with the LowProfileId from the API
+        if (apiResult.LowProfileId) {
+          await supabaseAdmin
+            .from('payment_sessions')
+            .update({
+              low_profile_id: apiResult.LowProfileId,
+              payment_details: { 
+                ...sessionData.payment_details,
+                lowProfileId: apiResult.LowProfileId,
+                url: cardcomUrl
+              }
+            })
+            .eq('id', sessionData.id);
+        }
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Payment initialized successfully",
+            data: {
+              iframeUrl: cardcomUrl,
+              url: cardcomUrl,
+              sessionId: sessionData.id,
+              lowProfileId: apiResult.LowProfileId || lowProfileId,
+              reference: transactionRef,
+              terminalNumber,
+              LowProfileId: apiResult.LowProfileId || lowProfileId
+            }
+          }),
+          { 
+            status: 200, 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json' 
+            } 
+          }
+        );
+      } else {
+        // API call failed, use the direct URL as fallback
+        logStep("CARDCOM-IFRAME", "API call failed, using direct URL", {
+          errorCode: apiResult.ResponseCode,
+          errorMessage: apiResult.Description
+        });
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Payment initialized with fallback URL",
+            data: {
+              iframeUrl: directLpcUrl,
+              url: directLpcUrl,
+              sessionId: sessionData.id,
+              lowProfileId: lowProfileId,
+              reference: transactionRef,
+              terminalNumber
+            }
+          }),
+          { 
+            status: 200, 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json' 
+            } 
+          }
+        );
+      }
+    } catch (apiError) {
+      // API call threw an exception, use the low profile URL as fallback
+      logStep("CARDCOM-IFRAME", "API call exception, using low profile URL", {
+        error: apiError instanceof Error ? apiError.message : String(apiError)
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Payment initialized with URL fallback",
+          data: {
+            iframeUrl: lowProfileUrl.toString(),
+            url: lowProfileUrl.toString(),
+            sessionId: sessionData.id,
+            lowProfileId: lowProfileId,
+            reference: transactionRef,
+            terminalNumber
+          }
+        }),
+        { 
+          status: 200, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    logStep("CARDCOM-IFRAME", "Error", { message: errorMessage });
+    console.error(`[CARDCOM-IFRAME] Error: ${errorMessage}`);
     
     const status = 
       errorMessage.includes("Invalid plan ID") || 
