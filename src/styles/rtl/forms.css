@@ -34,6 +34,11 @@
     text-align: right;
   }
 
+  /* RTL tab fixes */
+  [dir="rtl"] .tabs-list {
+    @apply flex-row-reverse;
+  }
+  
   [dir="rtl"] .rtl-button svg {
     margin-right: 0;
     margin-left: 0.5rem;
