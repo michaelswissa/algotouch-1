@@ -172,7 +172,7 @@ const Auth = () => {
                     הרשמה
                   </TabsTrigger>
                   
-                  {/* Switch track - fixed for RTL */}
+                  {/* Switch track - proper RTL positioning */}
                   <div 
                     className="absolute inset-y-1 rounded-full bg-primary transition-all duration-300 ease-in-out z-0"
                     style={{ 
