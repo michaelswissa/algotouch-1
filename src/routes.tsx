@@ -6,6 +6,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SubscriptionPage from "./pages/Subscription";
 import SubscriptionSuccess from "./components/subscription/SubscriptionSuccess";
+import SubscriptionFailed from "./components/subscription/SubscriptionFailed";
 import Profile from "./pages/Profile";
 import Calendar from "./pages/Calendar";
 import Blog from "./pages/Blog";
@@ -16,6 +17,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import SubscribedRoute from "./components/SubscribedRoute";
 import AdminRoute from "./components/AdminRoute";
 import PaymentRedirectPage from "./pages/PaymentRedirectPage";
+import CardComRedirectPage from "./pages/CardComRedirectPage";
 import IframePaymentPage from "./pages/IframePaymentPage";
 
 const router = createBrowserRouter([
@@ -41,6 +43,10 @@ const router = createBrowserRouter([
     path: "/payment-redirect-failed.html", 
     element: <PaymentRedirectPage />,
   },
+  {
+    path: "/cardcom-redirect",
+    element: <CardComRedirectPage />,
+  },
   
   // Direct payment page route (for testing the iframe separately if needed)
   {
@@ -56,6 +62,10 @@ const router = createBrowserRouter([
   {
     path: "/subscription/success", 
     element: <SubscriptionSuccess />,
+  },
+  {
+    path: "/subscription/failed", 
+    element: <SubscriptionFailed />,
   },
   
   // Protected routes that require authentication
