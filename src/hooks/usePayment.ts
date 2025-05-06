@@ -42,14 +42,20 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
 
   const { initializeCardcomFields } = useCardcomInitializer();
 
-  const statusCheckResult = usePaymentStatusCheck({ 
-    sessionId: state.sessionId
+  const {
+    checkPaymentStatus,
+    startStatusCheck,
+    cleanupStatusCheck,
+    isChecking
+  } = usePaymentStatusCheck({ 
+    lowProfileCode: state.lowProfileCode,
+    sessionId: state.sessionId,
+    setState,
+    onPaymentSuccess: handlePaymentSuccess
   });
-  
-  const checkPaymentStatus = statusCheckResult.checkStatus;
 
   useFrameMessages({
-    handlePaymentSuccess,
+    handlePaymentSuccess: handlePaymentSuccess,
     setState,
     checkPaymentStatus,
     lowProfileCode: state.lowProfileCode,
@@ -93,6 +99,12 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     }
   }, [state.lowProfileCode, state.sessionId, state.terminalNumber, isCardcomInitialized, operationType, initializeCardcomFields, handleError]);
 
+  useEffect(() => {
+    return () => {
+      cleanupStatusCheck();
+    };
+  }, [cleanupStatusCheck]);
+
   const handleRetry = useCallback(() => {
     PaymentLogger.log('Retrying payment initialization');
     setState(prev => ({
@@ -102,13 +114,6 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
     setIsCardcomInitialized(false);
     initializePayment();
   }, [initializePayment, setState]);
-
-  const startStatusCheck = useCallback((lowProfileCode: string, sessionId: string) => {
-    if (sessionId) {
-      PaymentLogger.log('Starting payment status check', { lowProfileCode, sessionId });
-      checkPaymentStatus();
-    }
-  }, [checkPaymentStatus]);
 
   const submitPayment = useCallback(() => {
     if (paymentInProgress) {
@@ -148,7 +153,7 @@ export const usePayment = ({ planId, onPaymentComplete }: UsePaymentProps) => {
           PaymentLogger.log('Payment request sent to CardCom 3DS');
           
           // Start checking payment status
-          startStatusCheck(state.lowProfileCode, state.sessionId);
+          startStatusCheck(state.lowProfileCode, state.sessionId, operationType, planId);
         } else {
           PaymentLogger.error('CardCom 3DS field validation failed');
           handleError("אנא וודא שפרטי כרטיס האשראי הוזנו כראוי");

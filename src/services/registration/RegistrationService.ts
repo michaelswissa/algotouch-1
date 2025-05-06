@@ -1,112 +1,221 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { User } from '@supabase/supabase-js';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
-interface RegistrationResult {
-  success: boolean;
+export interface RegistrationData {
+  email: string;
+  password: string;
+  userData?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    [key: string]: any;
+  };
+  planId?: string;
+  contractSigned?: boolean;
+  contractSignedAt?: string;
   userId?: string;
-  error?: Error;
+  registrationTime: string;
+  userCreated?: boolean;
 }
 
 export class RegistrationService {
   /**
-   * Creates a user account from registration data stored in session storage
+   * Create a new user account from registration data
    */
-  static async createUserAccount(registrationData: any): Promise<RegistrationResult> {
+  static async createUserAccount(registrationData: RegistrationData): Promise<{
+    success: boolean;
+    user: User | null;
+    error?: string;
+  }> {
     try {
-      if (!registrationData) {
-        throw new Error('No registration data provided');
-      }
-
-      PaymentLogger.log('Creating user account from registration data', { 
-        email: registrationData.email,
-        hasPassword: !!registrationData.password
-      });
-
       if (!registrationData.email || !registrationData.password) {
-        throw new Error('Missing required registration fields (email or password)');
+        return { 
+          success: false, 
+          user: null, 
+          error: 'Missing required fields (email/password)' 
+        };
       }
 
-      // Check if user already exists
-      const { data: existingUser, error: checkError } = await supabase.auth.signInWithPassword({
+      PaymentLogger.log('Creating user account', { 
         email: registrationData.email,
-        password: registrationData.password,
+        hasUserData: !!registrationData.userData 
       });
-
-      if (existingUser?.user) {
-        PaymentLogger.log('User already exists, skipping creation', { 
-          userId: existingUser.user.id 
+      
+      // Check if user is already created
+      if (registrationData.userCreated && registrationData.userId) {
+        PaymentLogger.log('User already created, skipping creation', { 
+          userId: registrationData.userId 
         });
         
-        // Set the user as created in registration data
-        StorageService.updateRegistrationData({ userCreated: true });
+        // Try to get the user
+        const { data: userData, error: getUserError } = await supabase.auth.getUser();
+        if (userData?.user) {
+          // Make sure we're authenticated as this user
+          if (userData.user.id === registrationData.userId) {
+            return { success: true, user: userData.user };
+          } else {
+            PaymentLogger.warn('User ID mismatch, signing out and attempting to sign in with stored credentials');
+            await supabase.auth.signOut();
+            return await this.signInUser(registrationData.email, registrationData.password);
+          }
+        }
         
-        return {
-          success: true,
-          userId: existingUser.user.id
-        };
-      } else if (checkError && checkError.message !== 'Invalid login credentials') {
-        throw new Error(`Error checking existing user: ${checkError.message}`);
+        // If not authenticated, try to sign in
+        PaymentLogger.log('User not authenticated, attempting to sign in');
+        return await this.signInUser(registrationData.email, registrationData.password);
       }
-
-      // User doesn't exist, create the account
-      const { data, error } = await supabase.auth.signUp({
+      
+      // Check if user already exists before creating
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: registrationData.email,
+        password: registrationData.password
+      });
+      
+      if (!signInError) {
+        // User already exists and we've signed them in
+        PaymentLogger.log('User already exists and signed in successfully');
+        
+        // Get the user data
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          // Update registration data to mark user as created
+          registrationData.userCreated = true;
+          registrationData.userId = userData.user.id;
+          
+          // Store updated registration data
+          StorageService.storeRegistrationData(registrationData);
+          
+          return { success: true, user: userData.user };
+        }
+      }
+      
+      // Create the user since they don't exist
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: registrationData.email,
         password: registrationData.password,
         options: {
           data: {
-            first_name: registrationData.firstName || '',
-            last_name: registrationData.lastName || '',
-            is_new_user: true,
-            phone: registrationData.phone || ''
-          }
+            first_name: registrationData.userData?.firstName,
+            last_name: registrationData.userData?.lastName,
+            phone: registrationData.userData?.phone,
+            full_name: `${registrationData.userData?.firstName || ''} ${registrationData.userData?.lastName || ''}`.trim()
+          },
+          // Disable email verification for now to simplify the flow
+          emailRedirectTo: `${window.location.origin}/subscription`
         }
       });
 
-      if (error) {
-        throw new Error(`Error creating user account: ${error.message}`);
-      }
-
-      const userId = data.user?.id;
-      
-      if (!userId) {
-        throw new Error('User created but no user ID returned');
-      }
-
-      // Update profile info if available
-      if (registrationData.firstName || registrationData.lastName) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: userId,
-            first_name: registrationData.firstName || '',
-            last_name: registrationData.lastName || '',
-            phone: registrationData.phone || '',
-            updated_at: new Date().toISOString()
-          });
-
-        if (profileError) {
-          PaymentLogger.error('Error updating user profile', profileError);
-          // We don't throw here, as the account was created successfully
+      if (signUpError) {
+        PaymentLogger.error('Error creating user account:', signUpError);
+        
+        // Check if user already exists
+        if (signUpError.message?.includes('already exists')) {
+          PaymentLogger.log('User already exists, attempting to sign in');
+          return await this.signInUser(registrationData.email, registrationData.password);
         }
+        
+        return { success: false, user: null, error: signUpError.message };
       }
 
-      // Set user as created in registration data
-      StorageService.updateRegistrationData({ userCreated: true });
+      const userId = authData.user?.id;
+      if (!userId) {
+        return { success: false, user: null, error: 'User creation failed - no user ID returned' };
+      }
 
-      PaymentLogger.log('User account created successfully', { userId });
+      // Update registration data to mark user as created
+      registrationData.userCreated = true;
+      registrationData.userId = userId;
       
-      return {
-        success: true,
-        userId
-      };
+      // Store updated registration data
+      StorageService.storeRegistrationData(registrationData);
+      
+      PaymentLogger.log('User created successfully', { userId });
+      
+      // Sign in the user immediately
+      if (!authData.session) {
+        PaymentLogger.log('No session after signup, signing in explicitly');
+        return await this.signInUser(registrationData.email, registrationData.password);
+      }
+      
+      return { success: true, user: authData.user };
+      
+    } catch (error: any) {
+      PaymentLogger.error('Exception during account creation:', error);
+      return { success: false, user: null, error: error.message || 'Unknown error' };
+    }
+  }
+  
+  /**
+   * Sign in an existing user
+   */
+  private static async signInUser(email: string, password: string): Promise<{
+    success: boolean;
+    user: User | null;
+    error?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+      
+      if (error) {
+        PaymentLogger.error('Error signing in user:', error);
+        return { success: false, user: null, error: error.message };
+      }
+      
+      return { success: true, user: data.user };
+    } catch (error: any) {
+      PaymentLogger.error('Exception during sign in:', error);
+      return { success: false, user: null, error: error.message || 'Unknown error' };
+    }
+  }
+  
+  /**
+   * Get and validate registration data from storage
+   */
+  static getValidRegistrationData(): RegistrationData | null {
+    try {
+      const data = StorageService.getRegistrationData();
+      
+      // Check if we have the minimum required data
+      if (!data.email || !data.registrationTime) {
+        PaymentLogger.warn('Invalid registration data', { data });
+        return null;
+      }
+      
+      // Check if registration is expired (30 minutes)
+      const registrationTime = new Date(data.registrationTime);
+      const now = new Date();
+      const timeDiffMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+      
+      if (timeDiffMinutes > 30) {
+        PaymentLogger.warn('Registration data expired', { 
+          registrationTime: data.registrationTime,
+          timeDiffMinutes
+        });
+        return null;
+      }
+      
+      return data as RegistrationData;
     } catch (error) {
-      PaymentLogger.error('Error in createUserAccount', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error))
-      };
+      PaymentLogger.error('Error retrieving registration data:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Check if the user is authenticated and get the current user
+   */
+  static async getCurrentUser(): Promise<User | null> {
+    try {
+      const { data } = await supabase.auth.getUser();
+      return data?.user || null;
+    } catch (error) {
+      PaymentLogger.error('Error getting current user:', error);
+      return null;
     }
   }
 }

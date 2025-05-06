@@ -1,7 +1,7 @@
 
 @import './styles/base.css';
 @import './styles/components.css';
-@import './styles/rtl/index.css';
+@import './styles/rtl.css';
 @import './styles/modern-effects.css';
 
 /* Add keyframes that weren't moved to separate files */

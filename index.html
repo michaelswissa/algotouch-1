@@ -8,41 +8,25 @@
     <meta name="description" content="מערכת מתקדמת למסחר אלגוריתמי" />
     <meta name="author" content="AlgoTouch.AI" />
 
-    <!-- Open Graph / Social Media -->
     <meta property="og:title" content="AlgoTouch.AI - מערכת למסחר אלגוריתמי" />
     <meta property="og:description" content="מערכת מתקדמת למסחר אלגוריתמי" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@algotouch_ai" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
-    <!-- Performance optimizations -->
-    <link rel="preconnect" href="https://cdn.gpteng.co" crossorigin />
-    <link rel="preconnect" href="https://secure.cardcom.solutions" crossorigin />
+    <!-- Add Content Security Policy meta tag to allow CSSStyleSheet access -->
+    <meta http-equiv="Content-Security-Policy" content="style-src 'self' 'unsafe-inline' https://secure.cardcom.solutions https://cdn.gpteng.co; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://secure.cardcom.solutions; frame-src https://secure.cardcom.solutions; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://secure.cardcom.solutions">
     
-    <!-- Preload critical fonts -->
-    <link rel="preload" as="font" href="/fonts/your-main-font.woff2" type="font/woff2" crossorigin />
-    
-    <!-- Preload critical styles -->
-    <link rel="preload" as="style" href="/src/index.css" />
-    
-    <!-- Enable caching -->
-    <meta http-equiv="Cache-Control" content="max-age=86400" />
-    
-    <!-- Updated Content Security Policy to properly support CardCom -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://secure.cardcom.solutions https://cdn.gpteng.co; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://secure.cardcom.solutions; frame-src https://secure.cardcom.solutions; frame-ancestors 'self' https://secure.cardcom.solutions; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://secure.cardcom.solutions">
-    
-    <!-- Updated CardCom script reference with current timestamp -->
-    <script src="https://secure.cardcom.solutions/Interface/3DS.js?v=20254290001"></script>
-    <!-- Enable gpteng script for the "Select" feature -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    <!-- CardCom 3DS script for payment processing with timestamp to prevent caching -->
+    <script src="https://secure.cardcom.solutions/External/OpenFields/3DS.js?v=20254290001"></script>
   </head>
 
   <body>
     <div id="root"></div>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,0 +1,331 @@
+@layer components {  
+  /* Enhanced RTL menu specific styling */
+  [dir="rtl"] .menu-icon {
+    @apply ml-2 -mr-1;
+  }
+  
+  [dir="rtl"] .dropdown-content {
+    @apply right-0 text-right;
+  }
+  
+  [dir="rtl"] .dropdown-item {
+    @apply flex flex-row-reverse text-right;
+  }
+  
+  [dir="rtl"] .dropdown-item-icon {
+    @apply ml-2 mr-0;
+  }
+  
+  /* General RTL utilities */
+  [dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+  
+  [dir="rtl"] .ml-auto {
+    margin-left: 0;
+    margin-right: auto;
+  }
+  
+  [dir="rtl"] .mr-auto {
+    margin-right: 0;
+    margin-left: auto;
+  }
+  
+  [dir="rtl"] .ml-1 {
+    margin-left: 0;
+    margin-right: 0.25rem;
+  }
+  
+  [dir="rtl"] .ml-2 {
+    margin-left: 0;
+    margin-right: 0.5rem;
+  }
+  
+  [dir="rtl"] .ml-3 {
+    margin-left: 0;
+    margin-right: 0.75rem;
+  }
+  
+  [dir="rtl"] .ml-4 {
+    margin-left: 0;
+    margin-right: 1rem;
+  }
+  
+  [dir="rtl"] .mr-1 {
+    margin-right: 0;
+    margin-left: 0.25rem;
+  }
+  
+  [dir="rtl"] .mr-2 {
+    margin-right: 0;
+    margin-left: 0.5rem;
+  }
+  
+  [dir="rtl"] .mr-3 {
+    margin-right: 0;
+    margin-left: 0.75rem;
+  }
+  
+  [dir="rtl"] .mr-4 {
+    margin-right: 0;
+    margin-left: 1rem;
+  }
+
+  /* Icon spacing in RTL */
+  [dir="rtl"] .icon-ml {
+    @apply ml-0 mr-2;
+  }
+  
+  [dir="rtl"] .icon-mr {
+    @apply mr-0 ml-2;
+  }
+
+  /* Dropdown and menu positioning for RTL */
+  [dir="rtl"] .dropdown-menu,
+  [dir="rtl"] .popover-content {
+    @apply right-0 left-auto;
+  }
+  
+  /* Fix for button icons in RTL */
+  [dir="rtl"] button svg:first-child:not(:last-child),
+  [dir="rtl"] .button svg:first-child:not(:last-child) {
+    @apply ml-2 -mr-1;
+  }
+  
+  [dir="rtl"] button svg:last-child:not(:first-child),
+  [dir="rtl"] .button svg:last-child:not(:first-child) {
+    @apply mr-2 -ml-1;
+  }
+  
+  /* RTL search input adjustments */
+  [dir="rtl"] .search-input {
+    @apply pr-10 pl-4;
+  }
+  
+  [dir="rtl"] .search-icon {
+    @apply right-3 left-auto;
+  }
+  
+  /* Special rules for ScrollArea RTL */
+  [dir="rtl"] .space-x-reverse {
+    --tw-space-x-reverse: 1;
+  }
+  
+  [dir="rtl"] .rtl {
+    direction: rtl;
+    text-align: right;
+  }
+  
+  /* RTL blog card adjustments */
+  [dir="rtl"] .card-actions {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .card-badge {
+    @apply left-2 right-auto;
+  }
+
+  /* Radio and checkbox RTL */
+  [dir="rtl"] .radio-group-item,
+  [dir="rtl"] .checkbox-item {
+    @apply mr-0 ml-2;
+  }
+
+  /* Form elements spacing for RTL */
+  [dir="rtl"] .form-control {
+    @apply text-right;
+  }
+
+  /* Tooltip RTL */
+  [dir="rtl"] [data-popper-placement="left"] {
+    @apply right-8 left-auto;
+  }
+
+  /* Image flip for directional icons */
+  [dir="rtl"] .direction-icon {
+    transform: rotateY(180deg);
+  }
+
+  /* Slider RTL */
+  [dir="rtl"] .slider-value {
+    transform: translateX(50%);
+    right: 50%;
+    left: auto;
+  }
+
+  /* Chart labels for RTL */
+  [dir="rtl"] .recharts-text {
+    text-anchor: end;
+  }
+  
+  /* Fixed RTL charts better positioning */
+  [dir="rtl"] .recharts-label {
+    text-anchor: middle;
+  }
+  
+  [dir="rtl"] .recharts-cartesian-axis-tick-value {
+    text-anchor: middle;
+  }
+  
+  /* Proper RTL for Tooltip in charts */
+  [dir="rtl"] .recharts-tooltip-wrapper {
+    direction: rtl;
+  }
+  
+  /* RTL compatible insight card */
+  [dir="rtl"] .insight-card {
+    @apply text-right border-r-4 border-l-0 pr-3 pl-0;
+  }
+  
+  /* Fix for Pie Chart text in RTL */
+  [dir="rtl"] .recharts-pie-label-text {
+    direction: rtl;
+  }
+  
+  /* Fix for legend in RTL */
+  [dir="rtl"] .recharts-default-legend {
+    direction: rtl;
+    @apply text-right;
+  }
+  
+  [dir="rtl"] .recharts-legend-item {
+    @apply ml-0 mr-2;
+  }
+
+  /* Questionnaire specific RTL fixes */
+  [dir="rtl"] .questionnaire-container {
+    @apply text-right w-full;
+  }
+  
+  [dir="rtl"] .questionnaire-container .form-group {
+    @apply text-right;
+  }
+
+  [dir="rtl"] .step-navigation {
+    @apply flex-row-reverse;
+  }
+
+  [dir="rtl"] .radio-group {
+    @apply text-right;
+  }
+
+  [dir="rtl"] .checkbox-group {
+    @apply text-right;
+  }
+  
+  /* Fix for animation direction in RTL */
+  [dir="rtl"] .slide-in {
+    animation-direction: reverse;
+  }
+  
+  /* Ensure form elements align correctly */
+  [dir="rtl"] input[type="text"],
+  [dir="rtl"] input[type="number"],
+  [dir="rtl"] textarea {
+    @apply text-right;
+  }
+  
+  /* Star rating RTL fix */
+  [dir="rtl"] .star-rating {
+    @apply flex-row-reverse;
+  }
+  
+  /* Rating buttons with RTL support */
+  [dir="rtl"] .rating-buttons {
+    @apply flex-row-reverse;
+  }
+
+  /* Additional questionnaire RTL fixes */
+  [dir="rtl"] .question-step {
+    @apply text-right;
+  }
+  
+  [dir="rtl"] .question-title {
+    @apply flex flex-row-reverse;
+  }
+  
+  [dir="rtl"] .confidence-scale {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .intervention-options {
+    @apply flex-row-reverse;
+  }
+  
+  [dir="rtl"] .completion-content {
+    @apply text-right;
+  }
+
+  /* Animation direction overrides for RTL */
+  [dir="rtl"] .animate-slide-in-right {
+    animation-name: slide-in-right-rtl;
+  }
+
+  @keyframes slide-in-right-rtl {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(0); }
+  }
+
+  [dir="rtl"] .animate-slide-out-right {
+    animation-name: slide-out-right-rtl;
+  }
+
+  @keyframes slide-out-right-rtl {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Card heading RTL adjustments */
+  [dir="rtl"] .card-title,
+  [dir="rtl"] h1, 
+  [dir="rtl"] h2, 
+  [dir="rtl"] h3, 
+  [dir="rtl"] h4, 
+  [dir="rtl"] h5, 
+  [dir="rtl"] h6,
+  [dir="rtl"] p {
+    text-align: right;
+  }
+
+  /* Text center enforcement for upload components and footer */
+  [dir="rtl"] .text-center {
+    text-align: center !important;
+  }
+  
+  /* Card elements in RTL with forced center alignment */
+  [dir="rtl"] .card-header-center {
+    @apply flex flex-col items-center justify-center;
+  }
+  
+  [dir="rtl"] .card-title-center {
+    @apply flex justify-center items-center gap-2 w-full text-center;
+  }
+  
+  [dir="rtl"] .upload-container {
+    @apply flex flex-col items-center justify-center w-full;
+  }
+  
+  [dir="rtl"] .upload-text {
+    @apply text-center w-full;
+  }
+  
+  /* Footer always centered */
+  [dir="rtl"] .footer-centered {
+    @apply flex flex-col items-center justify-center w-full text-center;
+  }
+  
+  [dir="rtl"] .footer-text {
+    @apply text-center w-full;
+  }
+
+  /* Mobile RTL adjustments */
+  @media (max-width: 640px) {
+    [dir="rtl"] .mobile-nav {
+      @apply right-0 left-auto;
+    }
+    
+    [dir="rtl"] .questionnaire-container {
+      @apply px-2;
+    }
+  }
+}
