@@ -1,68 +1,53 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { UserRoles, AppRole } from '@/contexts/auth/role-types';
+import { AppRole } from '@/contexts/auth/role-types';
+
+export interface UserRoles {
+  isAdmin: boolean;
+  isModerator: boolean;
+  roles: AppRole[];
+}
 
 export const DEFAULT_USER_ROLES: UserRoles = {
   isAdmin: false,
   isModerator: false,
-  roles: []
+  roles: ['user'],
 };
 
-export const useUserRoles = (userId?: string) => {
+export const useUserRoles = () => {
   const [roles, setRoles] = useState<UserRoles>(DEFAULT_USER_ROLES);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
 
-  const fetchUserRoles = useCallback(async (targetUserId?: string) => {
-    if (!targetUserId) {
-      return DEFAULT_USER_ROLES;
-    }
-
-    setLoading(true);
-    setError(null);
-
+  const fetchUserRoles = useCallback(async (userId: string): Promise<UserRoles> => {
     try {
       const { data, error } = await supabase
-        .rpc('get_user_roles', { user_id: targetUserId });
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
 
       if (error) {
-        throw error;
+        console.error('Error fetching user roles:', error);
+        return DEFAULT_USER_ROLES;
       }
 
-      const userRoles = Array.isArray(data) ? data as AppRole[] : [];
-      const isAdmin = userRoles.includes('admin');
-      const isModerator = userRoles.includes('moderator') || isAdmin;
+      if (!data || data.length === 0) {
+        return { ...DEFAULT_USER_ROLES };
+      }
 
-      const newRoles: UserRoles = {
-        isAdmin,
-        isModerator,
-        roles: userRoles
+      const roleList = data.map(r => r.role) as AppRole[];
+      const newRoles = {
+        roles: roleList,
+        isAdmin: roleList.includes('admin'),
+        isModerator: roleList.includes('moderator') || roleList.includes('admin')
       };
 
       setRoles(newRoles);
       return newRoles;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to fetch user roles');
-      console.error('Error fetching user roles:', error);
-      setError(error);
+    } catch (error) {
+      console.error('Error in fetchUserRoles:', error);
       return DEFAULT_USER_ROLES;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
-  const checkRole = useCallback((role: AppRole): boolean => {
-    if (role === 'admin') return roles.isAdmin;
-    if (role === 'moderator') return roles.isModerator;
-    return roles.roles.includes(role);
-  }, [roles]);
-
-  return {
-    roles,
-    loading,
-    error,
-    fetchUserRoles,
-    checkRole
-  };
+  return { roles, fetchUserRoles };
 };
