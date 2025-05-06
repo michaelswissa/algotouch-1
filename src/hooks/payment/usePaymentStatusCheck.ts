@@ -1,160 +1,184 @@
 
-import { useState, useCallback, useEffect } from 'react';
-import { PaymentStatusEnum } from '@/types/payment';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CardComService } from '@/services/payment/CardComService';
+import { PaymentStatus, PaymentStatusType } from '@/types/payment';
+import { StorageService } from '@/services/storage/StorageService';
 import { toast } from 'sonner';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
-interface UsePaymentStatusCheckProps {
-  lowProfileCode: string;
+interface PaymentStatusCheckOptions {
   sessionId: string;
-  setState: (state: any) => void;
-  onPaymentSuccess: () => void;
+  onSuccess?: (data: any) => void;
+  onFailure?: (error: any) => void;
+  redirectOnSuccess?: string;
+  redirectOnFailure?: string;
+  maxAttempts?: number;
+  interval?: number;
 }
 
-export const usePaymentStatusCheck = ({ 
-  lowProfileCode, 
-  sessionId, 
-  setState, 
-  onPaymentSuccess 
-}: UsePaymentStatusCheckProps) => {
-  const [isChecking, setIsChecking] = useState(false);
-  const [checkCount, setCheckCount] = useState(0);
-  const [statusCheckInterval, setStatusCheckInterval] = useState<number | null>(null);
-  
-  // Function to start the status check polling
-  const startStatusCheck = useCallback((
-    lowProfileCode: string, 
-    sessionId: string, 
-    operationType: 'payment' | 'token_only',
-    planId: string
-  ) => {
-    // Clear any existing intervals first
-    if (statusCheckInterval !== null) {
-      window.clearInterval(statusCheckInterval);
-    }
-    
-    // Set up a new interval for checking status
-    const intervalId = window.setInterval(() => {
-      checkPaymentStatus(sessionId);
-    }, 3000); // Check every 3 seconds
-    
-    setStatusCheckInterval(intervalId);
-    
-    // Do an immediate check
-    checkPaymentStatus(sessionId);
-    
-    PaymentLogger.log('Started payment status checking', {
-      lowProfileCode,
-      sessionId,
-      operationType,
-      planId
-    });
-  }, []);
-  
-  // Function to clean up the status check interval
-  const cleanupStatusCheck = useCallback(() => {
-    if (statusCheckInterval !== null) {
-      window.clearInterval(statusCheckInterval);
-      setStatusCheckInterval(null);
-      PaymentLogger.log('Cleaned up payment status check interval');
-    }
-  }, [statusCheckInterval]);
-  
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (statusCheckInterval !== null) {
-        window.clearInterval(statusCheckInterval);
-      }
-    };
-  }, [statusCheckInterval]);
-  
-  const checkPaymentStatus = useCallback(async (sessionId: string) => {
-    if (!lowProfileCode || !sessionId || isChecking) {
+export const usePaymentStatusCheck = (options: PaymentStatusCheckOptions) => {
+  const {
+    sessionId,
+    onSuccess,
+    onFailure,
+    redirectOnSuccess = '/subscription/success',
+    redirectOnFailure = '/subscription/failed',
+    maxAttempts = 20,
+    interval = 2000
+  } = options;
+
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<PaymentStatusType>(PaymentStatus.INITIALIZING);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const [checkInProgress, setCheckInProgress] = useState(false);
+  const [paymentData, setPaymentData] = useState<any>(null);
+
+  // Function to check payment status
+  const checkStatus = async () => {
+    if (!sessionId || checkInProgress || attempts >= maxAttempts) {
       return;
     }
-    
+
+    setCheckInProgress(true);
     try {
-      setIsChecking(true);
-      setCheckCount(prev => prev + 1);
+      PaymentLogger.log('Checking payment status', { sessionId, attempt: attempts + 1 });
+      const response = await CardComService.checkPaymentStatus(sessionId);
       
-      PaymentLogger.log('Checking payment status', { 
-        lowProfileCode,
-        sessionId, 
-        checkCount: checkCount + 1 
-      });
+      setPaymentData(response.data);
       
-      const statusResult = await CardComService.checkPaymentStatus(sessionId);
-      
-      PaymentLogger.log('Payment status result', statusResult);
-      
-      if (statusResult.success) {
-        // If the payment was successful
-        if (statusResult.status === 'success' || 
-            statusResult.status === 'completed' || 
-            statusResult.status === 'approved') {
-          setState(prev => ({
-            ...prev,
-            paymentStatus: PaymentStatusEnum.SUCCESS
-          }));
-          onPaymentSuccess();
-          cleanupStatusCheck(); // Stop checking once successful
-        } 
-        // If the payment is still processing
-        else if (statusResult.status === 'processing' || statusResult.status === 'pending') {
-          // Continue checking if we haven't reached the limit
-          if (checkCount < 10) {
-            // The interval will handle checking again
-          } else {
-            // Too many attempts, assume something is wrong
-            setState(prev => ({
-              ...prev,
-              paymentStatus: PaymentStatusEnum.FAILED,
-              error: 'זמן רב מדי עבר ללא תגובה מחברת האשראי'
-            }));
-            toast.error('זמן רב מדי עבר ללא תגובה מחברת האשראי');
-            cleanupStatusCheck(); // Stop checking
+      if (response.success) {
+        // Map the status returned from the API to our internal status
+        const responseStatus = response.status;
+        
+        if (responseStatus === 'success' || responseStatus === 'completed' || responseStatus === 'approved') {
+          // Payment successful
+          setStatus(PaymentStatus.SUCCESS);
+          
+          if (onSuccess) {
+            onSuccess(response.data);
           }
-        } 
-        // If the payment failed
-        else {
-          setState(prev => ({
-            ...prev,
-            paymentStatus: PaymentStatusEnum.FAILED,
-            error: statusResult.message || 'התשלום נכשל'
-          }));
-          toast.error(statusResult.message || 'התשלום נכשל');
-          cleanupStatusCheck(); // Stop checking
+          
+          // Redirect to success page if not already there
+          if (redirectOnSuccess && !window.location.pathname.includes('success')) {
+            navigate(redirectOnSuccess, { replace: true });
+          }
+          
+          return;
+        } else if (responseStatus === 'processing' || responseStatus === 'pending') {
+          // Payment is still processing
+          setStatus(PaymentStatus.PROCESSING);
+          
+          // Continue checking
+          setAttempts(prev => prev + 1);
+        } else if (responseStatus === 'failed' || responseStatus === 'cancelled') {
+          // Payment failed
+          setStatus(PaymentStatus.FAILED);
+          setErrorMessage(response.message || 'Payment process failed');
+          
+          if (onFailure) {
+            onFailure(response);
+          }
+          
+          // Redirect to failure page
+          if (redirectOnFailure) {
+            navigate(redirectOnFailure, { replace: true });
+          }
+          
+          return;
+        } else {
+          // Unknown status
+          setStatus(PaymentStatus.PROCESSING);
+          setAttempts(prev => prev + 1);
         }
       } else {
-        // If there was an API error
-        setState(prev => ({
-          ...prev,
-          paymentStatus: PaymentStatusEnum.FAILED,
-          error: statusResult.message || 'שגיאה בבדיקת סטטוס התשלום'
-        }));
-        toast.error(statusResult.message || 'שגיאה בבדיקת סטטוס התשלום');
-        cleanupStatusCheck(); // Stop checking
+        // Error in checking status
+        setAttempts(prev => prev + 1);
+        setErrorMessage(response.message || 'Error checking payment status');
+        
+        // After max attempts, mark as failed
+        if (attempts >= maxAttempts - 1) {
+          setStatus(PaymentStatus.FAILED);
+          
+          if (onFailure) {
+            onFailure(response);
+          }
+          
+          // Redirect to failure page
+          if (redirectOnFailure) {
+            navigate(redirectOnFailure, { replace: true });
+          }
+        }
       }
     } catch (error) {
       PaymentLogger.error('Error checking payment status:', error);
-      setState(prev => ({
-        ...prev,
-        paymentStatus: PaymentStatusEnum.FAILED,
-        error: error instanceof Error ? error.message : 'שגיאה בבדיקת סטטוס התשלום'
-      }));
-      toast.error('שגיאה בבדיקת סטטוס התשלום');
-      cleanupStatusCheck(); // Stop checking on error
+      setAttempts(prev => prev + 1);
+      setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+      
+      // After max attempts, mark as failed
+      if (attempts >= maxAttempts - 1) {
+        setStatus(PaymentStatus.FAILED);
+        
+        if (onFailure) {
+          onFailure(error);
+        }
+        
+        // Redirect to failure page
+        if (redirectOnFailure) {
+          navigate(redirectOnFailure, { replace: true });
+        }
+      }
     } finally {
-      setIsChecking(false);
+      setCheckInProgress(false);
     }
-  }, [isChecking, checkCount, setState, onPaymentSuccess, cleanupStatusCheck, lowProfileCode]);
+  };
 
-  return { 
-    checkPaymentStatus, 
-    startStatusCheck,
-    cleanupStatusCheck,
-    isChecking 
+  // Check status on component mount and when sessionId changes
+  useEffect(() => {
+    if (sessionId) {
+      checkStatus();
+      
+      // Continue checking until we reach a terminal state or max attempts
+      const intervalId = setInterval(() => {
+        // Only continue if we're still processing and haven't reached max attempts
+        if (status === PaymentStatus.PROCESSING || status === PaymentStatus.INITIALIZING) {
+          if (attempts < maxAttempts) {
+            checkStatus();
+          } else if (status !== PaymentStatus.FAILED) {
+            // If we've reached max attempts and aren't already in FAILED state
+            setStatus(PaymentStatus.FAILED);
+            setErrorMessage('Payment process timed out');
+            
+            if (onFailure) {
+              onFailure({ message: 'Payment process timed out' });
+            }
+            
+            // Redirect to failure page
+            if (redirectOnFailure) {
+              navigate(redirectOnFailure, { replace: true });
+            }
+            
+            // Clear interval
+            clearInterval(intervalId);
+          }
+        } else {
+          // Clear interval if we're in a terminal state
+          clearInterval(intervalId);
+        }
+      }, interval);
+      
+      // Cleanup
+      return () => clearInterval(intervalId);
+    }
+  }, [sessionId, attempts, status]);
+
+  return {
+    status,
+    errorMessage,
+    attempts,
+    maxAttempts,
+    checkStatus,
+    paymentData
   };
 };

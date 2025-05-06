@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Tabs } from '@/components/ui/tabs';
 import AuthHeader from '@/components/auth/AuthHeader';
@@ -7,6 +7,7 @@ import TabNavigation from '@/components/auth/TabNavigation';
 import AuthFormContainer from '@/components/auth/AuthFormContainer';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
+import { Spinner } from '@/components/ui/spinner';
 
 interface AuthContentProps {
   redirectTo: string | null;

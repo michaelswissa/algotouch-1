@@ -75,7 +75,7 @@ export const useSignupForm = () => {
         userCreated: false,
       };
       
-      // Store registration data and don't check the return value
+      // Store registration data
       StorageService.storeRegistrationData(registrationData);
       
       PaymentLogger.log('Registration data saved successfully');
