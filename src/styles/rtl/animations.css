@@ -28,10 +28,4 @@
   [dir="rtl"] .tab-indicator {
     transition: transform 0.3s ease;
   }
-  
-  /* Fix for tab switch animation in RTL */
-  [dir="rtl"] .tabs-switch-track {
-    right: auto !important;
-    left: 0 !important;
-  }
 }
