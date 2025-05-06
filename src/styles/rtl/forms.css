@@ -1,51 +1,49 @@
 
-@layer components {
-  /* RTL input adjustments */
-  [dir="rtl"] input[type="text"],
-  [dir="rtl"] input[type="email"],
-  [dir="rtl"] input[type="password"],
-  [dir="rtl"] input[type="tel"],
-  [dir="rtl"] input[type="number"],
-  [dir="rtl"] textarea {
-    text-align: right;
-  }
+/* RTL specific form styles */
 
-  /* RTL form elements */
-  [dir="rtl"] .form-group, 
-  [dir="rtl"] .form-item,
-  [dir="rtl"] .form-label,
-  [dir="rtl"] .form-message {
-    text-align: right;
-  }
+/* Custom styles for authentication tabs */
+[dir="rtl"] .tabs-container {
+  flex-direction: row-reverse;
+}
 
-  /* Form elements spacing for RTL */
-  [dir="rtl"] .form-control {
-    @apply text-right;
-  }
+[dir="rtl"] .tab-trigger {
+  margin-left: 0;
+  margin-right: 0;
+}
 
-  /* Radio and checkbox RTL */
-  [dir="rtl"] .radio-group-item,
-  [dir="rtl"] .checkbox-item {
-    @apply mr-0 ml-2;
-  }
+/* Enhanced tab styling for auth page */
+[dir="rtl"] [data-state=active]:not(.tab-content) {
+  color: hsl(var(--primary-foreground));
+  font-weight: 500;
+}
 
-  /* Auth page specific RTL fixes */
-  [dir="rtl"] .auth-form-container {
-    text-align: right;
-  }
+[dir="rtl"] [data-state=inactive]:not(.tab-content) {
+  color: hsl(var(--muted-foreground));
+}
 
-  [dir="rtl"] .rtl-button svg {
-    margin-right: 0;
-    margin-left: 0.5rem;
-  }
+[dir="rtl"] [data-state=inactive]:not(.tab-content):hover {
+  color: hsl(var(--foreground));
+}
 
-  /* Star rating RTL fix */
-  [dir="rtl"] .star-rating {
-    @apply flex-row-reverse;
-  }
-  
-  /* Rating buttons with RTL support */
-  [dir="rtl"] .rating-buttons {
-    @apply flex-row-reverse;
-  }
+/* Ensure proper RTL form layout */
+[dir="rtl"] .form-item {
+  text-align: right;
+}
+
+[dir="rtl"] .form-label {
+  justify-content: flex-end;
+}
+
+[dir="rtl"] .rtl-button {
+  flex-direction: row-reverse;
+}
+
+/* Adjust input fields for RTL */
+[dir="rtl"] input[type="text"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="number"],
+[dir="rtl"] textarea {
+  text-align: right;
 }
