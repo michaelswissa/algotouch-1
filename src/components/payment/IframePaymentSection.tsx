@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,16 +43,26 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
         
         // Get contract data from storage - contains customer info
         const contractData = StorageService.get<ContractData>('contract_data');
+        console.log('Contract data from storage:', contractData); // Debug log
+        
         if (!contractData) {
           throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
         }
 
         if (!contractData.email || !contractData.fullName) {
+          console.error('Missing required contract fields:', { 
+            email: contractData.email, 
+            fullName: contractData.fullName 
+          });
           throw new Error('חסרים פרטי לקוח בחוזה');
         }
 
         // Validate phone and idNumber are present
         if (!contractData.phone || !contractData.idNumber) {
+          console.error('Missing required contract fields:', { 
+            phone: contractData.phone, 
+            idNumber: contractData.idNumber 
+          });
           throw new Error('חסרים פרטי טלפון או תעודת זהות בחוזה');
         }
 
@@ -61,8 +70,8 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           planId, 
           email: contractData.email,
           fullName: contractData.fullName,
-          hasPhone: Boolean(contractData.phone),
-          hasIdNumber: Boolean(contractData.idNumber),
+          phone: contractData.phone,
+          idNumber: contractData.idNumber,
           operationType
         });
         

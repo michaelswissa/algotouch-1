@@ -3,6 +3,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
+// Helper function for logging
+function logStep(functionName: string, step: string, data: any = {}) {
+  console.log(`[${functionName}][${step}]`, JSON.stringify(data));
+}
+
 serve(async (req) => {
   const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
@@ -12,11 +17,20 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[CARDCOM-STATUS] Function started");
+    logStep("CARDCOM-STATUS", "Function started");
     
     // Parse the request body
-    const { sessionId } = await req.json();
-    console.log(`[CARDCOM-STATUS] Checking status for session ID: ${sessionId}`);
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      logStep("CARDCOM-STATUS", "Request body parsed", requestBody);
+    } catch (parseError) {
+      logStep("CARDCOM-STATUS", "Error parsing request body", { error: parseError.message });
+      throw new Error("Invalid JSON body");
+    }
+    
+    const { sessionId } = requestBody;
+    logStep("CARDCOM-STATUS", "Checking status for session ID", { sessionId });
 
     if (!sessionId) {
       throw new Error("Missing required parameter: sessionId");
@@ -40,15 +54,22 @@ serve(async (req) => {
       .single();
     
     if (sessionError) {
-      console.error("[CARDCOM-STATUS] Error fetching session:", sessionError.message);
+      logStep("CARDCOM-STATUS", "Error fetching session", { error: sessionError.message });
       throw new Error(`Error fetching session data: ${sessionError.message}`);
     }
     
     if (!session) {
+      logStep("CARDCOM-STATUS", "Payment session not found", { sessionId });
       throw new Error(`Payment session not found: ${sessionId}`);
     }
     
-    console.log(`[CARDCOM-STATUS] Payment session found, status: ${session.status}`);
+    logStep("CARDCOM-STATUS", "Payment session found", { 
+      status: session.status,
+      created_at: session.created_at,
+      expires_at: session.expires_at,
+      plan_id: session.plan_id,
+      operation_type: session.operation_type
+    });
     
     // Map session status to response format
     let responseStatus = 'pending';
@@ -56,6 +77,17 @@ serve(async (req) => {
       responseStatus = 'success';
     } else if (session.status === 'failed') {
       responseStatus = 'failed';
+    } else if (session.status === 'expired' || new Date(session.expires_at) < new Date()) {
+      responseStatus = 'expired';
+      
+      // If the session has expired but not marked as expired, update it
+      if (session.status !== 'expired' && new Date(session.expires_at) < new Date()) {
+        logStep("CARDCOM-STATUS", "Marking expired session", { sessionId });
+        await supabaseAdmin
+          .from('payment_sessions')
+          .update({ status: 'expired' })
+          .eq('id', sessionId);
+      }
     }
     
     // Return the session status
@@ -83,7 +115,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('[CARDCOM-STATUS] Error:', error instanceof Error ? error.message : String(error));
+    logStep("CARDCOM-STATUS", "Error", { message: error instanceof Error ? error.message : String(error) });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     return new Response(
