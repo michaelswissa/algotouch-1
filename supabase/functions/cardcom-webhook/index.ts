@@ -10,6 +10,33 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
+// Helper function for logging
+function logStep(functionName: string, step: string, data: any = {}) {
+  console.log(`[${functionName}][${step}]`, JSON.stringify(data));
+}
+
+// Function to verify response data from CardCom API
+async function verifyPaymentStatus(terminalNumber: string, apiName: string, lowProfileCode: string): Promise<any> {
+  try {
+    const url = new URL("https://secure.cardcom.solutions/Interface/BillGoldGetLowProfileIndicator.aspx");
+    url.searchParams.append("TerminalNumber", terminalNumber);
+    url.searchParams.append("UserName", apiName);
+    url.searchParams.append("LowProfileCode", lowProfileCode);
+    url.searchParams.append("codepage", "65001");
+    
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Failed to verify payment: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("[CARDCOM-WEBHOOK] Error verifying payment:", error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -20,9 +47,15 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const terminalNumber = Deno.env.get('CARDCOM_TERMINAL_NUMBER');
+    const apiName = Deno.env.get('CARDCOM_API_NAME');
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error("Missing Supabase configuration");
+    }
+    
+    if (!terminalNumber || !apiName) {
+      throw new Error("Missing CardCom configuration");
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
@@ -45,10 +78,10 @@ serve(async (req) => {
       );
     }
 
-    console.log("[CARDCOM-WEBHOOK] Received webhook notification:", JSON.stringify(paymentData));
+    logStep("CARDCOM-WEBHOOK", "Received webhook notification", paymentData);
     
     // Extract key information
-    const responseCode = paymentData.ResponseCode;
+    const lowProfileId = paymentData.LowProfileId;
     const sessionId = paymentData.ReturnValue; // We stored the session ID in ReturnValue
     
     if (!sessionId) {
@@ -65,7 +98,28 @@ serve(async (req) => {
       );
     }
 
+    // Verify transaction using CardCom API
+    if (lowProfileId) {
+      try {
+        const verificationData = await verifyPaymentStatus(terminalNumber, apiName, lowProfileId);
+        logStep("CARDCOM-WEBHOOK", "Payment verification result", verificationData);
+        
+        if (verificationData.OperationResponse !== "0") {
+          logStep("CARDCOM-WEBHOOK", "Payment verification failed", {
+            operationResponse: verificationData.OperationResponse,
+            errorMessage: verificationData.ErrorMessage || "Unknown error"
+          });
+        }
+      } catch (verifyError) {
+        logStep("CARDCOM-WEBHOOK", "Payment verification error", {
+          error: verifyError instanceof Error ? verifyError.message : String(verifyError)
+        });
+        // Continue processing even if verification fails - we'll rely on the webhook data
+      }
+    }
+
     // Update the payment session status based on the response code
+    const responseCode = paymentData.ResponseCode;
     const status = responseCode === 0 ? 'completed' : 'failed';
     
     const { error: updateError } = await supabaseAdmin
@@ -83,6 +137,12 @@ serve(async (req) => {
       console.error("[CARDCOM-WEBHOOK] Error updating payment session:", updateError);
       throw new Error(`Error updating payment session: ${updateError.message}`);
     }
+
+    logStep("CARDCOM-WEBHOOK", "Updated payment session", {
+      sessionId,
+      status,
+      transactionId: paymentData.TranzactionId
+    });
 
     // If it was a successful payment and there's token info, save it
     if (responseCode === 0 && paymentData.TokenInfo) {
@@ -163,6 +223,32 @@ serve(async (req) => {
         status,
         data: paymentData
       });
+
+    // Broadcast a realtime message to notify clients
+    try {
+      const { data: dbSession } = await supabaseAdmin
+        .from('payment_sessions')
+        .select('id, plan_id, user_id')
+        .eq('id', sessionId)
+        .single();
+
+      if (dbSession) {
+        await supabaseAdmin.rpc('broadcast_payment_status', {
+          session_id: sessionId,
+          status: status,
+          plan_id: dbSession.plan_id,
+          user_id: dbSession.user_id
+        });
+        
+        logStep("CARDCOM-WEBHOOK", "Broadcasted payment status update", {
+          sessionId,
+          status
+        });
+      }
+    } catch (broadcastError) {
+      console.error("[CARDCOM-WEBHOOK] Error broadcasting payment update:", broadcastError);
+      // Continue processing - this is just a notification error
+    }
 
     // Return success to CardCom
     return new Response(
