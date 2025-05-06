@@ -65,9 +65,6 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           operationType
         });
         
-        // Map operation type to CardCom format
-        const cardcomOperation = operationType === 'token_only' ? 'CreateTokenOnly' : 'ChargeOnly';
-        
         // Call the CardCom iframe initialization edge function
         const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
           body: {
@@ -77,7 +74,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
             fullName: contractData.fullName,
             phone: contractData.phone,
             idNumber: contractData.idNumber,
-            operationType: cardcomOperation
+            operationType: operationType
           }
         });
         
@@ -86,7 +83,13 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           throw new Error(`Failed to initialize payment: ${error.message}`);
         }
         
+        // Log the full response for debugging
+        PaymentLogger.log('CardCom iframe response:', data);
+        
         if (!data?.success || !data?.data) {
+          if (data?.data?.rawResponse) {
+            PaymentLogger.error('CardCom raw error response:', data.data.rawResponse);
+          }
           throw new Error(data?.message || 'Invalid response from payment service');
         }
         
@@ -124,66 +127,61 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   // Handle iframe messages from CardCom
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Only process messages from CardCom domains or if it's from inside an iframe
-      const isFromCardCom = event.origin.includes('cardcom.solutions') || 
-                           event.origin.includes('cardcom.co.il');
-      
-      PaymentLogger.log('Received message:', { 
+      // Process all messages to catch CardCom responses
+      PaymentLogger.log('Received postMessage:', { 
         origin: event.origin, 
-        data: typeof event.data === 'object' ? JSON.stringify(event.data) : event.data,
-        isFromCardCom 
+        data: typeof event.data === 'object' ? JSON.stringify(event.data) : event.data
       });
       
-      // Handle payment success message
-      if (isFromCardCom || !event.origin) {
-        try {
-          const data = typeof event.data === 'string' 
-            ? JSON.parse(event.data) 
-            : event.data;
-            
-          PaymentLogger.log('Processed message data:', data);
+      try {
+        // Parse message data (could be string or object)
+        const data = typeof event.data === 'string' 
+          ? JSON.parse(event.data) 
+          : event.data;
           
-          // Check for direct payment success message
-          if (data.type === 'paid' || data.action === 'payment_success' || 
-              data.Status === 'success' || data.status === 'success') {
-            
-            PaymentLogger.log('Payment success event received');
-            setPaymentStatus(PaymentStatusEnum.SUCCESS);
-            toast.success('התשלום בוצע בהצלחה!');
-            
-            if (onPaymentComplete) {
-              // Navigate to next step in subscription flow
-              onPaymentComplete();
-              // Use window.location for reliable navigation out of iframe context if needed
-              if (data.redirect) {
-                window.location.href = '/subscription/step4';
-              }
-            }
-            return;
+        PaymentLogger.log('Processed message data:', data);
+        
+        // Look for any indication of payment success
+        if (
+          data.type === 'paid' || 
+          data.status === 'success' || 
+          data.Status === 'success' || 
+          data.action === 'payment_success' ||
+          data.action === 'HandleSubmit' ||
+          (data.action === 'doTransaction' && data.IsSuccess === true)
+        ) {
+          PaymentLogger.log('Payment success event received');
+          setPaymentStatus(PaymentStatusEnum.SUCCESS);
+          toast.success('התשלום בוצע בהצלחה!');
+          
+          // Notify parent component
+          if (onPaymentComplete) {
+            onPaymentComplete();
           }
           
-          // Handle detailed CardCom response
-          if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
-            PaymentLogger.log('HandleSubmit success received');
-            setPaymentStatus(PaymentStatusEnum.SUCCESS);
-            toast.success('התשלום בוצע בהצלחה!');
-            
-            if (onPaymentComplete) {
-              onPaymentComplete();
-            }
-            return;
-          } else if (data.action === 'HandleError') {
-            PaymentLogger.error('Payment error from CardCom:', data);
-            setPaymentStatus(PaymentStatusEnum.FAILED);
-            setError(data.message || 'התשלום נכשל');
-            toast.error(data.message || 'התשלום נכשל');
+          // If redirect is requested in the message, handle it
+          if (data.redirect) {
+            window.location.href = '/subscription/step4';
           }
-        } catch (err) {
-          PaymentLogger.error('Error processing iframe message:', err);
         }
+        // Look for payment failure indicators
+        else if (
+          data.type === 'error' || 
+          data.status === 'failed' ||
+          data.action === 'HandleError'
+        ) {
+          PaymentLogger.error('Payment error message received:', data);
+          setPaymentStatus(PaymentStatusEnum.FAILED);
+          setError(data.message || 'התשלום נכשל');
+          toast.error(data.message || 'התשלום נכשל');
+        }
+      } catch (err) {
+        // Not a JSON message or other error processing the message
+        PaymentLogger.log('Non-JSON message or error processing message:', err);
       }
     };
     
+    // Listen to all messages - we'll filter by relevant content
     window.addEventListener('message', handleMessage);
     
     return () => {
@@ -191,7 +189,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     };
   }, [onPaymentComplete]);
   
-  // Poll for payment status updates
+  // Poll for payment status updates using Supabase
   useEffect(() => {
     if (!sessionId || paymentStatus !== PaymentStatusEnum.IDLE) {
       return;
@@ -215,14 +213,13 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           
           if (onPaymentComplete) {
             onPaymentComplete();
+            window.location.href = '/subscription/step4';
           }
         } else if (data?.data?.status === 'failed') {
           PaymentLogger.log('Payment status check: failed', data);
           setPaymentStatus(PaymentStatusEnum.FAILED);
           setError('התשלום נדחה');
           toast.error('התשלום נכשל');
-        } else {
-          PaymentLogger.log('Payment status check: in progress', data);
         }
       } catch (err) {
         PaymentLogger.error('Error in payment status check:', err);
@@ -262,6 +259,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
             
             if (onPaymentComplete) {
               onPaymentComplete();
+              window.location.href = '/subscription/step4';
             }
           } else if (newStatus === 'failed') {
             setPaymentStatus(PaymentStatusEnum.FAILED);

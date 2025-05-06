@@ -37,6 +37,13 @@ serve(async (req) => {
       throw new Error("Missing CardCom API configuration");
     }
 
+    // Log the environment variables (sanitized)
+    logStep("CARDCOM-IFRAME", "Credentials check", {
+      hasTerminalNumber: Boolean(terminalNumber),
+      hasApiName: Boolean(apiName),
+      terminalNumberPartial: terminalNumber ? terminalNumber.substring(0, 2) + "..." : "missing",
+    });
+
     const requestData = await req.json();
     logStep("CARDCOM-IFRAME", "Request data received", requestData);
 
@@ -50,16 +57,21 @@ serve(async (req) => {
       idNumber
     } = requestData;
 
-    // Map operation type based on request
-    let operation = "ChargeOnly"; // Default
-    if (requestData.operationType === "CreateTokenOnly" || requestData.operationType === "token_only") {
-      operation = "CreateTokenOnly";
-    } else if (planId === 'monthly') {
-      // For monthly plan, always use token only (initial registration without payment)
-      operation = "CreateTokenOnly";
+    // Convert operation type to numeric value as required by CardCom
+    // 1 = ChargeOnly, 2 = ChargeAndCreateToken, 3 = CreateTokenOnly
+    let operation = 1; // Default: ChargeOnly (1)
+    
+    if (requestData.operationType === "CreateTokenOnly" || requestData.operationType === "token_only" || planId === 'monthly') {
+      operation = 3; // CreateTokenOnly (3)
+    } else if (requestData.operationType === "ChargeAndCreateToken") {
+      operation = 2; // ChargeAndCreateToken (2)
     }
 
-    logStep("CARDCOM-IFRAME", "Operation determined", { operation });
+    logStep("CARDCOM-IFRAME", "Operation determined", { 
+      operation,
+      operationTypeRequested: requestData.operationType,
+      planId
+    });
 
     if (!planId) {
       throw new Error("Missing required parameter: planId");
@@ -78,7 +90,7 @@ serve(async (req) => {
 
     // Get plan details from database
     let amount = 0;
-    let productName = "Subscription";
+    let productName = "מנוי שירות";
 
     // Map plan ID to appropriate operation and amount
     const { data: plan, error: planError } = await supabaseAdmin
@@ -95,12 +107,27 @@ serve(async (req) => {
       throw new Error(`Invalid plan ID: ${planId}`);
     }
 
-    productName = plan.name || `Plan ${planId}`;
-    amount = plan.price || 0;
+    productName = plan.name || `מנוי ${planId}`;
+    
+    // Ensure productName is within limits and doesn't have special characters
+    if (productName.length > 90) {
+      productName = productName.substring(0, 90);
+    }
+    // Remove special characters that might cause issues
+    productName = productName.replace(/["\\:\/]/g, "");
 
-    // For monthly plan or token-only operation, amount should be 0
-    if (planId === 'monthly' || operation === "CreateTokenOnly") {
+    // For monthly plan or token-only operations, set amount
+    if (operation === 3) { // CreateTokenOnly
+      // For token-only operations, amount can be 0 but must exist
       amount = 0;
+    } else {
+      // For charge operations, must be > 0
+      amount = plan.price || 0;
+      
+      // If the amount is 0 and we're trying to charge, set a minimal value
+      if (amount === 0 && operation !== 3) {
+        amount = 0.01; // Minimum amount to avoid error
+      }
     }
 
     logStep("CARDCOM-IFRAME", "Plan details", { 
@@ -134,7 +161,7 @@ serve(async (req) => {
         amount: amount,
         currency: "ILS",
         status: 'initiated',
-        operation_type: operation,
+        operation_type: operation === 1 ? "ChargeOnly" : (operation === 2 ? "ChargeAndCreateToken" : "CreateTokenOnly"),
         reference: transactionRef,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         payment_details: { 
@@ -159,53 +186,24 @@ serve(async (req) => {
       operation,
       amount
     });
-
-    // Build CardCom direct URL to EA/LPC6 page for seamless iframe integration
-    // This avoids the redirect issue we were having with the LowProfile.aspx approach
-    const directLpcUrl = `https://secure.cardcom.solutions/EA/LPC6/${terminalNumber}/${lowProfileId}`;
     
-    // Build traditional LowProfile.aspx URL as fallback
-    const lowProfileUrl = new URL("https://secure.cardcom.solutions/Interface/LowProfile.aspx");
-    
-    // Add required parameters
-    lowProfileUrl.searchParams.append('TerminalNumber', terminalNumber);
-    lowProfileUrl.searchParams.append('UserName', apiName); // Use ApiName as UserName
-    lowProfileUrl.searchParams.append('ReturnValue', sessionData.id); // Use session ID as return value
-    lowProfileUrl.searchParams.append('SumToBill', amount.toString());
-    lowProfileUrl.searchParams.append('CoinId', '1'); // ILS
-    lowProfileUrl.searchParams.append('Language', 'he');
-    lowProfileUrl.searchParams.append('ProductName', productName);
-    
-    // Add operation type
-    lowProfileUrl.searchParams.append('Operation', operation);
-    
-    // Add redirect URLs - REMOVED to prevent CSP issues
-    // Instead rely on webhook notifications and postMessage communication
-    
-    // Add webhook URL only for backend notification
-    lowProfileUrl.searchParams.append('IndicatorUrl', 
-      `${publicFunctionsUrl}/cardcom-webhook`);
-    
-    // Add customer details
-    lowProfileUrl.searchParams.append('CardOwnerName', fullName);
-    lowProfileUrl.searchParams.append('CardOwnerEmail', email);
-    lowProfileUrl.searchParams.append('CardOwnerPhone', phone);
-    lowProfileUrl.searchParams.append('CardOwnerId', idNumber);
-    
-    // For the Low Profile Create API, need to create a proper URL
+    // For the Low Profile Create API
     const lowProfileApiUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
     
-    // Prepare the request body for the API - WITHOUT redirect URLs
-    const lowProfileApiBody = {
+    // Convert amount to agorot (multiply by 100) - CardCom format
+    const amountInAgorot = Math.round(amount * 100);
+    
+    // Prepare the request body for the API - WITHOUT redirect URLs (to avoid CSP issues)
+    const lowProfileApiBody: any = {
       TerminalNumber: parseInt(terminalNumber),
       ApiName: apiName,
-      ReturnValue: sessionData.id, // Use session ID as return value for better tracking
-      Amount: amount,
+      ReturnValue: encodeURIComponent(sessionData.id), // Use encoded session ID as return value for better tracking
+      Amount: amountInAgorot, // Amount in agorot
       WebHookUrl: `${publicFunctionsUrl}/cardcom-webhook`,
       ProductName: productName,
       Language: "he",
       ISOCoinId: 1, // ILS
-      Operation: operation,
+      Operation: operation, // Use numeric operation code
       UIDefinition: {
         CardOwnerNameValue: fullName,
         CardOwnerEmailValue: email,
@@ -214,9 +212,13 @@ serve(async (req) => {
       }
     };
     
-    logStep("CARDCOM-IFRAME", "Created URL options", {
-      directUrl: directLpcUrl,
-      lowProfileUrl: lowProfileUrl.toString(),
+    // Add createTokenJValidateType only when Operation = 2 (ChargeAndCreateToken)
+    if (operation === 2) {
+      lowProfileApiBody.JValidateType = 5;
+    }
+    
+    logStep("CARDCOM-IFRAME", "API request prepared", {
+      url: lowProfileApiUrl,
       apiRequestBody: { ...lowProfileApiBody, TerminalNumber: "REDACTED", ApiName: "REDACTED" }
     });
 
@@ -242,19 +244,35 @@ serve(async (req) => {
       try {
         // Try to parse the response as JSON
         apiResult = JSON.parse(responseText);
-        logStep("CARDCOM-IFRAME", "CardCom API Response", apiResult);
+        logStep("CARDCOM-IFRAME", "CardCom API Response parsed", apiResult);
       } catch (error) {
         logStep("CARDCOM-IFRAME", "Failed to parse CardCom response as JSON", {
           error: error instanceof Error ? error.message : String(error)
         });
         
-        // If we can't parse as JSON, handle the error
-        throw new Error("CardCom API returned non-JSON response: " + responseText.substring(0, 100) + "...");
+        // Return the raw response for debugging
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Failed to parse CardCom response",
+            data: {
+              rawResponse: responseText,
+              status: apiResponse.status
+            }
+          }),
+          { 
+            status: 500, 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json' 
+            } 
+          }
+        );
       }
       
       if (apiResult.ResponseCode === 0) {
         // Success - use the URL from the API response
-        const cardcomUrl = apiResult.url || apiResult.Url || directLpcUrl;
+        const cardcomUrl = apiResult.Url || directLpcUrl;
         
         // Update the session with the LowProfileId from the API
         if (apiResult.LowProfileId) {
@@ -293,27 +311,23 @@ serve(async (req) => {
           }
         );
       } else {
-        // API call failed, use the direct URL as fallback
-        logStep("CARDCOM-IFRAME", "API call failed, using direct URL", {
+        // API call failed with error code
+        logStep("CARDCOM-IFRAME", "API call returned error", {
           errorCode: apiResult.ResponseCode,
           errorMessage: apiResult.Description
         });
         
         return new Response(
           JSON.stringify({
-            success: true,
-            message: "Payment initialized with fallback URL",
+            success: false,
+            message: apiResult.Description || "CardCom API error",
             data: {
-              iframeUrl: directLpcUrl,
-              url: directLpcUrl,
-              sessionId: sessionData.id,
-              lowProfileId: lowProfileId,
-              reference: transactionRef,
-              terminalNumber
+              responseCode: apiResult.ResponseCode,
+              rawResponse: responseText
             }
           }),
           { 
-            status: 200, 
+            status: 400, 
             headers: { 
               ...corsHeaders, 
               'Content-Type': 'application/json' 
@@ -322,26 +336,19 @@ serve(async (req) => {
         );
       }
     } catch (apiError) {
-      // API call threw an exception, use the low profile URL as fallback
-      logStep("CARDCOM-IFRAME", "API call exception, using low profile URL", {
+      // API call threw an exception
+      logStep("CARDCOM-IFRAME", "API call exception", {
         error: apiError instanceof Error ? apiError.message : String(apiError)
       });
       
       return new Response(
         JSON.stringify({
-          success: true,
-          message: "Payment initialized with URL fallback",
-          data: {
-            iframeUrl: lowProfileUrl.toString(),
-            url: lowProfileUrl.toString(),
-            sessionId: sessionData.id,
-            lowProfileId: lowProfileId,
-            reference: transactionRef,
-            terminalNumber
-          }
+          success: false,
+          message: "Error connecting to CardCom API: " + (apiError instanceof Error ? apiError.message : String(apiError)),
+          data: null
         }),
         { 
-          status: 200, 
+          status: 500, 
           headers: { 
             ...corsHeaders, 
             'Content-Type': 'application/json' 
