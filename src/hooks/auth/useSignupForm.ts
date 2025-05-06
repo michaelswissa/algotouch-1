@@ -5,7 +5,7 @@ import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
-export interface SignupFormData {
+interface SignupFormData {
   email: string;
   password: string;
   firstName: string;

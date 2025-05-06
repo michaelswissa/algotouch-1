@@ -23,8 +23,8 @@ export interface AuthContextType {
   signUp: (userData: {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
+    firstName?: string;
+    lastName?: string;
     phone?: string;
   }) => Promise<{ success: boolean; user: User | null }>;
   signOut: () => Promise<void>;
