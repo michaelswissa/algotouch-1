@@ -1,43 +1,24 @@
 
-import React, { Suspense, lazy } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './components/ui/theme-provider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/auth';
-import ProtectedRoute from './components/ProtectedRoute';
-import { Spinner } from '@/components/ui/spinner';
 
-// Eagerly load critical components
 import Index from './pages/Index';
+import Auth from './pages/Auth';
+import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
+import Subscription from './pages/Subscription';
+import MySubscriptionPage from './pages/MySubscriptionPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import IframePaymentPage from './pages/IframePaymentPage';
+import CardComRedirectPage from './pages/CardComRedirectPage';
+import SubscriptionSuccess from './components/subscription/SubscriptionSuccess';
+import SubscriptionFailed from './components/subscription/SubscriptionFailed';
 
-// Lazy load non-critical pages
-const Auth = lazy(() => import('./pages/Auth'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Subscription = lazy(() => import('./pages/Subscription'));
-const MySubscriptionPage = lazy(() => import('./pages/MySubscriptionPage'));
-const IframePaymentPage = lazy(() => import('./pages/IframePaymentPage'));
-const CardComRedirectPage = lazy(() => import('./pages/CardComRedirectPage'));
-const SubscriptionSuccess = lazy(() => import('./components/subscription/SubscriptionSuccess'));
-const SubscriptionFailed = lazy(() => import('./components/subscription/SubscriptionFailed'));
-
-// Loading fallback component
-const PageLoader = () => (
-  <div className="flex min-h-screen items-center justify-center">
-    <Spinner className="h-8 w-8" />
-  </div>
-);
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000, // 1 minute by default
-      cacheTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false, // Reduce unnecessary refetches
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 function App() {
   return (
@@ -48,45 +29,15 @@ function App() {
             <AuthProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
-                <Route 
-                  path="/auth" 
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <Auth />
-                    </Suspense>
-                  } 
-                />
-                <Route 
-                  path="/subscription" 
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <Subscription />
-                    </Suspense>
-                  } 
-                />
-                <Route 
-                  path="/subscription/success" 
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <SubscriptionSuccess />
-                    </Suspense>
-                  } 
-                />
-                <Route 
-                  path="/subscription/failed" 
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <SubscriptionFailed />
-                    </Suspense>
-                  } 
-                />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/subscription" element={<Subscription />} />
+                <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+                <Route path="/subscription/failed" element={<SubscriptionFailed />} />
                 <Route
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<PageLoader />}>
-                        <Dashboard />
-                      </Suspense>
+                      <Dashboard />
                     </ProtectedRoute>
                   }
                 />
@@ -94,9 +45,7 @@ function App() {
                   path="/settings"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<PageLoader />}>
-                        <Settings />
-                      </Suspense>
+                      <Settings />
                     </ProtectedRoute>
                   }
                 />
@@ -104,28 +53,12 @@ function App() {
                   path="/my-subscription"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<PageLoader />}>
-                        <MySubscriptionPage />
-                      </Suspense>
+                      <MySubscriptionPage />
                     </ProtectedRoute>
                   }
                 />
-                <Route 
-                  path="/payment/iframe/:planId" 
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <IframePaymentPage />
-                    </Suspense>
-                  }
-                />
-                <Route 
-                  path="/payment/redirect" 
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <CardComRedirectPage />
-                    </Suspense>
-                  }
-                />
+                <Route path="/payment/iframe/:planId" element={<IframePaymentPage />} />
+                <Route path="/payment/redirect" element={<CardComRedirectPage />} />
               </Routes>
               <Toaster richColors position="top-center" />
             </AuthProvider>
