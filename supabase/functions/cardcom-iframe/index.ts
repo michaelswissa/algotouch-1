@@ -178,6 +178,7 @@ serve(async (req) => {
       ProductName: productName,
       Operation: cardcomOperationCode,
       createTokenJValidateType: 5, // Required in production, this creates a real authorization
+      // No JValidateOptionalFields by default - add only if Cardcom returns error 103
       IndicatorUrl: `${publicFunctionsUrl}/cardcom-webhook`,
       APILevel: 10,
       UIDefinition: {
@@ -244,6 +245,67 @@ serve(async (req) => {
             } 
           }
         );
+      } else if (apiResult.ResponseCode === 103 && !lowProfileApiBody.hasOwnProperty('JValidateOptionalFields')) {
+        // If we get error 103, try again with JValidateOptionalFields = 1
+        logStep("CARDCOM-IFRAME", "Received error 103, retrying with JValidateOptionalFields=1", apiResult);
+        
+        // Add JValidateOptionalFields and retry
+        lowProfileApiBody.JValidateOptionalFields = 1;
+        
+        const retryResponse = await fetch(lowProfileApiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(lowProfileApiBody)
+        });
+        
+        const retryResult = await retryResponse.json();
+        logStep("CARDCOM-IFRAME", "Retry API Response", retryResult);
+        
+        if (retryResult.ResponseCode === 0) {
+          const cardcomUrl = retryResult.url || retryResult.Url;
+          
+          // Update the session with the LowProfileId from the API
+          if (retryResult.LowProfileId) {
+            await supabaseAdmin
+              .from('payment_sessions')
+              .update({
+                low_profile_id: retryResult.LowProfileId,
+                payment_details: { 
+                  ...sessionData.payment_details,
+                  lowProfileId: retryResult.LowProfileId,
+                  url: cardcomUrl
+                }
+              })
+              .eq('id', sessionData.id);
+          }
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: "Payment initialized successfully (with JValidateOptionalFields=1)",
+              data: {
+                iframeUrl: cardcomUrl,
+                url: cardcomUrl,
+                sessionId: sessionData.id,
+                lowProfileId: retryResult.LowProfileId || lowProfileId,
+                reference: transactionRef,
+                terminalNumber,
+                LowProfileId: retryResult.LowProfileId || lowProfileId
+              }
+            }),
+            { 
+              status: 200, 
+              headers: { 
+                ...corsHeaders, 
+                'Content-Type': 'application/json' 
+              } 
+            }
+          );
+        } else {
+          throw new Error(`CardCom API error on retry: ${retryResult.Description || "Unknown error"} (code: ${retryResult.ResponseCode})`);
+        }
       } else {
         throw new Error(`CardCom API error: ${apiResult.Description || "Unknown error"} (code: ${apiResult.ResponseCode})`);
       }

@@ -99,9 +99,10 @@ serve(async (req) => {
     }
 
     // Verify transaction using CardCom API
+    let verificationData;
     if (lowProfileId) {
       try {
-        const verificationData = await verifyPaymentStatus(terminalNumber, apiName, lowProfileId);
+        verificationData = await verifyPaymentStatus(terminalNumber, apiName, lowProfileId);
         logStep("CARDCOM-WEBHOOK", "Payment verification result", verificationData);
         
         if (verificationData.OperationResponse !== "0") {
@@ -122,15 +123,30 @@ serve(async (req) => {
     const responseCode = paymentData.ResponseCode;
     const status = responseCode === 0 ? 'completed' : 'failed';
     
+    // Set up the update data
+    const updateData: Record<string, any> = {
+      status,
+      transaction_id: paymentData.TranzactionId?.toString(),
+      response_code: responseCode?.toString(),
+      updated_at: new Date().toISOString(),
+      payment_data: paymentData
+    };
+    
+    // Add token-related fields if available (critical for future recurring charges)
+    if (paymentData.TokenInfo && paymentData.TokenInfo.Token) {
+      updateData.token = paymentData.TokenInfo.Token;
+      updateData.token_approval_number = paymentData.TokenInfo.TokenApprovalNumber;
+    }
+    
+    // Add additional verification data if available
+    if (verificationData) {
+      updateData.token_approval_number = verificationData.TokenApprovalNumber || updateData.token_approval_number;
+      updateData.internal_deal_number = verificationData.InternalDealNumber;
+    }
+    
     const { error: updateError } = await supabaseAdmin
       .from('payment_sessions')
-      .update({
-        status,
-        transaction_id: paymentData.TranzactionId?.toString(),
-        response_code: responseCode?.toString(),
-        updated_at: new Date().toISOString(),
-        payment_data: paymentData
-      })
+      .update(updateData)
       .eq('id', sessionId);
     
     if (updateError) {
@@ -141,13 +157,16 @@ serve(async (req) => {
     logStep("CARDCOM-WEBHOOK", "Updated payment session", {
       sessionId,
       status,
-      transactionId: paymentData.TranzactionId
+      transactionId: paymentData.TranzactionId,
+      tokenApprovalNumber: updateData.token_approval_number,
+      internalDealNumber: updateData.internal_deal_number
     });
 
     // If it was a successful payment and there's token info, save it
     if (responseCode === 0 && paymentData.TokenInfo) {
       const token = paymentData.TokenInfo.Token;
       const tokenExpDate = paymentData.TokenInfo.TokenExDate;
+      const tokenApprovalNumber = paymentData.TokenInfo.TokenApprovalNumber;
       
       if (token) {
         // Get the session data to find out which user and plan this is for
@@ -164,6 +183,7 @@ serve(async (req) => {
             .insert({
               user_id: sessionData.user_id,
               token,
+              token_approval_number: tokenApprovalNumber, // Store token approval number
               token_expiry: tokenExpDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
               plan_id: sessionData.plan_id,
               is_valid: true,
@@ -206,6 +226,8 @@ serve(async (req) => {
                 status,
                 payment_method: 'credit_card',
                 recurring_token: token,
+                token_approval_number: tokenApprovalNumber, // Store token approval number
+                internal_deal_number: verificationData?.InternalDealNumber, // Store internal deal number if available
                 trial_end: trialEndDate ? trialEndDate.toISOString() : null,
                 next_charge_at: trialEndDate ? trialEndDate.toISOString() : null
               });

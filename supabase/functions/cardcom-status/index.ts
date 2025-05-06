@@ -67,6 +67,9 @@ serve(async (req) => {
           status: responseStatus,
           sessionId: session.id,
           transactionId: session.transaction_id,
+          token: session.token,
+          tokenApprovalNumber: session.token_approval_number,
+          internalDealNumber: session.internal_deal_number,
           paymentDetails: session.payment_details,
           timestamp: new Date().toISOString()
         }

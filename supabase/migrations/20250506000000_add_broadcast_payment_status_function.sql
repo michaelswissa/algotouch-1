@@ -13,7 +13,8 @@ BEGIN
         'plan_id', plan_id,
         'user_id', user_id,
         'timestamp', now()
-      )
+      ),
+      'broadcast', json_build_object('level', 'session')
     )::text
   );
 END;
