@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -127,58 +128,61 @@ const Auth = () => {
     return activeTab === 'login' ? 'הזן את פרטי ההתחברות שלך' : 'צור חשבון חדש';
   };
 
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as 'login' | 'signup');
+  };
+
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center p-4" dir="rtl">
       <BeamsBackground />
       
       <div className="w-full max-w-md space-y-6 backdrop-blur-sm bg-background/80 p-6 rounded-lg shadow-lg animate-fade-in">
         <AuthHeader>
-          <div className="relative w-full max-w-xs mx-auto mt-2">
-            <TabsList className="grid grid-cols-2 w-full rounded-full border border-border/20 p-1 bg-muted/30 backdrop-blur-md overflow-hidden">
-              {/* Switch track - fixed the position for RTL */}
-              <div 
-                className="absolute inset-y-1 rounded-full bg-primary transition-all duration-300 ease-in-out z-0"
-                style={{ 
-                  width: '50%', 
-                  right: activeTab === 'login' ? '0%' : '50%' 
-                }}
-              />
-              
-              {/* Tab triggers */}
-              <TabsTrigger 
-                value="login" 
-                className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
-              >
-                התחברות
-              </TabsTrigger>
-              <TabsTrigger 
-                value="signup" 
-                className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
-              >
-                הרשמה
-              </TabsTrigger>
-            </TabsList>
-          </div>
-        </AuthHeader>
-        
-        <div className="space-y-4 mt-8">
-          <div className="text-right">
-            <h2 className="text-2xl font-semibold">{getTabTitle()}</h2>
-            <p className="text-sm text-muted-foreground">{getTabDescription()}</p>
-          </div>
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <div className="relative w-full max-w-xs mx-auto mt-2">
+              <TabsList className="grid grid-cols-2 w-full rounded-full border border-border/20 p-1 bg-muted/30 backdrop-blur-md overflow-hidden">
+                {/* Switch track - fixed for RTL */}
+                <div 
+                  className="absolute inset-y-1 rounded-full bg-primary transition-all duration-300 ease-in-out z-0"
+                  style={{ 
+                    width: '50%', 
+                    right: activeTab === 'login' ? '0%' : '50%' 
+                  }}
+                />
+                
+                {/* Tab triggers */}
+                <TabsTrigger 
+                  value="login" 
+                  className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
+                >
+                  התחברות
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="signup" 
+                  className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
+                >
+                  הרשמה
+                </TabsTrigger>
+              </TabsList>
+            </div>
           
-          <div className="w-full">
-            {activeTab === 'login' ? (
-              <TabsContent value="login" className="mt-0">
-                <LoginForm redirectTo={redirectTo} />
-              </TabsContent>
-            ) : (
-              <TabsContent value="signup" className="mt-0">
-                <SignupForm redirectTo={redirectTo} />
-              </TabsContent>
-            )}
-          </div>
-        </div>
+            <div className="space-y-4 mt-8">
+              <div className="text-right">
+                <h2 className="text-2xl font-semibold">{getTabTitle()}</h2>
+                <p className="text-sm text-muted-foreground">{getTabDescription()}</p>
+              </div>
+              
+              <div className="w-full">
+                <TabsContent value="login" className="mt-0">
+                  <LoginForm redirectTo={redirectTo} />
+                </TabsContent>
+                <TabsContent value="signup" className="mt-0">
+                  <SignupForm redirectTo={redirectTo} />
+                </TabsContent>
+              </div>
+            </div>
+          </Tabs>
+        </AuthHeader>
       </div>
     </div>
   );
