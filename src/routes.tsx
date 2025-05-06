@@ -1,19 +1,20 @@
+
 import { createBrowserRouter } from "react-router-dom";
-import DashboardPage from "./pages/DashboardPage";
+import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SubscriptionPage from "./pages/Subscription";
 import SubscriptionSuccess from "./components/subscription/SubscriptionSuccess";
-import ProfilePage from "./pages/ProfilePage";
-import CalendarPage from "./pages/CalendarPage";
-import BlogPage from "./pages/BlogPage";
-import CoursesPage from "./pages/CoursesPage";
-import CourseDetailPage from "./pages/CourseDetailPage";
-import AdminPage from "./pages/AdminPage";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { SubscribedRoute } from "./components/SubscribedRoute";
-import { AdminRoute } from "./components/AdminRoute";
+import Profile from "./pages/Profile";
+import Calendar from "./pages/Calendar";
+import Blog from "./pages/Blog";
+import Courses from "./pages/Courses";
+import CourseDetail from "./pages/CourseDetail";
+import Admin from "./pages/Admin";
+import ProtectedRoute from "./components/ProtectedRoute";
+import SubscribedRoute from "./components/SubscribedRoute";
+import AdminRoute from "./components/AdminRoute";
 import PaymentRedirectPage from "./pages/PaymentRedirectPage";
 import IframePaymentPage from "./pages/IframePaymentPage";
 
@@ -62,7 +63,7 @@ const router = createBrowserRouter([
     path: "/dashboard",
     element: (
       <ProtectedRoute>
-        <DashboardPage />
+        <Dashboard />
       </ProtectedRoute>
     ),
   },
@@ -70,7 +71,7 @@ const router = createBrowserRouter([
     path: "/profile",
     element: (
       <ProtectedRoute>
-        <ProfilePage />
+        <Profile />
       </ProtectedRoute>
     ),
   },
@@ -80,7 +81,7 @@ const router = createBrowserRouter([
     path: "/calendar",
     element: (
       <SubscribedRoute>
-        <CalendarPage />
+        <Calendar />
       </SubscribedRoute>
     ),
   },
@@ -88,7 +89,7 @@ const router = createBrowserRouter([
     path: "/blog",
     element: (
       <SubscribedRoute>
-        <BlogPage />
+        <Blog />
       </SubscribedRoute>
     ),
   },
@@ -96,7 +97,7 @@ const router = createBrowserRouter([
     path: "/courses",
     element: (
       <SubscribedRoute>
-        <CoursesPage />
+        <Courses />
       </SubscribedRoute>
     ),
   },
@@ -104,7 +105,7 @@ const router = createBrowserRouter([
     path: "/courses/:courseId",
     element: (
       <SubscribedRoute>
-        <CourseDetailPage />
+        <CourseDetail />
       </SubscribedRoute>
     ),
   },
@@ -114,7 +115,7 @@ const router = createBrowserRouter([
     path: "/admin",
     element: (
       <AdminRoute>
-        <AdminPage />
+        <Admin />
       </AdminRoute>
     ),
   },
