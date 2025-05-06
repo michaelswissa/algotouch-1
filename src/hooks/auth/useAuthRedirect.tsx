@@ -30,21 +30,23 @@ export const useRegistrationCheck = () => {
       if (registrationData) {
         // Validate registration timestamp (if needed)
         // Consider it valid if created in the last 30 minutes
-        const regTime = new Date(registrationData.registrationTime);
-        const now = new Date();
-        const timeDiffInMinutes = (now.getTime() - regTime.getTime()) / (1000 * 60);
-        
-        if (timeDiffInMinutes > 30) {
-          // Registration data is too old, clear it
-          StorageService.clearAllSubscriptionData();
-          toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
-        } else if (!registrationData.userCreated) {
-          // Valid registration data exists, redirect to subscription page if not on auth page
-          if (!window.location.pathname.includes('/auth')) {
-            navigate('/subscription', {
-              replace: true,
-              state: { isRegistering: true }
-            });
+        if (typeof registrationData === 'object' && registrationData !== null) {
+          const regTime = new Date(registrationData.registrationTime as string);
+          const now = new Date();
+          const timeDiffInMinutes = (now.getTime() - regTime.getTime()) / (1000 * 60);
+          
+          if (timeDiffInMinutes > 30) {
+            // Registration data is too old, clear it
+            StorageService.clearAllSubscriptionData();
+            toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
+          } else if (!(registrationData as any).userCreated) {
+            // Valid registration data exists, redirect to subscription page if not on auth page
+            if (!window.location.pathname.includes('/auth')) {
+              navigate('/subscription', {
+                replace: true,
+                state: { isRegistering: true }
+              });
+            }
           }
         }
       }

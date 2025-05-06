@@ -34,7 +34,7 @@ export const usePaymentStatusCheck = (options: PaymentStatusCheckOptions) => {
   const [attempts, setAttempts] = useState(0);
   const [checkInProgress, setCheckInProgress] = useState(false);
   const [paymentData, setPaymentData] = useState<any>(null);
-
+  
   // Function to check payment status
   const checkStatus = async () => {
     if (!sessionId || checkInProgress || attempts >= maxAttempts) {
@@ -145,7 +145,7 @@ export const usePaymentStatusCheck = (options: PaymentStatusCheckOptions) => {
         if (status === PaymentStatus.PROCESSING || status === PaymentStatus.INITIALIZING) {
           if (attempts < maxAttempts) {
             checkStatus();
-          } else if (status !== PaymentStatus.FAILED) {
+          } else if (status === PaymentStatus.INITIALIZING || status === PaymentStatus.PROCESSING) {
             // If we've reached max attempts and aren't already in FAILED state
             setStatus(PaymentStatus.FAILED);
             setErrorMessage('Payment process timed out');
