@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -12,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { StorageService } from '@/services/storage/StorageService';
 import { motion } from 'framer-motion';
+import { useSignupForm, SignupFormData } from '@/hooks/auth/useSignupForm';
 
 // Signup form schema
 const signupFormSchema = z.object({
@@ -48,6 +50,7 @@ const inputAnimation = {
 const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const { handleSignup, errors: signupErrors, isProcessing } = useSignupForm();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
@@ -63,17 +66,14 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
   const onSubmit = async (values: SignupFormValues) => {
     setIsLoading(true);
     try {
-      // Store registration data in session storage first
-      StorageService.storeRegistrationData({
+      // Create the required SignupFormData object (all fields are required except phone)
+      const formData: SignupFormData = {
         email: values.email,
         password: values.password,
-        userData: {
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phone,
-        },
-        registrationTime: new Date().toISOString(),
-      });
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone,
+      };
 
       // Check if we have a redirect parameter for post-payment flow
       if (redirectTo) {
@@ -98,10 +98,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
         toast.success('נרשמת בהצלחה!');
         navigate(redirectTo, { replace: true });
       } else {
-        // Otherwise, redirect to subscription flow
-        navigate('/subscription', { 
-          state: { isRegistering: true } 
-        });
+        // Use our reusable signup hook
+        await handleSignup(formData);
       }
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -138,7 +136,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       <Input
                         placeholder="ישראל"
                         autoComplete="given-name"
-                        disabled={isLoading}
+                        disabled={isLoading || isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -157,7 +155,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                       <Input
                         placeholder="ישראלי"
                         autoComplete="family-name"
-                        disabled={isLoading}
+                        disabled={isLoading || isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -180,7 +178,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                         placeholder="name@example.com"
                         type="email"
                         autoComplete="email"
-                        disabled={isLoading}
+                        disabled={isLoading || isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -203,7 +201,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                         placeholder="050-1234567"
                         type="tel"
                         autoComplete="tel"
-                        disabled={isLoading}
+                        disabled={isLoading || isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -226,7 +224,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
                         placeholder="******"
                         type="password"
                         autoComplete="new-password"
-                        disabled={isLoading}
+                        disabled={isLoading || isProcessing}
                         className="text-right"
                         {...field}
                       />
@@ -244,8 +242,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
-                {isLoading ? (
+              <Button type="submit" className="w-full rtl-button" disabled={isLoading || isProcessing}>
+                {isLoading || isProcessing ? (
                   <>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" /> מעבד...
                   </>
