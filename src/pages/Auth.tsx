@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -149,23 +148,22 @@ const Auth = () => {
                   className="absolute inset-y-1 rounded-full bg-primary transition-all duration-300 ease-in-out z-0"
                   style={{ 
                     width: '50%', 
-                    right: activeTab === 'login' ? '50%' : '0%',
-                    transform: `translateX(${activeTab === 'login' ? '0%' : '0%'})` 
+                    right: activeTab === 'signup' ? '50%' : '0%'
                   }}
                 />
                 
                 {/* Tab triggers */}
                 <TabsTrigger 
-                  value="login" 
-                  className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
-                >
-                  התחברות
-                </TabsTrigger>
-                <TabsTrigger 
                   value="signup" 
                   className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
                 >
                   הרשמה
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="login" 
+                  className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
+                >
+                  התחברות
                 </TabsTrigger>
               </TabsList>
             </div>
