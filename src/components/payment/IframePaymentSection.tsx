@@ -11,7 +11,8 @@ import { PaymentStatusEnum } from '@/types/payment';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { CardComService } from '@/services/payment/CardComService';
 import type { ContractData } from '@/lib/contracts/contract-validation-service';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 
 interface IframePaymentSectionProps {
   planId: string;
@@ -25,6 +26,8 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   onBack 
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { handlePaymentComplete } = useSubscriptionContext();
   const [isLoading, setIsLoading] = useState(true);
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,27 +35,27 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // בדיקת פרמטרים בכתובת אם הגענו מהפניה חיצונית
+  // Check URL params if we're coming from a redirect
   const searchParams = useSearchParams()[0];
   const location = useLocation();
   
-  // בדיקת פרמטרים מיד עם טעינת הקומפוננטה - לטיפול בהפניה מ-CardCom
+  // Check parameters as soon as the component loads - to handle redirects from CardCom
   useEffect(() => {
     if (location.search && searchParams) {
       PaymentLogger.log('Detected URL parameters, checking if redirect from CardCom', { search: location.search });
       
-      // טיפול בפרמטרים של ההפניה
+      // Handle redirect parameters
       const redirectParams = CardComService.handleRedirectParameters(searchParams);
       
       if (redirectParams.sessionId) {
         setSessionId(redirectParams.sessionId);
         
-        // אם יש קוד תגובה בהצלחה
+        // If successful response code
         if (redirectParams.status === 'success') {
           PaymentLogger.log('Payment success detected from URL parameters');
           setPaymentStatus(PaymentStatusEnum.SUCCESS);
           
-          // עדכון הסטטוס במסד הנתונים
+          // Update status in database
           const updatePaymentStatus = async () => {
             try {
               await supabase.functions.invoke('cardcom-status', {
@@ -79,7 +82,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           setPaymentStatus(PaymentStatusEnum.FAILED);
         }
         
-        return; // לא ממשיכים ליצירת תשלום חדש אם זיהינו פרמטרים
+        return; // Don't continue to create a new payment if we detected parameters
       }
     }
     
@@ -173,45 +176,77 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     initializePaymentIframe();
   }, [planId, user?.id, location.search, searchParams, onPaymentComplete]);
   
-  // Handle iframe messages from CardCom
+  // Handle iframe messages from CardCom and our redirect pages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Only process messages from CardCom domains
-      if (!event.origin.includes('cardcom.solutions')) {
-        return;
-      }
+      PaymentLogger.log('Received message event:', {
+        origin: event.origin,
+        ourOrigin: window.location.origin,
+        data: event.data
+      });
       
-      PaymentLogger.log('Received message from iframe:', event.data);
-      
-      try {
-        // Try to parse the message if it's a string
-        const data = typeof event.data === 'string' 
-          ? JSON.parse(event.data) 
-          : event.data;
-          
-        if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
+      // First, check if this is a message from our payment redirect pages
+      if (event.origin === window.location.origin) {
+        // Handle messages from our redirect pages
+        if (event.data?.type === 'cardcom-ok') {
+          PaymentLogger.log('Received cardcom-ok message from redirect page', event.data);
           setPaymentStatus(PaymentStatusEnum.SUCCESS);
           toast.success('התשלום בוצע בהצלחה!');
           
+          // Move to next step in subscription flow
           if (onPaymentComplete) {
             onPaymentComplete();
+          } else {
+            // Alternative: Call handlePaymentComplete from subscription context
+            handlePaymentComplete?.();
+            // Or navigate to success page
+            navigate('/subscription/success', { replace: true });
           }
-        } else if (data.action === 'HandleError') {
+        } 
+        else if (event.data?.type === 'cardcom-fail') {
+          PaymentLogger.log('Received cardcom-fail message from redirect page', event.data);
           setPaymentStatus(PaymentStatusEnum.FAILED);
-          setError(data.message || 'התשלום נכשל');
-          toast.error(data.message || 'התשלום נכשל');
+          setError(event.data?.message || 'התשלום נכשל');
+          toast.error('התשלום נכשל');
         }
-      } catch (err) {
-        PaymentLogger.error('Error processing iframe message:', err);
+        return;
+      }
+      
+      // For messages from CardCom domains
+      if (event.origin.includes('cardcom.solutions')) {
+        PaymentLogger.log('Received message from CardCom iframe:', event.data);
+        
+        try {
+          // Try to parse the message if it's a string
+          const data = typeof event.data === 'string' 
+            ? JSON.parse(event.data) 
+            : event.data;
+            
+          if (data.action === 'HandleSubmit' && data.data?.IsSuccess) {
+            setPaymentStatus(PaymentStatusEnum.SUCCESS);
+            toast.success('התשלום בוצע בהצלחה!');
+            
+            if (onPaymentComplete) {
+              onPaymentComplete();
+            }
+          } else if (data.action === 'HandleError') {
+            setPaymentStatus(PaymentStatusEnum.FAILED);
+            setError(data.message || 'התשלום נכשל');
+            toast.error(data.message || 'התשלום נכשל');
+          }
+        } catch (err) {
+          PaymentLogger.error('Error processing CardCom iframe message:', err);
+        }
       }
     };
     
+    // Add message event listener
     window.addEventListener('message', handleMessage);
     
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [onPaymentComplete]);
+  }, [onPaymentComplete, navigate, handlePaymentComplete]);
   
   // Poll for payment status updates
   useEffect(() => {

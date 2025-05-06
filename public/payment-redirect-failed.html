@@ -1,0 +1,24 @@
+
+<!doctype html>
+<meta charset="utf-8">
+<script>
+  // Get the LowProfileCode from the URL parameters
+  const lp = new URLSearchParams(location.search).get('LowProfileCode');
+  // Get the session_id from the URL parameters
+  const sessionId = new URLSearchParams(location.search).get('session_id');
+  // Get the error code if available
+  const responseCode = new URLSearchParams(location.search).get('ResponseCode');
+  // Send message to parent window with failed status
+  parent.postMessage({
+    type: 'cardcom-fail',
+    lp: lp,
+    sessionId: sessionId,
+    responseCode: responseCode
+  }, location.origin);
+  
+  console.log('Payment failed redirect page loaded, sending message to parent');
+</script>
+<body style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
+  <h2>התשלום נכשל</h2>
+  <p>מעבד את התוצאה, אנא המתן...</p>
+</body>

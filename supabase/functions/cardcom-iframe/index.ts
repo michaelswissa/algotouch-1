@@ -161,10 +161,17 @@ serve(async (req) => {
       amount
     });
 
-    // Use our new redirect page instead of direct routes
-    const successRedirectUrl = `${frontendBaseUrl}/payment/redirect?session_id=${sessionData.id}&ref=${transactionRef}&status=success`;
-    const failedRedirectUrl = `${frontendBaseUrl}/payment/redirect?session_id=${sessionData.id}&ref=${transactionRef}&status=failed`;
+    // Define redirect URLs including session information
+    // *** IMPORTANT: Updated to use our own redirect pages that will communicate with the parent window ***
+    const successRedirectUrl = `${frontendBaseUrl}/payment-redirect-success.html?session_id=${sessionData.id}&ref=${transactionRef}`;
+    const failedRedirectUrl = `${frontendBaseUrl}/payment-redirect-failed.html?session_id=${sessionData.id}&ref=${transactionRef}`;
     const webhookUrl = `${publicFunctionsUrl}/cardcom-webhook`;
+    
+    logStep("CARDCOM-IFRAME", "Redirect URLs generated", {
+      successRedirectUrl,
+      failedRedirectUrl,
+      webhookUrl
+    });
     
     // For the Low Profile Create API, need to create a proper URL
     const lowProfileApiUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
