@@ -1,5 +1,14 @@
 
-import { getLCP, getFID, getCLS, getFCP, getTTFB, Metric } from 'web-vitals';
+import * as webVitals from 'web-vitals';
+
+/**
+ * Metric type definition
+ */
+export type Metric = {
+  name: string;
+  value: number;
+  id: string;
+};
 
 /**
  * Send metrics to an analytics endpoint
@@ -25,26 +34,26 @@ const sendMetric = ({ name, value, id }: Metric) => {
  */
 export const reportWebVitals = () => {
   // Largest Contentful Paint
-  getLCP(sendMetric);
+  webVitals.onLCP(sendMetric);
   
   // First Input Delay
-  getFID(sendMetric);
+  webVitals.onFID(sendMetric);
   
   // Cumulative Layout Shift
-  getCLS(sendMetric);
+  webVitals.onCLS(sendMetric);
   
   // First Contentful Paint
-  getFCP(sendMetric);
+  webVitals.onFCP(sendMetric);
   
   // Time to First Byte
-  getTTFB(sendMetric);
+  webVitals.onTTFB(sendMetric);
 };
 
 /**
  * Monitor Core Web Vitals and provide warnings for poor values
  */
 export const monitorCoreWebVitals = () => {
-  getLCP(metric => {
+  webVitals.onLCP(metric => {
     if (metric.value > 2500) {
       console.warn(`LCP too high: ${Math.round(metric.value)}ms`, {
         recommendedValue: '< 2.5s',
@@ -53,7 +62,7 @@ export const monitorCoreWebVitals = () => {
     }
   });
   
-  getFID(metric => {
+  webVitals.onFID(metric => {
     if (metric.value > 100) {
       console.warn(`FID too high: ${Math.round(metric.value)}ms`, {
         recommendedValue: '< 100ms',
@@ -62,7 +71,7 @@ export const monitorCoreWebVitals = () => {
     }
   });
   
-  getCLS(metric => {
+  webVitals.onCLS(metric => {
     if (metric.value > 0.1) {
       console.warn(`CLS too high: ${metric.value.toFixed(3)}`, {
         recommendedValue: '< 0.1',
