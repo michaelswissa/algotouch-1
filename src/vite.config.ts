@@ -24,38 +24,20 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'es2015',
     minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: mode === 'production',
-        drop_debugger: true,
-      },
-    },
+    // Disable code splitting for problematic modules
     rollupOptions: {
       output: {
-        // Use function form for manual chunks
         manualChunks: (id) => {
-          // Create separate chunks for large dependencies
+          // Create only two chunks: vendor and app
           if (id.includes('node_modules')) {
-            if (id.includes('@tanstack/react-query')) {
-              return 'vendor-query';
-            }
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'vendor-react';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'vendor-radix';
-            }
-            return 'vendor'; // other dependencies
+            return 'vendor';
           }
-          // Create chunk for UI components
-          if (id.includes('/components/ui/')) {
-            return 'ui-components';
-          }
+          return 'app';
         }
       }
     },
-    // Optimize chunk size
-    chunkSizeWarningLimit: 1000,
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 2000,
   },
   // Improve dev experience
   optimizeDeps: {

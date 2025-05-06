@@ -7,13 +7,13 @@ import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
 
-// Eagerly load the Index page and ProtectedRoute for initial rendering
+// Import main components directly to avoid lazy loading issues
 import Index from './pages/Index';
+import Dashboard from './pages/Dashboard'; 
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load other pages that aren't needed immediately
 const Auth = lazy(() => import('./pages/Auth'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Subscription = lazy(() => import('./pages/Subscription'));
 const MySubscriptionPage = lazy(() => import('./pages/MySubscriptionPage'));
@@ -74,9 +74,7 @@ function App() {
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<PageLoader />}>
-                        <Dashboard />
-                      </Suspense>
+                      <Dashboard />
                     </ProtectedRoute>
                   }
                 />

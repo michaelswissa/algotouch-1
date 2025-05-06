@@ -2,7 +2,7 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw, Clock, BookOpen, Newspaper } from 'lucide-react';
 import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { Button } from '@/components/ui/button';
