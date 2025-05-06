@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
@@ -61,8 +60,8 @@ export const useAuthActions = () => {
   const signUp = async (userData: {
     email: string,
     password: string,
-    firstName?: string,
-    lastName?: string,
+    firstName: string,
+    lastName: string,
     phone?: string
   }) => {
     try {
