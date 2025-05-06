@@ -20,6 +20,7 @@ import PaymentRedirectPage from "./pages/PaymentRedirectPage";
 import CardComRedirectPage from "./pages/CardComRedirectPage";
 import IframePaymentPage from "./pages/IframePaymentPage";
 
+// Create the router without using React.lazy() for any components
 const router = createBrowserRouter([
   {
     path: "/",

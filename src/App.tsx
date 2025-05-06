@@ -11,16 +11,15 @@ import { Spinner } from '@/components/ui/spinner';
 import Index from './pages/Index';
 import Dashboard from './pages/Dashboard'; 
 import ProtectedRoute from './components/ProtectedRoute';
-
-// Lazy load other pages that aren't needed immediately
-const Auth = lazy(() => import('./pages/Auth'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Subscription = lazy(() => import('./pages/Subscription'));
-const MySubscriptionPage = lazy(() => import('./pages/MySubscriptionPage'));
-const IframePaymentPage = lazy(() => import('./pages/IframePaymentPage'));
-const CardComRedirectPage = lazy(() => import('./pages/CardComRedirectPage'));
-const SubscriptionSuccess = lazy(() => import('./components/subscription/SubscriptionSuccess'));
-const SubscriptionFailed = lazy(() => import('./components/subscription/SubscriptionFailed'));
+import SubscribedRoute from './components/SubscribedRoute';
+import Auth from './pages/Auth';
+import Settings from './pages/Settings';
+import Subscription from './pages/Subscription';
+import MySubscriptionPage from './pages/MySubscriptionPage';
+import IframePaymentPage from './pages/IframePaymentPage';
+import CardComRedirectPage from './pages/CardComRedirectPage';
+import SubscriptionSuccess from './components/subscription/SubscriptionSuccess';
+import SubscriptionFailed from './components/subscription/SubscriptionFailed';
 
 // Loading fallback component
 const PageLoader = () => (
@@ -50,26 +49,10 @@ function App() {
             <AuthProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
-                <Route path="/auth" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <Auth />
-                  </Suspense>
-                } />
-                <Route path="/subscription" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <Subscription />
-                  </Suspense>
-                } />
-                <Route path="/subscription/success" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <SubscriptionSuccess />
-                  </Suspense>
-                } />
-                <Route path="/subscription/failed" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <SubscriptionFailed />
-                  </Suspense>
-                } />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/subscription" element={<Subscription />} />
+                <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+                <Route path="/subscription/failed" element={<SubscriptionFailed />} />
                 <Route
                   path="/dashboard"
                   element={
@@ -82,9 +65,7 @@ function App() {
                   path="/settings"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<PageLoader />}>
-                        <Settings />
-                      </Suspense>
+                      <Settings />
                     </ProtectedRoute>
                   }
                 />
@@ -92,22 +73,12 @@ function App() {
                   path="/my-subscription"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<PageLoader />}>
-                        <MySubscriptionPage />
-                      </Suspense>
+                      <MySubscriptionPage />
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/payment/iframe/:planId" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <IframePaymentPage />
-                  </Suspense>
-                } />
-                <Route path="/payment/redirect" element={
-                  <Suspense fallback={<PageLoader />}>
-                    <CardComRedirectPage />
-                  </Suspense>
-                } />
+                <Route path="/payment/iframe/:planId" element={<IframePaymentPage />} />
+                <Route path="/payment/redirect" element={<CardComRedirectPage />} />
               </Routes>
               <Toaster richColors position="top-center" />
             </AuthProvider>

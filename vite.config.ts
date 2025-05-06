@@ -20,4 +20,29 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Completely disable code splitting
+  build: {
+    target: 'es2015',
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Disable manual chunks
+        inlineDynamicImports: true // Force everything into a single bundle
+      }
+    },
+    // Increase chunk size warning limit since we'll have a larger bundle
+    chunkSizeWarningLimit: 5000,
+  },
+  // Improve dev experience with eager loading
+  optimizeDeps: {
+    include: [
+      'react', 
+      'react-dom', 
+      'react-router-dom', 
+      '@tanstack/react-query',
+      'lucide-react',
+      'date-fns',
+      'recharts'
+    ],
+  },
 }));
