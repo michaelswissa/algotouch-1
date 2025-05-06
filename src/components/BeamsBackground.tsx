@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 
 interface BeamsBackgroundProps {
   className?: string;
@@ -7,8 +7,9 @@ interface BeamsBackgroundProps {
 
 /**
  * A beautiful radial gradient beams background component
+ * Memoized to prevent unnecessary re-renders
  */
-const BeamsBackground: React.FC<BeamsBackgroundProps> = ({ className }) => {
+const BeamsBackground: React.FC<BeamsBackgroundProps> = memo(({ className }) => {
   return (
     <div
       className={`absolute inset-0 -z-10 overflow-hidden ${className}`}
@@ -22,6 +23,8 @@ const BeamsBackground: React.FC<BeamsBackgroundProps> = ({ className }) => {
       </div>
     </div>
   );
-};
+});
+
+BeamsBackground.displayName = 'BeamsBackground';
 
 export default BeamsBackground;

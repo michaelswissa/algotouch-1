@@ -1,16 +1,25 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth';
 import AuthHeader from '@/components/auth/AuthHeader';
-import LoginForm from '@/components/auth/LoginForm';
-import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
 import { StorageService } from '@/services/storage/StorageService';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 import BeamsBackground from '@/components/BeamsBackground';
+
+// Lazy load the forms
+const LoginForm = lazy(() => import('@/components/auth/LoginForm'));
+const SignupForm = lazy(() => import('@/components/auth/SignupForm'));
+
+// FormLoader component
+const FormLoader = () => (
+  <div className="flex justify-center items-center py-8">
+    <Spinner className="h-6 w-6" />
+  </div>
+);
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -23,6 +32,13 @@ const Auth = () => {
     redirectToSubscription?: boolean,
     isRegistering?: boolean
   };
+
+  // Performance mark for timing component load
+  useEffect(() => {
+    if (typeof performance !== 'undefined') {
+      performance.mark('auth-page-rendered');
+    }
+  }, []);
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -175,10 +191,14 @@ const Auth = () => {
                 
                 <div className="w-full">
                   <TabsContent value="login" className="mt-0">
-                    <LoginForm redirectTo={redirectTo} />
+                    <Suspense fallback={<FormLoader />}>
+                      <LoginForm redirectTo={redirectTo} />
+                    </Suspense>
                   </TabsContent>
                   <TabsContent value="signup" className="mt-0">
-                    <SignupForm redirectTo={redirectTo} />
+                    <Suspense fallback={<FormLoader />}>
+                      <SignupForm redirectTo={redirectTo} />
+                    </Suspense>
                   </TabsContent>
                 </div>
               </div>
