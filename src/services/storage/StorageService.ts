@@ -6,6 +6,7 @@ export class StorageService {
   private static REGISTRATION_DATA_KEY = 'registration_data';
   private static CONTRACT_DATA_KEY = 'contract_data';
   private static PAYMENT_SESSION_KEY = 'payment_session';
+  private static REGISTRATION_EXPIRY_HOURS = 24; // Registration data expires after 24 hours
 
   /**
    * Get registration data from session storage
@@ -23,7 +24,7 @@ export class StorageService {
   /**
    * Store registration data to session storage
    */
-  static storeRegistrationData(data: any): void {
+  static storeRegistrationData(data: any): boolean {
     try {
       // Ensure data has a timestamp if not present
       if (!data.registrationTime) {
@@ -31,8 +32,10 @@ export class StorageService {
       }
       
       sessionStorage.setItem(this.REGISTRATION_DATA_KEY, JSON.stringify(data));
+      return true;
     } catch (error) {
       console.error('Error storing registration data:', error);
+      return false;
     }
   }
 
@@ -48,6 +51,27 @@ export class StorageService {
     } catch (error) {
       console.error('Error updating registration data:', error);
       return newData;
+    }
+  }
+
+  /**
+   * Check if registration data is valid (not expired)
+   */
+  static isRegistrationValid(): boolean {
+    try {
+      const data = this.getRegistrationData();
+      if (!data || !data.registrationTime) {
+        return false;
+      }
+
+      const registrationTime = new Date(data.registrationTime);
+      const now = new Date();
+      const diffHours = (now.getTime() - registrationTime.getTime()) / (1000 * 60 * 60);
+      
+      return diffHours < this.REGISTRATION_EXPIRY_HOURS;
+    } catch (error) {
+      console.error('Error checking registration validity:', error);
+      return false;
     }
   }
 
@@ -95,6 +119,28 @@ export class StorageService {
       return data ? JSON.parse(data) : null;
     } catch (error) {
       console.error('Error getting payment session data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generic get method to retrieve data from session storage
+   */
+  static get<T>(key: string): T | null {
+    try {
+      switch (key) {
+        case 'registration_data':
+          return this.getRegistrationData() as T;
+        case 'contract_data':
+          return this.getContractData() as T;
+        case 'payment_session':
+          return this.getPaymentSessionData() as T;
+        default:
+          const data = sessionStorage.getItem(key);
+          return data ? JSON.parse(data) as T : null;
+      }
+    } catch (error) {
+      console.error(`Error getting data for key ${key}:`, error);
       return null;
     }
   }
