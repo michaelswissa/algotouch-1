@@ -1,12 +1,11 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { sendWelcomeEmail } from '@/lib/email-service';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { StorageService } from '@/services/storage/StorageService';
+import { SignupFormData } from '@/types/auth';
+import { AuthStorageService } from '@/services/storage/AuthStorageService';
 
 export const useAuthActions = () => {
   const [loading, setLoading] = useState(false);
@@ -58,58 +57,71 @@ export const useAuthActions = () => {
     }
   };
 
-  const signUp = async (userData: {
-    email: string,
-    password: string,
-    firstName?: string,
-    lastName?: string,
-    phone?: string
-  }) => {
+  const signUp = async (formData: SignupFormData): Promise<{ success: boolean; user: User | null; error?: string }> => {
     try {
       setLoading(true);
+      PaymentLogger.log('Starting signup process', { email: formData.email });
       
-      const { email, password, firstName, lastName, phone } = userData;
+      // First check if we're in a subscription flow or direct signup
+      const shouldProceedToSubscription = !sessionStorage.getItem('contract_data');
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            phone: phone,
-            is_new_user: true
+      if (shouldProceedToSubscription) {
+        // Store registration data for subscription flow
+        const registrationData = {
+          email: formData.email,
+          password: formData.password,
+          userData: {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            phone: formData.phone
           },
-          // Remove emailRedirectTo to disable email verification
+          registrationTime: new Date().toISOString(),
+          userCreated: false
+        };
+        
+        const stored = AuthStorageService.storeRegistrationData(registrationData);
+        if (!stored) {
+          throw new Error('שגיאה בשמירת נתוני הרשמה');
         }
-      });
-      
-      if (error) {
-        console.error('Sign up error:', error.message);
-        toast.error(error.message);
-        throw error;
+        
+        PaymentLogger.log('Registration data stored, redirecting to subscription');
+        toast.success('הפרטים נשמרו בהצלחה');
+        
+        navigate('/subscription', { replace: true, state: { isRegistering: true } });
+        return { success: true, user: null };
+      } else {
+        // Direct signup - create user immediately
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              phone: formData.phone,
+              full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+              is_new_user: true
+            }
+          }
+        });
+        
+        if (error) {
+          PaymentLogger.error('Sign up error:', error);
+          throw error;
+        }
+        
+        PaymentLogger.log('Sign up successful');
+        toast.success('נרשמת בהצלחה!');
+        
+        return { success: true, user: data.user };
       }
-      
-      // Store registration data for subscription flow
-      const registrationData = {
-        email,
-        password,
-        userData: {
-          firstName,
-          lastName,
-          phone
-        },
-        registrationTime: new Date().toISOString()
+    } catch (error: any) {
+      PaymentLogger.error('Error signing up:', error);
+      return { 
+        success: false, 
+        user: null, 
+        error: error.message || 'שגיאה בתהליך ההרשמה'
       };
-      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
-      
-      console.log('Sign up successful, proceeding to subscription');
-      toast.success('נרשמת בהצלחה!');
-      
-      return { success: true, user: data.user };
-    } catch (error) {
-      console.error('Error signing up:', error);
-      throw error;
     } finally {
       setLoading(false);
     }

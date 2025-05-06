@@ -1,6 +1,7 @@
 
 import { Session, User } from '@supabase/supabase-js';
 import { UserRoles } from './role-types';
+import { SignupFormData } from '@/types/auth';
 
 export interface AuthContextType {
   // Auth state
@@ -20,13 +21,11 @@ export interface AuthContextType {
     user: User | null;
     error?: string;
   }>;
-  signUp: (userData: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phone?: string;
-  }) => Promise<{ success: boolean; user: User | null }>;
+  signUp: (userData: SignupFormData) => Promise<{ 
+    success: boolean; 
+    user: User | null;
+    error?: string;
+  }>;
   signOut: () => Promise<void>;
   updateProfile: (userData: any) => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;

@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { formAnimation, inputAnimation, buttonAnimation } from '@/components/ui/animations';
+import { useAuth } from '@/contexts/auth';
+import { PaymentLogger } from '@/services/payment/PaymentLogger';
 
 // Login form schema
 const loginFormSchema = z.object({
@@ -25,26 +27,10 @@ interface LoginFormProps {
   redirectTo?: string | null;
 }
 
-const formAnimation = {
-  hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1,
-    transition: {
-      duration: 0.3,
-      staggerChildren: 0.1,
-      when: "beforeChildren"
-    }
-  }
-};
-
-const inputAnimation = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0 }
-};
-
 const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const { signIn } = useAuth();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -57,30 +43,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
-      });
+      PaymentLogger.log('Starting login submission', { email: values.email });
+      
+      const { success, error } = await signIn(values.email, values.password);
 
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
+        if (error.includes('Invalid login credentials')) {
           toast.error('פרטי התחברות שגויים');
         } else {
-          toast.error(error.message);
+          toast.error(error);
         }
         return;
       }
 
-      toast.success('התחברת בהצלחה!');
-      
-      // Redirect to the specified path or dashboard
-      if (redirectTo) {
+      // If we need to redirect to a specific path
+      if (redirectTo && success) {
         navigate(redirectTo, { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
+      PaymentLogger.error('Login submission error:', error);
       toast.error('שגיאה בהתחברות');
     } finally {
       setIsLoading(false);
@@ -147,9 +128,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ redirectTo }) => {
           <CardFooter className="px-0">
             <motion.div 
               className="w-full"
-              variants={inputAnimation}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              variants={buttonAnimation}
+              whileHover="hover"
+              whileTap="tap"
             >
               <Button type="submit" className="w-full rtl-button" disabled={isLoading}>
                 {isLoading ? (
