@@ -54,7 +54,8 @@ serve(async (req) => {
       email, 
       fullName, 
       phone,
-      idNumber
+      idNumber,
+      enableJValidateOptionalFields = false // New parameter for error 103 retry
     } = requestData;
 
     // Convert operation type to numeric value as required by CardCom
@@ -70,7 +71,8 @@ serve(async (req) => {
     logStep("CARDCOM-IFRAME", "Operation determined", { 
       operation,
       operationTypeRequested: requestData.operationType,
-      planId
+      planId,
+      enableJValidateOptionalFields
     });
 
     if (!planId) {
@@ -212,14 +214,26 @@ serve(async (req) => {
       }
     };
     
-    // Add createTokenJValidateType only when Operation = 2 (ChargeAndCreateToken)
+    // Add JValidateType only when Operation = 2 (ChargeAndCreateToken)
     if (operation === 2) {
       lowProfileApiBody.JValidateType = 5;
     }
     
+    // Add JValidateOptionalFields if enableJValidateOptionalFields is true (for retry with CVV flag)
+    if (enableJValidateOptionalFields) {
+      lowProfileApiBody.JValidateOptionalFields = 1;
+      logStep("CARDCOM-IFRAME", "Adding JValidateOptionalFields due to CVV requirement", {
+        JValidateOptionalFields: 1
+      });
+    }
+    
     logStep("CARDCOM-IFRAME", "API request prepared", {
       url: lowProfileApiUrl,
-      apiRequestBody: { ...lowProfileApiBody, TerminalNumber: "REDACTED", ApiName: "REDACTED" }
+      apiRequestBody: { 
+        ...lowProfileApiBody, 
+        TerminalNumber: "REDACTED", 
+        ApiName: "REDACTED" 
+      }
     });
 
     // Now let's try using the CardCom API to create the LowProfile
@@ -272,7 +286,7 @@ serve(async (req) => {
       
       if (apiResult.ResponseCode === 0) {
         // Success - use the URL from the API response
-        const cardcomUrl = apiResult.Url || directLpcUrl;
+        const cardcomUrl = apiResult.Url;
         
         // Update the session with the LowProfileId from the API
         if (apiResult.LowProfileId) {
@@ -283,7 +297,8 @@ serve(async (req) => {
               payment_details: { 
                 ...sessionData.payment_details,
                 lowProfileId: apiResult.LowProfileId,
-                url: cardcomUrl
+                url: cardcomUrl,
+                enabledJValidateOptionalFields: enableJValidateOptionalFields
               }
             })
             .eq('id', sessionData.id);

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -10,6 +9,39 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
+// Helper function to log steps and data
+function logStep(functionName: string, step: string, data: any = {}) {
+  console.log(`[${functionName}][${step}]`, JSON.stringify(data));
+}
+
+// Helper function to sanitize payment data for storage (PCI compliance)
+function sanitizePaymentData(data: any): any {
+  // Create a deep copy to avoid modifying the original
+  const sanitized = JSON.parse(JSON.stringify(data));
+  
+  // Remove full card number if present (keep only last 4 digits)
+  if (sanitized.CardNumber) {
+    const last4 = sanitized.CardNumber.slice(-4);
+    sanitized.CardNumber = `****${last4}`;
+  }
+  
+  // Ensure we only keep last 4 digits for any card number fields
+  if (sanitized.TranzactionInfo?.CardNumber) {
+    const last4 = sanitized.TranzactionInfo.CardNumber.slice(-4);
+    sanitized.TranzactionInfo.CardNumber = `****${last4}`;
+  }
+  
+  // Remove CVV if present
+  if (sanitized.CVV) {
+    sanitized.CVV = '***';
+  }
+  if (sanitized.CVV2) {
+    sanitized.CVV2 = '***';
+  }
+  
+  return sanitized;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,6 +49,8 @@ serve(async (req) => {
   }
 
   try {
+    logStep("CARDCOM-WEBHOOK", "Function started", {});
+    
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -32,7 +66,10 @@ serve(async (req) => {
     try {
       paymentData = await req.json();
     } catch (error) {
-      console.error("[CARDCOM-WEBHOOK] Error parsing request body:", error);
+      logStep("CARDCOM-WEBHOOK", "Error parsing request body", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -45,14 +82,24 @@ serve(async (req) => {
       );
     }
 
-    console.log("[CARDCOM-WEBHOOK] Received webhook notification:", JSON.stringify(paymentData));
+    // Log truncated webhook data for debugging (without sensitive information)
+    const logSafeData = {
+      ResponseCode: paymentData.ResponseCode,
+      ReturnValue: paymentData.ReturnValue,
+      TranzactionId: paymentData.TranzactionId,
+      OperationType: paymentData.Operation,
+      hasTokenInfo: Boolean(paymentData.TokenInfo),
+      hasUIValues: Boolean(paymentData.UIValues)
+    };
+    
+    logStep("CARDCOM-WEBHOOK", "Received webhook notification", logSafeData);
     
     // Extract key information
     const responseCode = paymentData.ResponseCode;
     const sessionId = paymentData.ReturnValue; // We stored the session ID in ReturnValue
     
     if (!sessionId) {
-      console.error("[CARDCOM-WEBHOOK] Missing session ID in webhook data");
+      logStep("CARDCOM-WEBHOOK", "Missing session ID in webhook data", {});
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -68,28 +115,45 @@ serve(async (req) => {
     // Update the payment session status based on the response code
     const status = responseCode === 0 ? 'completed' : 'failed';
     
+    // Sanitize payment data before storage to ensure PCI compliance
+    const sanitizedPaymentData = sanitizePaymentData(paymentData);
+    
+    logStep("CARDCOM-WEBHOOK", "Updating session status", {
+      sessionId,
+      status,
+      responseCode: responseCode?.toString(),
+      hasTokenInfo: Boolean(sanitizedPaymentData.TokenInfo),
+      tokenExpiryDate: sanitizedPaymentData.TokenInfo?.TokenExDate || null
+    });
+    
     const { error: updateError } = await supabaseAdmin
       .from('payment_sessions')
       .update({
         status,
-        transaction_id: paymentData.TranzactionId?.toString(),
+        transaction_id: sanitizedPaymentData.TranzactionId?.toString(),
         response_code: responseCode?.toString(),
         updated_at: new Date().toISOString(),
-        payment_data: paymentData
+        payment_data: sanitizedPaymentData
       })
       .eq('id', sessionId);
     
     if (updateError) {
-      console.error("[CARDCOM-WEBHOOK] Error updating payment session:", updateError);
+      logStep("CARDCOM-WEBHOOK", "Error updating payment session", {
+        error: updateError.message
+      });
       throw new Error(`Error updating payment session: ${updateError.message}`);
     }
 
-    console.log(`[CARDCOM-WEBHOOK] Session ${sessionId} updated with status: ${status}`);
+    logStep("CARDCOM-WEBHOOK", "Session updated", {
+      sessionId,
+      status
+    });
 
     // If it was a successful payment and there's token info, save it
-    if (responseCode === 0 && paymentData.TokenInfo) {
-      const token = paymentData.TokenInfo.Token;
-      const tokenExpDate = paymentData.TokenInfo.TokenExDate;
+    if (responseCode === 0 && sanitizedPaymentData.TokenInfo) {
+      const token = sanitizedPaymentData.TokenInfo.Token;
+      const tokenExpDate = sanitizedPaymentData.TokenInfo.TokenExDate;
+      const tokenApprovalNumber = sanitizedPaymentData.TokenInfo.TokenApprovalNumber;
       
       if (token) {
         // Get the session data to find out which user and plan this is for
@@ -100,6 +164,13 @@ serve(async (req) => {
           .single();
           
         if (sessionData && (sessionData.user_id || sessionData.payment_details?.email)) {
+          logStep("CARDCOM-WEBHOOK", "Saving recurring payment token", {
+            userId: sessionData.user_id,
+            tokenExpiry: tokenExpDate,
+            planId: sessionData.plan_id,
+            hasApprovalNumber: Boolean(tokenApprovalNumber)
+          });
+          
           // Save the token for future recurring payments
           await supabaseAdmin
             .from('recurring_payments')
@@ -110,17 +181,20 @@ serve(async (req) => {
               plan_id: sessionData.plan_id,
               is_valid: true,
               status: 'active',
+              token_approval_number: tokenApprovalNumber,
               card_details: {
-                last4: paymentData.TranzactionInfo?.Last4CardDigits || '****',
-                card_type: paymentData.TranzactionInfo?.CardInfo || 'Unknown',
-                card_owner: paymentData.UIValues?.CardOwnerName || '',
-                email: paymentData.UIValues?.CardOwnerEmail || sessionData.payment_details?.email || '',
-                expiry_month: paymentData.TokenInfo?.CardMonth,
-                expiry_year: paymentData.TokenInfo?.CardYear
+                last4: sanitizedPaymentData.TranzactionInfo?.Last4CardDigits || sanitizedPaymentData.TranzactionInfo?.Last4CardDigitsString || '****',
+                card_type: sanitizedPaymentData.TranzactionInfo?.CardInfo || 'Unknown',
+                card_owner: sanitizedPaymentData.UIValues?.CardOwnerName || '',
+                email: sanitizedPaymentData.UIValues?.CardOwnerEmail || sessionData.payment_details?.email || '',
+                expiry_month: sanitizedPaymentData.TokenInfo?.CardMonth,
+                expiry_year: sanitizedPaymentData.TokenInfo?.CardYear
               }
             });
             
-          console.log(`[CARDCOM-WEBHOOK] Saved recurring payment token for user: ${sessionData.user_id}`);
+          logStep("CARDCOM-WEBHOOK", "Saved recurring payment token", {
+            userId: sessionData.user_id
+          });
             
           // If a subscription doesn't exist yet, create it
           const { data: existingSub } = await supabaseAdmin
@@ -142,6 +216,13 @@ serve(async (req) => {
               trialEndDate.setDate(trialEndDate.getDate() + 30);
             }
             
+            logStep("CARDCOM-WEBHOOK", "Creating subscription", {
+              userId: sessionData.user_id,
+              planId: sessionData.plan_id,
+              status,
+              hasTrialEnd: Boolean(trialEndDate)
+            });
+            
             await supabaseAdmin
               .from('subscriptions')
               .insert({
@@ -154,9 +235,54 @@ serve(async (req) => {
                 next_charge_at: trialEndDate ? trialEndDate.toISOString() : null
               });
             
-            console.log(`[CARDCOM-WEBHOOK] Created new subscription for user: ${sessionData.user_id}`);
+            logStep("CARDCOM-WEBHOOK", "Created subscription", {
+              userId: sessionData.user_id
+            });
           }
         }
+      }
+    } else if (responseCode !== 0) {
+      // Log failed transaction details
+      logStep("CARDCOM-WEBHOOK", "Payment failed", {
+        sessionId,
+        responseCode,
+        description: paymentData.Description || 'No error description provided'
+      });
+      
+      // Record the payment error in the database
+      try {
+        const { data: sessionData } = await supabaseAdmin
+          .from('payment_sessions')
+          .select('user_id, plan_id')
+          .eq('id', sessionId)
+          .single();
+          
+        if (sessionData?.user_id) {
+          await supabaseAdmin
+            .from('payment_errors')
+            .insert({
+              user_id: sessionData.user_id,
+              error_code: responseCode.toString(),
+              error_message: paymentData.Description || 'Transaction failed',
+              request_data: {
+                planId: sessionData.plan_id,
+                sessionId: sessionId
+              },
+              response_data: {
+                responseCode: responseCode,
+                description: paymentData.Description
+              }
+            });
+            
+          logStep("CARDCOM-WEBHOOK", "Recorded payment error", {
+            userId: sessionData.user_id,
+            errorCode: responseCode
+          });
+        }
+      } catch (errorLogError) {
+        logStep("CARDCOM-WEBHOOK", "Error recording payment error", {
+          error: errorLogError instanceof Error ? errorLogError.message : String(errorLogError)
+        });
       }
     }
     
@@ -167,10 +293,13 @@ serve(async (req) => {
         session_id: sessionId,
         event_type: 'webhook',
         status,
-        data: paymentData
+        data: sanitizedPaymentData
       });
 
-    console.log(`[CARDCOM-WEBHOOK] Logged payment event for session: ${sessionId}`);
+    logStep("CARDCOM-WEBHOOK", "Webhook processing complete", {
+      sessionId,
+      status
+    });
 
     // Return success to CardCom
     return new Response(
@@ -185,7 +314,9 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error processing webhook';
-    console.error(`[CARDCOM-WEBHOOK][ERROR] ${errorMessage}`);
+    logStep("CARDCOM-WEBHOOK", "Error", {
+      error: errorMessage
+    });
     
     return new Response(
       JSON.stringify({ 

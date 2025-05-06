@@ -28,6 +28,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusEnum>(PaymentStatusEnum.IDLE);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [processingTimeout, setProcessingTimeout] = useState<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Determine if we're using token_only mode (for monthly plans)
@@ -124,11 +125,22 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     initializePaymentIframe();
   }, [planId, user?.id, operationType]);
   
-  // Handle iframe messages from CardCom
+  // Handle iframe messages from CardCom with proper origin validation
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Strict origin validation for security
+      const allowedOrigins = [
+        'https://secure.cardcom.solutions', 
+        'https://secure.cardcom.co.il'
+      ];
+      
+      if (!allowedOrigins.includes(event.origin)) {
+        PaymentLogger.warn('Ignored message from unauthorized origin:', event.origin);
+        return;
+      }
+      
       // Process all messages to catch CardCom responses
-      PaymentLogger.log('Received postMessage:', { 
+      PaymentLogger.log('Received postMessage from CardCom:', { 
         origin: event.origin, 
         data: typeof event.data === 'object' ? JSON.stringify(event.data) : event.data
       });
@@ -154,6 +166,12 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           setPaymentStatus(PaymentStatusEnum.SUCCESS);
           toast.success('התשלום בוצע בהצלחה!');
           
+          // Clear any timeout if it exists
+          if (processingTimeout) {
+            clearTimeout(processingTimeout);
+            setProcessingTimeout(null);
+          }
+          
           // Notify parent component
           if (onPaymentComplete) {
             onPaymentComplete();
@@ -171,9 +189,23 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           data.action === 'HandleError'
         ) {
           PaymentLogger.error('Payment error message received:', data);
+          
+          // Check for error code 103 (CVV required) and retry with JValidateOptionalFields
+          if (data.errorCode === 103 || data.code === 103 || (data.message && data.message.includes('103'))) {
+            PaymentLogger.log('Received error 103, retrying with CVV flag');
+            handleRetryWithCVVFlag();
+            return;
+          }
+          
           setPaymentStatus(PaymentStatusEnum.FAILED);
           setError(data.message || 'התשלום נכשל');
           toast.error(data.message || 'התשלום נכשל');
+          
+          // Clear any timeout if it exists
+          if (processingTimeout) {
+            clearTimeout(processingTimeout);
+            setProcessingTimeout(null);
+          }
         }
       } catch (err) {
         // Not a JSON message or other error processing the message
@@ -187,7 +219,70 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [onPaymentComplete]);
+  }, [onPaymentComplete, processingTimeout]);
+  
+  // Retry payment with CVV flag set
+  const handleRetryWithCVVFlag = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setPaymentStatus(PaymentStatusEnum.INITIALIZING);
+      
+      PaymentLogger.log('Retrying payment with CVV flag enabled');
+      
+      // Get contract data from storage again
+      const contractData = StorageService.get<ContractData>('contract_data');
+      if (!contractData) {
+        throw new Error('נדרש למלא את פרטי החוזה לפני ביצוע תשלום');
+      }
+      
+      // Call CardCom iframe initialization with JValidateOptionalFields flag
+      const { data, error } = await supabase.functions.invoke('cardcom-iframe', {
+        body: {
+          planId,
+          userId: user?.id || null,
+          email: contractData.email,
+          fullName: contractData.fullName,
+          phone: contractData.phone,
+          idNumber: contractData.idNumber,
+          operationType: operationType,
+          enableJValidateOptionalFields: true // Add flag for CVV validation
+        }
+      });
+      
+      if (error) {
+        PaymentLogger.error('Error from cardcom-iframe function (retry):', error);
+        throw new Error(`Failed to initialize payment: ${error.message}`);
+      }
+      
+      PaymentLogger.log('CardCom iframe response for retry:', data);
+      
+      if (!data?.success || !data?.data) {
+        throw new Error(data?.message || 'Invalid response from payment service');
+      }
+      
+      const url = data.data.url || data.data.iframeUrl || data.data.Url;
+      if (!url) {
+        throw new Error('No iframe URL provided in the retry response');
+      }
+      
+      // Update the iframe URL and session ID
+      setIframeUrl(url);
+      setSessionId(data.data.sessionId);
+      setPaymentStatus(PaymentStatusEnum.IDLE);
+      
+      toast.info('מנסה שנית עם אימות מאובטח');
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'אירעה שגיאה בניסיון חוזר';
+      PaymentLogger.error('Payment retry error:', error);
+      setError(errorMessage);
+      setPaymentStatus(PaymentStatusEnum.FAILED);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Poll for payment status updates using Supabase
   useEffect(() => {
@@ -195,8 +290,13 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
       return;
     }
     
+    let pollCount = 0;
+    const maxPolls = 24; // 2 minutes of polling (5 second intervals)
+    
     const checkPaymentStatus = async () => {
       try {
+        pollCount++;
+        
         const { data, error } = await supabase.functions.invoke('cardcom-status', {
           body: { sessionId }
         });
@@ -220,6 +320,20 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           setPaymentStatus(PaymentStatusEnum.FAILED);
           setError('התשלום נדחה');
           toast.error('התשלום נכשל');
+        } else if (pollCount >= maxPolls) {
+          // If we've been polling for too long without a result, switch to processing state
+          PaymentLogger.log('Payment timeout - switching to processing state');
+          setPaymentStatus(PaymentStatusEnum.PROCESSING);
+          
+          // Set a timeout to show a notification to the user
+          const timeoutId = window.setTimeout(() => {
+            toast.info('התשלום בתהליך. נעדכן אותך ברגע שנקבל אישור מחברת האשראי', {
+              duration: 10000,
+            });
+          }, 2000);
+          
+          setProcessingTimeout(timeoutId);
+          return; // Stop polling
         }
       } catch (err) {
         PaymentLogger.error('Error in payment status check:', err);
@@ -257,6 +371,12 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
             setPaymentStatus(PaymentStatusEnum.SUCCESS);
             toast.success('התשלום בוצע בהצלחה!');
             
+            // Clear any timeout if it exists
+            if (processingTimeout) {
+              clearTimeout(processingTimeout);
+              setProcessingTimeout(null);
+            }
+            
             if (onPaymentComplete) {
               onPaymentComplete();
               window.location.href = '/subscription/step4';
@@ -265,6 +385,12 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
             setPaymentStatus(PaymentStatusEnum.FAILED);
             setError('התשלום נדחה');
             toast.error('התשלום נכשל');
+            
+            // Clear any timeout if it exists
+            if (processingTimeout) {
+              clearTimeout(processingTimeout);
+              setProcessingTimeout(null);
+            }
           }
         }
       )
@@ -272,8 +398,13 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
       
     return () => {
       supabase.removeChannel(channel);
+      
+      // Clear any timeout if component is unmounted
+      if (processingTimeout) {
+        clearTimeout(processingTimeout);
+      }
     };
-  }, [sessionId, onPaymentComplete]);
+  }, [sessionId, onPaymentComplete, processingTimeout]);
   
   // Handle iframe load events
   const handleIframeLoad = () => {
@@ -313,6 +444,24 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
         <CardFooter className="flex justify-center">
           <Button onClick={onPaymentComplete}>המשך</Button>
         </CardFooter>
+      </Card>
+    );
+  }
+  
+  if (paymentStatus === PaymentStatusEnum.PROCESSING) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>התשלום בתהליך</CardTitle>
+          <CardDescription>אנחנו מחכים לאישור מחברת האשראי</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <p>התשלום שלך בתהליך אישור. יתכן שזה יקח מספר דקות.</p>
+            <p className="text-sm text-muted-foreground">אין צורך לרענן את הדף, הוא יתעדכן אוטומטית כשהתשלום יאושר.</p>
+          </div>
+        </CardContent>
       </Card>
     );
   }
