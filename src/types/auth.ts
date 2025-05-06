@@ -1,4 +1,9 @@
 
+import { User, Session } from '@supabase/supabase-js';
+
+/**
+ * Form data for signup
+ */
 export interface SignupFormData {
   email: string;
   password: string;
@@ -7,18 +12,27 @@ export interface SignupFormData {
   phone?: string;
 }
 
+/**
+ * Auth state interface
+ */
 export interface AuthState {
   isAuthenticated: boolean;
-  user: any | null;
-  session: any | null;
+  user: User | null;
+  session: Session | null;
   loading: boolean;
   initialized: boolean;
 }
 
+/**
+ * Form validation errors
+ */
 export interface ValidationErrors {
   [key: string]: string | null;
 }
 
+/**
+ * Registration data stored during signup flow
+ */
 export interface RegistrationData {
   email: string;
   password: string;
@@ -31,4 +45,14 @@ export interface RegistrationData {
   userCreated?: boolean;
   planId?: string;
   contractSigned?: boolean;
+}
+
+/**
+ * Auth response interface for consistency
+ */
+export interface AuthResponse {
+  success: boolean;
+  user: User | null;
+  session?: Session | null;
+  error?: string;
 }

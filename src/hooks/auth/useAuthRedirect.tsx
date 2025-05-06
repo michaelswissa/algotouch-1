@@ -12,7 +12,7 @@ export const useAuthRedirect = (isAuthenticated: boolean) => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const contractData = sessionStorage.getItem('contract_data');
+      const contractData = AuthStorageService.getContractData();
       
       if (contractData) {
         // User has contract data (might be in subscription flow)

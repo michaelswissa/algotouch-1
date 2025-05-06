@@ -1,17 +1,18 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Session } from '@supabase/supabase-js';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
-import { SignupFormData } from '@/types/auth';
+import { SignupFormData, AuthResponse } from '@/types/auth';
 import { AuthStorageService } from '@/services/storage/AuthStorageService';
 
 export const useAuthActions = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<AuthResponse> => {
     try {
       setLoading(true);
       PaymentLogger.log('Attempting to sign in user', { email });
@@ -20,22 +21,28 @@ export const useAuthActions = () => {
       
       if (error) {
         PaymentLogger.error('Sign in error:', error);
-        toast.error(error.message || 'שגיאה בתהליך ההתחברות');
-        throw error;
+        return { 
+          success: false, 
+          user: null, 
+          error: error.message 
+        };
       }
       
       if (!data.session || !data.user) {
         const errorMsg = 'ההתחברות נכשלה - לא התקבלה תגובה מהשרת';
         PaymentLogger.error(errorMsg);
-        toast.error(errorMsg);
-        throw new Error(errorMsg);
+        return { 
+          success: false, 
+          user: null, 
+          error: errorMsg 
+        };
       }
       
       PaymentLogger.log('Sign in successful', { userId: data.user.id });
       toast.success('התחברת בהצלחה!');
       
       // Check for contract data to determine where to navigate
-      const contractData = sessionStorage.getItem('contract_data');
+      const contractData = AuthStorageService.getContractData();
       if (contractData) {
         PaymentLogger.log('Found contract data, redirecting to subscription');
         navigate('/subscription', { replace: true });
@@ -43,12 +50,15 @@ export const useAuthActions = () => {
         navigate('/dashboard', { replace: true });
       }
       
-      return { success: true, session: data.session, user: data.user };
-    } catch (error) {
+      return { 
+        success: true, 
+        user: data.user,
+        session: data.session
+      };
+    } catch (error: any) {
       PaymentLogger.error('Error during sign in:', error);
       return { 
         success: false, 
-        session: null, 
         user: null, 
         error: error instanceof Error ? error.message : 'שגיאה בתהליך ההתחברות'
       };
@@ -57,13 +67,14 @@ export const useAuthActions = () => {
     }
   };
 
-  const signUp = async (formData: SignupFormData): Promise<{ success: boolean; user: User | null; error?: string }> => {
+  const signUp = async (formData: SignupFormData): Promise<AuthResponse> => {
     try {
       setLoading(true);
       PaymentLogger.log('Starting signup process', { email: formData.email });
       
       // First check if we're in a subscription flow or direct signup
-      const shouldProceedToSubscription = !sessionStorage.getItem('contract_data');
+      const contractData = AuthStorageService.getContractData();
+      const shouldProceedToSubscription = !contractData;
       
       if (shouldProceedToSubscription) {
         // Store registration data for subscription flow
@@ -81,7 +92,11 @@ export const useAuthActions = () => {
         
         const stored = AuthStorageService.storeRegistrationData(registrationData);
         if (!stored) {
-          throw new Error('שגיאה בשמירת נתוני הרשמה');
+          return {
+            success: false,
+            user: null,
+            error: 'שגיאה בשמירת נתוני הרשמה'
+          };
         }
         
         PaymentLogger.log('Registration data stored, redirecting to subscription');
@@ -107,7 +122,11 @@ export const useAuthActions = () => {
         
         if (error) {
           PaymentLogger.error('Sign up error:', error);
-          throw error;
+          return {
+            success: false,
+            user: null,
+            error: error.message
+          };
         }
         
         PaymentLogger.log('Sign up successful');
@@ -140,6 +159,9 @@ export const useAuthActions = () => {
       
       console.log('Sign out successful');
       toast.success('התנתקת בהצלחה');
+      
+      // Clear any auth-related storage data
+      AuthStorageService.clearAllAuthData();
       
       // Use a longer timeout for sign out to ensure all state is cleared
       // before redirecting, preventing flash of protected content

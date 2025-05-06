@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import { formAnimation, inputAnimation, buttonAnimation } from '@/components/ui/animations';
 import { useAuth } from '@/contexts/auth';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { validateEmail, validatePassword } from '@/utils/form-validation';
 
 // Login form schema
 const loginFormSchema = z.object({

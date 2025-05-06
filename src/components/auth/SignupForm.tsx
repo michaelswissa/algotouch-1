@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 import { formAnimation, inputAnimation, buttonAnimation } from '@/components/ui/animations';
 import { useAuth } from '@/contexts/auth';
 import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import { SignupFormData } from '@/types/auth';
 
 // Signup form schema
 const signupFormSchema = z.object({
@@ -49,13 +50,15 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
     try {
       PaymentLogger.log('Starting signup submission', { email: values.email });
       
-      const { success, error } = await signUp({
+      const formData: SignupFormData = {
         email: values.email,
         password: values.password,
         firstName: values.firstName,
         lastName: values.lastName,
         phone: values.phone,
-      });
+      };
+      
+      const { success, error } = await signUp(formData);
 
       if (error) {
         if (error.includes('already registered')) {
@@ -67,7 +70,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ redirectTo }) => {
       }
 
       // For custom redirect flows, we might have already navigated in the signUp function
-      if (redirectTo) {
+      if (redirectTo && success) {
         toast.success('נרשמת בהצלחה!');
       }
     } catch (error: any) {

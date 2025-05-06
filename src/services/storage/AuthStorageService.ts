@@ -46,6 +46,13 @@ export class AuthStorageService {
   }
 
   /**
+   * Alias for storeRegistrationData to maintain backwards compatibility
+   */
+  static setRegistrationData(data: Partial<RegistrationData>): boolean {
+    return this.storeRegistrationData(data);
+  }
+
+  /**
    * Check if registration data is valid and not expired
    */
   static isRegistrationValid(): boolean {
@@ -76,6 +83,33 @@ export class AuthStorageService {
       sessionStorage.removeItem(StorageKeys.REGISTRATION);
     } catch (error) {
       PaymentLogger.error(`Error clearing registration data:`, error);
+    }
+  }
+
+  /**
+   * Get contract data
+   */
+  static getContractData(): any {
+    try {
+      const data = sessionStorage.getItem(StorageKeys.CONTRACT);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      PaymentLogger.error(`Error reading contract data:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Store contract data
+   */
+  static storeContractData(data: any): boolean {
+    try {
+      const existingData = this.getContractData() || {};
+      sessionStorage.setItem(StorageKeys.CONTRACT, JSON.stringify({ ...existingData, ...data }));
+      return true;
+    } catch (error) {
+      PaymentLogger.error(`Error storing contract data:`, error);
+      return false;
     }
   }
 

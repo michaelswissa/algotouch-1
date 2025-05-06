@@ -1,20 +1,20 @@
 
 import { useState, useCallback } from 'react';
+import { ValidationErrors } from '@/types/auth';
+import { validateForm as validateFormUtil, ValidationRule } from '@/utils/form-validation';
 
-type ValidationFunction<T> = (name: string, value: any, formData?: T) => string | null;
-
-interface ValidationState {
-  [key: string]: string | null;
-}
-
-export function useFormValidation<T>(initialData: T, validationFunction: ValidationFunction<T>) {
+export function useFormValidation<T extends Record<string, any>>(
+  initialData: T, 
+  validationRules: Record<keyof T, ValidationRule>
+) {
   const [formData, setFormData] = useState<T>(initialData);
-  const [errors, setErrors] = useState<ValidationState>({});
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const validateField = useCallback((name: string, value: any) => {
-    return validationFunction(name, value, formData);
-  }, [formData, validationFunction]);
+    const rule = validationRules[name as keyof T];
+    return rule ? rule(value, formData) : null;
+  }, [formData, validationRules]);
   
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -34,22 +34,10 @@ export function useFormValidation<T>(initialData: T, validationFunction: Validat
   }, [validateField]);
   
   const validateForm = useCallback((): boolean => {
-    const newErrors: ValidationState = {};
-    let isValid = true;
-    
-    // Validate all fields
-    Object.entries(formData).forEach(([name, value]) => {
-      const error = validateField(name, value);
-      
-      if (error) {
-        isValid = false;
-        newErrors[name] = error;
-      }
-    });
-    
+    const newErrors = validateFormUtil(formData, validationRules);
     setErrors(newErrors);
-    return isValid;
-  }, [formData, validateField]);
+    return Object.values(newErrors).every(error => !error);
+  }, [formData, validationRules]);
   
   const handleSubmit = useCallback((onSubmit: (data: T) => void) => {
     return async (e: React.FormEvent) => {
