@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -142,24 +143,29 @@ const Auth = () => {
             </div>
             
             <div className="relative">
-              <TabsList className="grid grid-cols-2 w-full mb-8 bg-background/40 backdrop-blur-md relative z-10">
+              <TabsList className="grid grid-cols-2 w-full mb-8 rounded-full border border-border/20 p-1 bg-muted/30 backdrop-blur-md overflow-hidden">
+                {/* Switch track */}
+                <div 
+                  className="absolute inset-y-1 rounded-full bg-primary transition-all duration-300 ease-in-out z-0"
+                  style={{ 
+                    width: '50%', 
+                    right: activeTab === 'login' ? '50%' : '0%',
+                    transform: `translateX(${activeTab === 'login' ? '0%' : '0%'})` 
+                  }}
+                />
+                
+                {/* Tab triggers */}
                 <TabsTrigger 
                   value="login" 
-                  className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
+                  className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
                 >
                   התחברות
-                  {activeTab === 'login' && (
-                    <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
-                  )}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="signup" 
-                  className="transition-all duration-300 data-[state=active]:text-primary-foreground relative"
+                  className="rounded-full py-1.5 px-3 relative z-10 transition-colors duration-300 data-[state=active]:text-primary-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
                 >
                   הרשמה
-                  {activeTab === 'signup' && (
-                    <div className="absolute inset-0 bg-primary rounded-sm -z-10" />
-                  )}
                 </TabsTrigger>
               </TabsList>
             </div>

@@ -23,4 +23,9 @@
     0% { transform: translateX(0); }
     100% { transform: translateX(-100%); }
   }
+
+  /* Tab switch animation for RTL */
+  [dir="rtl"] .tab-indicator {
+    transition: transform 0.3s ease;
+  }
 }
