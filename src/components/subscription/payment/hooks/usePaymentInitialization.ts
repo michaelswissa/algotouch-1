@@ -27,23 +27,12 @@ export const usePaymentInitialization = (
   const initiateCardcomPayment = async () => {
     setIsLoading(true);
     try {
-      // Set operation type based on the selected plan
-      // Monthly: CreateTokenOnly - Only create token for future billing, no immediate payment
-      // Annual: ChargeAndCreateToken - Charge and create token for future billing
-      // VIP: ChargeOnly - Charge once without creating token (one-time payment)
-      let operationType: number;
+      let operationType = 3; // Default: token creation only (for monthly trial)
       
-      switch (selectedPlan) {
-        case 'monthly':
-          operationType = 3; // CreateTokenOnly - token only without charging
-          break;
-        case 'annual':
-          operationType = 2; // ChargeAndCreateToken - charge and create token
-          break;
-        case 'vip':
-        default:
-          operationType = 1; // ChargeOnly - charge without creating token
-          break;
+      if (selectedPlan === 'annual') {
+        operationType = 2; // Charge and create token
+      } else if (selectedPlan === 'vip') {
+        operationType = 1; // Charge only
       }
 
       // Get registration data if available (for guest checkout)
@@ -67,9 +56,7 @@ export const usePaymentInitialization = (
         fullName: userFullName,
         email: userEmail,
         phone: userPhone,
-        idNumber: userIdNumber,
-        plan: selectedPlan,
-        operationType
+        idNumber: userIdNumber
       });
 
       // Prepare payload based on whether user is logged in or not
@@ -123,13 +110,13 @@ export const usePaymentInitialization = (
   const getPlanAmount = (plan: string): number => {
     switch (plan) {
       case 'monthly':
-        return 0.00; // Free first month, will be charged monthly after trial
+        return 99.00;
       case 'annual':
-        return 3371.00; // Annual payment
+        return 990.00;
       case 'vip':
-        return 13121.00; // One-time VIP payment
+        return 1990.00;
       default:
-        return 0.00;
+        return 99.00;
     }
   };
 
