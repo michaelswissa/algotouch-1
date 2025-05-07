@@ -64,15 +64,34 @@ serve(async (req) => {
       throw new Error('Missing CardCom configuration. Please set CARDCOM_TERMINAL and CARDCOM_USERNAME environment variables.');
     }
 
-    if (!amount && operation !== "CreateTokenOnly") {
+    // NOTE: Allow amount to be 0 for monthly plans (token-only operation)
+    if (amount === undefined && operation !== "CreateTokenOnly") {
       throw new Error('Missing required parameter: amount');
+    }
+
+    // Convert numeric operation type to string if needed
+    let operationString = operation;
+    if (typeof operation === 'number') {
+      switch (operation) {
+        case 1:
+          operationString = "ChargeOnly";
+          break;
+        case 2:
+          operationString = "ChargeAndCreateToken";
+          break;
+        case 3:
+          operationString = "CreateTokenOnly";
+          break;
+        default:
+          operationString = "ChargeOnly";
+      }
     }
 
     // Create a redirect URL on our domain that can communicate with the parent window
     const redirectUrl = `${origin}/payment-redirect.html`;
     
     // Log the configuration
-    console.log(`Creating CardCom payment session with terminal: ${terminalNumber}, operation: ${operation}`);
+    console.log(`Creating CardCom payment session with terminal: ${terminalNumber}, operation: ${operationString}, amount: ${amount}`);
 
     // Extract user details for pre-filling the form
     const cardOwnerName = userDetails?.fullName || '';
@@ -97,9 +116,9 @@ serve(async (req) => {
     const payload = {
       TerminalNumber: parseInt(terminalNumber),
       ApiName: apiName,
-      Operation: operation,
+      Operation: operationString,
       ReturnValue: returnValue || '',
-      Amount: amount,
+      Amount: amount || 0, // Ensure amount has a value, default to 0 for token-only
       // All redirects go through our internal redirect page
       SuccessRedirectUrl: `${redirectUrl}?success=true&plan=${planId || ''}`,
       FailedRedirectUrl: `${redirectUrl}?error=true&plan=${planId || ''}`,
@@ -114,7 +133,9 @@ serve(async (req) => {
       name: enhancedUiDefinition.CardOwnerNameValue,
       email: enhancedUiDefinition.CardOwnerEmailValue,
       phone: enhancedUiDefinition.CardOwnerPhoneValue,
-      idNumber: enhancedUiDefinition.CardOwnerIdValue
+      idNumber: enhancedUiDefinition.CardOwnerIdValue,
+      operation: operationString,
+      amount: amount || 0
     });
 
     // Make the API request

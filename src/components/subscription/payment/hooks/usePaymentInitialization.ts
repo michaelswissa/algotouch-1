@@ -27,6 +27,10 @@ export const usePaymentInitialization = (
   const initiateCardcomPayment = async () => {
     setIsLoading(true);
     try {
+      // Define operation types based on plan
+      // 1: ChargeOnly - for one-time VIP payment
+      // 2: ChargeAndCreateToken - for annual with immediate charge and future charges
+      // 3: CreateTokenOnly - for monthly with trial (no initial charge)
       let operationType = 3; // Default: token creation only (for monthly trial)
       
       if (selectedPlan === 'annual') {
@@ -56,7 +60,9 @@ export const usePaymentInitialization = (
         fullName: userFullName,
         email: userEmail,
         phone: userPhone,
-        idNumber: userIdNumber
+        idNumber: userIdNumber,
+        operationType,
+        amount: getPlanAmount(selectedPlan)
       });
 
       // Prepare payload based on whether user is logged in or not
@@ -65,7 +71,7 @@ export const usePaymentInitialization = (
         userId: user?.id,
         fullName: userFullName,
         email: userEmail,
-        operationType,
+        operationType, // Send numeric operation type (1, 2, or 3)
         origin: window.location.origin,
         amount: getPlanAmount(selectedPlan),
         webHookUrl: `${window.location.origin}/api/payment-webhook`,
