@@ -40,6 +40,9 @@ serve(async (req) => {
     // Parse request body
     const body = await req.json();
     
+    // Get origin for redirect URLs
+    const origin = body.origin || Deno.env.get('FRONTEND_URL') || 'http://localhost:3000';
+    
     // Extract required parameters from the request
     const {
       terminalNumber = Deno.env.get('CARDCOM_TERMINAL'),
@@ -47,13 +50,12 @@ serve(async (req) => {
       operation = "ChargeOnly", // Default to charge only
       amount,
       returnValue,
-      successRedirectUrl,
-      failedRedirectUrl,
       webHookUrl,
       productName,
       language = "he", // Default to Hebrew
       isoCoinId = 1, // Default to ILS
-      uiDefinition
+      uiDefinition,
+      planId,
     } = body;
 
     // Validate required parameters
@@ -61,9 +63,15 @@ serve(async (req) => {
       throw new Error('Missing CardCom configuration. Please set CARDCOM_TERMINAL and CARDCOM_USERNAME environment variables.');
     }
 
-    if (!amount || !successRedirectUrl || !failedRedirectUrl) {
-      throw new Error('Missing required parameters: amount, successRedirectUrl, failedRedirectUrl');
+    if (!amount) {
+      throw new Error('Missing required parameter: amount');
     }
+
+    // Create a redirect URL on our domain that can communicate with the parent window
+    const redirectUrl = `${origin}/payment-redirect.html`;
+    
+    // Log the configuration
+    console.log(`Creating CardCom payment session with terminal: ${terminalNumber}, operation: ${operation}`);
 
     // Prepare the request payload for LowProfile Create
     const payload = {
@@ -72,9 +80,10 @@ serve(async (req) => {
       Operation: operation,
       ReturnValue: returnValue || '',
       Amount: amount,
-      SuccessRedirectUrl: successRedirectUrl,
-      FailedRedirectUrl: failedRedirectUrl,
-      WebHookUrl: webHookUrl,
+      // Instead of direct redirect URLs, we'll use our internal redirect page
+      SuccessRedirectUrl: redirectUrl + "?success=true&plan=" + (planId || ''),
+      FailedRedirectUrl: redirectUrl + "?error=true&plan=" + (planId || ''),
+      WebHookUrl: webHookUrl || null,
       ProductName: productName || 'Product Purchase',
       Language: language,
       ISOCoinId: isoCoinId,
@@ -105,6 +114,8 @@ serve(async (req) => {
     if (result.ResponseCode !== 0) {
       throw new Error(`CardCom error: ${result.Description || 'Unknown error'}`);
     }
+
+    console.log(`Created CardCom payment session: ${result.LowProfileId}`);
 
     // Return the payment URL and ID
     return new Response(

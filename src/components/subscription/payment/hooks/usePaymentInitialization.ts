@@ -53,13 +53,15 @@ export const usePaymentInitialization = (
         fullName: fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName || '',
         email: email || user?.email || registrationData?.email || '',
         operationType,
-        successRedirectUrl: `${window.location.origin}/subscription?step=4&success=true&plan=${selectedPlan}`,
-        errorRedirectUrl: `${window.location.origin}/subscription?step=3&error=true&plan=${selectedPlan}`,
+        // Don't use redirect URLs directly in CardCom API - we'll handle it in our redirect page
+        origin: window.location.origin, // Pass the origin for our redirect page
+        amount: getPlanAmount(selectedPlan),
+        webHookUrl: `${window.location.origin}/api/payment-webhook`,
         // Include registration data for account creation after payment
         registrationData: registrationData
       };
 
-      const { data, error } = await supabase.functions.invoke('cardcom-payment/create-payment', {
+      const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
         body: payload
       });
 
@@ -82,6 +84,20 @@ export const usePaymentInitialization = (
       toast.error(error.message || 'שגיאה ביצירת עסקה');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Helper function to get plan amount
+  const getPlanAmount = (plan: string): number => {
+    switch (plan) {
+      case 'monthly':
+        return 99.00;
+      case 'annual':
+        return 990.00;
+      case 'vip':
+        return 1990.00;
+      default:
+        return 99.00;
     }
   };
 

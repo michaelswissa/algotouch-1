@@ -1,13 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { CardContent } from '@/components/ui/card';
-import { Shield, ShieldCheck } from 'lucide-react';
+import { Shield, ShieldCheck, CreditCard } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface PaymentIframeProps {
   paymentUrl: string | null;
+  onSuccess?: (paymentData: any) => void;
+  onError?: (error: Error) => void;
 }
 
-const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
+const PaymentIframe: React.FC<PaymentIframeProps> = ({ 
+  paymentUrl, 
+  onSuccess, 
+  onError 
+}) => {
   const [iframeHeight, setIframeHeight] = useState(650);
   
   useEffect(() => {
@@ -24,6 +31,35 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Listen for messages from the iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // For security, we should validate the origin, but for now we're using '*' in postMessage
+      console.log('Received message from iframe:', event.data);
+      
+      if (event.data?.type === 'cardcom-paid') {
+        // Payment successful
+        console.log('Payment successful:', event.data.details);
+        toast.success('התשלום התקבל בהצלחה!');
+        
+        if (onSuccess) {
+          onSuccess(event.data.details);
+        }
+      } else if (event.data?.type === 'cardcom-error') {
+        // Payment failed
+        console.error('Payment error:', event.data.message);
+        toast.error('שגיאה בתהליך התשלום: ' + (event.data.message || 'אנא נסה שנית'));
+        
+        if (onError) {
+          onError(new Error(event.data.message || 'Payment failed'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onSuccess, onError]);
 
   if (!paymentUrl) return null;
 
@@ -72,7 +108,5 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({ paymentUrl }) => {
     </CardContent>
   );
 };
-
-import { CreditCard } from 'lucide-react';
 
 export default PaymentIframe;

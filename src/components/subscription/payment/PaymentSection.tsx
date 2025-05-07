@@ -37,6 +37,29 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   // Determine if this is a monthly plan (with trial)
   const isMonthlyPlan = selectedPlan === 'monthly';
 
+  // Handle payment success
+  const handlePaymentSuccess = (paymentData: any) => {
+    console.log('Payment successful in parent component:', paymentData);
+    // We'll store the payment data in sessionStorage for later validation
+    if (paymentData?.lowProfileId) {
+      sessionStorage.setItem('payment_success_data', JSON.stringify({
+        lowProfileId: paymentData.lowProfileId,
+        transactionId: paymentData.transactionId,
+        plan: selectedPlan,
+        timestamp: new Date().toISOString()
+      }));
+    }
+    
+    // Complete the payment flow
+    onPaymentComplete();
+  };
+
+  // Handle payment error
+  const handlePaymentError = (error: Error) => {
+    console.error('Payment error in parent component:', error);
+    setIsLoading(false);
+  };
+
   // Show loading screen when initializing payment
   if (isLoading) {
     return <PaymentLoading />;
@@ -63,7 +86,11 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
           getPlanDetails={() => getPlanDetails(selectedPlan)} 
         />
         
-        <PaymentIframe paymentUrl={paymentUrl} />
+        <PaymentIframe 
+          paymentUrl={paymentUrl} 
+          onSuccess={handlePaymentSuccess}
+          onError={handlePaymentError}
+        />
         
         <PaymentSectionFooter 
           isLoading={isLoading} 

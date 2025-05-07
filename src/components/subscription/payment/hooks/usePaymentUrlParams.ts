@@ -10,43 +10,35 @@ export const usePaymentUrlParams = (
   const { verifyPaymentAndCompleteRegistration, retrieveAndProcessRegistrationData } = usePaymentProcessing();
 
   useEffect(() => {
-    // Check if we're on the correct step before processing payment URL params
-    const sessionData = sessionStorage.getItem('subscription_flow');
-    if (!sessionData) {
-      console.log('No session data found, skipping payment URL parameter processing');
-      return;
-    }
-    
-    try {
-      const parsedSession = JSON.parse(sessionData);
-      if (parsedSession.step !== 'payment' && parsedSession.step !== 'completion') {
-        console.log(`Current step is ${parsedSession.step}, not processing payment URL params`);
-        return;
-      }
-      
-      // Only process URL params if we're on the payment or completion step
-      console.log('Processing payment URL parameters');
-      
-      const params = new URLSearchParams(window.location.search);
-      const error = params.get('error');
-      const success = params.get('success');
-      const regId = params.get('regId');
-      
-      if (error === 'true') {
-        toast.error('התשלום נכשל, אנא נסה שנית');
-      } else if (success === 'true') {
-        if (regId) {
-          console.log('Payment success with registration ID, verifying payment');
-          // Need to verify payment and complete registration
-          verifyPaymentAndCompleteRegistration(regId, onPaymentComplete, setIsLoading);
-        } else {
-          console.log('Payment success without registration ID, completing payment');
-          toast.success('התשלום התקבל בהצלחה!');
-          onPaymentComplete();
+    // Check if there's stored payment data from a postMessage success
+    const paymentDataString = sessionStorage.getItem('payment_success_data');
+    if (paymentDataString) {
+      try {
+        const paymentData = JSON.parse(paymentDataString);
+        console.log('Found stored payment data:', paymentData);
+        
+        // Only process recently stored data (within last 5 minutes)
+        const timestamp = new Date(paymentData.timestamp).getTime();
+        const now = new Date().getTime();
+        const fiveMinutesInMs = 5 * 60 * 1000;
+        
+        if (now - timestamp < fiveMinutesInMs) {
+          // If we have a registration ID, verify the payment with the backend
+          const regId = localStorage.getItem('temp_registration_id');
+          if (regId) {
+            console.log('Found registration ID, verifying payment:', regId);
+            verifyPaymentAndCompleteRegistration(regId, onPaymentComplete, setIsLoading);
+          } else {
+            console.log('No registration ID found, completing payment directly');
+            onPaymentComplete();
+          }
+          
+          // Clear the stored payment data
+          sessionStorage.removeItem('payment_success_data');
         }
+      } catch (error) {
+        console.error('Error processing stored payment data:', error);
       }
-    } catch (error) {
-      console.error('Error processing payment URL params:', error);
     }
     
     // Always check for temp registration ID in localStorage

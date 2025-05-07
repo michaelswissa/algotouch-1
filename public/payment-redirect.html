@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מעבד תשלום</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #f9fafb;
+      color: #374151;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 1rem;
+      text-align: center;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #0066ff;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .message {
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h2 id="status">מעבד את התשלום...</h2>
+  <p class="message" id="message">אנא המתן, מתבצע עיבוד של פרטי התשלום</p>
+  
+  <script>
+    // Parse URL parameters
+    function getUrlParams() {
+      const params = {};
+      const queryString = window.location.search.substring(1);
+      const pairs = queryString.split('&');
+      
+      for (const pair of pairs) {
+        const [key, value] = pair.split('=');
+        if (key) params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+      }
+      
+      return params;
+    }
+
+    // Process the response
+    function processResponse() {
+      const params = getUrlParams();
+      const statusElement = document.getElementById('status');
+      const messageElement = document.getElementById('message');
+      
+      // Check if this is a success response
+      if (params.ResponseCode === '0' || params.success === 'true') {
+        statusElement.textContent = 'התשלום התקבל בהצלחה!';
+        messageElement.textContent = 'מעביר אותך לדף הבא...';
+        
+        // Send success message to parent
+        window.parent.postMessage({
+          type: 'cardcom-paid',
+          details: {
+            responseCode: params.ResponseCode || '0',
+            transactionId: params.TranzactionId || params.txId,
+            lowProfileId: params.LowProfileId,
+            plan: params.plan
+          }
+        }, '*');
+      } 
+      // Check if this is an error response
+      else if (params.error === 'true' || params.ResponseCode !== '0') {
+        statusElement.textContent = 'שגיאה בתהליך התשלום';
+        messageElement.textContent = params.Description || 'אנא נסה שנית';
+        
+        // Send error message to parent
+        window.parent.postMessage({
+          type: 'cardcom-error',
+          message: params.Description || 'Payment failed',
+          code: params.ResponseCode || 'unknown'
+        }, '*');
+      }
+    }
+
+    // Run when page loads
+    window.addEventListener('load', processResponse);
+  </script>
+</body>
+</html>
