@@ -16,7 +16,7 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
   price, 
   description,
   hasTrial = false,
-  currency = '$' 
+  currency = '₪' 
 }) => {
   return (
     <div className="bg-card border border-primary/20 rounded-xl shadow-md hover:shadow-lg transition-all">

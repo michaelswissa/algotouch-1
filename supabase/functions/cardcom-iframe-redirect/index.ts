@@ -64,7 +64,7 @@ serve(async (req) => {
       throw new Error('Missing CardCom configuration. Please set CARDCOM_TERMINAL and CARDCOM_USERNAME environment variables.');
     }
 
-    if (!amount) {
+    if (!amount && operation !== "CreateTokenOnly") {
       throw new Error('Missing required parameter: amount');
     }
 
@@ -80,7 +80,7 @@ serve(async (req) => {
     const cardOwnerPhone = userDetails?.phone || '';
     const cardOwnerIdValue = userDetails?.idNumber || '';
 
-    // Create UI definition with pre-filled user details but always show the fields
+    // Create UI definition with pre-filled user details and always show the fields
     const enhancedUiDefinition = {
       CardOwnerNameValue: cardOwnerName,
       CardOwnerEmailValue: cardOwnerEmail,

@@ -45,10 +45,18 @@ export const IframePayment: React.FC<IframePaymentProps> = ({
       const successUrl = `${origin}/payment/success?plan=${planId}`;
       const errorUrl = `${origin}/payment/error?plan=${planId}`;
       
+      // Determine operation type based on plan
+      let operation = "ChargeOnly";
+      if (planId === 'monthly') {
+        operation = "CreateTokenOnly"; // Token only for monthly (trial)
+      } else if (planId === 'annual') {
+        operation = "ChargeAndCreateToken"; // Charge + token for annual
+      }
+      
       // Prepare payload
       const payload = {
         amount,
-        operation: "ChargeOnly", 
+        operation, 
         successRedirectUrl: successUrl,
         failedRedirectUrl: errorUrl,
         returnValue: userId || 'guest-payment',
@@ -59,11 +67,12 @@ export const IframePayment: React.FC<IframePaymentProps> = ({
         email,
         fullName,
         uiDefinition: {
-          IsHideCardOwnerName: !!fullName,
+          IsHideCardOwnerName: false,
           CardOwnerNameValue: fullName || '',
-          IsHideCardOwnerEmail: !!email,
+          IsHideCardOwnerEmail: false,
           CardOwnerEmailValue: email || '',
-          IsHideCardOwnerPhone: false
+          IsHideCardOwnerPhone: false,
+          IsHideCardOwnerIdentityNumber: false
         }
       };
 

@@ -106,17 +106,17 @@ export const usePaymentInitialization = (
     }
   };
 
-  // Helper function to get plan amount
+  // Helper function to get plan amount (in agorot - cents)
   const getPlanAmount = (plan: string): number => {
     switch (plan) {
       case 'monthly':
-        return 99.00;
+        return 0; // No initial charge for monthly plan (token only)
       case 'annual':
-        return 990.00;
+        return 337100; // 3,371.00 ₪ in agorot
       case 'vip':
-        return 1990.00;
+        return 1312100; // 13,121.00 ₪ in agorot
       default:
-        return 99.00;
+        return 0;
     }
   };
 

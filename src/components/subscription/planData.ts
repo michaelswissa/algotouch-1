@@ -20,13 +20,12 @@ export const getPlansData = (): Plan[] => {
     {
       id: 'monthly',
       name: 'מסלול חודשי',
-      price: 99,
-      currency: '$',
+      price: 371,
+      currency: '₪',
       billingPeriod: 'לחודש',
       description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
       icon: null, // Will be set in the PlanCard component
       features: [
-        // Removed the "First month free" feature
         { name: 'מדריך הפעלה ברור ומדוייק', icon: '💡', description: 'בלי למידה מורכבת, כל מה שצריך לדעת כדי להתחיל לעבוד.', included: true },
         { name: 'עוזר אישי AI זמין 24/7', icon: '🤖', description: 'הכוונה מדויקת, תובנות חכמות ותמיכה בזמן אמת.', included: true },
         { name: 'בלוג מקצועי', icon: '🧠', description: 'מאמרים, סקירות עומק ועדכונים שיעזרו לך לקבל החלטות מושכלות יותר.', included: true },
@@ -41,8 +40,8 @@ export const getPlansData = (): Plan[] => {
     {
       id: 'annual',
       name: 'מסלול שנתי',
-      price: 899,
-      currency: '$',
+      price: 3371,
+      currency: '₪',
       billingPeriod: 'לשנה',
       description: 'למי שמבין את הערך שאנחנו מביאים – זו החבילה המשתלמת ביותר.',
       icon: null, // Will be set in the PlanCard component
@@ -58,8 +57,8 @@ export const getPlansData = (): Plan[] => {
     {
       id: 'vip',
       name: 'מסלול VIP',
-      price: 3499,
-      currency: '$',
+      price: 13121,
+      currency: '₪',
       billingPeriod: 'לכל החיים',
       description: 'מיועד לסוחרים שמכוונים גבוה במיוחד ומחפשים יתרון משמעותי בשוק.',
       icon: null, // Will be set in the PlanCard component

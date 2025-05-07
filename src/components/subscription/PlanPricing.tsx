@@ -22,7 +22,7 @@ const PlanPricing: React.FC<PlanPricingProps> = ({
       </div>
       {planId === 'monthly' && (
         <div className="text-purple-500 dark:text-purple-400 font-medium text-sm">
-          חודש ניסיון מתנה
+          חודש ניסיון ללא תשלום
         </div>
       )}
       {planId === 'annual' && (
