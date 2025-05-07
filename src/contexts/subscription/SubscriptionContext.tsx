@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-import { checkSubscriptionStatus } from '@/lib/supabase-client';
 
 interface UserData {
   phone?: string;
@@ -66,18 +65,25 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           }
           
           if (data) {
-            if (data.first_name || data.last_name) {
-              setFullName(`${data.first_name || ''} ${data.last_name || ''}`.trim());
+            // Ensure data is properly type checked
+            const profileData = data as {
+              first_name?: string | null;
+              last_name?: string | null;
+              phone?: string | null;
+            };
+            
+            if (profileData.first_name || profileData.last_name) {
+              setFullName(`${profileData.first_name || ''} ${profileData.last_name || ''}`.trim());
             }
             
             // Set user data with available fields
             setUserData({
-              phone: data.phone || '',
+              phone: profileData.phone || '',
               // For now, we'll use an empty string as id_number isn't available
               idNumber: ''
             });
 
-            console.log('Profile data loaded:', data);
+            console.log('Profile data loaded:', profileData);
           }
         });
     } else {

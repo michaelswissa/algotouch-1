@@ -80,16 +80,16 @@ serve(async (req) => {
     const cardOwnerPhone = userDetails?.phone || '';
     const cardOwnerIdValue = userDetails?.idNumber || '';
 
-    // Create UI definition with pre-filled user details
+    // Create UI definition with pre-filled user details but always show the fields
     const enhancedUiDefinition = {
       CardOwnerNameValue: cardOwnerName,
       CardOwnerEmailValue: cardOwnerEmail,
       CardOwnerPhoneValue: cardOwnerPhone,
       CardOwnerIdValue: cardOwnerIdValue,
-      IsHideCardOwnerName: cardOwnerName ? true : false,
-      IsHideCardOwnerEmail: cardOwnerEmail ? true : false,
-      IsHideCardOwnerPhone: cardOwnerPhone ? true : false,
-      IsHideCardOwnerIdentityNumber: cardOwnerIdValue ? true : false,
+      IsHideCardOwnerName: false,
+      IsHideCardOwnerEmail: false,
+      IsHideCardOwnerPhone: false,
+      IsHideCardOwnerIdentityNumber: false,
       ...(uiDefinition || {})
     };
 

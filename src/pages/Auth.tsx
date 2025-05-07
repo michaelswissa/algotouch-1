@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/contexts/auth';
 import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
+
+// Import useAuth from the index file rather than directly from AuthContext
+import { useAuth } from '@/contexts/auth';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();

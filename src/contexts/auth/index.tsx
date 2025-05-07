@@ -1,4 +1,5 @@
 
-export { AuthProvider } from './AuthProvider';
+// Export the hook and the context
 export { useAuth } from './useAuth';
-export type { AuthContextType } from './types';
+export { AuthContext } from './AuthContext';
+export { AuthProvider } from './AuthProvider';
