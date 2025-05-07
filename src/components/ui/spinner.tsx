@@ -2,31 +2,34 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-type SpinnerSize = 'sm' | 'md' | 'lg' | 'xl';
-
-interface SpinnerProps {
-  size?: SpinnerSize;
-  className?: string;
+export interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
+  size?: 'sm' | 'md' | 'lg';
 }
 
-const sizeClasses: Record<SpinnerSize, string> = {
-  sm: 'h-4 w-4 border-2',
-  md: 'h-8 w-8 border-2',
-  lg: 'h-12 w-12 border-3',
-  xl: 'h-16 w-16 border-4'
-};
-
-export const Spinner: React.FC<SpinnerProps> = ({ 
-  size = 'md', 
-  className 
-}) => {
+export function Spinner({ className, size = 'md', ...props }: SpinnerProps) {
+  const sizeClasses = {
+    sm: 'h-4 w-4 border-2',
+    md: 'h-8 w-8 border-3',
+    lg: 'h-12 w-12 border-4',
+  };
+  
   return (
-    <div 
+    <div
       className={cn(
-        "animate-spin rounded-full border-t-primary border-background",
+        'animate-spin rounded-full border-t-primary border-solid border-background/20',
         sizeClasses[size],
         className
       )}
+      {...props}
     />
   );
-};
+}
+
+export function LoadingPage({ message = 'טוען...' }: { message?: string }) {
+  return (
+    <div className="flex flex-col justify-center items-center min-h-screen gap-4">
+      <Spinner size="lg" />
+      {message && <p className="text-muted-foreground">{message}</p>}
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/auth/AuthProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import your pages lazily to avoid circular dependencies
 const Index = React.lazy(() => import('./pages/Index'));
@@ -40,124 +41,126 @@ document.documentElement.classList.add('dark');
 function App() {
   return (
     <AuthProvider>
-      <Toaster position="top-center" richColors />
-      <Router>
-        <React.Suspense fallback={<LoadingPage />}>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={
-              <ProtectedRoute requireAuth={false}>
-                <Auth />
-              </ProtectedRoute>
-            } />
-            
-            {/* Subscription routes */}
-            <Route path="/subscription/:planId" element={
-              <ProtectedRoute>
-                <Subscription />
-              </ProtectedRoute>
-            } />
-            <Route path="/subscription" element={
-              <ProtectedRoute>
-                <Subscription />
-              </ProtectedRoute>
-            } />
-            <Route path="/my-subscription" element={
-              <ProtectedRoute>
-                <MySubscriptionPage />
-              </ProtectedRoute>
-            } />
-            
-            {/* Payment handling routes */}
-            <Route path="/payment/success" element={
-              <ProtectedRoute publicPaths={['/payment/success']}>
-                <PaymentHandling />
-              </ProtectedRoute>
-            } />
-            <Route path="/payment/error" element={
-              <ProtectedRoute publicPaths={['/payment/error']}>
-                <PaymentHandling />
-              </ProtectedRoute>
-            } />
-            
-            {/* Protected routes - require authentication */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/calendar" element={
-              <ProtectedRoute>
-                <Calendar />
-              </ProtectedRoute>
-            } />
-            <Route path="/trade-journal" element={
-              <ProtectedRoute>
-                <TradeJournal />
-              </ProtectedRoute>
-            } />
-            <Route path="/monthly-report" element={
-              <ProtectedRoute>
-                <MonthlyReport />
-              </ProtectedRoute>
-            } />
-            <Route path="/journal" element={
-              <ProtectedRoute>
-                <Journal />
-              </ProtectedRoute>
-            } />
-            <Route path="/blog" element={
-              <ProtectedRoute>
-                <Blog />
-              </ProtectedRoute>
-            } />
-            <Route path="/blog/:id" element={
-              <ProtectedRoute>
-                <BlogPost />
-              </ProtectedRoute>
-            } />
-            <Route path="/community" element={
-              <ProtectedRoute>
-                <Community />
-              </ProtectedRoute>
-            } />
-            <Route path="/courses" element={
-              <ProtectedRoute>
-                <Courses />
-              </ProtectedRoute>
-            } />
-            <Route path="/courses/:courseId" element={
-              <ProtectedRoute>
-                <CourseDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/ai-assistant" element={
-              <ProtectedRoute>
-                <AIAssistant />
-              </ProtectedRoute>
-            } />
-            <Route path="/new-trade" element={
-              <ProtectedRoute>
-                <NewTrade />
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
-            <Route path="/contract/:contractId" element={
-              <ProtectedRoute>
-                <ContractDetails />
-              </ProtectedRoute>
-            } />
-            
-            {/* Catch all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </React.Suspense>
-      </Router>
+      <TooltipProvider>
+        <Toaster position="top-center" richColors />
+        <Router>
+          <React.Suspense fallback={<LoadingPage />}>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={
+                <ProtectedRoute requireAuth={false}>
+                  <Auth />
+                </ProtectedRoute>
+              } />
+              
+              {/* Subscription routes */}
+              <Route path="/subscription/:planId" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
+              <Route path="/subscription" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
+              <Route path="/my-subscription" element={
+                <ProtectedRoute>
+                  <MySubscriptionPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Payment handling routes */}
+              <Route path="/payment/success" element={
+                <ProtectedRoute publicPaths={['/payment/success']}>
+                  <PaymentHandling />
+                </ProtectedRoute>
+              } />
+              <Route path="/payment/error" element={
+                <ProtectedRoute publicPaths={['/payment/error']}>
+                  <PaymentHandling />
+                </ProtectedRoute>
+              } />
+              
+              {/* Protected routes - require authentication */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/calendar" element={
+                <ProtectedRoute>
+                  <Calendar />
+                </ProtectedRoute>
+              } />
+              <Route path="/trade-journal" element={
+                <ProtectedRoute>
+                  <TradeJournal />
+                </ProtectedRoute>
+              } />
+              <Route path="/monthly-report" element={
+                <ProtectedRoute>
+                  <MonthlyReport />
+                </ProtectedRoute>
+              } />
+              <Route path="/journal" element={
+                <ProtectedRoute>
+                  <Journal />
+                </ProtectedRoute>
+              } />
+              <Route path="/blog" element={
+                <ProtectedRoute>
+                  <Blog />
+                </ProtectedRoute>
+              } />
+              <Route path="/blog/:id" element={
+                <ProtectedRoute>
+                  <BlogPost />
+                </ProtectedRoute>
+              } />
+              <Route path="/community" element={
+                <ProtectedRoute>
+                  <Community />
+                </ProtectedRoute>
+              } />
+              <Route path="/courses" element={
+                <ProtectedRoute>
+                  <Courses />
+                </ProtectedRoute>
+              } />
+              <Route path="/courses/:courseId" element={
+                <ProtectedRoute>
+                  <CourseDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/ai-assistant" element={
+                <ProtectedRoute>
+                  <AIAssistant />
+                </ProtectedRoute>
+              } />
+              <Route path="/new-trade" element={
+                <ProtectedRoute>
+                  <NewTrade />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/contract/:contractId" element={
+                <ProtectedRoute>
+                  <ContractDetails />
+                </ProtectedRoute>
+              } />
+              
+              {/* Catch all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </React.Suspense>
+        </Router>
+      </TooltipProvider>
     </AuthProvider>
   );
 }
