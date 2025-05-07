@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw, Clock, BookOpen, Newspaper } from 'lucide-react';
 import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import BlogSection from '@/components/BlogSection';
 
 const Dashboard = () => {
-  const { toast } = useToast();
+  const { toast: useToastReturn } = { toast }; // Fix potential issue with toast import
   const { stockData, loading: stocksLoading, error: stocksError, lastUpdated: stocksLastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
 
   const handleManualRefresh = () => {

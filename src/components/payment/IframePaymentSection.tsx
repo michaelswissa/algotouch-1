@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -516,7 +515,7 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
           <Button 
             variant="outline" 
             onClick={onBack} 
-            disabled={isLoading || paymentStatus === PaymentStatusEnum.PROCESSING}
+            disabled={isLoading || paymentStatus === PaymentStatusEnum.PROCESSING ? true : false}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             חזרה
