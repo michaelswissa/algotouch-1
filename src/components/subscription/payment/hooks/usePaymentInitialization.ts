@@ -52,6 +52,13 @@ export const usePaymentInitialization = (
       const userPhone = userData?.phone || registrationData?.userData?.phone || '';
       const userIdNumber = userData?.idNumber || registrationData?.userData?.idNumber || '';
 
+      console.log('Sending user details to payment system:', {
+        fullName: userFullName,
+        email: userEmail,
+        phone: userPhone,
+        idNumber: userIdNumber
+      });
+
       // Prepare payload based on whether user is logged in or not
       const payload = {
         planId: selectedPlan,

@@ -110,6 +110,13 @@ serve(async (req) => {
       UIDefinition: enhancedUiDefinition
     };
 
+    console.log('Sending payload with user details:', {
+      name: enhancedUiDefinition.CardOwnerNameValue,
+      email: enhancedUiDefinition.CardOwnerEmailValue,
+      phone: enhancedUiDefinition.CardOwnerPhoneValue,
+      idNumber: enhancedUiDefinition.CardOwnerIdValue
+    });
+
     // Make the API request
     const response = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/Create', {
       method: 'POST',

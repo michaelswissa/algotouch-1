@@ -5,6 +5,12 @@ import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { checkSubscriptionStatus } from '@/lib/supabase-client';
 
+interface UserData {
+  phone?: string;
+  idNumber?: string;
+  // Add other user data fields as needed
+}
+
 interface SubscriptionContextType {
   hasActiveSubscription: boolean;
   isCheckingSubscription: boolean;
@@ -14,6 +20,7 @@ interface SubscriptionContextType {
   email: string | null;
   subscriptionDetails: any | null;
   planType: string | null;
+  userData: UserData | null;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -38,6 +45,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const [email, setEmail] = useState<string | null>(null);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any | null>(null);
   const [planType, setPlanType] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   // Check subscription on user change
   useEffect(() => {
@@ -48,7 +56,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       // Get user profile data
       supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, phone, id_number')
         .eq('id', user.id)
         .single()
         .then(({ data, error }) => {
@@ -57,8 +65,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
             return;
           }
           
-          if (data?.first_name || data?.last_name) {
-            setFullName(`${data.first_name || ''} ${data.last_name || ''}`.trim());
+          if (data) {
+            if (data.first_name || data.last_name) {
+              setFullName(`${data.first_name || ''} ${data.last_name || ''}`.trim());
+            }
+            
+            setUserData({
+              phone: data.phone || '',
+              idNumber: data.id_number || ''
+            });
           }
         });
     } else {
@@ -67,6 +82,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setEmail(null);
       setSubscriptionDetails(null);
       setPlanType(null);
+      setUserData(null);
       setIsCheckingSubscription(false);
     }
   }, [user]);
@@ -131,7 +147,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     fullName,
     email,
     subscriptionDetails,
-    planType
+    planType,
+    userData
   };
 
   return (
