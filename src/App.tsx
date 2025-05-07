@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/auth/AuthProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { LoadingPage } from '@/components/ui/spinner';
 
 // Import your pages lazily to avoid circular dependencies
 const Index = React.lazy(() => import('./pages/Index'));
@@ -27,13 +28,6 @@ const Journal = React.lazy(() => import('./pages/Journal'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 const PaymentHandling = React.lazy(() => import('./pages/PaymentHandling'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
-
-// Add a loading component for the suspense fallback
-const LoadingPage = () => (
-  <div className="flex justify-center items-center min-h-screen">
-    <div className="h-16 w-16 animate-spin rounded-full border-4 border-t-primary"></div>
-  </div>
-);
 
 // הוסף את ה-class dark ל-html כברירת מחדל בעת הטעינה הראשונית
 document.documentElement.classList.add('dark');

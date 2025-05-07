@@ -42,9 +42,9 @@ export interface CommunityContextType {
   };
   
   // Course related functions
-  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<void>;
-  completeModule?: (courseId: string, moduleId: string) => Promise<void>;
-  completeCourse?: (courseId: string) => Promise<void>;
+  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<boolean>;
+  completeModule?: (courseId: string, moduleId: string) => Promise<boolean>;
+  completeCourse?: (courseId: string) => Promise<boolean>;
   
   // Data refresh functions
   refreshData: {

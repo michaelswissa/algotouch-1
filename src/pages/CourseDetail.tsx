@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { CommunityProvider } from '@/contexts/community/CommunityContext';
 import { useParams } from 'react-router-dom';
 import { useCourseData } from '@/hooks/useCourseData';
+import { LoadingPage } from '@/components/ui/spinner';
 
 // Import course components
 import CourseHeader from '@/components/courses/CourseHeader';
@@ -29,6 +30,10 @@ const CourseDetailContent = () => {
     handleVideoEnded,
     hasCourseCompletionBadge
   } = useCourseData(courseId);
+
+  if (!courseData) {
+    return <LoadingPage message="טוען את הקורס..." />;
+  }
 
   return (
     <Layout className="p-4 md:p-6">
