@@ -80,18 +80,25 @@ serve(async (req) => {
     const cardOwnerPhone = userDetails?.phone || '';
     const cardOwnerIdValue = userDetails?.idNumber || '';
 
-    // Create UI definition with pre-filled user details
+    // Create UI definition with pre-filled user details but DON'T hide the fields
     const enhancedUiDefinition = {
       CardOwnerNameValue: cardOwnerName,
       CardOwnerEmailValue: cardOwnerEmail,
       CardOwnerPhoneValue: cardOwnerPhone,
       CardOwnerIdValue: cardOwnerIdValue,
-      IsHideCardOwnerName: cardOwnerName ? true : false,
-      IsHideCardOwnerEmail: cardOwnerEmail ? true : false,
-      IsHideCardOwnerPhone: cardOwnerPhone ? true : false,
-      IsHideCardOwnerIdentityNumber: cardOwnerIdValue ? true : false,
+      IsHideCardOwnerName: false, // Show name field even if pre-filled
+      IsHideCardOwnerEmail: false, // Show email field even if pre-filled
+      IsHideCardOwnerPhone: false, // Show phone field even if pre-filled
+      IsHideCardOwnerIdentityNumber: false, // Show ID number field even if pre-filled
       ...(uiDefinition || {})
     };
+
+    console.log('Sending payload with user details:', {
+      name: enhancedUiDefinition.CardOwnerNameValue,
+      email: enhancedUiDefinition.CardOwnerEmailValue,
+      phone: enhancedUiDefinition.CardOwnerPhoneValue,
+      idNumber: enhancedUiDefinition.CardOwnerIdValue
+    });
 
     // Prepare the request payload for LowProfile Create
     const payload = {
@@ -109,13 +116,6 @@ serve(async (req) => {
       ISOCoinId: isoCoinId,
       UIDefinition: enhancedUiDefinition
     };
-
-    console.log('Sending payload with user details:', {
-      name: enhancedUiDefinition.CardOwnerNameValue,
-      email: enhancedUiDefinition.CardOwnerEmailValue,
-      phone: enhancedUiDefinition.CardOwnerPhoneValue,
-      idNumber: enhancedUiDefinition.CardOwnerIdValue
-    });
 
     // Make the API request
     const response = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/Create', {
