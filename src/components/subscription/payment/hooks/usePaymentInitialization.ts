@@ -31,7 +31,7 @@ export const usePaymentInitialization = (
       // 1: ChargeOnly - for one-time VIP payment
       // 2: ChargeAndCreateToken - for annual with immediate charge and future charges
       // 3: CreateTokenOnly - for monthly with trial (no initial charge)
-      let operationType = 3; // Default: token creation only (for monthly trial)
+      let operationType = 2; // Changed to ChargeAndCreateToken for monthly
       
       if (selectedPlan === 'annual') {
         operationType = 2; // Charge and create token
@@ -116,7 +116,7 @@ export const usePaymentInitialization = (
   const getPlanAmount = (plan: string): number => {
     switch (plan) {
       case 'monthly':
-        return 0; // No initial charge for monthly plan (token only)
+        return 1; // Changed to 1₪ for the initial charge of monthly plan
       case 'annual':
         return 3371; // 3,371 ₪ (updated to shekels instead of agorot)
       case 'vip':
