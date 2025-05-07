@@ -65,24 +65,31 @@
       const statusElement = document.getElementById('status');
       const messageElement = document.getElementById('message');
       
+      console.log('Processing payment redirect with params:', params);
+      
       // Check if this is a success response
-      if (params.ResponseCode === '0' || params.success === 'true') {
+      if (params.success === 'true' || params.ResponseCode === '0') {
         statusElement.textContent = 'התשלום התקבל בהצלחה!';
         messageElement.textContent = 'מעביר אותך לדף הבא...';
+        
+        // Store payment data in session storage to handle page reload scenarios
+        const paymentData = {
+          timestamp: new Date().toISOString(),
+          lowProfileId: params.LowProfileId || params.lowProfileId,
+          transactionId: params.TranzactionId || params.txId,
+          plan: params.plan
+        };
+        
+        sessionStorage.setItem('payment_success_data', JSON.stringify(paymentData));
         
         // Send success message to parent
         window.parent.postMessage({
           type: 'cardcom-paid',
-          details: {
-            responseCode: params.ResponseCode || '0',
-            transactionId: params.TranzactionId || params.txId,
-            lowProfileId: params.LowProfileId,
-            plan: params.plan
-          }
+          details: paymentData
         }, '*');
       } 
       // Check if this is an error response
-      else if (params.error === 'true' || params.ResponseCode !== '0') {
+      else if (params.error === 'true' || (params.ResponseCode && params.ResponseCode !== '0')) {
         statusElement.textContent = 'שגיאה בתהליך התשלום';
         messageElement.textContent = params.Description || 'אנא נסה שנית';
         

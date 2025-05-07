@@ -47,5 +47,42 @@ export const usePaymentUrlParams = (
       console.log('Found stored registration ID:', storedRegId);
       retrieveAndProcessRegistrationData(storedRegId, onPaymentComplete);
     }
-  }, [onPaymentComplete]);
+    
+    // Listen for payment messages from the iframe
+    const handlePaymentMessage = (event: MessageEvent) => {
+      // For security, we should validate the origin
+      // but in this case we're communicating with our own page
+      console.log('Received message:', event.data);
+      
+      if (event.data?.type === 'cardcom-paid') {
+        console.log('Payment successful:', event.data.details);
+        
+        // Store the payment data in sessionStorage for later validation
+        if (event.data?.details) {
+          sessionStorage.setItem('payment_success_data', JSON.stringify({
+            ...event.data.details,
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        toast.success('התשלום התקבל בהצלחה!');
+        
+        // If we have a registration ID, verify the payment with the backend
+        const regId = localStorage.getItem('temp_registration_id');
+        if (regId) {
+          console.log('Verifying payment with registration ID:', regId);
+          verifyPaymentAndCompleteRegistration(regId, onPaymentComplete, setIsLoading);
+        } else {
+          console.log('Completing payment without registration ID');
+          onPaymentComplete();
+        }
+      } else if (event.data?.type === 'cardcom-error') {
+        console.error('Payment error:', event.data.message);
+        toast.error('שגיאה בתהליך התשלום: ' + (event.data.message || 'אנא נסה שנית'));
+      }
+    };
+    
+    window.addEventListener('message', handlePaymentMessage);
+    return () => window.removeEventListener('message', handlePaymentMessage);
+  }, [onPaymentComplete, setIsLoading, verifyPaymentAndCompleteRegistration, retrieveAndProcessRegistrationData]);
 };

@@ -11,7 +11,7 @@ export const usePaymentInitialization = (
   onBack: () => void,
   setIsLoadingExternal?: (val: boolean) => void
 ) => {
-  const { fullName, email } = useSubscriptionContext();
+  const { fullName, email, userData } = useSubscriptionContext();
   const { user } = useAuth();
   const [isLoading, setIsLoadingState] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -46,19 +46,31 @@ export const usePaymentInitialization = (
         return;
       }
 
+      // Extract user details from the context data or registration data
+      const userFullName = fullName || registrationData?.userData?.fullName || '';
+      const userEmail = email || user?.email || registrationData?.userData?.email || '';
+      const userPhone = userData?.phone || registrationData?.userData?.phone || '';
+      const userIdNumber = userData?.idNumber || registrationData?.userData?.idNumber || '';
+
       // Prepare payload based on whether user is logged in or not
       const payload = {
         planId: selectedPlan,
         userId: user?.id,
-        fullName: fullName || registrationData?.userData?.firstName + ' ' + registrationData?.userData?.lastName || '',
-        email: email || user?.email || registrationData?.email || '',
+        fullName: userFullName,
+        email: userEmail,
         operationType,
-        // Don't use redirect URLs directly in CardCom API - we'll handle it in our redirect page
-        origin: window.location.origin, // Pass the origin for our redirect page
+        origin: window.location.origin,
         amount: getPlanAmount(selectedPlan),
         webHookUrl: `${window.location.origin}/api/payment-webhook`,
         // Include registration data for account creation after payment
-        registrationData: registrationData
+        registrationData: registrationData,
+        // Add user details for payment form pre-fill
+        userDetails: {
+          fullName: userFullName,
+          email: userEmail,
+          phone: userPhone,
+          idNumber: userIdNumber
+        }
       };
 
       const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {

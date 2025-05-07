@@ -56,6 +56,7 @@ serve(async (req) => {
       isoCoinId = 1, // Default to ILS
       uiDefinition,
       planId,
+      userDetails, // New parameter containing user details
     } = body;
 
     // Validate required parameters
@@ -73,6 +74,25 @@ serve(async (req) => {
     // Log the configuration
     console.log(`Creating CardCom payment session with terminal: ${terminalNumber}, operation: ${operation}`);
 
+    // Extract user details for pre-filling the form
+    const cardOwnerName = userDetails?.fullName || '';
+    const cardOwnerEmail = userDetails?.email || '';
+    const cardOwnerPhone = userDetails?.phone || '';
+    const cardOwnerIdValue = userDetails?.idNumber || '';
+
+    // Create UI definition with pre-filled user details
+    const enhancedUiDefinition = {
+      CardOwnerNameValue: cardOwnerName,
+      CardOwnerEmailValue: cardOwnerEmail,
+      CardOwnerPhoneValue: cardOwnerPhone,
+      CardOwnerIdValue: cardOwnerIdValue,
+      IsHideCardOwnerName: cardOwnerName ? true : false,
+      IsHideCardOwnerEmail: cardOwnerEmail ? true : false,
+      IsHideCardOwnerPhone: cardOwnerPhone ? true : false,
+      IsHideCardOwnerIdentityNumber: cardOwnerIdValue ? true : false,
+      ...(uiDefinition || {})
+    };
+
     // Prepare the request payload for LowProfile Create
     const payload = {
       TerminalNumber: parseInt(terminalNumber),
@@ -80,18 +100,14 @@ serve(async (req) => {
       Operation: operation,
       ReturnValue: returnValue || '',
       Amount: amount,
-      // Instead of direct redirect URLs, we'll use our internal redirect page
-      SuccessRedirectUrl: redirectUrl + "?success=true&plan=" + (planId || ''),
-      FailedRedirectUrl: redirectUrl + "?error=true&plan=" + (planId || ''),
+      // All redirects go through our internal redirect page
+      SuccessRedirectUrl: `${redirectUrl}?success=true&plan=${planId || ''}`,
+      FailedRedirectUrl: `${redirectUrl}?error=true&plan=${planId || ''}`,
       WebHookUrl: webHookUrl || null,
       ProductName: productName || 'Product Purchase',
       Language: language,
       ISOCoinId: isoCoinId,
-      UIDefinition: uiDefinition || {
-        IsHideCardOwnerName: false,
-        IsHideCardOwnerEmail: false,
-        IsHideCardOwnerPhone: false
-      }
+      UIDefinition: enhancedUiDefinition
     };
 
     // Make the API request
