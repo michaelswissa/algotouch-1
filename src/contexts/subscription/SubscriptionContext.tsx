@@ -56,7 +56,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       // Get user profile data
       supabase
         .from('profiles')
-        .select('first_name, last_name, phone, id_number')
+        .select('first_name, last_name, phone')
         .eq('id', user.id)
         .single()
         .then(({ data, error }) => {
@@ -70,10 +70,14 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
               setFullName(`${data.first_name || ''} ${data.last_name || ''}`.trim());
             }
             
+            // Set user data with available fields
             setUserData({
               phone: data.phone || '',
-              idNumber: data.id_number || ''
+              // For now, we'll use an empty string as id_number isn't available
+              idNumber: ''
             });
+
+            console.log('Profile data loaded:', data);
           }
         });
     } else {
