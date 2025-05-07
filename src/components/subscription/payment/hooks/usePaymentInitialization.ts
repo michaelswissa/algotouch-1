@@ -112,15 +112,15 @@ export const usePaymentInitialization = (
     }
   };
 
-  // Helper function to get plan amount (in agorot - cents)
+  // Helper function to get plan amount (in shekels, not agorot)
   const getPlanAmount = (plan: string): number => {
     switch (plan) {
       case 'monthly':
         return 0; // No initial charge for monthly plan (token only)
       case 'annual':
-        return 337100; // 3,371.00 ₪ in agorot
+        return 3371; // 3,371 ₪ (updated to shekels instead of agorot)
       case 'vip':
-        return 1312100; // 13,121.00 ₪ in agorot
+        return 13121; // 13,121 ₪ (updated to shekels instead of agorot)
       default:
         return 0;
     }

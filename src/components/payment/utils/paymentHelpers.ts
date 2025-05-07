@@ -15,8 +15,8 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
     monthly: {
       id: 'monthly',
       name: 'חודשי',
-      price: 99,
-      currency: '$',
+      price: 371,
+      currency: '₪',
       description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
       features: ['גישה מלאה לכל התכונות', 'ללא התחייבות', 'חודש ניסיון חינם'],
       trialDays: 30,
@@ -25,8 +25,8 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
     annual: {
       id: 'annual',
       name: 'שנתי',
-      price: 899,
-      currency: '$',
+      price: 3371,
+      currency: '₪',
       description: '25% הנחה | שלושה חודשים מתנה',
       features: ['גישה מלאה לכל התכונות', 'חיסכון של 25%', 'חידוש שנתי'],
       trialDays: 0,
@@ -35,8 +35,8 @@ export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
     vip: {
       id: 'vip',
       name: 'VIP',
-      price: 3499,
-      currency: '$',
+      price: 13121,
+      currency: '₪',
       description: 'גישה לכל החיים בתשלום חד פעמי',
       features: ['גישה לכל החיים', 'כל התכונות העתידיות', 'תמיכה VIP'],
       trialDays: 0,
