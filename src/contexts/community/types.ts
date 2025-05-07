@@ -5,7 +5,8 @@ import {
   Tag,
   UserBadge,
   UserStreak,
-  Badge
+  Badge,
+  CourseProgress
 } from '@/lib/community/types';
 
 export interface CommunityContextType {
@@ -24,7 +25,7 @@ export interface CommunityContextType {
   userBadges: UserBadge[];
   userStreak: UserStreak | null;
   allBadges: Badge[];
-  courseProgress?: any; // For compatibility with useCourseData.ts
+  courseProgress: CourseProgress[];
   
   // Post functions
   addNewPost: (title: string, content: string, mediaUrls?: string[], tagIds?: string[], newTags?: string[]) => Promise<boolean>;
@@ -51,5 +52,6 @@ export interface CommunityContextType {
     fetchTags: () => Promise<void>;
     fetchUserBadges: () => void;
     fetchUserReputation: () => void;
+    fetchUserCourseProgress?: () => void;
   };
 }

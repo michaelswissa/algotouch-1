@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useCommunity } from '@/contexts/community/CommunityContext';
@@ -156,8 +157,8 @@ export const useCourseData = (courseId: string | undefined) => {
     recordLessonWatched, 
     completeModule, 
     completeCourse,
-    courseProgress,
-    userBadges
+    courseProgress = [],
+    userBadges = []
   } = useCommunity();
 
   const [activeTab, setActiveTab] = useState('content');
@@ -221,7 +222,7 @@ export const useCourseData = (courseId: string | undefined) => {
   const handleLessonClick = async (lessonId: number) => {
     setActiveVideoId(lessonId);
     
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && recordLessonWatched) {
       const lessonIdStr = lessonId.toString();
       await recordLessonWatched(courseId || 'unknown', lessonIdStr);
       
@@ -230,11 +231,11 @@ export const useCourseData = (courseId: string | undefined) => {
         const moduleId = courseData.modules.indexOf(lessonModule).toString();
         const allModuleLessonsWatched = checkAllModuleLessonsWatched(lessonModule);
         
-        if (allModuleLessonsWatched) {
+        if (allModuleLessonsWatched && completeModule) {
           await completeModule(courseId || 'unknown', moduleId);
           
           const allModulesCompleted = checkAllModulesCompleted();
-          if (allModulesCompleted) {
+          if (allModulesCompleted && completeCourse) {
             await completeCourse(courseId || 'unknown');
           }
         }
@@ -254,10 +255,12 @@ export const useCourseData = (courseId: string | undefined) => {
   };
   
   const hasCourseCompletionBadge = () => {
-    if (!courseId) return false;
+    if (!courseId || !userBadges || userBadges.length === 0) {
+      return false;
+    }
     
     return userBadges.some(userBadge => 
-      userBadge.badge.name.includes(courseData.title.substring(0, 10))
+      userBadge.badge && userBadge.badge.name.includes(courseData.title.substring(0, 10))
     );
   };
 

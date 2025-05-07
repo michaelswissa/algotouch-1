@@ -6,10 +6,11 @@ import {
   getCommunityPosts, registerCommunityPost, getPostById, likePost, uploadPostMedia,
   getPostComments, addComment, getAllTags, createTag, addTagsToPost,
   getUserBadges, getAllBadges, getUserReputation, getUserReputationPoints,
-  initCommunityStorage
+  getUserCourseProgress, initCommunityStorage
 } from '@/lib/community';
-import { Comment, Post, Tag, UserBadge, UserStreak, Badge } from '@/lib/community/types';
+import { Comment, Post, Tag, UserBadge, UserStreak, Badge, CourseProgress } from '@/lib/community/types';
 import { toast } from 'sonner';
+import { useCourseActions } from './useCourseActions';
 
 // Create context with default empty values
 const CommunityContext = createContext<CommunityContextType>({} as CommunityContextType);
@@ -28,6 +29,20 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [activePostComments, setActivePostComments] = useState<Comment[]>([]);
+  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
+
+  // Initialize course actions
+  const { 
+    recordLessonWatched, 
+    completeModule, 
+    completeCourse 
+  } = useCourseActions(user?.id, async () => {
+    if (user) {
+      await fetchUserBadges(user.id);
+      await fetchUserReputation(user.id);
+      await fetchUserCourseProgress(user.id);
+    }
+  });
 
   // Initialize on mount
   useEffect(() => {
@@ -50,6 +65,7 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isAuthenticated && user) {
       fetchUserBadges(user.id);
       fetchUserReputation(user.id);
+      fetchUserCourseProgress(user.id);
     }
   }, [isAuthenticated, user]);
   
@@ -113,6 +129,15 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     } catch (error) {
       console.error('Error fetching user reputation:', error);
+    }
+  };
+
+  const fetchUserCourseProgress = async (userId: string) => {
+    try {
+      const progress = await getUserCourseProgress(userId);
+      setCourseProgress(progress || []);
+    } catch (error) {
+      console.error('Error fetching user course progress:', error);
     }
   };
   
@@ -269,17 +294,22 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     userBadges: badges,
     userStreak,
     allBadges,
+    courseProgress,
     addNewPost,
     handlePostLiked,
     setActivePostId,
     addNewComment,
     handleCommentAdded,
     createPost,
+    recordLessonWatched,
+    completeModule,
+    completeCourse,
     refreshData: {
       fetchPosts,
       fetchTags,
       fetchUserBadges: () => user && fetchUserBadges(user.id),
-      fetchUserReputation: () => user && fetchUserReputation(user.id)
+      fetchUserReputation: () => user && fetchUserReputation(user.id),
+      fetchUserCourseProgress: () => user && fetchUserCourseProgress(user.id)
     }
   };
   
