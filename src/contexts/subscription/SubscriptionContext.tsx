@@ -1,165 +1,142 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
+import { checkSubscriptionStatus } from '@/lib/supabase-client';
 
 interface SubscriptionContextType {
   hasActiveSubscription: boolean;
   isCheckingSubscription: boolean;
-  error: Error | null;
   checkUserSubscription: (userId: string) => Promise<void>;
-  fullName: string;
-  setFullName: (name: string) => void;
-  email: string;
-  setEmail: (email: string) => void;
-  resetSubscriptionState: () => void;
-  
-  // Added properties for subscription flow
-  currentStep: 'plan' | 'contract' | 'payment' | 'success';
-  selectedPlan: string | null;
-  loading: boolean;
-  handlePlanSelected: (planId: string | null) => void;
-  handleContractSigned: (signed: boolean) => void;
-  handlePaymentComplete: () => void;
-}
-
-interface ProfileData {
-  first_name?: string;
-  last_name?: string;
+  refreshSubscription: () => Promise<void>;
+  fullName: string | null;
+  email: string | null;
+  subscriptionDetails: any | null;
+  planType: string | null;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  
-  // Added state for subscription flow
-  const [currentStep, setCurrentStep] = useState<'plan' | 'contract' | 'payment' | 'success'>('plan');
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+export const useSubscriptionContext = () => {
+  const context = useContext(SubscriptionContext);
+  if (!context) {
+    throw new Error('useSubscriptionContext must be used within a SubscriptionProvider');
+  }
+  return context;
+};
 
-  const handlePlanSelected = useCallback((planId: string | null) => {
-    setSelectedPlan(planId);
-    if (planId) {
-      setCurrentStep('contract');
+interface SubscriptionProviderProps {
+  children: ReactNode;
+}
+
+export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean>(false);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState<boolean>(true);
+  const [fullName, setFullName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [subscriptionDetails, setSubscriptionDetails] = useState<any | null>(null);
+  const [planType, setPlanType] = useState<string | null>(null);
+
+  // Check subscription on user change
+  useEffect(() => {
+    if (user?.id) {
+      checkUserSubscription(user.id);
+      setEmail(user.email || null);
+      
+      // Get user profile data
+      supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching user profile:', error);
+            return;
+          }
+          
+          if (data?.first_name || data?.last_name) {
+            setFullName(`${data.first_name || ''} ${data.last_name || ''}`.trim());
+          }
+        });
     } else {
-      setCurrentStep('plan');
+      setHasActiveSubscription(false);
+      setFullName(null);
+      setEmail(null);
+      setSubscriptionDetails(null);
+      setPlanType(null);
+      setIsCheckingSubscription(false);
     }
-  }, []);
+  }, [user]);
 
-  const handleContractSigned = useCallback((signed: boolean) => {
-    if (signed) {
-      setCurrentStep('payment');
-    } else {
-      setCurrentStep('contract');
+  const refreshSubscription = async () => {
+    if (user?.id) {
+      await checkUserSubscription(user.id);
     }
-  }, []);
+  };
 
-  const handlePaymentComplete = useCallback(() => {
-    setCurrentStep('success');
-  }, []);
-
-  const checkUserSubscription = useCallback(async (userId: string) => {
-    if (!userId) return;
-    
+  const checkUserSubscription = async (userId: string) => {
     try {
       setIsCheckingSubscription(true);
-      setError(null);
       
-      // Check subscription status
-      const { data: subscriptionData, error: subscriptionError } = await supabase
+      const { data, error } = await supabase
         .from('subscriptions')
-        .select('status, plan_type')
+        .select('*')
         .eq('user_id', userId)
         .maybeSingle();
+        
+      if (error) {
+        throw error;
+      }
       
-      if (subscriptionError) {
-        console.error("Error fetching subscription:", subscriptionError);
-        setError(new Error(subscriptionError.message));
+      if (!data) {
+        // No subscription found
+        setHasActiveSubscription(false);
+        setSubscriptionDetails(null);
+        setPlanType(null);
         return;
       }
       
       // Determine if subscription is active
-      setHasActiveSubscription(Boolean(
-        subscriptionData && 
-        (subscriptionData.status === 'active' || 
-         subscriptionData.status === 'trial' || 
-         subscriptionData.plan_type === 'vip')
-      ));
+      const now = new Date();
+      const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
+      const currentPeriodEndsAt = data.current_period_ends_at ? new Date(data.current_period_ends_at) : null;
       
-      // Get user profile data
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('id', userId)
-        .maybeSingle();
+      const isActive = data.status === 'active';
+      const isTrial = data.status === 'trial' && trialEndsAt && trialEndsAt > now;
+      const isValidPeriod = currentPeriodEndsAt && currentPeriodEndsAt > now;
+      const isCancelled = data.cancelled_at !== null && data.cancelled_at !== undefined;
       
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-      } else if (profile) {
-        const profileData = profile as ProfileData;
-        if (profileData.first_name || profileData.last_name) {
-          setFullName(`${profileData.first_name || ''} ${profileData.last_name || ''}`);
-        }
-      }
-
-      // Get user email from auth.users
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error("Error getting user data:", userError);
-      } else if (userData?.user?.email) {
-        setEmail(userData.user.email);
-      }
-    } catch (err) {
-      console.error("Error in checkUserSubscription:", err);
-      setError(err instanceof Error ? err : new Error('Unknown error checking subscription'));
+      const activeStatus = isActive || isTrial || (isValidPeriod && !isCancelled);
+      
+      setHasActiveSubscription(activeStatus);
+      setSubscriptionDetails(data);
+      setPlanType(data.plan_type);
+      
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+      toast.error('שגיאה בבדיקת פרטי המנוי');
     } finally {
       setIsCheckingSubscription(false);
     }
-  }, []);
+  };
 
-  const resetSubscriptionState = useCallback(() => {
-    setHasActiveSubscription(false);
-    setIsCheckingSubscription(false);
-    setError(null);
-    setFullName('');
-    setEmail('');
-    setCurrentStep('plan');
-    setSelectedPlan(null);
-    setLoading(false);
-  }, []);
+  const value = {
+    hasActiveSubscription,
+    isCheckingSubscription,
+    checkUserSubscription,
+    refreshSubscription,
+    fullName,
+    email,
+    subscriptionDetails,
+    planType
+  };
 
   return (
-    <SubscriptionContext.Provider value={{
-      hasActiveSubscription,
-      isCheckingSubscription,
-      error,
-      checkUserSubscription,
-      fullName,
-      setFullName,
-      email,
-      setEmail,
-      resetSubscriptionState,
-      currentStep,
-      selectedPlan,
-      loading,
-      handlePlanSelected,
-      handleContractSigned,
-      handlePaymentComplete
-    }}>
+    <SubscriptionContext.Provider value={value}>
       {children}
     </SubscriptionContext.Provider>
   );
-};
-
-export const useSubscriptionContext = () => {
-  const context = useContext(SubscriptionContext);
-  if (context === undefined) {
-    throw new Error('useSubscriptionContext must be used within a SubscriptionProvider');
-  }
-  return context;
 };

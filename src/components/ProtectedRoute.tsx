@@ -3,115 +3,111 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
-import { toast } from 'sonner';
-import { AppRole } from '@/contexts/auth/role-types';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAuth?: boolean;
-  requiredRole?: AppRole;
   publicPaths?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = true,
-  requiredRole,
   publicPaths = ['/auth']
 }) => {
-  const { isAuthenticated, loading, initialized, checkUserRole } = useAuth();
+  const { isAuthenticated, loading, initialized } = useAuth();
   const location = useLocation();
   const [hasRegistrationData, setHasRegistrationData] = useState(false);
-  const [hasValidFlow, setHasValidFlow] = useState(false);
+  const [isValidRegistration, setIsValidRegistration] = useState(false);
   
   useEffect(() => {
-    try {
-      // Validate registration data
-      const registrationData = sessionStorage.getItem('registration_data');
-      const contractData = sessionStorage.getItem('contract_data');
-      
-      if (registrationData) {
+    // Check for registration data in session storage and validate it
+    const registrationData = sessionStorage.getItem('registration_data');
+    if (registrationData) {
+      try {
         const data = JSON.parse(registrationData);
         const registrationTime = new Date(data.registrationTime);
         const now = new Date();
         const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
         
-        const isRegistrationValid = timeDiffInMinutes < 30;
-        setHasRegistrationData(isRegistrationValid);
+        // Registration data is valid if less than 30 minutes old
+        const isValid = timeDiffInMinutes < 30;
+        setHasRegistrationData(true);
+        setIsValidRegistration(isValid);
         
-        if (!isRegistrationValid) {
-          console.log('Registration data expired');
-          sessionStorage.removeItem('registration_data');
-          sessionStorage.removeItem('contract_data');
-          toast.error('מידע ההרשמה פג תוקף, אנא הירשם שנית');
+        if (!isValid) {
+          console.log("ProtectedRoute: Registration data is stale");
         }
+      } catch (error) {
+        console.error("Error parsing registration data:", error);
+        setHasRegistrationData(false);
+        setIsValidRegistration(false);
       }
-      
-      // Consider the flow valid if:
-      // 1. User is authenticated OR
-      // 2. Has valid contract data OR
-      // 3. Has valid registration data and is in the signup process
-      const isValidFlow = isAuthenticated || 
-                         Boolean(contractData) || 
-                         (registrationData && hasRegistrationData);
-                         
-      setHasValidFlow(isValidFlow);
-      
-    } catch (error) {
-      console.error("Error checking registration/contract data:", error);
+    } else {
       setHasRegistrationData(false);
-      setHasValidFlow(false);
-      sessionStorage.removeItem('registration_data');
-      sessionStorage.removeItem('contract_data');
+      setIsValidRegistration(false);
     }
-  }, [location.pathname, isAuthenticated]);
+  }, [location.pathname]);
 
-  // Show loading state while checking auth
+  // Show consistent loader while auth is initializing
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Spinner className="h-8 w-8" />
+        <Spinner size="lg" />
       </div>
     );
   }
 
-  // Special handling for subscription flow
-  if (location.pathname.startsWith('/subscription')) {
-    if (isAuthenticated || hasValidFlow) {
-      console.log("ProtectedRoute: Allowing access to subscription path", {
-        isAuthenticated,
-        hasRegistrationData,
-        hasValidFlow
-      });
-      return <>{children}</>;
-    }
-    
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
+  // Check for registration in progress from location state
+  const isRegistering = location.state?.isRegistering === true;
 
   // Allow access to public paths regardless of auth status
-  if (publicPaths.some(path => location.pathname === path || location.pathname.startsWith(`${path}/`))) {
+  if (isPublicPath(location.pathname, publicPaths)) {
     return <>{children}</>;
   }
 
-  // Check authentication requirements
+  // Special case for subscription page - allow access if:
+  // 1. User is authenticated OR
+  // 2. User is in registration process (has valid data in sessionStorage) OR
+  // 3. User is redirected directly from signup (isRegistering state)
+  if (isSubscriptionPath(location.pathname)) {
+    if (isAuthenticated || (hasRegistrationData && isValidRegistration) || isRegistering) {
+      console.log("ProtectedRoute: Allowing access to subscription path", {
+        isAuthenticated,
+        hasRegistrationData,
+        isValidRegistration,
+        isRegistering
+      });
+      return <>{children}</>;
+    }
+    console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
+    return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
+  }
+
   if (requireAuth && !isAuthenticated) {
+    console.log("ProtectedRoute: User is not authenticated, redirecting to auth");
+    // Redirect to login page if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
+    console.log("ProtectedRoute: User is already authenticated, redirecting to dashboard");
+    // Redirect to dashboard if already authenticated (for login/register pages)
     return <Navigate to="/dashboard" replace />;
-  }
-
-  // Role-based access control
-  if (requiredRole && isAuthenticated) {
-    if (!checkUserRole(requiredRole)) {
-      toast.error(`You need ${requiredRole} permissions to access this page`);
-      return <Navigate to="/dashboard" replace />;
-    }
   }
 
   return <>{children}</>;
 };
+
+// Helper functions to improve readability
+function isPublicPath(path: string, publicPaths: string[]): boolean {
+  return publicPaths.some(publicPath => 
+    path === publicPath || path.startsWith(`${publicPath}/`)
+  );
+}
+
+function isSubscriptionPath(path: string): boolean {
+  return path === '/subscription' || path.startsWith('/subscription/');
+}
 
 export default ProtectedRoute;

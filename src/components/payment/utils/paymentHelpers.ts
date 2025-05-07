@@ -1,78 +1,64 @@
-// Subscription plan definitions
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
   price: number;
-  displayPrice: string;
   description: string;
-  hasTrial: boolean;
-  freeTrialDays: number;
-  isPopular?: boolean;
   features: string[];
+  trialDays: number;
+  billingCycle: 'monthly' | 'annual' | 'one-time';
+  currency?: string;
 }
 
-export interface SubscriptionPlans {
-  monthly: SubscriptionPlan;
-  annual: SubscriptionPlan;
-  vip: SubscriptionPlan;
+export const getSubscriptionPlans = (): Record<string, SubscriptionPlan> => {
+  return {
+    monthly: {
+      id: 'monthly',
+      name: 'חודשי',
+      price: 99,
+      currency: '$',
+      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
+      features: ['גישה מלאה לכל התכונות', 'ללא התחייבות', 'חודש ניסיון חינם'],
+      trialDays: 30,
+      billingCycle: 'monthly',
+    },
+    annual: {
+      id: 'annual',
+      name: 'שנתי',
+      price: 899,
+      currency: '$',
+      description: '25% הנחה | שלושה חודשים מתנה',
+      features: ['גישה מלאה לכל התכונות', 'חיסכון של 25%', 'חידוש שנתי'],
+      trialDays: 0,
+      billingCycle: 'annual',
+    },
+    vip: {
+      id: 'vip',
+      name: 'VIP',
+      price: 3499,
+      currency: '$',
+      description: 'גישה לכל החיים בתשלום חד פעמי',
+      features: ['גישה לכל החיים', 'כל התכונות העתידיות', 'תמיכה VIP'],
+      trialDays: 0,
+      billingCycle: 'one-time',
+    },
+  };
+};
+
+// Updated TokenData interface with an index signature to make it compatible with Json type
+export interface TokenData {
+  lastFourDigits: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+  [key: string]: string | number | boolean | null | TokenData[] | undefined; // Adding index signature for Json compatibility
 }
 
-export const getSubscriptionPlans = (): SubscriptionPlans => ({
-  monthly: {
-    id: 'monthly',
-    name: 'מנוי חודשי',
-    price: 371,
-    displayPrice: '₪371',
-    description: 'חיוב חודשי, ניתן לבטל בכל עת',
-    hasTrial: true,
-    freeTrialDays: 7,
-    features: [
-      'גישה לכל התכנים',
-      'תמיכה טכנית בסיסית',
-      'ניתן לבטל בכל עת'
-    ]
-  },
-  annual: {
-    id: 'annual',
-    name: 'מנוי שנתי',
-    price: 3371,
-    displayPrice: '₪3,371',
-    description: 'חיסכון של 25% בהשוואה לתשלום חודשי',
-    hasTrial: true,
-    freeTrialDays: 14,
-    isPopular: true,
-    features: [
-      'גישה לכל התכנים',
-      'חיסכון של 25% בהשוואה לתשלום חודשי',
-      'תמיכה טכנית מורחבת',
-      'ניתן לבטל בכל עת עם החזר יחסי'
-    ]
-  },
-  vip: {
-    id: 'vip',
-    name: 'מנוי לכל החיים',
-    price: 13121,
-    displayPrice: '₪13,121',
-    description: 'תשלום חד פעמי, גישה לכל החיים',
-    hasTrial: false,
-    freeTrialDays: 0,
-    features: [
-      'גישה לכל החיים לכל התכנים',
-      'כולל תכנים עתידיים',
-      'תמיכה טכנית VIP',
-      'הטבות ייחודיות למנויי VIP'
-    ]
-  }
-});
-
-// Format price amount to display with proper currency symbol
-export const formatPrice = (amount: number, currencyCode = 'ILS'): string => {
-  const formatter = new Intl.NumberFormat('he-IL', {
-    style: 'currency',
-    currency: currencyCode,
-    minimumFractionDigits: currencyCode === 'ILS' ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
-  
-  return formatter.format(amount);
+export const createTokenData = (cardNumber: string, expiryDate: string, cardholderName: string): TokenData => {
+  return {
+    lastFourDigits: cardNumber.slice(-4),
+    expiryMonth: expiryDate.split('/')[0],
+    expiryYear: `20${expiryDate.split('/')[1]}`,
+    cardholderName
+  };
 };

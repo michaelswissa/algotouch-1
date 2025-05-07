@@ -4,39 +4,37 @@ project_id = "ndhakvhrrkczgylcmyoc"
 [api]
 enabled = true
 port = 54321
-
-[db]
-port = 54322
-
-[studio]
-port = 54323
-
-[inbucket]
-port = 54324
-
-[storage]
-port = 54325
+swagger_ui = true
+openapi_url = "/rest/v1/swagger.json"
 
 [functions]
-port = 54326
+[functions.ai-chatbot]
+verify_jwt = true
+
+[functions.financial-news]
+verify_jwt = true
+
+[functions.generate-insight]
+verify_jwt = true
 
 [functions.cardcom-payment]
 verify_jwt = false
 
-[functions.cardcom-redirect]
+[functions.cancel-subscription]
+verify_jwt = true
+
+[functions.generate-document]
+verify_jwt = true
+
+[functions.get-cancellation-data]
+verify_jwt = true
+
+[functions.recover-payment-session]
 verify_jwt = false
 
-[functions.cardcom-status]
+[functions."recover-payment-session/get-session"]
 verify_jwt = false
 
-[functions.cardcom-webhook]
+[functions."recover-payment-session/save-session"]
 verify_jwt = false
 
-[functions.cardcom-iframe]
-verify_jwt = false
-
-[functions.cardcom-json-create]
-verify_jwt = false
-
-[auth]
-site_url = "http://localhost:3000"

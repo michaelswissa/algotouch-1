@@ -32,15 +32,25 @@ export async function getUserBadges(userId: string): Promise<UserBadge[]> {
     
     // Transform the data to match our UserBadge type
     const formattedData = data?.map(item => {
-      // Check if badge is an array or a direct object and handle accordingly
-      const badgeData = Array.isArray(item.badge) && item.badge.length > 0 
-        ? item.badge[0] 
-        : item.badge;
-      
+      // First check if badge exists and is an object before using it
+      if (item.badge && typeof item.badge === 'object' && !Array.isArray(item.badge)) {
+        return {
+          id: item.id,
+          earned_at: item.earned_at,
+          badge: item.badge as Badge
+        } as UserBadge;
+      }
+      // Return a fallback object if badge is missing or malformed
       return {
         id: item.id,
         earned_at: item.earned_at,
-        badge: badgeData as Badge // Properly cast the badge data
+        badge: {
+          id: item.badge_id,
+          name: 'Unknown Badge',
+          description: 'Badge information unavailable',
+          icon: 'award',
+          points_required: 0
+        }
       } as UserBadge;
     }) || [];
     
@@ -66,8 +76,7 @@ export async function getAllBadges(): Promise<Badge[]> {
       return [];
     }
     
-    // The correct way to handle this type conversion
-    return data as Badge[] || [];
+    return (data as Badge[]) || [];
   } catch (error) {
     console.error('Exception in getAllBadges:', error);
     return [];

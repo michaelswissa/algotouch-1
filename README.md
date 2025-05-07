@@ -1,82 +1,69 @@
+# Welcome to your Lovable project
 
-# AlgoTouch Trading Platform
+## Project info
 
-A comprehensive platform for AlgoTouch traders, providing advanced trading tools, educational resources, and a vibrant community. The platform offers subscription-based access to premium features and content.
+**URL**: https://lovable.dev/projects/943ea41c-32cf-4f38-9bf8-8a57a35db025
 
-## Core Features
+## How can I edit this code?
 
-### Trading Tools & Analytics
-- Performance tracking
-- Trade analysis
-- Emotional trading insights
-- Custom reporting
+There are several ways of editing your application.
 
-### Educational Resources
-- Comprehensive trading courses
-- Live workshops
-- Trading strategies
-- Market analysis
+**Use Lovable**
 
-### Community Features
-- Trader discussions
-- Experience sharing
-- Achievement system
-- Progress tracking
+Simply visit the [Lovable Project](https://lovable.dev/projects/943ea41c-32cf-4f38-9bf8-8a57a35db025) and start prompting.
 
-## Technical Infrastructure
+Changes made via Lovable will be committed automatically to this repo.
 
-### Payment Processing
-Secure payment handling through CardCom gateway, supporting:
-- Subscription management
-- Recurring billing
-- Secure payment processing
-- Trial period handling
+**Use your preferred IDE**
 
-### Edge Functions
-1. **cardcom-payment** - Payment initialization
-2. **cardcom-webhook** - Payment status management
-3. **cardcom-recurring** - Subscription handling
-4. **cardcom-status** - Transaction verification
-5. **cardcom-submit** - Payment processing
-6. **process-recurring** - Automated billing
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-### Database Structure
-- User profiles and preferences
-- Trading data and analytics
-- Subscription management
-- Payment processing
-- Community interaction
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-### Security
-- Secure API key management
-- Input validation
-- Transaction verification
-- Error monitoring
-- Audit logging
+Follow these steps:
 
-### Automated Processing
-Daily scheduled tasks:
-- Subscription renewals
-- Trial period management
-- Payment token validation
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
 
-## Subscription Plans
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
 
-Access to premium features through flexible subscription options:
+# Step 3: Install the necessary dependencies.
+npm i
 
-1. **Monthly Access**
-   - 371₪/month
-   - 30-day free trial
-   - Full platform access
+# Step 4: Start the development server with auto-reloading and an instant preview.
+npm run dev
+```
 
-2. **Annual Access**
-   - 3,371₪/year
-   - 30-day free trial
-   - Full platform access
-   - Priority support
+**Edit a file directly in GitHub**
 
-3. **VIP Lifetime**
-   - 13,121₪ one-time
-   - Lifetime access
-   - All premium features
-   - Priority support
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
+
+**Use GitHub Codespaces**
+
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
+
+## What technologies are used for this project?
+
+This project is built with .
+
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
+
+## How can I deploy this project?
+
+Simply open [Lovable](https://lovable.dev/projects/943ea41c-32cf-4f38-9bf8-8a57a35db025) and click on Share -> Publish.
+
+## I want to use a custom domain - is that possible?
+
+We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)

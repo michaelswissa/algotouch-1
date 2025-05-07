@@ -1,3 +1,4 @@
+
 /* Add loading pulse animation for data fetching */
 .data-pulse {
   animation: data-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -30,4 +31,98 @@
 
 .elevated-card:hover {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* Payment form animation - simplified */
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { 
+    opacity: 1;
+  }
+  50% { 
+    opacity: 0.8;
+  }
+}
+
+/* Payment iframe placeholder */
+.payment-iframe-placeholder {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(110deg, #f5f7fa 8%, #e6e9f0 18%, #f5f7fa 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
+/* Hover glow effect - simplified */
+.hover-glow {
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 10px 15px -5px rgba(0, 102, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Trust badge animations - simplified */
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.trust-badge:hover {
+  transform: translateY(-1px);
+}
+
+/* Payment form section transition - simplified */
+.payment-section-transition {
+  transition: all 0.3s ease;
+}
+
+/* Premium badge animation */
+.premium-badge {
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: badge-shine 3s infinite;
+}
+
+@keyframes badge-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  20%, 100% {
+    transform: translateX(100%);
+  }
 }

@@ -12,9 +12,7 @@ export interface PlanProps {
   id: string;
   name: string;
   price: number;
-  displayPrice: number;
   currency: string;
-  displayCurrency: string;
   billingPeriod: string;
   description: string;
   icon: React.ReactNode;
@@ -29,9 +27,7 @@ const PlanCard: React.FC<PlanProps> = ({
   id,
   name,
   price,
-  displayPrice,
   currency,
-  displayCurrency,
   billingPeriod,
   description,
   features,
@@ -99,9 +95,7 @@ const PlanCard: React.FC<PlanProps> = ({
         <CardDescription className="text-sm">{description}</CardDescription>
         <PlanPricing 
           price={price} 
-          displayPrice={displayPrice}
           currency={currency} 
-          displayCurrency={displayCurrency}
           billingPeriod={billingPeriod}
           planId={id}
         />

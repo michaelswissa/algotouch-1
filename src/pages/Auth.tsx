@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,8 +7,6 @@ import AuthHeader from '@/components/auth/AuthHeader';
 import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
-import { StorageService } from '@/services/storage/StorageService';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
 import { toast } from 'sonner';
 
 const Auth = () => {
@@ -15,11 +14,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as { 
-    from?: Location, 
-    redirectToSubscription?: boolean,
-    isRegistering?: boolean
-  };
+  const state = location.state as { from?: Location, redirectToSubscription?: boolean };
 
   // Get initial tab from URL if present
   useEffect(() => {
@@ -32,85 +27,58 @@ const Auth = () => {
 
   // Check if the state specifies to show the signup tab
   useEffect(() => {
-    if (state?.redirectToSubscription || state?.isRegistering) {
+    if (state?.redirectToSubscription) {
       setActiveTab('signup');
     }
   }, [state]);
 
   // Check if there's valid registration data in session storage
   useEffect(() => {
-    const checkSessionData = () => {
+    const storedData = sessionStorage.getItem('registration_data');
+    if (storedData) {
       try {
-        // First check if registration data is valid
-        if (StorageService.isRegistrationValid()) {
-          const registrationData = StorageService.getRegistrationData();
-          
-          // Check if we have a contract
-          const contractData = StorageService.getContractData();
-          
-          // If we have valid contract data with plan selection, redirect to subscription
-          if (contractData?.planId) {
-            PaymentLogger.log("Auth: Valid contract data found, redirecting to subscription");
-            navigate('/subscription', { replace: true });
-            return;
-          }
-          
-          // Otherwise check if we're in the registration flow
-          if (registrationData && location.state?.isRegistering) {
-            PaymentLogger.log("Auth: Valid registration data found, redirecting to subscription");
-            navigate('/subscription', { replace: true, state: { isRegistering: true } });
-            return;
-          }
-        } else {
-          // Clear expired registration data
-          const hasExpired = StorageService.getRegistrationData().registrationTime;
-          
-          if (hasExpired) {
-            PaymentLogger.log("Auth: Clearing expired registration data");
-            StorageService.clearAllSubscriptionData();
-            toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
-          }
+        const data = JSON.parse(storedData);
+        const registrationTime = new Date(data.registrationTime);
+        const now = new Date();
+        const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
+        
+        // If registration is fresh (less than 30 minutes old) and explicitly coming from signup
+        if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
+          console.log("Auth: Valid registration data found, redirecting to subscription");
+          navigate('/subscription', { replace: true, state: { isRegistering: true } });
+        } else if (timeDiffInMinutes >= 30) {
+          // Clear stale registration data older than 30 minutes
+          console.log("Auth: Clearing stale registration data");
+          sessionStorage.removeItem('registration_data');
+          toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
         }
       } catch (error) {
-        PaymentLogger.error("Error checking session data:", error);
-        StorageService.clearAllSubscriptionData();
+        console.error("Error parsing registration data:", error);
+        sessionStorage.removeItem('registration_data');
       }
-    };
-    
-    checkSessionData();
+    }
   }, [navigate, location.state]);
 
   // Show loading state while auth is initializing
   if (!initialized || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
-        <Spinner className="h-8 w-8" />
+        <Spinner size="lg" />
       </div>
     );
   }
 
   // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
-    PaymentLogger.log("Auth page: User is authenticated, redirecting");
-    
+    console.log("Auth page: User is authenticated, redirecting to appropriate page");
     if (state?.redirectToSubscription) {
       return <Navigate to="/subscription" replace />;
     }
-    
-    // Check if we're in the middle of a registration flow
-    const registrationData = StorageService.getRegistrationData();
-    const contractData = StorageService.getContractData();
-    
-    if ((registrationData && StorageService.isRegistrationValid()) || contractData) {
-      PaymentLogger.log("Auth: User authenticated with registration data, redirecting to subscription");
-      return <Navigate to="/subscription" replace />;
-    }
-    
     return <Navigate to="/dashboard" replace />;
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4" dir="rtl">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4 dark:bg-background dark:text-foreground" dir="rtl">
       <div className="w-full max-w-md space-y-6">
         <AuthHeader />
         

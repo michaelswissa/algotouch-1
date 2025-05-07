@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth';
-import { toast } from 'sonner';
 
 interface ContractSectionProps {
   selectedPlan: string;
@@ -21,38 +20,24 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   onBack 
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
   
   // Function to handle contract signing
   const handleSignContract = async (contractData: any) => {
     try {
       setIsProcessing(true);
-      console.log('Contract signed, saving before payment');
-      
-      // Get existing registration data if available
-      const registrationData = sessionStorage.getItem('registration_data');
-      const parsedRegistrationData = registrationData ? JSON.parse(registrationData) : null;
-      
-      // Save contract data to session storage for use during payment
-      const contractStateData = {
-        ...contractData,
-        registrationData: parsedRegistrationData,
-        contractSignedAt: new Date().toISOString(),
-        isAuthenticated,
-        selectedPlan
-      };
-      
-      // Save contract state in session storage and ensure it persists
-      sessionStorage.setItem('contract_data', JSON.stringify(contractStateData));
+      console.log('Contract signed, forwarding data to parent component');
       
       // Add a small delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Pass the contract data up to the parent
-      onSign(contractStateData);
+      // Pass the contract data directly to the parent along with user information
+      onSign({
+        ...contractData,
+        userId: user?.id // This will be undefined if the user isn't authenticated
+      });
     } catch (error) {
       console.error('Error signing contract:', error);
-      toast.error('אירעה שגיאה בשמירת החוזה');
     } finally {
       setIsProcessing(false);
     }

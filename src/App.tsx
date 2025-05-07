@@ -1,64 +1,41 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from './components/ui/theme-provider';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/sonner';
-import { AuthProvider } from './contexts/auth';
 
-import Index from './pages/Index';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Import your pages
+import Index from './pages/Index'; // Changed from Home to Index
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
-import Settings from './pages/Settings';
 import Subscription from './pages/Subscription';
-import MySubscriptionPage from './pages/MySubscriptionPage';
-import ProtectedRoute from './components/ProtectedRoute';
-import IframePaymentPage from './pages/IframePaymentPage';
+import MySubscriptionPage from './pages/MySubscriptionPage'; // Changed from MySubscription to MySubscriptionPage
+import ContractDetails from './pages/ContractDetails';
 
-const queryClient = new QueryClient();
+import { Toaster } from 'sonner';
+import { AuthProvider } from './contexts/auth/AuthProvider';
+
+// הוסף את ה-class dark ל-html כברירת מחדל בעת הטעינה הראשונית
+document.documentElement.classList.add('dark');
 
 function App() {
   return (
-    <div className="App">
-      <ThemeProvider defaultTheme="dark" storageKey="theme-preference">
-        <BrowserRouter>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/subscription" element={<Subscription />} />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/my-subscription"
-                  element={
-                    <ProtectedRoute>
-                      <MySubscriptionPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/payment/iframe/:planId" element={<IframePaymentPage />} />
-              </Routes>
-              <Toaster richColors position="top-center" />
-            </AuthProvider>
-          </QueryClientProvider>
-        </BrowserRouter>
-      </ThemeProvider>
-    </div>
+    <AuthProvider>
+      <Toaster position="top-center" richColors />
+      <Router>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/subscription" element={<Subscription />} />
+          <Route path="/my-subscription" element={<MySubscriptionPage />} />
+          <Route path="/contract/:contractId" element={<ContractDetails />} />
+          
+          {/* Add any other routes you have */}
+          
+          {/* Catch-all route */}
+          <Route path="*" element={<h1>Page not found</h1>} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

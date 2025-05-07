@@ -1,146 +1,176 @@
 
-import React, { useState, useEffect } from 'react';
-import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
-import SecurityNote from './SecurityNote';
-import { PaymentStatusEnum } from '@/types/payment';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { PaymentLogger } from '@/services/payment/PaymentLogger';
+import React, { useState } from 'react';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import CreditCardDisplay from '@/components/payment/CreditCardDisplay';
 
 interface PaymentDetailsProps {
-  planId: string;
-  terminalNumber: string;
-  cardcomUrl: string;
-  isReady?: boolean;
-  onPaymentStatus?: (status: PaymentStatusEnum) => void;
+  cardNumber: string;
+  setCardNumber: (value: string) => void;
+  cardholderName: string;
+  setCardholderName: (value: string) => void;
+  expiryDate: string;
+  setExpiryDate: (value: string) => void;
+  cvv: string;
+  setCvv: (value: string) => void;
 }
 
 const PaymentDetails: React.FC<PaymentDetailsProps> = ({
-  planId,
-  terminalNumber,
-  cardcomUrl = 'https://secure.cardcom.solutions',
-  isReady = false,
-  onPaymentStatus
+  cardNumber,
+  setCardNumber,
+  cardholderName,
+  setCardholderName,
+  expiryDate,
+  setExpiryDate,
+  cvv,
+  setCvv
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [iframeUrl, setIframeUrl] = useState('');
-  const [sessionId, setSessionId] = useState('');
+  const [isCvvFocused, setIsCvvFocused] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
   
-  useEffect(() => {
-    if (!isReady || !planId) return;
+  // Format card number with spaces
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
     
-    const initializePayment = async () => {
-      try {
-        setIsLoading(true);
-        PaymentLogger.log('Initializing payment for plan:', planId);
-        
-        // Get payment configuration from the server
-        const { data, error } = await supabase.functions.invoke('cardcom-redirect', {
-          body: {
-            planId
-          }
-        });
-        
-        if (error) {
-          throw new Error(`Failed to initialize payment: ${error.message}`);
+    // Format with spaces
+    if (value.length > 0) {
+      // Check if it's AMEX (starts with 34 or 37)
+      const isAmex = /^3[47]/.test(value);
+      
+      if (isAmex) {
+        // Format as XXXX XXXXXX XXXXX for AMEX (4-6-5 format)
+        if (value.length > 4 && value.length <= 10) {
+          value = value.slice(0, 4) + ' ' + value.slice(4);
+        } else if (value.length > 10) {
+          value = value.slice(0, 4) + ' ' + value.slice(4, 10) + ' ' + value.slice(10);
         }
-        
-        if (!data?.success || !data?.data?.redirectUrl) {
-          throw new Error('Invalid response from payment service');
-        }
-        
-        PaymentLogger.log('Payment initialized successfully', data);
-        
-        setSessionId(data.data.sessionId);
-        setIframeUrl(data.data.redirectUrl);
-        setIsLoading(false);
-        
-        if (onPaymentStatus) {
-          onPaymentStatus(PaymentStatusEnum.IDLE);
-        }
-      } catch (error) {
-        PaymentLogger.error('Payment initialization error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error initializing payment';
-        toast.error(errorMessage);
-        setIsLoading(false);
-        
-        if (onPaymentStatus) {
-          onPaymentStatus(PaymentStatusEnum.FAILED);
-        }
+        value = value.substring(0, 17); // AMEX has 15 digits plus 2 spaces
+      } else {
+        // Format as XXXX XXXX XXXX XXXX for other cards
+        value = value.match(/.{1,4}/g)?.join(' ') || value;
+        value = value.substring(0, 19); // Other cards have 16 digits plus 3 spaces
       }
-    };
+    }
     
-    initializePayment();
-  }, [isReady, planId, onPaymentStatus]);
+    setCardNumber(value);
+  };
 
-  // Setup message listener for iframe communication
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const checkPaymentStatus = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('cardcom-status', {
-          body: {
-            sessionId
-          }
-        });
-
-        if (error) {
-          PaymentLogger.error('Error checking payment status:', error);
-          return;
-        }
-
-        if (data?.data?.status === 'success') {
-          PaymentLogger.log('Payment completed successfully');
-          if (onPaymentStatus) {
-            onPaymentStatus(PaymentStatusEnum.SUCCESS);
-          }
-        } else if (data?.data?.status === 'failed') {
-          PaymentLogger.log('Payment failed');
-          if (onPaymentStatus) {
-            onPaymentStatus(PaymentStatusEnum.FAILED);
-          }
-        }
-      } catch (error) {
-        PaymentLogger.error('Error checking payment status:', error);
+  // Format expiry date as MM/YY
+  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length > 0) {
+      // First digit can only be 0 or 1
+      if (value.length === 1 && parseInt(value) > 1) {
+        value = '0' + value;
       }
-    };
+      
+      // Second digit for months can't be > 2 if first digit is 1
+      if (value.length === 2 && value[0] === '1' && parseInt(value[1]) > 2) {
+        value = '1' + '2';
+      }
+      
+      // Format MM/YY
+      if (value.length > 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2, 4);
+      }
+      
+      // Limit to MM/YY format (5 chars)
+      value = value.substring(0, 5);
+    }
+    
+    setExpiryDate(value);
+  };
 
-    // Check status initially
-    checkPaymentStatus();
-    
-    // And set interval to check periodically
-    const statusInterval = setInterval(checkPaymentStatus, 5000);
-    
-    // Cleanup interval on unmount
-    return () => clearInterval(statusInterval);
-  }, [sessionId, onPaymentStatus]);
-  
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin mb-4" />
-        <p>מתחבר למערכת התשלום...</p>
-      </div>
-    );
-  }
+  // Validate CVV format
+  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    // AMEX has 4-digit CVV, others have 3-digit
+    const isAmex = /^3[47]/.test(cardNumber);
+    const maxLength = isAmex ? 4 : 3;
+    setCvv(value.substring(0, maxLength));
+  };
+
+  const handleCardholderNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCardholderName(e.target.value.toUpperCase());
+  };
 
   return (
-    <div className="space-y-4" dir="rtl">
-      <div className="rounded-lg border overflow-hidden relative w-full pt-[56.25%]">
-        {iframeUrl && (
-          <iframe 
-            className="absolute top-0 left-0 w-full h-full"
-            src={iframeUrl}
-            title="CardCom Payment"
-            frameBorder="0"
-            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-          ></iframe>
-        )}
+    <div className="space-y-6" dir="rtl">
+      {/* Credit Card Display */}
+      <div className="mb-6">
+        <CreditCardDisplay 
+          cardNumber={cardNumber}
+          cardholderName={cardholderName}
+          expiryDate={expiryDate}
+          cvv={cvv}
+          onFlip={setIsCvvFocused}
+        />
       </div>
-
-      <SecurityNote />
+      
+      {/* Credit Card Form */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="card-number">מספר כרטיס</Label>
+          <Input
+            id="card-number"
+            placeholder="0000 0000 0000 0000"
+            value={cardNumber}
+            onChange={handleCardNumberChange}
+            maxLength={19}
+            className="text-lg text-right"
+            autoComplete="cc-number"
+            onFocus={() => setIsCvvFocused(false)}
+          />
+          {errors.cardNumber && <p className="text-sm text-red-500">{errors.cardNumber}</p>}
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="cardholder-name">שם בעל הכרטיס</Label>
+          <Input
+            id="cardholder-name"
+            placeholder="שם מלא כפי שמופיע על הכרטיס"
+            value={cardholderName}
+            onChange={handleCardholderNameChange}
+            className="text-right"
+            autoComplete="cc-name"
+            onFocus={() => setIsCvvFocused(false)}
+          />
+          {errors.cardholderName && <p className="text-sm text-red-500">{errors.cardholderName}</p>}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="expiry-date">תוקף</Label>
+            <Input
+              id="expiry-date"
+              placeholder="MM/YY"
+              value={expiryDate}
+              onChange={handleExpiryDateChange}
+              maxLength={5}
+              className="text-right"
+              autoComplete="cc-exp"
+              onFocus={() => setIsCvvFocused(false)}
+            />
+            {errors.expiryDate && <p className="text-sm text-red-500">{errors.expiryDate}</p>}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="cvv">קוד אבטחה (CVV)</Label>
+            <Input
+              id="cvv"
+              placeholder={cardNumber.startsWith('3') ? '4 ספרות' : '3 ספרות'}
+              value={cvv}
+              onChange={handleCvvChange}
+              maxLength={cardNumber.startsWith('3') ? 4 : 3}
+              className="text-right"
+              autoComplete="cc-csc"
+              onFocus={() => setIsCvvFocused(true)}
+            />
+            {errors.cvv && <p className="text-sm text-red-500">{errors.cvv}</p>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

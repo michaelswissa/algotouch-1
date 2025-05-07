@@ -1,108 +1,101 @@
 
-// Define payment status types
-export type PaymentStatusType = 'idle' | 'initializing' | 'processing' | 'success' | 'failed';
-
-export const PaymentStatus = {
-  IDLE: 'idle' as const,
-  INITIALIZING: 'initializing' as const,
-  PROCESSING: 'processing' as const,
-  SUCCESS: 'success' as const,
-  FAILED: 'failed' as const,
-};
-
-export enum PaymentStatusEnum {
-  IDLE = 'idle',
-  INITIALIZING = 'initializing',
-  PROCESSING = 'processing',
-  SUCCESS = 'success',
-  FAILED = 'failed',
+export interface TokenData {
+  token?: string;
+  lastFourDigits: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+  simulated?: boolean;
+  [key: string]: string | number | boolean | null | TokenData[] | undefined; // Adding index signature for Json compatibility
 }
 
-export interface PaymentSessionData {
-  lowProfileId: string;
-  sessionId: string;
-  terminalNumber: string;
-  cardcomUrl: string;
-  reference: string;
-  url?: string;
-}
-
-export interface CardOwnerDetails {
-  cardOwnerName: string;
-  cardOwnerId: string;
-  cardOwnerEmail: string;
-  cardOwnerPhone: string;
-  expirationMonth: string;
-  expirationYear: string;
-}
-
-export interface CardComPaymentResponse {
-  success: boolean;
-  message?: string;
-  data?: {
-    transactionId?: string;
-    sessionId?: string;
-    status?: string;
+export interface ContractSignatureData {
+  contractHtml?: string;
+  signature?: string;
+  agreedToTerms: boolean;
+  agreedToPrivacy: boolean;
+  contractVersion?: string;
+  browserInfo?: {
+    userAgent: string;
+    language: string;
+    platform: string;
+    screenSize: string;
+    timeZone: string;
     [key: string]: any;
   };
 }
 
-export interface PaymentError {
-  code: string;
-  message: string;
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  features: string[];
+  trialDays: number;
+  billingCycle: 'monthly' | 'annual' | 'one-time';
+  currency?: string;
 }
 
-// Interface for initialization config sent to CardCom iframe
-export interface CardComFieldsInitConfig {
-  action: 'init';
-  lowProfileCode: string;
-  LowProfileCode: string; // Duplicate for compatibility
-  sessionId: string;
-  terminalNumber: string;
-  cardFieldCSS: string;
-  cvvFieldCSS: string;
-  reCaptchaFieldCSS: string;
-  placeholder: string;
-  cvvPlaceholder: string;
-  language: string;
-  operation: string;
+export interface PaymentHistoryItem {
+  id: string;
+  userId: string;
+  subscriptionId: string;
+  amount: number;
+  currency: string;
+  status: 'completed' | 'pending' | 'failed' | 'trial_started' | 'cancelled';
+  paymentMethod: TokenData | null;
+  paymentDate: string;
 }
 
-// Interface for transaction request sent to CardCom iframe
-export interface CardComTransactionRequest {
-  action: 'doTransaction';
-  cardOwnerName: string;
-  cardOwnerId: string;
-  cardOwnerEmail: string;
-  cardOwnerPhone: string;
-  expirationMonth: string;
-  expirationYear: string;
-  numberOfPayments: string;
-  ExternalUniqTranId: string;
-  TerminalNumber: string;
-  Operation: string;
-  lowProfileCode: string;
-  LowProfileCode: string;
-  Document?: {
-    Name: string;
-    Email: string;
-    TaxId: string;
-    Phone: string;
-    DocumentTypeToCreate: string;
+export interface RegistrationData {
+  email: string;
+  password: string;
+  planId: string;
+  contractSigned?: boolean;
+  contractSignedAt?: string;
+  contractDetails?: ContractSignatureData;
+  userData: {
+    firstName: string;
+    lastName: string;
+    phone?: string;
+  };
+  registrationTime: string;
+  paymentToken?: {
+    token?: string;
+    expiry?: string;
+    last4Digits?: string;
+    cardholderName?: string;
   };
 }
 
-// Adding the missing PlanDetails interface for subscription plans
-export interface PlanDetails {
-  id: string;
-  name: string;
-  displayName?: string;
-  description: string;
-  price: number;
-  displayPrice: string;
-  billingFrequency: 'monthly' | 'yearly' | 'one-time';
-  featured?: boolean;
-  hasTrial?: boolean;
-  freeTrialDays?: number;
-  features?: string[];
+export interface CardcomPaymentResponse {
+  success: boolean;
+  url?: string;
+  error?: string;
+  lowProfileId?: string; // Updated from transactionId to match the new API
+  tempRegistrationId?: string;
+  simulated?: boolean;
+}
+
+export interface CardcomVerifyResponse {
+  success: boolean;
+  paymentDetails?: {
+    transactionId: number;
+    amount: number;
+    cardLastDigits: string;
+    approvalNumber: string;
+    cardType: string;
+    cardExpiry: string;
+    cardOwnerName: string;
+    cardOwnerEmail: string;
+    cardOwnerPhone: string;
+  };
+  tokenInfo?: {
+    token: string;
+    expiryDate: string;
+    approvalNumber: string;
+  };
+  registrationId?: string;
+  error?: string;
+  details?: any;
 }

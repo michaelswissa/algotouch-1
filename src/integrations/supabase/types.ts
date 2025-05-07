@@ -324,160 +324,43 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_errors: {
-        Row: {
-          created_at: string
-          error_code: string | null
-          error_message: string | null
-          id: string
-          request_data: Json | null
-          response_data: Json | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          id?: string
-          request_data?: Json | null
-          response_data?: Json | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          id?: string
-          request_data?: Json | null
-          response_data?: Json | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      payment_logs: {
+      payment_history: {
         Row: {
           amount: number
-          created_at: string
+          created_at: string | null
           currency: string
           id: string
-          payment_data: Json | null
-          payment_status: string
-          plan_id: string
-          transaction_id: string
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          id?: string
-          payment_data?: Json | null
-          payment_status: string
-          plan_id: string
-          transaction_id: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          id?: string
-          payment_data?: Json | null
-          payment_status?: string
-          plan_id?: string
-          transaction_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      payment_sessions: {
-        Row: {
-          amount: number
-          anonymous_data: Json | null
-          created_at: string
-          currency: string
-          expires_at: string
-          id: string
-          low_profile_id: string
-          operation_type: string | null
-          payment_details: Json | null
-          plan_id: string
-          reference: string
+          payment_date: string | null
+          payment_method: Json | null
           status: string
-          transaction_data: Json | null
-          transaction_id: string | null
-          updated_at: string
-          user_id: string | null
+          subscription_id: string
+          user_id: string
         }
         Insert: {
           amount: number
-          anonymous_data?: Json | null
-          created_at?: string
+          created_at?: string | null
           currency?: string
-          expires_at: string
           id?: string
-          low_profile_id: string
-          operation_type?: string | null
-          payment_details?: Json | null
-          plan_id: string
-          reference: string
-          status?: string
-          transaction_data?: Json | null
-          transaction_id?: string | null
-          updated_at?: string
-          user_id?: string | null
+          payment_date?: string | null
+          payment_method?: Json | null
+          status: string
+          subscription_id: string
+          user_id: string
         }
         Update: {
           amount?: number
-          anonymous_data?: Json | null
-          created_at?: string
+          created_at?: string | null
           currency?: string
-          expires_at?: string
           id?: string
-          low_profile_id?: string
-          operation_type?: string | null
-          payment_details?: Json | null
-          plan_id?: string
-          reference?: string
+          payment_date?: string | null
+          payment_method?: Json | null
           status?: string
-          transaction_data?: Json | null
-          transaction_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      payments: {
-        Row: {
-          amount: number | null
-          id: number
-          paid_at: string | null
-          payload: Json | null
-          response_code: number | null
-          subscription_id: string | null
-          tranzaction_id: number | null
-        }
-        Insert: {
-          amount?: number | null
-          id?: never
-          paid_at?: string | null
-          payload?: Json | null
-          response_code?: number | null
-          subscription_id?: string | null
-          tranzaction_id?: number | null
-        }
-        Update: {
-          amount?: number | null
-          id?: never
-          paid_at?: string | null
-          payload?: Json | null
-          response_code?: number | null
-          subscription_id?: string | null
-          tranzaction_id?: number | null
+          subscription_id?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "payments_subscription_id_fkey"
+            foreignKeyName: "payment_history_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "subscriptions"
@@ -485,51 +368,39 @@ export type Database = {
           },
         ]
       }
-      plans: {
+      payment_tokens: {
         Row: {
-          billing_period: string | null
-          code: string
+          card_brand: string | null
+          card_last_four: string | null
           created_at: string
-          currency: string
-          cycle_days: number | null
-          description: string | null
-          free_trial_days: number | null
-          has_trial: boolean | null
           id: string
-          name: string
-          price: number
-          trial_days: number | null
+          is_active: boolean | null
+          token: string
+          token_expiry: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          billing_period?: string | null
-          code: string
+          card_brand?: string | null
+          card_last_four?: string | null
           created_at?: string
-          currency?: string
-          cycle_days?: number | null
-          description?: string | null
-          free_trial_days?: number | null
-          has_trial?: boolean | null
           id?: string
-          name: string
-          price: number
-          trial_days?: number | null
+          is_active?: boolean | null
+          token: string
+          token_expiry: string
           updated_at?: string
+          user_id: string
         }
         Update: {
-          billing_period?: string | null
-          code?: string
+          card_brand?: string | null
+          card_last_four?: string | null
           created_at?: string
-          currency?: string
-          cycle_days?: number | null
-          description?: string | null
-          free_trial_days?: number | null
-          has_trial?: boolean | null
           id?: string
-          name?: string
-          price?: number
-          trial_days?: number | null
+          is_active?: boolean | null
+          token?: string
+          token_expiry?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -605,145 +476,67 @@ export type Database = {
         }
         Relationships: []
       }
-      recurring_payments: {
+      subscriptions: {
         Row: {
-          card_type: string | null
+          cancelled_at: string | null
+          contract_signed: boolean | null
+          contract_signed_at: string | null
+          contract_signed_location: string | null
           created_at: string | null
-          failed_attempts: number | null
+          current_period_ends_at: string | null
           id: string
-          is_valid: boolean | null
-          last_4_digits: string | null
-          last_payment_date: string | null
-          payment_status: string | null
+          next_charge_date: string | null
+          payment_method: Json | null
+          payment_token_id: string | null
+          plan_type: string
           status: string
-          terminal_number: string | null
-          token: string
-          token_approval_number: string | null
-          token_expiry: string
+          trial_ends_at: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          card_type?: string | null
+          cancelled_at?: string | null
+          contract_signed?: boolean | null
+          contract_signed_at?: string | null
+          contract_signed_location?: string | null
           created_at?: string | null
-          failed_attempts?: number | null
+          current_period_ends_at?: string | null
           id?: string
-          is_valid?: boolean | null
-          last_4_digits?: string | null
-          last_payment_date?: string | null
-          payment_status?: string | null
+          next_charge_date?: string | null
+          payment_method?: Json | null
+          payment_token_id?: string | null
+          plan_type?: string
           status?: string
-          terminal_number?: string | null
-          token: string
-          token_approval_number?: string | null
-          token_expiry: string
+          trial_ends_at?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          card_type?: string | null
+          cancelled_at?: string | null
+          contract_signed?: boolean | null
+          contract_signed_at?: string | null
+          contract_signed_location?: string | null
           created_at?: string | null
-          failed_attempts?: number | null
+          current_period_ends_at?: string | null
           id?: string
-          is_valid?: boolean | null
-          last_4_digits?: string | null
-          last_payment_date?: string | null
-          payment_status?: string | null
+          next_charge_date?: string | null
+          payment_method?: Json | null
+          payment_token_id?: string | null
+          plan_type?: string
           status?: string
-          terminal_number?: string | null
-          token?: string
-          token_approval_number?: string | null
-          token_expiry?: string
+          trial_ends_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
-      }
-      subscriptions: {
-        Row: {
-          cancelled_at: string | null
-          created_at: string | null
-          current_period_ends_at: string | null
-          fail_count: number | null
-          id: string
-          next_charge_at: string | null
-          payment_method: Json | null
-          plan_id: string | null
-          plan_type: string | null
-          status: string | null
-          token: string | null
-          token_expires_ym: string | null
-          trial_ends_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          cancelled_at?: string | null
-          created_at?: string | null
-          current_period_ends_at?: string | null
-          fail_count?: number | null
-          id?: string
-          next_charge_at?: string | null
-          payment_method?: Json | null
-          plan_id?: string | null
-          plan_type?: string | null
-          status?: string | null
-          token?: string | null
-          token_expires_ym?: string | null
-          trial_ends_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          cancelled_at?: string | null
-          created_at?: string | null
-          current_period_ends_at?: string | null
-          fail_count?: number | null
-          id?: string
-          next_charge_at?: string | null
-          payment_method?: Json | null
-          plan_id?: string | null
-          plan_type?: string | null
-          status?: string | null
-          token?: string | null
-          token_expires_ym?: string | null
-          trial_ends_at?: string | null
-          user_id?: string | null
-        }
         Relationships: [
           {
-            foreignKeyName: "subscriptions_plan_id_fkey"
-            columns: ["plan_id"]
+            foreignKeyName: "subscriptions_payment_token_id_fkey"
+            columns: ["payment_token_id"]
             isOneToOne: false
-            referencedRelation: "plans"
+            referencedRelation: "payment_tokens"
             referencedColumns: ["id"]
           },
         ]
-      }
-      system_logs: {
-        Row: {
-          created_at: string
-          details: Json | null
-          function_name: string
-          id: number
-          level: string
-          message: string
-        }
-        Insert: {
-          created_at?: string
-          details?: Json | null
-          function_name: string
-          id?: number
-          level: string
-          message: string
-        }
-        Update: {
-          created_at?: string
-          details?: Json | null
-          function_name?: string
-          id?: number
-          level?: string
-          message?: string
-        }
-        Relationships: []
       }
       temp_registration_data: {
         Row: {
@@ -798,77 +591,6 @@ export type Database = {
           },
         ]
       }
-      user_payment_logs: {
-        Row: {
-          amount: number
-          created_at: string | null
-          currency: string | null
-          id: string
-          payment_data: Json | null
-          status: string
-          subscription_id: string | null
-          token: string
-          transaction_id: string | null
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          currency?: string | null
-          id?: string
-          payment_data?: Json | null
-          status: string
-          subscription_id?: string | null
-          token: string
-          transaction_id?: string | null
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          currency?: string | null
-          id?: string
-          payment_data?: Json | null
-          status?: string
-          subscription_id?: string | null
-          token?: string
-          transaction_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_payment_logs_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_streaks: {
         Row: {
           created_at: string
@@ -907,46 +629,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      assign_role: {
-        Args: {
-          target_user_id: string
-          assigned_role: Database["public"]["Enums"]["app_role"]
-        }
-        Returns: boolean
-      }
-      check_duplicate_payment: {
-        Args: { low_profile_id: string }
-        Returns: boolean
-      }
-      check_duplicate_payment_extended: {
-        Args: { low_profile_id: string }
-        Returns: Json
-      }
       check_row_exists: {
         Args: { p_table_name: string; p_column_name: string; p_value: string }
-        Returns: boolean
-      }
-      cleanup_expired_payment_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_user_payment_sessions: {
-        Args: { user_id_param: string }
-        Returns: undefined
-      }
-      create_initial_admin: {
-        Args: { admin_email: string }
-        Returns: boolean
-      }
-      get_user_roles: {
-        Args: { user_id?: string }
-        Returns: Database["public"]["Enums"]["app_role"][]
-      }
-      has_role: {
-        Args: {
-          user_id: string
-          requested_role: Database["public"]["Enums"]["app_role"]
-        }
         Returns: boolean
       }
       increment: {
@@ -963,51 +647,12 @@ export type Database = {
         Returns: boolean
       }
       is_admin: {
-        Args: { user_id?: string }
-        Returns: boolean
-      }
-      is_moderator: {
-        Args: { user_id?: string }
-        Returns: boolean
-      }
-      is_token_valid: {
-        Args: { token_to_check: string }
-        Returns: boolean
-      }
-      remove_role: {
-        Args: {
-          target_user_id: string
-          removed_role: Database["public"]["Enums"]["app_role"]
-        }
-        Returns: boolean
-      }
-      update_expired_trials: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_subscription_after_payment: {
-        Args: {
-          subscription_id: string
-          transaction_id: string
-          response_code: string
-        }
-        Returns: undefined
-      }
-      validate_payment_session: {
-        Args: { session_id: string }
-        Returns: boolean
-      }
-      validate_registration_step: {
-        Args: { registration_id: string; current_step: string }
-        Returns: boolean
-      }
-      validate_token: {
-        Args: { token_id: string }
+        Args: { user_id: string }
         Returns: boolean
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1122,8 +767,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "moderator", "user"],
-    },
+    Enums: {},
   },
 } as const

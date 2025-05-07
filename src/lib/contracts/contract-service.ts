@@ -1,8 +1,7 @@
 
 import { toast } from 'sonner';
-import { callIzidocSignFunction, ContractData } from './izidoc-service';
-import { saveContractToDatabase, updateSubscriptionStatus } from './storage-service';
-import { sendContractConfirmationEmail } from './email-service';
+import { saveContractToDatabase, updateSubscriptionStatus, callIzidocSignFunction } from './storage-service';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Processes a signed contract, saving it to the database and sending confirmation
@@ -12,8 +11,8 @@ export async function processSignedContract(
   planId: string,
   fullName: string,
   email: string,
-  contractData: ContractData
-): Promise<boolean> {
+  contractData: any
+): Promise<string | boolean> {
   try {
     console.log('Processing signed contract for user:', { userId, planId, email });
     
@@ -29,46 +28,49 @@ export async function processSignedContract(
       return false;
     }
     
-    // Improved logging to debug contract data
-    console.log('Contract data signature length:', contractData.signature?.length || 0);
-    console.log('Contract data contains HTML:', Boolean(contractData.contractHtml));
-    console.log('Contract user agreement:', {
-      agreedToTerms: contractData.agreedToTerms,
-      agreedToPrivacy: contractData.agreedToPrivacy
-    });
-    
-    // Try the direct edge function approach first (preferred)
-    const result = await callIzidocSignFunction(userId, planId, fullName, email, contractData);
-    
-    if (result.success) {
-      // Function call was successful
-      toast.success('ההסכם נחתם ונשמר בהצלחה!');
-      return true;
+    // First try to use the edge function for processing
+    console.log('Attempting to use izidoc-sign edge function');
+    try {
+      const { success, data, error } = await callIzidocSignFunction(
+        userId, 
+        planId, 
+        fullName, 
+        email, 
+        contractData
+      );
+      
+      if (success) {
+        console.log('Contract processed successfully by edge function:', data);
+        toast.success('ההסכם נחתם ונשמר בהצלחה!');
+        return data.documentId || true;
+      } else {
+        console.error('Edge function error:', error);
+        console.log('Falling back to client-side processing');
+      }
+    } catch (edgeFunctionError) {
+      console.error('Edge function call failed:', edgeFunctionError);
+      console.log('Falling back to client-side processing');
     }
     
-    console.warn('Direct function call failed, falling back to client-side processing', result.error);
-    
-    // Save the contract signature to Supabase directly as fallback
+    // Fallback to client-side processing
+    console.log('Using client-side fallback for contract processing');
     const saveResult = await saveContractToDatabase(userId, planId, fullName, email, contractData);
     
     if (!saveResult.success) {
+      console.error('Error saving contract:', saveResult.error);
       toast.error('שגיאה בשמירת החתימה');
       return false;
     }
     
-    // Also try to send a confirmation email directly, in case the edge function fails
-    try {
-      await sendContractConfirmationEmail(email, fullName, new Date().toISOString());
-      console.log('Contract confirmation email sent directly');
-    } catch (emailError) {
-      console.error('Error sending direct confirmation email:', emailError);
-      // Don't return false here, as the contract was still saved successfully
-    }
+    // Return the contract ID for potential redirects to view the contract
+    const contractId = saveResult.data?.id;
+    console.log('Contract saved with ID:', contractId);
     
-    // Try to update the subscription status as well
+    // Try to update the subscription status
     await updateSubscriptionStatus(userId);
     
-    return true;
+    toast.success('ההסכם נחתם ונשמר בהצלחה!');
+    return contractId || true;
   } catch (error) {
     console.error('Exception processing contract signature:', error);
     toast.error('שגיאה בעיבוד החתימה');
@@ -76,7 +78,49 @@ export async function processSignedContract(
   }
 }
 
-// Re-export component functions for backward compatibility
-export * from './email-service';
-export * from './izidoc-service';
+// Upload contract HTML to storage bucket
+export async function uploadContractToStorage(
+  userId: string,
+  contractHtml: string,
+  contractId: string
+): Promise<{ success: boolean; url?: string; error?: any }> {
+  try {
+    console.log(`Uploading contract HTML to storage for user: ${userId}, contract: ${contractId}`);
+    
+    // Generate a file name based on contract ID
+    const fileName = `${userId}/${contractId}.html`;
+    
+    // Upload the file to the contracts bucket
+    const { data, error } = await supabase
+      .storage
+      .from('contracts')
+      .upload(fileName, contractHtml, {
+        contentType: 'text/html',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Error uploading contract to storage:', error);
+      return { success: false, error };
+    }
+    
+    console.log('Contract uploaded successfully to storage:', data?.path);
+    
+    // Create a URL for accessing the contract
+    const { data: urlData } = await supabase
+      .storage
+      .from('contracts')
+      .createSignedUrl(fileName, 60 * 60 * 24 * 30); // 30 days expiry
+    
+    return { 
+      success: true, 
+      url: urlData?.signedUrl
+    };
+  } catch (error) {
+    console.error('Exception uploading contract to storage:', error);
+    return { success: false, error };
+  }
+}
+
+// Export other functions for backward compatibility
 export * from './storage-service';

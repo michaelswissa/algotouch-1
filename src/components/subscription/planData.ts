@@ -6,15 +6,12 @@ export interface Plan {
   id: string;
   name: string;
   price: number;
-  displayPrice: number;
   currency: string;
-  displayCurrency: string;
   billingPeriod: string;
   description: string;
   icon: React.ReactNode;
   features: PlanFeatureProps[];
   hasTrial?: boolean;
-  freeTrialDays?: number;
   recommended?: boolean;
 }
 
@@ -23,15 +20,13 @@ export const getPlansData = (): Plan[] => {
     {
       id: 'monthly',
       name: 'מסלול חודשי',
-      price: 371, // Actual price in ILS
-      displayPrice: 99, // Display price in USD
-      currency: '₪',
-      displayCurrency: '$',
+      price: 99,
+      currency: '$',
       billingPeriod: 'לחודש',
-      description: 'חודש ניסיון חינם, אחר כך חיוב אוטומטי של 371 ₪ לחודש. ללא התחייבות.',
+      description: 'ללא התחייבות: תתחיל, תתנסה, תחליט לפי התוצאות.',
       icon: null, // Will be set in the PlanCard component
       features: [
-        { name: 'חודש ראשון חינם', icon: '🎁', description: 'התנסה ללא עלות למשך 30 יום.', included: true },
+        // Removed the "First month free" feature
         { name: 'מדריך הפעלה ברור ומדוייק', icon: '💡', description: 'בלי למידה מורכבת, כל מה שצריך לדעת כדי להתחיל לעבוד.', included: true },
         { name: 'עוזר אישי AI זמין 24/7', icon: '🤖', description: 'הכוונה מדויקת, תובנות חכמות ותמיכה בזמן אמת.', included: true },
         { name: 'בלוג מקצועי', icon: '🧠', description: 'מאמרים, סקירות עומק ועדכונים שיעזרו לך לקבל החלטות מושכלות יותר.', included: true },
@@ -42,37 +37,31 @@ export const getPlansData = (): Plan[] => {
         { name: 'הטבה של 300$ בעמלות', icon: '💵', description: 'למצטרפים חדשים בלבד.', included: true },
       ],
       hasTrial: true,
-      freeTrialDays: 30,
     },
     {
       id: 'annual',
       name: 'מסלול שנתי',
-      price: 3371, // Actual price in ILS
-      displayPrice: 899, // Display price in USD
-      currency: '₪',
-      displayCurrency: '$',
+      price: 899,
+      currency: '$',
       billingPeriod: 'לשנה',
-      description: 'תשלום שנתי של 3,371 ₪ (חיסכון של 25%). חיוב אוטומטי מידי שנה.',
+      description: 'למי שמבין את הערך שאנחנו מביאים – זו החבילה המשתלמת ביותר.',
       icon: null, // Will be set in the PlanCard component
       features: [
         { name: 'כל הפיצ\'רים מהמסלול החודשי', icon: '🧰', description: 'בלי יוצא מן הכלל.', included: true },
-        { name: 'חיסכון של 25% לעומת המסלול החודשי', icon: '💰', description: 'חוסך 3 חודשים בשנה.', included: true },
         { name: 'גישה מוקדמת (Beta) לפיצ\'רים חדשים', icon: '🧪', description: 'בדוק ראשון את הפיצ\'רים החדשים, לפני כולם.', included: true },
         { name: 'תמיכה מועדפת בווטסאפ', icon: '⚡', description: 'עונים לך מהר יותר, ברור יותר, אישי יותר.', included: true },
+        { name: 'חיסכון משמעותי', icon: '💸', description: 'חוסך כ-300$ בשנה.', included: true },
         { name: 'רצף עבודה שנתי', icon: '🔁', description: 'בלי הפרעות, בלי התנתקויות, בלי לאבד מומנטום.', included: true },
       ],
       hasTrial: false,
-      freeTrialDays: 0,
     },
     {
       id: 'vip',
       name: 'מסלול VIP',
-      price: 13121, // Actual price in ILS
-      displayPrice: 3499, // Display price in USD
-      currency: '₪',
-      displayCurrency: '$',
+      price: 3499,
+      currency: '$',
       billingPeriod: 'לכל החיים',
-      description: 'תשלום חד פעמי של 13,121 ₪ לגישה ללא הגבלת זמן וליווי VIP.',
+      description: 'מיועד לסוחרים שמכוונים גבוה במיוחד ומחפשים יתרון משמעותי בשוק.',
       icon: null, // Will be set in the PlanCard component
       features: [
         { name: 'כל הפיצ\'רים מהמסלול השנתי', icon: '🌟', description: 'כולל תמיכה מועדפת וגישה מוקדמת לפיצ\'רים החדשים.', included: true },
@@ -82,7 +71,6 @@ export const getPlansData = (): Plan[] => {
         { name: 'אירועי VIP וקבוצות Mastermind', icon: '🔑', description: 'נטוורקינג איכותי, שיתופי פעולה ולמידה ממיטב הסוחרים בתחום.', included: true },
       ],
       hasTrial: false,
-      freeTrialDays: 0,
     }
   ];
 };

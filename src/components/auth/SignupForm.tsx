@@ -1,34 +1,115 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSignupForm } from '@/hooks/auth/useSignupForm';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/auth';
 
-const SignupForm: React.FC = () => {
+interface SignupFormProps {
+  onSignupSuccess?: () => void;
+}
+
+const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
+  const navigate = useNavigate();
+  const { signUp } = useAuth();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  
-  const { handleSignup, errors, isProcessing } = useSignupForm();
+  const [signingUp, setSigningUp] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
-  const onSubmit = (e: React.FormEvent) => {
+  const validateInputs = () => {
+    const newErrors: {[key: string]: string} = {};
+    
+    // בדיקת שדות חובה
+    if (!firstName.trim()) newErrors.firstName = 'שדה חובה';
+    if (!lastName.trim()) newErrors.lastName = 'שדה חובה';
+    
+    // בדיקת תקינות מייל
+    if (!email.trim()) {
+      newErrors.email = 'שדה חובה';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'כתובת מייל לא תקינה';
+    }
+    
+    // בדיקת תקינות סיסמה
+    if (!password) {
+      newErrors.password = 'שדה חובה';
+    } else if (password.length < 6) {
+      newErrors.password = 'הסיסמה חייבת להכיל לפחות 6 תווים';
+    }
+    
+    // בדיקת התאמת סיסמאות
+    if (password !== passwordConfirm) {
+      newErrors.passwordConfirm = 'הסיסמאות אינן תואמות';
+    }
+    
+    // בדיקת תקינות מספר טלפון (אם הוזן)
+    if (phone.trim() && !/^0[2-9]\d{7,8}$/.test(phone)) {
+      newErrors.phone = 'מספר טלפון לא תקין';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (password !== passwordConfirm) {
+    if (!validateInputs()) {
       return;
     }
     
-    handleSignup({
-      email,
-      password,
-      firstName,
-      lastName,
-      phone
-    });
+    try {
+      setSigningUp(true);
+      console.log('Starting registration process for:', email);
+      
+      // Use auth context to sign up
+      await signUp({
+        email,
+        password,
+        firstName,
+        lastName,
+        phone
+      });
+      
+      // Store registration data in session storage for the subscription flow
+      const registrationData = {
+        email,
+        userData: {
+          firstName,
+          lastName,
+          phone
+        },
+        registrationTime: new Date().toISOString()
+      };
+      
+      // Clear any existing registration data to start fresh
+      sessionStorage.removeItem('registration_data');
+      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
+      
+      console.log('Registration data saved to session storage');
+      toast.success('הפרטים נשמרו בהצלחה');
+      
+      // Navigate directly to subscription page
+      navigate('/subscription', { replace: true, state: { isRegistering: true } });
+      
+      if (onSignupSuccess) {
+        onSignupSuccess();
+      }
+    } catch (error: any) {
+      console.error('Signup validation error:', error);
+      toast.error(error.message || 'אירעה שגיאה בתהליך ההרשמה');
+    } finally {
+      setSigningUp(false);
+    }
   };
 
   return (
@@ -37,7 +118,7 @@ const SignupForm: React.FC = () => {
         <CardTitle>הרשמה</CardTitle>
         <CardDescription>צור חשבון חדש כדי להתחיל</CardDescription>
       </CardHeader>
-      <form onSubmit={onSubmit}>
+      <form onSubmit={handleSignup}>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -117,8 +198,8 @@ const SignupForm: React.FC = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={isProcessing}>
-            {isProcessing ? 'בודק פרטים...' : 'המשך לבחירת תכנית'}
+          <Button type="submit" className="w-full" disabled={signingUp}>
+            {signingUp ? 'בודק פרטים...' : 'המשך לבחירת תכנית'}
           </Button>
         </CardFooter>
       </form>
