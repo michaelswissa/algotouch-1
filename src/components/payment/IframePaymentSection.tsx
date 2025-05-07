@@ -513,7 +513,11 @@ export const IframePaymentSection: React.FC<IframePaymentSectionProps> = ({
       
       <CardFooter className="flex justify-between">
         {onBack && (
-          <Button variant="outline" onClick={onBack} disabled={isLoading || paymentStatus === PaymentStatusEnum.PROCESSING}>
+          <Button 
+            variant="outline" 
+            onClick={onBack} 
+            disabled={isLoading || paymentStatus === PaymentStatusEnum.PROCESSING}
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             חזרה
           </Button>
