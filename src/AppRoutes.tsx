@@ -21,6 +21,7 @@ import Profile from "./pages/Profile";
 import Subscription from "./pages/Subscription";
 import MySubscriptionPage from "./pages/MySubscriptionPage";
 import Index from "./pages/Index";
+import PaymentHandling from "./pages/PaymentHandling";
 
 const AppRoutes: React.FC = () => {
   const { signIn, signOut } = useAuth();
@@ -71,6 +72,18 @@ const AppRoutes: React.FC = () => {
       <Route path="/my-subscription" element={
         <ProtectedRoute>
           <MySubscriptionPage />
+        </ProtectedRoute>
+      } />
+      
+      {/* Payment handling routes */}
+      <Route path="/payment/success" element={
+        <ProtectedRoute publicPaths={['/payment/success']}>
+          <PaymentHandling />
+        </ProtectedRoute>
+      } />
+      <Route path="/payment/error" element={
+        <ProtectedRoute publicPaths={['/payment/error']}>
+          <PaymentHandling />
         </ProtectedRoute>
       } />
       
