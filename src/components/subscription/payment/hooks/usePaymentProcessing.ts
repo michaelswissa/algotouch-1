@@ -3,6 +3,13 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define types to avoid deep instantiation issues
+interface RegistrationData {
+  id: string;
+  payment_verified?: boolean;
+  used?: boolean;
+}
+
 export const usePaymentProcessing = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -58,7 +65,6 @@ export const usePaymentProcessing = () => {
         .from('temp_registration_data')
         .select('*')
         .eq('id', registrationId)
-        .eq('payment_verified', true)  // Only get verified payments
         .single();
         
       if (error || !data) {
@@ -66,8 +72,11 @@ export const usePaymentProcessing = () => {
         return;
       }
       
+      // Add explicit type checking to avoid property access errors
+      const registrationData = data as unknown as RegistrationData;
+      
       // If payment is verified but user isn't registered yet, complete the process
-      if (data.payment_verified && !data.used) {
+      if (registrationData && registrationData.payment_verified && !registrationData.used) {
         console.log('Found verified payment for registration:', registrationId);
         onComplete();
       }
