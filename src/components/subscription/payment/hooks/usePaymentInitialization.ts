@@ -52,7 +52,6 @@ export const usePaymentInitialization = (
         '';
 
       // Call the edge function to create a payment URL
-      // CRITICAL: Always pass user.id as ReturnValue for webhook identification
       const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
         body: {
           amount,
@@ -61,8 +60,7 @@ export const usePaymentInitialization = (
           fullName,
           phone: profile?.phone || '',
           operation: "ChargeOnly", // Create a charge directly
-          planId: selectedPlan,
-          returnValue: user.id // ALWAYS pass user ID as return value for webhook identification
+          planId: selectedPlan
         }
       });
 

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 interface UserData {
   phone?: string;
   idNumber?: string;
+  // Add other user data fields as needed
 }
 
 interface SubscriptionContextType {
@@ -79,6 +80,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
             // Set user data with available fields
             setUserData({
               phone: profileData.phone || '',
+              // For now, we'll use an empty string as id_number isn't available
               idNumber: ''
             });
 
@@ -109,7 +111,6 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setIsCheckingSubscription(true);
       console.log(`Checking subscription for user ID: ${userId}`);
       
-      // SINGLE SOURCE OF TRUTH: Query only from the subscriptions table
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')

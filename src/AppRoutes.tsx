@@ -1,12 +1,16 @@
 
 import React from 'react';
 import App from './App';
-import { BrowserRouter } from 'react-router-dom';
+import CardcomRedirectPage from './pages/CardcomRedirectPage';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 const AppRoutes: React.FC = () => {
   return (
     <BrowserRouter>
-      <App />
+      <Routes>
+        <Route path="/cardcom-redirect" element={<CardcomRedirectPage />} />
+        <Route path="/*" element={<App />} />
+      </Routes>
     </BrowserRouter>
   );
 };

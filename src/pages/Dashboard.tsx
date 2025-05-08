@@ -1,45 +1,18 @@
 
-import React, { Suspense } from 'react';
+import React from 'react';
 import Layout from '@/components/Layout';
+import Courses from '@/components/Courses';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw, Clock, BookOpen, Newspaper } from 'lucide-react';
+import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-
-// Lazy loaded components with error boundaries
-const DynamicCourses = React.lazy(() => 
-  import('@/components/Courses').catch(err => {
-    console.error("Error loading Courses component:", err);
-    return { default: () => <ErrorFallback componentName="Courses" /> };
-  })
-);
-
-const DynamicBlogSection = React.lazy(() => 
-  import('@/components/BlogSection').catch(err => {
-    console.error("Error loading BlogSection component:", err);
-    return { default: () => <ErrorFallback componentName="Blog Posts" /> };
-  })
-);
-
-// Error fallback component
-const ErrorFallback = ({ componentName }: { componentName: string }) => (
-  <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
-    <p className="text-red-600 dark:text-red-400">שגיאה בטעינת רכיב {componentName}. נסה לרענן את הדף.</p>
-    <Button variant="outline" className="mt-2" onClick={() => window.location.reload()}>
-      <RefreshCw size={14} className="mr-1" /> נסה שוב
-    </Button>
-  </Card>
-);
-
-// Loading fallback
-const LoadingFallback = () => (
-  <div className="w-full h-32 flex items-center justify-center">
-    <div className="h-8 w-8 rounded-full border-4 border-t-primary animate-spin"></div>
-  </div>
-);
+import { format } from 'date-fns';
+import BlogSection from '@/components/BlogSection';
 
 const Dashboard = () => {
   const { toast } = useToast();
+  const { stockData, loading: stocksLoading, error: stocksError, lastUpdated: stocksLastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
 
   const handleManualRefresh = () => {
     window.location.reload();
@@ -49,6 +22,11 @@ const Dashboard = () => {
       duration: 2000,
     });
   };
+
+  // Format last updated time
+  const formattedStocksLastUpdated = stocksLastUpdated 
+    ? format(stocksLastUpdated, 'HH:mm:ss')
+    : 'לא ידוע';
 
   return (
     <Layout>
@@ -68,36 +46,79 @@ const Dashboard = () => {
           </Button>
         </div>
         
-        {/* Stock Indices Section - Simplified for reliability */}
+        {/* Stock Indices Section - First for greater prominence */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">מדדים בזמן אמת</h2>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <TrendingUp size={18} className="text-primary" />
+              <span>מדדים בזמן אמת</span>
+            </h2>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Clock size={14} className="mr-1" />
+              <span>עודכן לאחרונה: {formattedStocksLastUpdated}</span>
+            </div>
           </div>
           
-          <Card className="p-4">
-            <p>נתוני מדדים יוצגו כאן לאחר טעינה מוצלחת.</p>
-            <Button variant="outline" className="mt-2" onClick={handleManualRefresh}>
-              <RefreshCw size={14} className="mr-1" /> טען נתונים
-            </Button>
-          </Card>
+          {stocksLoading && stockData.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <Card key={i} className="hover-scale">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center animate-pulse">
+                      <div className="w-20 h-6 bg-muted rounded"></div>
+                      <div className="w-16 h-6 bg-muted rounded"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : stocksError ? (
+            <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
+              <p className="text-red-600 dark:text-red-400">שגיאה בטעינת נתוני המדדים. נסה לרענן את הדף.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {stockData.map((index) => (
+                <Card key={index.symbol} className="hover-scale">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-bold text-foreground">{index.symbol}</h3>
+                        <p className="text-2xl font-medium mt-1">{index.price}</p>
+                      </div>
+                      <div className={`flex items-center text-lg ${index.isPositive ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
+                        {index.isPositive ? 
+                          <ArrowUpRight className="mr-1" size={20} /> : 
+                          <ArrowDownRight className="mr-1" size={20} />
+                        }
+                        <span>{index.changePercent} ({index.change})</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
         
         {/* Blog Section */}
         <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold">פוסטים אחרונים</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Newspaper size={18} className="text-primary" />
+              <span>פוסטים אחרונים</span>
+            </h2>
           </div>
-          <Suspense fallback={<LoadingFallback />}>
-            <DynamicBlogSection />
-          </Suspense>
+          <BlogSection />
         </div>
         
-        {/* Courses Section */}
+        {/* Courses Section - Last */}
         <div>
-          <h2 className="text-2xl font-bold mb-6">קורסים דיגיטליים</h2>
-          <Suspense fallback={<LoadingFallback />}>
-            <DynamicCourses />
-          </Suspense>
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            <BookOpen size={20} className="text-primary" />
+            <span>קורסים דיגיטליים</span>
+          </h2>
+          <Courses />
         </div>
       </div>
     </Layout>
