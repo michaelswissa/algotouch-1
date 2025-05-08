@@ -5,7 +5,6 @@ import CourseHeader from '@/components/courses/CourseHeader';
 import CourseContentTabs from '@/components/courses/CourseContentTabs';
 import { Card } from '@/components/ui/card';
 import { useCourseData } from '@/hooks/useCourseData';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
 const CourseDetail = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -24,33 +23,31 @@ const CourseDetail = () => {
   const completedModules = userProgress?.modulesCompleted || [];
 
   return (
-    <TooltipProvider>
-      <div className="space-y-6">
-        <CourseHeader 
-          title={courseData.title} 
-          description={courseData.description} 
-          instructor={courseData.instructor} 
-          progress={progressPercentage} 
-          isAuthenticated={true} 
-          hasCourseCompletionBadge={hasCourseCompletionBadge}
+    <div className="space-y-6">
+      <CourseHeader 
+        title={courseData.title} 
+        description={courseData.description} 
+        instructor={courseData.instructor} 
+        progress={progressPercentage} 
+        isAuthenticated={true} 
+        hasCourseCompletionBadge={!!hasCourseCompletionBadge()}
+      />
+      
+      <Card className="overflow-hidden">
+        <CourseContentTabs 
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          lessons={courseData.lessons}
+          modules={courseData.modules}
+          resources={courseData.resources}
+          quizzes={courseData.quizzes}
+          activeVideoId={activeVideoId}
+          watchedLessons={watchedLessons}
+          completedModules={completedModules}
+          onLessonClick={handleLessonClick}
         />
-        
-        <Card className="overflow-hidden">
-          <CourseContentTabs 
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            lessons={courseData.lessons}
-            modules={courseData.modules}
-            resources={courseData.resources}
-            quizzes={courseData.quizzes}
-            activeVideoId={activeVideoId}
-            watchedLessons={watchedLessons}
-            completedModules={completedModules}
-            onLessonClick={handleLessonClick}
-          />
-        </Card>
-      </div>
-    </TooltipProvider>
+      </Card>
+    </div>
   );
 };
 
