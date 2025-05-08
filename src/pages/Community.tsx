@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/auth';
 import { CommunityProvider } from '@/contexts/community/CommunityContext';
 import { UserProfile } from '@/components/community/UserProfile';
@@ -18,11 +17,9 @@ import { Separator } from '@/components/ui/separator';
 
 const Community = () => {
   return (
-    <Layout>
-      <CommunityProvider>
-        <CommunityContent />
-      </CommunityProvider>
-    </Layout>
+    <CommunityProvider>
+      <CommunityContent />
+    </CommunityProvider>
   );
 };
 

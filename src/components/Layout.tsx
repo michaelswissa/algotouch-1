@@ -2,9 +2,10 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import { cn } from '@/lib/utils';
+import { Outlet } from 'react-router-dom';
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   hideSidebar?: boolean;
 }
@@ -39,7 +40,7 @@ const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
           {/* Subtle accent border */}
           <div className="absolute inset-0 rounded-xl border border-primary/20 opacity-30 pointer-events-none"></div>
           
-          {children}
+          {children || <Outlet />}
         </div>
       </main>
     </div>
