@@ -1,6 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // List of common routes to prefetch
 const commonRoutes = [
@@ -33,19 +34,31 @@ const RoutePrefetcher: React.FC = () => {
     // Get routes that aren't the current route
     const routesToPrefetch = commonRoutes.filter(route => route !== location.pathname);
     
-    // Prefetch the modules for these routes
+    // Prefetch the modules for these routes with error handling
     routesToPrefetch.forEach(route => {
-      // Using it directly from the modules in App.tsx
       try {
-        const moduleName = route === '/' ? 'Index' 
-          : route.substring(1).charAt(0).toUpperCase() + route.substring(2);
+        // Mapping of routes to module names
+        const routeToModuleMap: Record<string, string> = {
+          '/': 'Index',
+          '/dashboard': 'Dashboard',
+          '/community': 'Community',
+          '/courses': 'Courses',
+          '/trade-journal': 'TradeJournal',
+          '/calendar': 'Calendar',
+          '/profile': 'Profile',
+          '/my-subscription': 'MySubscriptionPage'
+        };
         
-        // Dynamic import to trigger preload
-        import(`../pages/${moduleName}.tsx`).catch(() => {
-          // Ignore errors - this is just prefetching
-        });
+        const moduleName = routeToModuleMap[route] || route.substring(1).charAt(0).toUpperCase() + route.substring(2);
+        
+        // Dynamic import to trigger preload - add catch handler to prevent errors from bubbling up
+        import(`../pages/${moduleName}.tsx`)
+          .catch(error => {
+            console.log(`Prefetching ${route} (${moduleName}) failed:`, error.message);
+            // Don't show toast for prefetch failures as they're not critical
+          });
       } catch (e) {
-        // Ignore errors in prefetch
+        // Silently ignore errors in prefetch - they're not critical
       }
     });
   };

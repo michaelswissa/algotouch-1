@@ -10,7 +10,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import BlogSection from '@/components/BlogSection';
 
-// Ensure proper imports to avoid circular dependencies
 const Dashboard = () => {
   const { toast } = useToast();
   const { stockData, loading: stocksLoading, error: stocksError, lastUpdated: stocksLastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
