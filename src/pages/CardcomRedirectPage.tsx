@@ -68,7 +68,7 @@ export default function CardcomRedirectPage() {
           setPaymentResult({
             success: processingResult.success || false,
             message: processingResult.message || 'Payment processed',
-            data: (webhookData[0].processing_result as unknown) as typeof paymentResult?.data
+            data: (webhookData[0].processing_result as unknown) as { paymentData: { transactionId: string; amount: number } }
           });
           
           if (processingResult.success) {
