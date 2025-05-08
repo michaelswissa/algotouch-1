@@ -38,3 +38,7 @@ verify_jwt = false
 [functions."recover-payment-session/save-session"]
 verify_jwt = false
 
+[functions.iframe-redirect]
+verify_jwt = false
+
+

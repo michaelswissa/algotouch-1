@@ -11,23 +11,23 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
     const { data: bucket, error: getBucketError } = await supabase.storage
       .getBucket('community_media');
     
-    if (getBucketError && getBucketError.message.includes('The bucket does not exist')) {
-      // Create the bucket if it doesn't exist
-      const { error: createBucketError } = await supabase.storage
-        .createBucket('community_media', {
-          public: true,
-          fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-        });
-      
-      if (createBucketError) {
-        console.error('Error creating community media bucket:', createBucketError);
-        return false;
-      }
-      
-      // Update bucket to make it public (use the appropriate method available in your Supabase version)
-      try {
-        // For newer Supabase versions
+    if (getBucketError) {
+      if (getBucketError.message.includes('The bucket does not exist')) {
+        console.log('Bucket does not exist, attempting to create it...');
+        // Create the bucket if it doesn't exist
+        const { error: createBucketError } = await supabase.storage
+          .createBucket('community_media', {
+            public: true,
+            fileSizeLimit: 10485760, // 10MB
+            allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+          });
+        
+        if (createBucketError) {
+          console.error('Error creating community media bucket:', createBucketError);
+          return false;
+        }
+        
+        // Update bucket to make it public
         const { error: updateError } = await supabase.storage
           .updateBucket('community_media', {
             public: true
@@ -37,16 +37,17 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
           console.error('Error making bucket public:', updateError);
           return false;
         }
-      } catch (err) {
-        console.warn('Error updating bucket, may be using older Supabase version:', err);
-        // Fallback for older versions or different API
+        
+        console.log('Created community media bucket successfully');
+        return true;
+      } else {
+        console.error('Error checking community media bucket:', getBucketError);
+        return false;
       }
-      
-      console.log('Created community media bucket successfully');
-      return true;
     }
     
-    return !!bucket;
+    console.log('Community media bucket exists:', bucket);
+    return true;
   } catch (error) {
     console.error('Exception in ensureCommunityMediaBucketExists:', error);
     return false;
@@ -58,6 +59,7 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
  */
 export async function initCommunityStorage(): Promise<void> {
   try {
+    console.log('Initializing community storage...');
     const bucketExists = await ensureCommunityMediaBucketExists();
     
     if (!bucketExists) {
@@ -66,6 +68,8 @@ export async function initCommunityStorage(): Promise<void> {
         position: 'top-center',
         id: 'storage-init-error',
       });
+    } else {
+      console.log('Community storage initialized successfully');
     }
   } catch (error) {
     console.error('Error initializing community storage:', error);

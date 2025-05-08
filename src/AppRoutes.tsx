@@ -22,6 +22,7 @@ import Subscription from "./pages/Subscription";
 import MySubscriptionPage from "./pages/MySubscriptionPage";
 import Index from "./pages/Index";
 import PaymentHandling from "./pages/PaymentHandling";
+import IframeRedirect from "./pages/IframeRedirect";
 
 const AppRoutes: React.FC = () => {
   const { signIn, signOut } = useAuth();
@@ -86,6 +87,9 @@ const AppRoutes: React.FC = () => {
           <PaymentHandling />
         </ProtectedRoute>
       } />
+      
+      {/* Iframe redirection page - public */}
+      <Route path="/iframe-redirect" element={<IframeRedirect />} />
       
       {/* Protected routes - require authentication */}
       <Route path="/dashboard" element={
