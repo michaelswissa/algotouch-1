@@ -9,7 +9,7 @@ const AppRoutes: React.FC = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/cardcom-redirect" element={<CardcomRedirectPage />} />
-        <Route path="*" element={<App />} />
+        <Route path="/*" element={<App />} />
       </Routes>
     </BrowserRouter>
   );
