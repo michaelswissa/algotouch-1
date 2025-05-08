@@ -1,242 +1,318 @@
-import { useState, useEffect } from 'react';
-import { useToast } from './use-toast';
-import { recordLessonWatched, completeModule, completeCourse } from '@/lib/community/course-service';
 
-// Define the types for course data
-interface Lesson {
+import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
+import { useCommunity } from '@/contexts/community/CommunityContext';
+import { useAuth } from '@/contexts/auth';
+
+// Mock course data interface
+export interface Lesson {
   id: number;
   title: string;
-  videoUrl: string;
-  duration: string;
-  moduleId: number;
+  duration?: string;
+  completed?: boolean;
+  content?: string;
+  videoUrl?: string;
 }
 
-interface Module {
-  id: number;
+export interface Module {
   title: string;
-  description: string;
-  lessonIds: number[];
+  duration?: string;
+  details?: string;
+  isNew?: boolean;
+  lessons?: Lesson[];
 }
 
-interface Quiz {
-  id: number;
-  title: string;
-  questions: number;
-  completed: boolean;
-}
-
-interface Resource {
+export interface CourseResource {
   id: number;
   title: string;
   type: string;
   size: string;
 }
 
-interface CourseData {
-  id: string;
+export interface Quiz {
+  id: number;
+  title: string;
+  questions: number;
+  completed: boolean;
+}
+
+export interface Course {
   title: string;
   description: string;
   instructor: string;
-  lessons: Lesson[];
   modules: Module[];
-  quizzes: Quiz[];
-  resources: Resource[];
+  lessons: Lesson[];
+  resources: CourseResource[];
+  progress: number;
+  quizzes?: Quiz[];
+  activeVideo?: {
+    title: string;
+    url: string;
+    duration: string;
+  };
 }
 
-interface UserProgress {
-  lessonsWatched: number[];
-  modulesCompleted: number[];
-  courseCompleted: boolean;
-  lastWatchedLessonId?: number;
-}
-
-// Example course data - in a real app, this would come from an API
-const mockCourseData: Record<string, CourseData> = {
-  'algotouch-basics': {
-    id: 'algotouch-basics',
-    title: 'יסודות המסחר עם AlgoTouch',
-    description: 'קורס מקיף ללימוד יסודות המסחר האלגוריתמי בפלטפורמת AlgoTouch',
-    instructor: 'דר׳ אלגו',
-    lessons: [
-      { id: 1, title: 'מבוא למסחר אלגוריתמי', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '12:30', moduleId: 1 },
-      { id: 2, title: 'הכרת פלטפורמת AlgoTouch', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '15:45', moduleId: 1 },
-      { id: 3, title: 'יצירת אסטרטגיה ראשונה', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '18:20', moduleId: 1 },
-      { id: 4, title: 'עבודה עם נתוני מחיר', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '20:15', moduleId: 2 },
-      { id: 5, title: 'אינדיקטורים טכניים', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '22:40', moduleId: 2 },
-      { id: 6, title: 'מבנה וניהול תיק השקעות', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '14:55', moduleId: 3 },
-      { id: 7, title: 'ניהול סיכונים', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', duration: '16:30', moduleId: 3 },
-    ],
+export const mockCourseData: Record<string, Course> = {
+  "algotouch-basics": {
+    title: "קורס אלגוטאצ' למתחילים",
+    description: "לימוד שיטתי של מערכת אלגוטאצ' הכולל פתיחת חשבון, הגדרת המערכת, תפעול ומסחר, ועד ניהול כספים ומיסוי.",
+    instructor: "דני אלוני",
     modules: [
-      { 
-        id: 1, 
-        title: 'מבוא ויסודות', 
-        description: 'הכרת עולם המסחר האלגוריתמי והבנת היתרונות שבשימוש בכלים ממוחשבים', 
-        lessonIds: [1, 2, 3] 
-      },
-      { 
-        id: 2, 
-        title: 'ניתוח טכני', 
-        description: 'לימוד שיטות וכלים לניתוח טכני אפקטיבי של גרפים וזיהוי מגמות', 
-        lessonIds: [4, 5] 
-      },
-      { 
-        id: 3, 
-        title: 'אסטרטגיות מסחר', 
-        description: 'פיתוח אסטרטגיות מסחר מתקדמות ושילובן בפלטפורמה', 
-        lessonIds: [6, 7] 
-      }
+      { title: "פתיחת חשבון ב-TradeStation", details: "הרשמה ל-Tradestation, העברת כספים לחשבון המסחר, מילוי טפסים + התקנת הפלטפורמה של Tradestation" },
+      { title: "הגדרת מערכת אלגוטאצ'", details: "בקשת גישה למערכת + התקנה, חיבור אלגוטאצ' לחשבון המסחר שלך ב-Tradestation" },
+      { title: "תפעול ומסחר במערכת", isNew: true, details: "בחירת נכס למסחר, הגדרת פרקי זמן למסחר, הגדרת רמות תמיכה והתנגדות, כפתורי הפעלה והגדרות בסיסיות, ניהול יעדי רווח, ניהול סיכונים והגנה על עסקאות, שימוש חוזר ברמות תמיכה והתנגדות, שליחת פקודות מדויקות, אסטרטגיות מתקדמות לניהול עסקאות" },
+      { title: "ניהול ומעקב שוטף", details: "חוקים להצלחה במסחר - הדרך למסחר יציב ורווחי, איך להוציא דו\"ח עסקאות במערכת, שינויים ואופטימיזציה לפרמטרים - שיפור ביצועים בעזרת בינה מלאכותית" },
+      { title: "משיכת כספים", details: "תהליך משיכת כספים מ-Tradestation לחשבון הבנק שלך" },
+      { title: "מיסוי", details: "נקודות חשובות בהקשר למיסוי רווחים מהמסחר, חישוב מס ורווחים נטו" },
+      { title: "קבלת תמיכה", details: "איך ליצור קשר עם התמיכה של אלגוטאצ'" }
+    ],
+    lessons: [
+      { id: 1, title: "מבוא למסחר אלגוריתמי", duration: "45 דקות", completed: true, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 2, title: "התקנת וחיבור המערכת", duration: "35 דקות", completed: true, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 3, title: "ממשק המשתמש", duration: "50 דקות", completed: false, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 4, title: "הגדרת רמות מחיר", duration: "55 דקות", completed: false, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" },
+      { id: 5, title: "הגדרות בסיסיות", duration: "40 דקות", completed: false, videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" }
     ],
     resources: [
-      { id: 1, title: 'מדריך למשתמש AlgoTouch', type: 'PDF', size: '2.4MB' },
-      { id: 2, title: 'טבלת אינדיקטורים טכניים', type: 'XLSX', size: '1.1MB' },
-      { id: 3, title: 'תבנית לניהול יומן מסחר', type: 'PDF', size: '0.8MB' }
+      { id: 1, title: "מדריך למשתמש - PDF", type: "pdf", size: "2.4 MB" },
+      { id: 2, title: "גיליון סימולים - Excel", type: "excel", size: "450 KB" },
+      { id: 3, title: "תבניות מסחר - ZIP", type: "zip", size: "3.1 MB" }
     ],
+    progress: 40,
     quizzes: [
-      { id: 1, title: 'מבחן יסודות - חלק א', questions: 10, completed: true },
-      { id: 2, title: 'מבחן יסודות - חלק ב', questions: 15, completed: false },
-      { id: 3, title: 'מבחן סיום קורס', questions: 25, completed: false }
+      { id: 1, title: "מבחן בסיסי - מושגי יסוד", questions: 10, completed: true },
+      { id: 2, title: "מבחן מתקדם - אסטרטגיות מסחר", questions: 15, completed: false }
+    ],
+    activeVideo: {
+      title: "מבוא למסחר אלגוריתמי",
+      url: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      duration: "45 דקות"
+    }
+  },
+  "algotouch-advanced": {
+    title: "הדרכה מקיפה למערכת TradeStation",
+    description: "קורס עומק המכסה את כל היבטי מערכת TradeStation מסביבת העבודה ועד סורקי מניות, גרפים, ושליחת פקודות.",
+    instructor: "מור כהן",
+    modules: [
+      { title: "הדרכת מתחילים למערכת מסחר טריידסטיישן", duration: "1:25:56" },
+      { title: "תחילת העבודה עם חשבון החוזים העתידיים", duration: "9:35" },
+      { title: "סביבת עבודה", duration: "6:50" },
+      { title: "ניהול חשבון", duration: "11:56" },
+      { title: "ניתוחים וחדשות על מניות חמות", duration: "11:54" },
+      { title: "היכרות עם הגרפים", duration: "10:04" },
+      { title: "סורק המניות עטור הפרסים Radar Screen", duration: "6:54" },
+      { title: "סורקי מניות ורשימות חמות", duration: "7:40" },
+      { title: "אפשרויות שליחת פקודות", duration: "17:48" },
+      { title: "סטופ לוס וטייק פרופיט", duration: "17:32" },
+      { title: "הכרת המטריקס: ניתוח עומק השוק בזמן אמת", duration: "11:49" },
+      { title: "הדרכת מערכת TS למתקדמים", duration: "52:00" }
+    ],
+    lessons: [
+      { id: 1, title: "אסטרטגיות מסחר באזורי תנודה", duration: "60 דקות", completed: false },
+      { id: 2, title: "אסטרטגיות מגמה", duration: "55 דקות", completed: false },
+      { id: 3, title: "ניהול סיכונים מתקדם", duration: "65 דקות", completed: false },
+      { id: 4, title: "אופטימיזציה של אסטרטגיות", duration: "70 דקות", completed: false },
+      { id: 5, title: "אסטרטגיות סקאלפינג", duration: "50 דקות", completed: false }
+    ],
+    resources: [
+      { id: 1, title: "מדריך לאסטרטגיות מתקדמות - PDF", type: "pdf", size: "3.2 MB" },
+      { id: 2, title: "אקסל אופטימיזציה - Excel", type: "excel", size: "550 KB" }
+    ],
+    progress: 25,
+    quizzes: [
+      { id: 1, title: "מבחן מערכת בסיסי", questions: 12, completed: false },
+      { id: 2, title: "מבחן מתקדם - ניתוח גרפים", questions: 10, completed: false }
     ]
+  },
+  "market-analysis": {
+    title: "מסחר בחוזים עתידיים",
+    description: "קורס מקיף העוסק במסחר בחוזים עתידיים בבורסה האמריקאית, כולל סשנים, סימולים, פקיעות ובטחונות.",
+    instructor: "רונית לוי",
+    modules: [
+      { title: "מבוא למסחר בחוזים עתידיים", duration: "45:22" },
+      { title: "חוזים עתידיים על מדדים", duration: "38:15" },
+      { title: "חוזים עתידיים על סחורות", duration: "42:30" },
+      { title: "גמישות בטחונות", duration: "27:45" },
+      { title: "סשנים בשוק החוזים העתידיים", duration: "33:10" },
+      { title: "פקיעות ורולים", duration: "29:55" },
+      { title: "יתרונות וחסרונות במסחר בחוזים", duration: "35:20" }
+    ],
+    lessons: [
+      { id: 1, title: "מושגי יסוד בחוזים עתידיים", duration: "40 דקות", completed: false },
+      { id: 2, title: "מינוף וניהול סיכונים", duration: "45 דקות", completed: false },
+      { id: 3, title: "עונתיות בחוזים על סחורות", duration: "50 דקות", completed: false },
+      { id: 4, title: "אסטרטגיות ספרדים", duration: "65 דקות", completed: false }
+    ],
+    resources: [
+      { id: 1, title: "לוח מועדי פקיעה - PDF", type: "pdf", size: "1.8 MB" },
+      { id: 2, title: "מחשבון מרווחים - Excel", type: "excel", size: "350 KB" }
+    ],
+    progress: 10
   }
 };
 
 export const useCourseData = (courseId: string | undefined) => {
-  const [courseData, setCourseData] = useState<CourseData>({
-    id: '',
-    title: '',
-    description: '',
-    instructor: '',
-    lessons: [],
-    modules: [],
-    quizzes: [],
-    resources: []
-  });
+  const { isAuthenticated, user } = useAuth();
+  const { 
+    recordLessonWatched, 
+    completeModule, 
+    completeCourse,
+    courseProgress = [],
+    userBadges = []
+  } = useCommunity();
+
   const [activeTab, setActiveTab] = useState('content');
-  const [activeVideoId, setActiveVideoId] = useState<number | null>(null);
-  const [userProgress, setUserProgress] = useState<UserProgress>({
-    lessonsWatched: [],
-    modulesCompleted: [],
-    courseCompleted: false
-  });
+  const [activeVideoId, setActiveVideoId] = useState<number | null>(1);
+  const [watchedTime, setWatchedTime] = useState<number>(0);
+  const [videoCompleted, setVideoCompleted] = useState<boolean>(false);
+  const lessonCompletionThreshold = 0.8; // 80% of video needs to be watched to count as completed
   
-  const { toast } = useToast();
+  // Track if video has been marked as watched to avoid duplicate points
+  const videoMarkedAsWatched = useRef(false);
+  
+  // Get course data
+  const courseData = courseId && mockCourseData[courseId] 
+    ? mockCourseData[courseId] 
+    : Object.values(mockCourseData)[0];
 
-  // Load course data when courseId changes
+  // Get active lesson and video info
+  const activeLesson = courseData.lessons.find(lesson => lesson.id === activeVideoId);
+  const videoUrl = activeLesson?.videoUrl || courseData.activeVideo?.url;
+  const videoTitle = activeLesson?.title || courseData.activeVideo?.title || '';
+
+  // Get user progress for this course
+  const userProgress = courseProgress.find(progress => progress.courseId === courseId);
+  
+  // Reset watched time and completion status when video changes
   useEffect(() => {
-    if (courseId && mockCourseData[courseId]) {
-      setCourseData(mockCourseData[courseId]);
-      
-      // Load progress from local storage
-      const savedProgress = localStorage.getItem(`course-progress-${courseId}`);
-      if (savedProgress) {
-        const parsedProgress = JSON.parse(savedProgress) as UserProgress;
-        setUserProgress(parsedProgress);
-        
-        // If there's a last watched lesson, make it active
-        if (parsedProgress.lastWatchedLessonId) {
-          setActiveVideoId(parsedProgress.lastWatchedLessonId);
-        } else if (mockCourseData[courseId].lessons.length > 0) {
-          // Otherwise, set the first lesson as active
-          setActiveVideoId(mockCourseData[courseId].lessons[0].id);
-        }
-      } else if (mockCourseData[courseId].lessons.length > 0) {
-        // If no saved progress, set the first lesson as active
-        setActiveVideoId(mockCourseData[courseId].lessons[0].id);
-      }
+    setWatchedTime(0);
+    setVideoCompleted(false);
+    videoMarkedAsWatched.current = false;
+  }, [activeVideoId]);
+  
+  const calculateProgress = () => {
+    if (!userProgress || courseData.lessons.length === 0) {
+      return courseData.progress;
     }
-  }, [courseId]);
-
-  // Handle lesson click
-  const handleLessonClick = (lessonId: number) => {
-    setActiveVideoId(lessonId);
     
-    // Update last watched lesson in progress
-    if (courseId) {
-      const updatedProgress = {
-        ...userProgress,
-        lastWatchedLessonId: lessonId
-      };
-      setUserProgress(updatedProgress);
-      localStorage.setItem(`course-progress-${courseId}`, JSON.stringify(updatedProgress));
-    }
+    const watchedCount = userProgress.lessonsWatched.length;
+    return Math.round((watchedCount / courseData.lessons.length) * 100);
+  };
+  
+  const progressPercentage = calculateProgress();
+
+  const findModuleForLesson = (lessonId: number) => {
+    const lessonIndex = courseData.lessons.findIndex(lesson => lesson.id === lessonId);
+    if (lessonIndex === -1) return null;
+    
+    const moduleIndex = Math.floor(lessonIndex / (courseData.lessons.length / courseData.modules.length));
+    return courseData.modules[moduleIndex < courseData.modules.length ? moduleIndex : 0];
+  };
+  
+  const checkAllModuleLessonsWatched = (module: any) => {
+    if (!userProgress) return false;
+    
+    const moduleIndex = courseData.modules.indexOf(module);
+    const lessonsPerModule = Math.ceil(courseData.lessons.length / courseData.modules.length);
+    const startIdx = moduleIndex * lessonsPerModule;
+    const endIdx = Math.min(startIdx + lessonsPerModule, courseData.lessons.length);
+    
+    const moduleLessons = courseData.lessons.slice(startIdx, endIdx);
+    
+    return moduleLessons.every(lesson => 
+      userProgress.lessonsWatched.includes(lesson.id.toString())
+    );
+  };
+  
+  const checkAllModulesCompleted = () => {
+    if (!userProgress) return false;
+    
+    return courseData.modules.every((_, index) => 
+      userProgress.modulesCompleted.includes(index.toString())
+    );
   };
 
-  // Mark video as completed when it ends
-  const handleVideoEnded = () => {
-    if (activeVideoId && courseId) {
-      // Add to watched lessons if not already there
-      if (!userProgress.lessonsWatched.includes(activeVideoId)) {
-        const updatedLessons = [...userProgress.lessonsWatched, activeVideoId];
+  const handleLessonClick = async (lessonId: number) => {
+    // Only update active video ID when clicking on a lesson
+    setActiveVideoId(lessonId);
+    
+    // We don't award points here - only when the video is actually watched
+    // Reset progress tracking
+    setWatchedTime(0);
+    setVideoCompleted(false);
+    videoMarkedAsWatched.current = false;
+  };
+
+  // Track video progress
+  const handleVideoProgress = async (event: any) => {
+    if (!activeVideoId || !isAuthenticated) return;
+    
+    const currentTime = event.target?.currentTime || 0;
+    const duration = event.target?.duration || 0;
+    
+    if (duration > 0) {
+      setWatchedTime(currentTime);
+      const percentWatched = currentTime / duration;
+      
+      // If watched more than threshold and not already marked as watched
+      if (percentWatched >= lessonCompletionThreshold && !videoMarkedAsWatched.current) {
+        videoMarkedAsWatched.current = true;
+        setVideoCompleted(true);
         
-        const updatedProgress = {
-          ...userProgress,
-          lessonsWatched: updatedLessons,
-        };
-        
-        // Check if this completes a module
-        const lesson = courseData.lessons.find(l => l.id === activeVideoId);
-        if (lesson) {
-          const module = courseData.modules.find(m => m.id === lesson.moduleId);
-          if (module) {
-            // Check if all lessons in this module are now watched
-            const allModuleLessonsWatched = module.lessonIds.every(id => 
-              updatedLessons.includes(id)
-            );
-            
-            if (allModuleLessonsWatched && !userProgress.modulesCompleted.includes(module.id)) {
-              // Mark module as completed
-              updatedProgress.modulesCompleted = [...userProgress.modulesCompleted, module.id];
+        // Now award points for watching the lesson
+        if (isAuthenticated && user && recordLessonWatched) {
+          const lessonIdStr = activeVideoId.toString();
+          const pointsAwarded = await recordLessonWatched(courseId || 'unknown', lessonIdStr);
+          
+          if (pointsAwarded) {
+            // Check if module is completed
+            const lessonModule = findModuleForLesson(activeVideoId);
+            if (lessonModule) {
+              const moduleId = courseData.modules.indexOf(lessonModule).toString();
+              const allModuleLessonsWatched = checkAllModuleLessonsWatched(lessonModule);
               
-              // Call external module completion function
-              completeModule(courseId, module.id);
-              
-              toast({
-                title: "מודול הושלם!",
-                description: `השלמת את המודול "${module.title}"`,
-              });
+              if (allModuleLessonsWatched && completeModule) {
+                await completeModule(courseId || 'unknown', moduleId);
+                
+                const allModulesCompleted = checkAllModulesCompleted();
+                if (allModulesCompleted && completeCourse) {
+                  await completeCourse(courseId || 'unknown');
+                }
+              }
             }
           }
         }
-        
-        // Check if all modules are completed
-        const allModulesCompleted = courseData.modules.every(module => 
-          updatedProgress.modulesCompleted.includes(module.id)
-        );
-        
-        if (allModulesCompleted && !userProgress.courseCompleted) {
-          updatedProgress.courseCompleted = true;
-          
-          // Call external course completion function
-          completeCourse(courseId);
-          
-          toast({
-            title: "הקורס הושלם!",
-            description: "כל הכבוד! השלמת את כל המודולים בקורס",
-          });
-        }
-        
-        setUserProgress(updatedProgress);
-        localStorage.setItem(`course-progress-${courseId}`, JSON.stringify(updatedProgress));
-        
-        // Call external lesson completion function
-        recordLessonWatched(courseId, activeVideoId);
       }
     }
   };
   
-  // Handle video progress updates
-  const handleVideoProgress = (event: any) => {
-    // You can track video progress here if needed
-    console.log('Video progress:', event);
+  const handleVideoEnded = async () => {
+    if (isAuthenticated && activeVideoId && !videoMarkedAsWatched.current) {
+      videoMarkedAsWatched.current = true;
+      
+      // Award points if not already awarded earlier by the progress handler
+      if (!videoCompleted && recordLessonWatched) {
+        const lessonIdStr = activeVideoId.toString();
+        await recordLessonWatched(courseId || 'unknown', lessonIdStr);
+      }
+      
+      toast.success('השיעור הושלם!', {
+        description: 'המשך לשיעור הבא כדי להמשיך ללמוד',
+        duration: 3000,
+      });
+      
+      setVideoCompleted(true);
+    }
   };
   
-  // Calculate progress percentage
-  const progressPercentage = courseData.lessons.length > 0
-    ? Math.round((userProgress.lessonsWatched.length / courseData.lessons.length) * 100)
-    : 0;
-    
-  // Check if user has earned the course completion badge
   const hasCourseCompletionBadge = () => {
-    return userProgress.courseCompleted;
+    if (!courseId || !userBadges || userBadges.length === 0) {
+      return false;
+    }
+    
+    return userBadges.some(userBadge => 
+      userBadge.badge && userBadge.badge.name && userBadge.badge.name.includes(courseData.title.substring(0, 10))
+    );
   };
 
   return {
@@ -244,11 +320,15 @@ export const useCourseData = (courseId: string | undefined) => {
     activeTab,
     setActiveTab,
     activeVideoId,
+    activeLesson,
+    videoUrl,
+    videoTitle,
+    progressPercentage,
     userProgress,
     handleLessonClick,
-    progressPercentage,
-    hasCourseCompletionBadge,
+    handleVideoProgress,
     handleVideoEnded,
-    handleVideoProgress
+    hasCourseCompletionBadge,
+    videoCompleted
   };
 };

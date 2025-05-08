@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import Layout from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TradeJournalHeader from '@/components/trade-journal/TradeJournalHeader';
 import TradeNotes from '@/components/trade-journal/TradeNotes';
@@ -100,51 +101,53 @@ const TradeJournalPage = () => {
   };
 
   return (
-    <div className="tradervue-container py-6" dir="rtl">
-      <TradeJournalHeader onNewNote={handleNewNote} />
-      
-      {/* Horizontal scrollable notes section - showing saved reports */}
-      <TradeNotes 
-        notes={savedReports} 
-        onDeleteNote={handleDeleteNote}
-      />
-      
-      {/* Main content area with tabs */}
-      <div className="space-y-6 animate-fade-in mt-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-slate-900/30 dark:bg-white/5 p-1 rounded-lg flex justify-end gap-2">
-            <TabsTrigger 
-              value="report" 
-              className={`text-sm font-medium px-4 py-2 ${questionnaireSubmitted ? 'text-primary' : 'text-muted-foreground'}`}
-              disabled={!questionnaireSubmitted}
-            >
-              דוח יומי
-            </TabsTrigger>
-            <TabsTrigger value="questionnaire" className="text-sm font-medium px-4 py-2">שאלון יומי</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="questionnaire" className="space-y-6">
-            <ModernTraderQuestionnaire 
-              onSubmit={handleQuestionnaireSubmit} 
-              isLoading={isLoading}
-            />
-          </TabsContent>
-          
-          <TabsContent value="report" className="space-y-6">
-            {questionnaireSubmitted && reportData ? (
-              <TradingReport data={reportData} />
-            ) : (
-              <div className="text-center p-8 bg-card rounded-lg shadow-md">
-                <h3 className="text-lg font-medium mb-2">דוח מסחר יומי</h3>
-                <p className="text-muted-foreground">
-                  הדוח יוצג כאן לאחר מילוי השאלון היומי. מלא את השאלון היומי כדי לצפות בדוח.
-                </p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+    <Layout>
+      <div className="tradervue-container py-6" dir="rtl">
+        <TradeJournalHeader onNewNote={handleNewNote} />
+        
+        {/* Horizontal scrollable notes section - showing saved reports */}
+        <TradeNotes 
+          notes={savedReports} 
+          onDeleteNote={handleDeleteNote}
+        />
+        
+        {/* Main content area with tabs */}
+        <div className="space-y-6 animate-fade-in mt-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-6 bg-slate-900/30 dark:bg-white/5 p-1 rounded-lg flex justify-end gap-2">
+              <TabsTrigger 
+                value="report" 
+                className={`text-sm font-medium px-4 py-2 ${questionnaireSubmitted ? 'text-primary' : 'text-muted-foreground'}`}
+                disabled={!questionnaireSubmitted}
+              >
+                דוח יומי
+              </TabsTrigger>
+              <TabsTrigger value="questionnaire" className="text-sm font-medium px-4 py-2">שאלון יומי</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="questionnaire" className="space-y-6">
+              <ModernTraderQuestionnaire 
+                onSubmit={handleQuestionnaireSubmit} 
+                isLoading={isLoading}
+              />
+            </TabsContent>
+            
+            <TabsContent value="report" className="space-y-6">
+              {questionnaireSubmitted && reportData ? (
+                <TradingReport data={reportData} />
+              ) : (
+                <div className="text-center p-8 bg-card rounded-lg shadow-md">
+                  <h3 className="text-lg font-medium mb-2">דוח מסחר יומי</h3>
+                  <p className="text-muted-foreground">
+                    הדוח יוצג כאן לאחר מילוי השאלון היומי. מלא את השאלון היומי כדי לצפות בדוח.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

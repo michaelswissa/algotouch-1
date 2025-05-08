@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
@@ -14,24 +14,13 @@ import LoadingSkeleton from './subscription/LoadingSkeleton';
 import ContractViewer from './subscription/ContractViewer';
 import DocumentsList from './subscription/DocumentsList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 
 const UserSubscription = () => {
   const navigate = useNavigate();
-  const { hasActiveSubscription, subscriptionDetails, isCheckingSubscription } = useSubscriptionContext();
   const { subscription, loading, details } = useSubscription();
   const [activeTab, setActiveTab] = useState('details');
-  
-  useEffect(() => {
-    console.log("Subscription details in UserSubscription:", { 
-      hasActiveSubscription, 
-      subscriptionDetails,
-      subscription,
-      details 
-    });
-  }, [hasActiveSubscription, subscriptionDetails, subscription, details]);
 
-  if (isCheckingSubscription || loading) {
+  if (loading) {
     return <LoadingSkeleton />;
   }
 
@@ -94,10 +83,10 @@ const UserSubscription = () => {
           <TabsContent value="details" className="mt-4">
             {/* If subscription is cancelled, show a notice */}
             {isCancelled && (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 dark:bg-yellow-900/20 dark:border-yellow-600">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
                 <div className="flex">
                   <div>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                    <p className="text-sm text-yellow-700">
                       המנוי שלך בוטל ויישאר פעיל עד {details?.nextBillingDate}.
                       לאחר מכן, לא תחויב יותר והגישה למערכת תיחסם.
                     </p>

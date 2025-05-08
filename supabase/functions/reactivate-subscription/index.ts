@@ -167,42 +167,6 @@ serve(async (req) => {
   }
 });
 
-// Helper function to create table if it doesn't exist
-async function createCancellationTableIfNeeded(supabaseClient: any) {
-  try {
-    // Check if table exists
-    const { error } = await supabaseClient.rpc('check_row_exists', {
-      p_table_name: 'information_schema.tables',
-      p_column_name: 'table_name',
-      p_value: 'subscription_cancellations'
-    });
-
-    if (error) {
-      console.log('Creating subscription_cancellations table');
-      // Create the table
-      await supabaseClient.rpc('execute_sql', {
-        sql: `
-          CREATE TABLE IF NOT EXISTS public.subscription_cancellations (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            subscription_id UUID NOT NULL REFERENCES public.subscriptions(id) ON DELETE CASCADE,
-            user_id UUID NOT NULL,
-            reason TEXT,
-            feedback TEXT,
-            cancelled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-          ALTER TABLE public.subscription_cancellations ENABLE ROW LEVEL SECURITY;
-          CREATE POLICY "Users can view their own cancellations" ON public.subscription_cancellations
-            FOR SELECT USING (auth.uid() = user_id);
-        `
-      });
-    }
-  } catch (e) {
-    console.error('Error creating subscription_cancellations table:', e);
-    // Continue execution, this is not critical
-  }
-}
-
 // Helper function to send confirmation email
 async function sendReactivationEmail(supabaseClient: any, email: string, name: string, planType: string) {
   const planLabel = planType === 'monthly' ? 'חודשי' : 
@@ -220,15 +184,62 @@ async function sendReactivationEmail(supabaseClient: any, email: string, name: s
     </div>
   `;
 
+  await supabaseClient.functions.invoke('smtp-sender', {
+    body: {
+      to: email,
+      subject: emailSubject,
+      html: emailContent,
+    }
+  });
+}
+
+// Create subscription_cancellations table if it doesn't exist
+async function createCancellationTableIfNeeded(supabaseClient: any) {
   try {
-    await supabaseClient.functions.invoke('smtp-sender', {
-      body: {
-        to: email,
-        subject: emailSubject,
-        htmlContent: emailContent
-      }
+    // Check if the table exists
+    const { data, error } = await supabaseClient.rpc('check_row_exists', {
+      p_table_name: 'information_schema.tables',
+      p_column_name: 'table_name',
+      p_value: 'subscription_cancellations'
     });
+
+    // If the table doesn't exist, create it
+    if (!data) {
+      await supabaseClient.rpc('execute_sql', {
+        sql_query: `
+          CREATE TABLE IF NOT EXISTS public.subscription_cancellations (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            subscription_id UUID REFERENCES public.subscriptions(id),
+            user_id UUID REFERENCES auth.users(id),
+            reason TEXT NOT NULL,
+            feedback TEXT,
+            cancelled_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+          );
+
+          -- Add RLS policies
+          ALTER TABLE public.subscription_cancellations ENABLE ROW LEVEL SECURITY;
+
+          -- Allow users to read their own cancellations
+          CREATE POLICY "Users can read their own cancellations"
+            ON public.subscription_cancellations
+            FOR SELECT
+            USING (
+              auth.uid() = user_id OR
+              auth.uid() = '00000000-0000-0000-0000-000000000000'
+            );
+            
+          -- Allow users to insert their own cancellations
+          CREATE POLICY "Users can insert their own cancellations"
+            ON public.subscription_cancellations
+            FOR INSERT
+            WITH CHECK (
+              auth.uid() = user_id OR
+              auth.uid() = '00000000-0000-0000-0000-000000000000'
+            );
+        `
+      });
+    }
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error ensuring subscription_cancellations table exists:', error);
   }
 }

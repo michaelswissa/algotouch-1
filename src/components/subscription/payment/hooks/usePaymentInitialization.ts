@@ -1,98 +1,133 @@
 
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useAuth } from '@/contexts/auth';
 
 export const usePaymentInitialization = (
   selectedPlan: string,
   onPaymentComplete: () => void,
   onBack: () => void,
-  setIsLoading: (loading: boolean) => void
+  setIsLoadingExternal?: (val: boolean) => void
 ) => {
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const { fullName, email, userData } = useSubscriptionContext();
   const { user } = useAuth();
+  const [isLoading, setIsLoadingState] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  
+  // Use either the external loading state or the internal one
+  const setIsLoading = setIsLoadingExternal || setIsLoadingState;
+
+  // Automatically create iframe payment URL on component mount
+  useEffect(() => {
+    initiateCardcomPayment();
+  }, []);
 
   const initiateCardcomPayment = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      setPaymentUrl(null);
+      // Define operation types based on plan
+      // 1: ChargeOnly - for one-time VIP payment
+      // 2: ChargeAndCreateToken - for annual with immediate charge and future charges
+      // 3: CreateTokenOnly - for monthly with trial (no initial charge)
+      let operationType = 2; // Changed to ChargeAndCreateToken for monthly
+      
+      if (selectedPlan === 'annual') {
+        operationType = 2; // Charge and create token
+      } else if (selectedPlan === 'vip') {
+        operationType = 1; // Charge only
+      }
 
-      // Make sure we have authenticated user
-      if (!user) {
-        toast.error('יש להתחבר למערכת לפני ביצוע תשלום');
-        onBack();
+      // Get registration data if available (for guest checkout)
+      const registrationData = sessionStorage.getItem('registration_data') 
+        ? JSON.parse(sessionStorage.getItem('registration_data') || '{}')
+        : null;
+
+      if (!user && !registrationData) {
+        toast.error('נדרשים פרטי הרשמה כדי להמשיך');
+        setIsLoading(false);
         return;
       }
 
-      // Get user profile information
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, phone')
-        .eq('id', user.id)
-        .single();
+      // Extract user details from the context data or registration data
+      const userFullName = fullName || registrationData?.userData?.fullName || '';
+      const userEmail = email || user?.email || registrationData?.userData?.email || '';
+      const userPhone = userData?.phone || registrationData?.userData?.phone || '';
+      const userIdNumber = userData?.idNumber || registrationData?.userData?.idNumber || '';
 
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-      }
+      console.log('Sending user details to payment system:', {
+        fullName: userFullName,
+        email: userEmail,
+        phone: userPhone,
+        idNumber: userIdNumber,
+        operationType,
+        amount: getPlanAmount(selectedPlan)
+      });
 
-      // Determine amount based on plan (example amounts)
-      let amount = 0;
-      if (selectedPlan === 'monthly') {
-        amount = 49.90;
-      } else if (selectedPlan === 'annual') {
-        amount = 499.00;
-      } else {
-        amount = 1.00; // Default for testing
-      }
-
-      // Combine first and last name for the full name
-      const fullName = profile ? 
-        `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 
-        '';
-
-      // Call the edge function to create a payment URL
-      const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
-        body: {
-          amount,
-          userId: user.id,
-          email: user.email,
-          fullName,
-          phone: profile?.phone || '',
-          operation: "ChargeOnly", // Create a charge directly
-          planId: selectedPlan
+      // Prepare payload based on whether user is logged in or not
+      const payload = {
+        planId: selectedPlan,
+        userId: user?.id,
+        fullName: userFullName,
+        email: userEmail,
+        operationType, // Send numeric operation type (1, 2, or 3)
+        origin: window.location.origin,
+        amount: getPlanAmount(selectedPlan),
+        webHookUrl: `${window.location.origin}/api/payment-webhook`,
+        // Include registration data for account creation after payment
+        registrationData: registrationData,
+        // Add user details for payment form pre-fill
+        userDetails: {
+          fullName: userFullName,
+          email: userEmail,
+          phone: userPhone,
+          idNumber: userIdNumber
         }
+      };
+
+      const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
+        body: payload
       });
 
       if (error) {
-        throw new Error(`Error generating payment URL: ${error.message}`);
+        throw new Error(error.message);
       }
 
-      if (!data?.url) {
-        throw new Error('No payment URL returned from server');
+      if (data?.url) {
+        // Store temporary registration ID if available
+        if (data.tempRegistrationId) {
+          localStorage.setItem('temp_registration_id', data.tempRegistrationId);
+        }
+        
+        setPaymentUrl(data.url);
+      } else {
+        throw new Error('לא התקבלה כתובת תשלום מהשרת');
       }
-
-      console.log('Payment session created:', data);
-      setPaymentUrl(data.url);
-
-      // Store the session ID and low profile ID in localStorage for later reference
-      if (data.sessionId) {
-        localStorage.setItem('payment_session_id', data.sessionId);
-      }
-      if (data.lowProfileId) {
-        localStorage.setItem('payment_low_profile_id', data.lowProfileId);
-      }
-
     } catch (error: any) {
-      console.error('Payment initialization error:', error);
-      toast.error(`שגיאה ביצירת קישור תשלום: ${error.message}`);
-      setPaymentUrl(null);
+      console.error('Error initiating Cardcom payment:', error);
+      toast.error(error.message || 'שגיאה ביצירת עסקה');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Helper function to get plan amount (in shekels, not agorot)
+  const getPlanAmount = (plan: string): number => {
+    switch (plan) {
+      case 'monthly':
+        return 1; // Changed to 1₪ for the initial charge of monthly plan
+      case 'annual':
+        return 3371; // 3,371 ₪ (updated to shekels instead of agorot)
+      case 'vip':
+        return 13121; // 13,121 ₪ (updated to shekels instead of agorot)
+      default:
+        return 0;
+    }
+  };
+
   return {
+    isLoading,
     paymentUrl,
     initiateCardcomPayment
   };

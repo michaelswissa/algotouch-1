@@ -1,71 +1,83 @@
 
 import React from 'react';
+import Layout from '@/components/Layout';
+import { CommunityProvider } from '@/contexts/community/CommunityContext';
 import { useParams } from 'react-router-dom';
-import CourseHeader from '@/components/courses/CourseHeader';
-import CourseContentTabs from '@/components/courses/CourseContentTabs';
-import CourseVideoPlayer from '@/components/courses/CourseVideoPlayer';
-import { Card } from '@/components/ui/card';
 import { useCourseData } from '@/hooks/useCourseData';
+import { LoadingPage } from '@/components/ui/spinner';
 
-const CourseDetail = () => {
+// Import course components
+import CourseHeader from '@/components/courses/CourseHeader';
+import CourseVideoPlayer from '@/components/courses/CourseVideoPlayer';
+import CourseContentTabs from '@/components/courses/CourseContentTabs';
+import { useAuth } from '@/contexts/auth';
+
+const CourseDetailContent = () => {
   const { courseId } = useParams<{ courseId: string }>();
-  const { 
-    courseData, 
-    activeTab, 
-    setActiveTab, 
-    activeVideoId, 
-    userProgress, 
-    handleLessonClick,
+  const { isAuthenticated } = useAuth();
+  
+  const {
+    courseData,
+    activeTab,
+    setActiveTab,
+    videoUrl,
+    videoTitle,
+    activeLesson,
     progressPercentage,
-    hasCourseCompletionBadge,
+    userProgress,
+    activeVideoId,
+    handleLessonClick,
+    handleVideoProgress,
     handleVideoEnded,
-    handleVideoProgress
+    hasCourseCompletionBadge,
+    videoCompleted
   } = useCourseData(courseId);
 
-  const watchedLessons = userProgress?.lessonsWatched || [];
-  const completedModules = userProgress?.modulesCompleted || [];
-  
-  // Find the active lesson to display in the video player
-  const activeLesson = courseData.lessons?.find(lesson => lesson.id === activeVideoId);
+  if (!courseData) {
+    return <LoadingPage message="טוען את הקורס..." />;
+  }
 
   return (
-    <div className="space-y-6">
+    <Layout className="p-4 md:p-6">
       <CourseHeader 
-        title={courseData.title} 
-        description={courseData.description} 
-        instructor={courseData.instructor} 
-        progress={progressPercentage} 
-        isAuthenticated={true} 
-        hasCourseCompletionBadge={!!hasCourseCompletionBadge()}
+        title={courseData.title}
+        description={courseData.description}
+        instructor={courseData.instructor}
+        progress={progressPercentage}
+        isAuthenticated={isAuthenticated}
+        hasCourseCompletionBadge={hasCourseCompletionBadge()}
       />
       
-      {/* Video Player - Add this back */}
-      {activeLesson && (
-        <CourseVideoPlayer 
-          videoUrl={activeLesson.videoUrl}
-          videoTitle={activeLesson.title}
-          duration={activeLesson.duration}
-          onEnded={handleVideoEnded}
-          onProgress={handleVideoProgress}
-          completed={watchedLessons.includes(activeLesson.id)}
-        />
-      )}
+      <CourseVideoPlayer 
+        videoUrl={videoUrl}
+        videoTitle={videoTitle}
+        duration={activeLesson?.duration || courseData.activeVideo?.duration}
+        onEnded={handleVideoEnded}
+        onProgress={handleVideoProgress}
+        completed={videoCompleted}
+      />
       
-      <Card className="overflow-hidden">
-        <CourseContentTabs 
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          lessons={courseData.lessons}
-          modules={courseData.modules}
-          resources={courseData.resources}
-          quizzes={courseData.quizzes}
-          activeVideoId={activeVideoId}
-          watchedLessons={watchedLessons}
-          completedModules={completedModules}
-          onLessonClick={handleLessonClick}
-        />
-      </Card>
-    </div>
+      <CourseContentTabs 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        lessons={courseData.lessons}
+        modules={courseData.modules}
+        resources={courseData.resources}
+        quizzes={courseData.quizzes}
+        activeVideoId={activeVideoId}
+        watchedLessons={userProgress?.lessonsWatched || []}
+        completedModules={userProgress?.modulesCompleted || []}
+        onLessonClick={handleLessonClick}
+      />
+    </Layout>
+  );
+};
+
+const CourseDetail = () => {
+  return (
+    <CommunityProvider>
+      <CourseDetailContent />
+    </CommunityProvider>
   );
 };
 

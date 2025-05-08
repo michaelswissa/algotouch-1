@@ -6,7 +6,6 @@ import { format, addMonths, parseISO, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Json } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 
 // Interface for Subscription from Supabase
 interface Subscription {
@@ -22,12 +21,6 @@ interface Subscription {
     expiryYear: string;
   } | Json | null;
   contract_signed?: boolean | null;
-}
-
-// Interface for cancellation data
-interface CancellationData {
-  reason?: string;
-  feedback?: string;
 }
 
 // Interface for processed subscription details
@@ -49,7 +42,6 @@ export interface SubscriptionDetails {
 
 export const useSubscription = () => {
   const { user } = useAuth();
-  const { refreshSubscription: refreshContextSubscription, subscriptionDetails: contextSubscription } = useSubscriptionContext();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
@@ -64,14 +56,11 @@ export const useSubscription = () => {
             .from('subscriptions')
             .select('*')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .single();
           
           if (error) {
             if (error.code === 'PGRST116') {
               // No subscription found for user, this is not an error, just no subscription
-              console.log("No subscription found for user in useSubscription");
               setSubscription(null);
               setDetails(null);
               setLoading(false);
@@ -82,7 +71,6 @@ export const useSubscription = () => {
           
           // Convert Supabase data to our Subscription type
           if (data) {
-            console.log("Found subscription in useSubscription:", data);
             const formattedSubscription: Subscription = {
               id: data.id,
               plan_type: data.plan_type,
@@ -96,41 +84,19 @@ export const useSubscription = () => {
             setSubscription(formattedSubscription);
             
             // Try to fetch cancellation data if available
-            let cancellationData: CancellationData | null = null;
-            
-            // Check if the subscription is cancelled before trying to fetch cancellation data
-            if (data.cancelled_at) {
-              try {
-                // Check if table exists first by checking for table definition
-                const { error: tableCheckError } = await supabase
-                  .from('subscription_cancellations')
-                  .select('id')
-                  .limit(1);
-                
-                // If no error, the table exists
-                if (!tableCheckError) {
-                  const { data: cancelData, error: cancelError } = await supabase
-                    .from('subscription_cancellations')
-                    .select('reason, feedback')
-                    .eq('subscription_id', data.id)
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (cancelError) {
-                    console.error("Error fetching cancellation data:", cancelError);
-                  }
-                  
-                  if (cancelData) {
-                    console.log("Found cancellation data:", cancelData);
-                    cancellationData = cancelData;
-                  }
-                } else {
-                  console.log("subscription_cancellations table does not exist or is not accessible");
-                }
-              } catch (cancelError) {
-                console.error('Error fetching cancellation data:', cancelError);
-                // Continue even if this fails
+            let cancellationData = null;
+            try {
+              // Check if subscription_cancellations table exists and has data for this subscription
+              const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
+                body: { subscriptionId: data.id }
+              });
+              
+              if (cancelData && cancelData.length > 0) {
+                cancellationData = cancelData;
               }
+            } catch (cancelError) {
+              console.error('Error fetching cancellation data:', cancelError);
+              // Continue even if this fails
             }
             
             // Process the subscription details
@@ -153,7 +119,7 @@ export const useSubscription = () => {
     fetchSubscription();
   }, [user]);
 
-  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: CancellationData | null): SubscriptionDetails | null => {
+  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: any): SubscriptionDetails | null => {
     if (!sub) return null;
     
     const planName = sub.plan_type === 'annual' ? 'שנתי' : 
@@ -219,9 +185,9 @@ export const useSubscription = () => {
     let cancellationReason = undefined;
     let cancellationFeedback = undefined;
     
-    if (cancellationData) {
-      cancellationReason = cancellationData.reason;
-      cancellationFeedback = cancellationData.feedback;
+    if (cancellationData && cancellationData[0]) {
+      cancellationReason = cancellationData[0].reason;
+      cancellationFeedback = cancellationData[0].feedback;
     }
     
     return {
@@ -244,65 +210,58 @@ export const useSubscription = () => {
         throw new Error('לא ניתן לבטל מנוי, אנא התחבר מחדש');
       }
       
-      console.log("Cancelling subscription with reason:", reason);
+      const { error } = await supabase.functions.invoke('cancel-subscription', {
+        body: {
+          subscriptionId: subscription.id,
+          userId: user.id,
+          reason,
+          feedback
+        }
+      });
       
-      // First, update the subscription status in supabase
-      const { data: updatedSub, error: updateError } = await supabase
+      if (error) {
+        throw new Error(`אירעה שגיאה בביטול המנוי: ${error.message}`);
+      }
+      
+      // Refresh the subscription data
+      const { data: updatedData, error: fetchError } = await supabase
         .from('subscriptions')
-        .update({
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .select('*')
         .eq('id', subscription.id)
-        .select()
         .single();
         
-      if (updateError) {
-        throw new Error(`שגיאה בביטול המנוי: ${updateError.message}`);
+      if (fetchError) {
+        throw fetchError;
       }
       
-      // Create a record in subscription_cancellations table
-      try {
-        // Try to insert cancellation reason
-        const { error: cancelError } = await supabase
-          .from('subscription_cancellations')
-          .insert({
-            subscription_id: subscription.id,
-            user_id: user.id,
-            reason: reason,
-            feedback: feedback || null,
-            cancelled_at: new Date().toISOString()
-          });
-          
-        if (cancelError) {
-          console.error("Error recording cancellation reason:", cancelError);
-        }
-      } catch (e) {
-        console.error("Error creating cancellation record:", e);
-        // Continue execution, this is not critical
-      }
-      
-      if (updatedSub) {
+      if (updatedData) {
         // Update local state with cancelled subscription
         const updatedSubscription: Subscription = {
           ...subscription,
-          status: 'cancelled',
-          cancelled_at: updatedSub.cancelled_at
+          status: updatedData.status,
+          cancelled_at: updatedData.cancelled_at
         };
         
         setSubscription(updatedSubscription);
         
+        // Try to fetch cancellation data
+        let cancellationData = null;
+        try {
+          const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
+            body: { subscriptionId: subscription.id }
+          });
+          
+          if (cancelData && cancelData.length > 0) {
+            cancellationData = cancelData;
+          }
+        } catch (cancelError) {
+          console.error('Error fetching cancellation data:', cancelError);
+        }
+        
         // Update details with cancellation info
-        const updatedDetails = getSubscriptionDetails(updatedSubscription, {
-          reason,
-          feedback
-        });
+        const updatedDetails = getSubscriptionDetails(updatedSubscription, cancellationData);
         setDetails(updatedDetails);
       }
-      
-      // Also refresh the context's subscription data
-      refreshContextSubscription();
       
       toast.success('המנוי בוטל בהצלחה');
       return true;
@@ -325,10 +284,7 @@ export const useSubscription = () => {
         throw new Error('לא ניתן להפעיל מחדש את המנוי, אנא התחבר מחדש');
       }
       
-      console.log("Reactivating subscription:", subscription.id);
-      
-      // Call the reactivate-subscription edge function
-      const { data, error } = await supabase.functions.invoke('reactivate-subscription', {
+      const { error } = await supabase.functions.invoke('reactivate-subscription', {
         body: {
           subscriptionId: subscription.id,
           userId: user.id
@@ -338,8 +294,6 @@ export const useSubscription = () => {
       if (error) {
         throw new Error(`אירעה שגיאה בהפעלה מחדש של המנוי: ${error.message}`);
       }
-      
-      console.log("Reactivation response:", data);
       
       // Refresh the subscription data
       const { data: updatedData, error: fetchError } = await supabase
@@ -365,9 +319,6 @@ export const useSubscription = () => {
         // Update details
         const updatedDetails = getSubscriptionDetails(updatedSubscription);
         setDetails(updatedDetails);
-        
-        // Also refresh the context's subscription data
-        refreshContextSubscription();
       }
       
       toast.success('המנוי הופעל מחדש בהצלחה');

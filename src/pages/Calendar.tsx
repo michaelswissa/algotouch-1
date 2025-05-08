@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+import Layout from '@/components/Layout';
 import { CalendarPageHeader } from '@/components/calendar/CalendarPageHeader';
 import { CalendarPageContent } from '@/components/calendar/CalendarPageContent';
 import { useCalendar } from '@/hooks/use-calendar';
@@ -45,30 +46,32 @@ const CalendarPage = () => {
   const systemCurrentYear = currentDate.getFullYear();
 
   return (
-    <div className="tradervue-container py-6 bg-dots">
-      <div className="flex flex-col max-w-5xl mx-auto">
-        <CalendarPageHeader 
-          viewMode={viewMode}
-          currentYear={currentYear}
-          prevYear={prevYear}
-          nextYear={nextYear}
-        />
-        
-        <CalendarPageContent 
-          viewMode={viewMode}
-          currentMonth={currentMonth}
-          currentYear={currentYear}
-          prevMonth={prevMonth}
-          nextMonth={nextMonth}
-          systemCurrentMonth={systemCurrentMonth}
-          systemCurrentYear={systemCurrentYear}
-          handleMonthSelect={handleMonthSelect}
-          handleBackToYear={handleBackToYear}
-          tradeDays={tradeDays}
-          tradesByDay={tradesByDay}
-        />
+    <Layout>
+      <div className="tradervue-container py-6 bg-dots">
+        <div className="flex flex-col max-w-5xl mx-auto">
+          <CalendarPageHeader 
+            viewMode={viewMode}
+            currentYear={currentYear}
+            prevYear={prevYear}
+            nextYear={nextYear}
+          />
+          
+          <CalendarPageContent 
+            viewMode={viewMode}
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+            prevMonth={prevMonth}
+            nextMonth={nextMonth}
+            systemCurrentMonth={systemCurrentMonth}
+            systemCurrentYear={systemCurrentYear}
+            handleMonthSelect={handleMonthSelect}
+            handleBackToYear={handleBackToYear}
+            tradeDays={tradeDays}
+            tradesByDay={tradesByDay}
+          />
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
