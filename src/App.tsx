@@ -8,6 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadingPage } from '@/components/ui/spinner';
 import RoutePrefetcher from '@/components/RoutePrefetcher';
 import PageTransition from '@/components/PageTransition';
+import { SubscriptionProvider } from '@/contexts/subscription/SubscriptionContext';
 
 // Import your pages lazily to avoid circular dependencies
 const Index = React.lazy(() => import('./pages/Index'));
@@ -51,29 +52,39 @@ const RouteTransitionManager = () => {
           {/* Subscription routes */}
           <Route path="/subscription/:planId" element={
             <ProtectedRoute>
-              <Subscription />
+              <SubscriptionProvider>
+                <Subscription />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           <Route path="/subscription" element={
             <ProtectedRoute>
-              <Subscription />
+              <SubscriptionProvider>
+                <Subscription />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           <Route path="/my-subscription" element={
             <ProtectedRoute>
-              <MySubscriptionPage />
+              <SubscriptionProvider>
+                <MySubscriptionPage />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           
           {/* Payment handling routes */}
           <Route path="/payment/success" element={
             <ProtectedRoute publicPaths={['/payment/success']}>
-              <PaymentHandling />
+              <SubscriptionProvider>
+                <PaymentHandling />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           <Route path="/payment/error" element={
             <ProtectedRoute publicPaths={['/payment/error']}>
-              <PaymentHandling />
+              <SubscriptionProvider>
+                <PaymentHandling />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           
@@ -140,12 +151,16 @@ const RouteTransitionManager = () => {
           } />
           <Route path="/profile" element={
             <ProtectedRoute>
-              <Profile />
+              <SubscriptionProvider>
+                <Profile />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           <Route path="/contract/:contractId" element={
             <ProtectedRoute>
-              <ContractDetails />
+              <SubscriptionProvider>
+                <ContractDetails />
+              </SubscriptionProvider>
             </ProtectedRoute>
           } />
           

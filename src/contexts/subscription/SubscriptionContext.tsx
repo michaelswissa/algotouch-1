@@ -49,6 +49,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   // Check subscription on user change
   useEffect(() => {
     if (user?.id) {
+      console.log("User ID detected, checking subscription:", user.id);
       checkUserSubscription(user.id);
       setEmail(user.email || null);
       
@@ -87,6 +88,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           }
         });
     } else {
+      console.log("No user ID, resetting subscription state");
       setHasActiveSubscription(false);
       setFullName(null);
       setEmail(null);
@@ -99,6 +101,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
   const refreshSubscription = async () => {
     if (user?.id) {
+      console.log("Refreshing subscription for user:", user.id);
       await checkUserSubscription(user.id);
     }
   };
@@ -106,19 +109,25 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const checkUserSubscription = async (userId: string) => {
     try {
       setIsCheckingSubscription(true);
+      console.log(`Checking subscription for user ID: ${userId}`);
       
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
         
       if (error) {
         throw error;
       }
       
+      console.log("Subscription data retrieved:", data);
+      
       if (!data) {
         // No subscription found
+        console.log("No subscription found");
         setHasActiveSubscription(false);
         setSubscriptionDetails(null);
         setPlanType(null);
@@ -136,6 +145,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       const isCancelled = data.cancelled_at !== null && data.cancelled_at !== undefined;
       
       const activeStatus = isActive || isTrial || (isValidPeriod && !isCancelled);
+      console.log(`Subscription status: ${activeStatus ? 'active' : 'inactive'}`, {
+        isActive,
+        isTrial,
+        isValidPeriod,
+        isCancelled,
+        status: data.status,
+        trialEndsAt: trialEndsAt?.toISOString(),
+        currentPeriodEndsAt: currentPeriodEndsAt?.toISOString()
+      });
       
       setHasActiveSubscription(activeStatus);
       setSubscriptionDetails(data);

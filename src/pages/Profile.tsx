@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { UserCircle, Lock, MapPin } from 'lucide-react';
+import { UserCircle, Lock, MapPin, CreditCard } from 'lucide-react';
 import UserSubscription from '@/components/UserSubscription';
 import { supabase } from '@/integrations/supabase/client';
+import { SubscriptionProvider } from '@/contexts/subscription/SubscriptionContext';
 
 interface ProfileData {
   first_name: string;
@@ -41,6 +42,7 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState('personal');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -148,17 +150,18 @@ const Profile = () => {
 
   return (
     <Layout>
-      <div className="tradervue-container py-8" dir="rtl">
-        <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
-          <UserCircle size={28} className="text-primary" />
-          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">הפרופיל שלי</span>
-        </h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2">
-            <Tabs defaultValue="personal" className="w-full">
+      <SubscriptionProvider>
+        <div className="tradervue-container py-8" dir="rtl">
+          <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
+            <UserCircle size={28} className="text-primary" />
+            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">הפרופיל שלי</span>
+          </h1>
+          
+          <div className="grid grid-cols-1 gap-8">
+            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-4">
                 <TabsTrigger value="personal">פרטים אישיים</TabsTrigger>
+                <TabsTrigger value="subscription">המנוי שלי</TabsTrigger>
                 <TabsTrigger value="security">אבטחה</TabsTrigger>
               </TabsList>
               
@@ -262,6 +265,14 @@ const Profile = () => {
                 </Card>
               </TabsContent>
               
+              <TabsContent value="subscription">
+                <div className="flex items-center mb-4">
+                  <CreditCard className="h-5 w-5 mr-2 text-primary" />
+                  <h2 className="text-xl font-semibold">המנוי שלי</h2>
+                </div>
+                <UserSubscription />
+              </TabsContent>
+              
               <TabsContent value="security">
                 <Card className="glass-card-2025">
                   <CardHeader>
@@ -318,12 +329,8 @@ const Profile = () => {
               </TabsContent>
             </Tabs>
           </div>
-          
-          <div>
-            <UserSubscription />
-          </div>
         </div>
-      </div>
+      </SubscriptionProvider>
     </Layout>
   );
 };

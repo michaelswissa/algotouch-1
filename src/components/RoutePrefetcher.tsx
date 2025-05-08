@@ -9,7 +9,8 @@ const commonRoutes = [
   '/courses',
   '/trade-journal',
   '/calendar',
-  '/profile'
+  '/profile',
+  '/my-subscription'
 ];
 
 const RoutePrefetcher: React.FC = () => {
