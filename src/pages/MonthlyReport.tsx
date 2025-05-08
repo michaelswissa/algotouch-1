@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import Layout from '@/components/Layout';
+import React, { useState } from 'react';
 import { FileSpreadsheet } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { parseCSVFile, calculateTradeStats, TradeRecord, TradeStats } from '@/lib/trade-analysis';
@@ -85,26 +84,24 @@ const MonthlyReport = () => {
   };
 
   return (
-    <Layout>
-      <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
-        <h1 className="text-3xl font-bold mb-6 flex items-center gap-3">
-          <FileSpreadsheet className="text-primary" size={30} />
-          <span className="text-gradient-blue">דוח עסקאות</span>
-        </h1>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <TradeUploadCard selectedFile={selectedFile} isUploading={isUploading} onFileChange={handleFileSelected} onAddManualTrade={handleAddManualTrade} />
-            
-            <TradeReportContent trades={trades} stats={stats} activeTab={activeTab} setActiveTab={setActiveTab} />
-          </div>
+    <div className="tradervue-container py-8 animate-fade-in" dir="rtl">
+      <h1 className="text-3xl font-bold mb-6 flex items-center gap-3">
+        <FileSpreadsheet className="text-primary" size={30} />
+        <span className="text-gradient-blue">דוח עסקאות</span>
+      </h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <TradeUploadCard selectedFile={selectedFile} isUploading={isUploading} onFileChange={handleFileSelected} onAddManualTrade={handleAddManualTrade} />
           
-          <div className="lg:col-span-1 px-[3px] my-[9px] py-0 mx-0">
-            <StatsCard stats={stats} />
-          </div>
+          <TradeReportContent trades={trades} stats={stats} activeTab={activeTab} setActiveTab={setActiveTab} />
+        </div>
+        
+        <div className="lg:col-span-1 px-[3px] my-[9px] py-0 mx-0">
+          <StatsCard stats={stats} />
         </div>
       </div>
-    </Layout>
+    </div>
   );
 };
 
