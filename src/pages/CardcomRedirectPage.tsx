@@ -12,6 +12,7 @@ export default function CardcomRedirectPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
 
   useEffect(() => {
     async function handleRedirect() {
@@ -26,9 +27,45 @@ export default function CardcomRedirectPage() {
           return;
         }
 
-        // Call Supabase function to verify payment
+        console.log('Processing payment redirect with LowProfileId:', lowProfileId);
+
+        // Check if we already have this payment recorded in webhooks
+        const { data: webhookData, error: webhookError } = await supabase
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', true)
+          .contains('payload', { LowProfileId: lowProfileId })
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        // If webhook already processed this payment, we can just query that result
+        if (webhookData && webhookData.length > 0) {
+          console.log('Payment already processed by webhook:', webhookData[0]);
+          
+          // Set payment result based on webhook data
+          setPaymentResult({
+            success: webhookData[0].processing_result?.success || false,
+            message: webhookData[0].processing_result?.message || 'Payment processed',
+            data: webhookData[0].processing_result
+          });
+          
+          if (webhookData[0].processing_result?.success) {
+            toast.success('התשלום התקבל בהצלחה!');
+            navigate('/my-subscription');
+            return;
+          } else {
+            setError(webhookData[0].processing_result?.reason || 'אירעה שגיאה בתהליך התשלום');
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // FALLBACK: Call Supabase function to verify payment directly from CardCom API
+        // This will trigger if the webhook hasn't been received/processed yet
+        console.log('No webhook found, calling direct verification with CardCom API');
+        
         const { data, error: functionError } = await supabase.functions.invoke('verify-cardcom-payment', {
-          body: { lowProfileId }
+          body: { lowProfileId, source: 'redirect-page' }
         });
 
         if (functionError) {
@@ -36,6 +73,7 @@ export default function CardcomRedirectPage() {
         }
 
         if (data?.success) {
+          setPaymentResult(data);
           toast.success('התשלום התקבל בהצלחה!');
           // Navigate to success page or dashboard
           navigate('/my-subscription');
@@ -86,6 +124,12 @@ export default function CardcomRedirectPage() {
         </CardHeader>
         <CardContent>
           <p>פרטי העסקה נשמרו במערכת.</p>
+          {paymentResult?.data?.paymentData && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              <p>מספר עסקה: {paymentResult.data.paymentData.transactionId}</p>
+              <p>סכום: {paymentResult.data.paymentData.amount} ₪</p>
+            </div>
+          )}
         </CardContent>
         <CardFooter>
           <Button onClick={() => navigate('/my-subscription')} className="w-full">

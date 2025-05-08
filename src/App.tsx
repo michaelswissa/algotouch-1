@@ -7,6 +7,7 @@ import MySubscriptionPage from './pages/MySubscriptionPage';
 import { AuthProvider } from './contexts/auth';
 import { SubscriptionProvider } from './contexts/subscription/SubscriptionContext';
 import Dashboard from './pages/Dashboard';
+import CardcomRedirectPage from './pages/CardcomRedirectPage';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/my-subscription" element={<MySubscriptionPage />} />
+          <Route path="/cardcom-redirect" element={<CardcomRedirectPage />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </SubscriptionProvider>
