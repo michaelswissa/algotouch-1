@@ -1,98 +1,48 @@
 
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { LoadingPage } from '@/components/ui/spinner';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Spinner } from '@/components/ui/spinner';
+import { useSubscription } from '@/hooks/useSubscription';
 
-export default function CardcomRedirectPage() {
-  const location = useLocation();
+const CardcomRedirectPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { verifyPayment } = useSubscription();
 
   useEffect(() => {
-    async function handleRedirect() {
+    const handleRedirect = async () => {
       try {
-        // Parse URL search params to get relevant data
-        const searchParams = new URLSearchParams(location.search);
+        // Extract transaction info from URL parameters
         const lowProfileId = searchParams.get('LowProfileId');
         
-        if (!lowProfileId) {
-          setError('לא התקבלו נתונים מספיקים מהשרת');
-          setIsLoading(false);
-          return;
-        }
-
-        // Call Supabase function to verify payment
-        const { data, error: functionError } = await supabase.functions.invoke('verify-cardcom-payment', {
-          body: { lowProfileId }
-        });
-
-        if (functionError) {
-          throw new Error(functionError.message);
-        }
-
-        if (data?.success) {
-          toast.success('התשלום התקבל בהצלחה!');
-          // Navigate to success page or dashboard
-          navigate('/my-subscription');
+        if (lowProfileId) {
+          console.log('Payment redirect detected with LowProfileId:', lowProfileId);
+          
+          // Call your verification function
+          await verifyPayment(lowProfileId);
+          
+          // Redirect to success page
+          navigate('/my-subscription', { replace: true });
         } else {
-          setError(data?.message || 'אירעה שגיאה בתהליך אימות התשלום');
+          console.error('Missing LowProfileId in redirect URL');
+          navigate('/subscription', { replace: true });
         }
-      } catch (err: any) {
-        console.error('Error processing redirect:', err);
-        setError('אירעה שגיאה בעת עיבוד נתוני התשלום');
-      } finally {
-        setIsLoading(false);
+      } catch (error) {
+        console.error('Error handling payment redirect:', error);
+        navigate('/subscription?error=payment-failed', { replace: true });
       }
-    }
+    };
 
     handleRedirect();
-  }, [location, navigate]);
-
-  if (isLoading) {
-    return <LoadingPage />;
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>שגיאה בתהליך התשלום</CardTitle>
-            <CardDescription>לא ניתן היה לאמת את התשלום</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-destructive">{error}</p>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => navigate('/subscription')}>חזרה לדף התשלום</Button>
-            <Button onClick={() => navigate('/dashboard')}>חזרה לדף הבית</Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
+  }, [searchParams, navigate, verifyPayment]);
 
   return (
-    <div className="flex justify-center items-center min-h-screen p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>התשלום התקבל בהצלחה!</CardTitle>
-          <CardDescription>תודה על הצטרפותך</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p>פרטי העסקה נשמרו במערכת.</p>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={() => navigate('/my-subscription')} className="w-full">
-            צפייה במנוי שלי
-          </Button>
-        </CardFooter>
-      </Card>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <Spinner size="lg" />
+      <p className="mt-4 text-lg">מעבד את התשלום...</p>
+      <p className="text-muted-foreground">אנא המתן, אתה מועבר לעמוד המנוי</p>
     </div>
   );
-}
+};
+
+export default CardcomRedirectPage;
