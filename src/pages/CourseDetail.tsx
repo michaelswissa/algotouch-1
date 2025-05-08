@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { CourseHeader } from '@/components/courses/CourseHeader';
-import { CourseContentTabs } from '@/components/courses/CourseContentTabs';
+import CourseHeader from '@/components/courses/CourseHeader';
+import CourseContentTabs from '@/components/courses/CourseContentTabs';
 import { Card } from '@/components/ui/card';
 
 const CourseDetail = () => {
