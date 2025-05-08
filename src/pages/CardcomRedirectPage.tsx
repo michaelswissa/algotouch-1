@@ -2,12 +2,12 @@
 import React, { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Spinner } from '@/components/ui/spinner';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext'; 
 
 const CardcomRedirectPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { verifyPayment } = useSubscription();
+  const { refreshSubscription } = useSubscriptionContext();
 
   useEffect(() => {
     const handleRedirect = async () => {
@@ -18,8 +18,8 @@ const CardcomRedirectPage: React.FC = () => {
         if (lowProfileId) {
           console.log('Payment redirect detected with LowProfileId:', lowProfileId);
           
-          // Call your verification function
-          await verifyPayment(lowProfileId);
+          // Refresh subscription data instead of directly verifying payment
+          await refreshSubscription();
           
           // Redirect to success page
           navigate('/my-subscription', { replace: true });
@@ -34,7 +34,7 @@ const CardcomRedirectPage: React.FC = () => {
     };
 
     handleRedirect();
-  }, [searchParams, navigate, verifyPayment]);
+  }, [searchParams, navigate, refreshSubscription]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">

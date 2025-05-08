@@ -120,7 +120,9 @@ function App() {
           } />
           <Route path="/courses/:courseId" element={
             <ProtectedRoute>
-              <CourseDetail />
+              <Layout>
+                <CourseDetail />
+              </Layout>
             </ProtectedRoute>
           } />
           <Route path="/ai-assistant" element={
