@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useCommunity } from '@/contexts/community/CommunityContext';
 import { useAuth } from '@/contexts/auth';
@@ -163,6 +163,12 @@ export const useCourseData = (courseId: string | undefined) => {
 
   const [activeTab, setActiveTab] = useState('content');
   const [activeVideoId, setActiveVideoId] = useState<number | null>(1);
+  const [watchedTime, setWatchedTime] = useState<number>(0);
+  const [videoCompleted, setVideoCompleted] = useState<boolean>(false);
+  const lessonCompletionThreshold = 0.8; // 80% of video needs to be watched to count as completed
+  
+  // Track if video has been marked as watched to avoid duplicate points
+  const videoMarkedAsWatched = useRef(false);
   
   // Get course data
   const courseData = courseId && mockCourseData[courseId] 
@@ -176,6 +182,13 @@ export const useCourseData = (courseId: string | undefined) => {
 
   // Get user progress for this course
   const userProgress = courseProgress.find(progress => progress.courseId === courseId);
+  
+  // Reset watched time and completion status when video changes
+  useEffect(() => {
+    setWatchedTime(0);
+    setVideoCompleted(false);
+    videoMarkedAsWatched.current = false;
+  }, [activeVideoId]);
   
   const calculateProgress = () => {
     if (!userProgress || courseData.lessons.length === 0) {
@@ -220,37 +233,75 @@ export const useCourseData = (courseId: string | undefined) => {
   };
 
   const handleLessonClick = async (lessonId: number) => {
+    // Only update active video ID when clicking on a lesson
     setActiveVideoId(lessonId);
     
-    if (isAuthenticated && user && recordLessonWatched) {
-      const lessonIdStr = lessonId.toString();
-      await recordLessonWatched(courseId || 'unknown', lessonIdStr);
+    // We don't award points here - only when the video is actually watched
+    // Reset progress tracking
+    setWatchedTime(0);
+    setVideoCompleted(false);
+    videoMarkedAsWatched.current = false;
+  };
+
+  // Track video progress
+  const handleVideoProgress = async (event: any) => {
+    if (!activeVideoId || !isAuthenticated) return;
+    
+    const currentTime = event.target?.currentTime || 0;
+    const duration = event.target?.duration || 0;
+    
+    if (duration > 0) {
+      setWatchedTime(currentTime);
+      const percentWatched = currentTime / duration;
       
-      const lessonModule = findModuleForLesson(lessonId);
-      if (lessonModule) {
-        const moduleId = courseData.modules.indexOf(lessonModule).toString();
-        const allModuleLessonsWatched = checkAllModuleLessonsWatched(lessonModule);
+      // If watched more than threshold and not already marked as watched
+      if (percentWatched >= lessonCompletionThreshold && !videoMarkedAsWatched.current) {
+        videoMarkedAsWatched.current = true;
+        setVideoCompleted(true);
         
-        if (allModuleLessonsWatched && completeModule) {
-          await completeModule(courseId || 'unknown', moduleId);
+        // Now award points for watching the lesson
+        if (isAuthenticated && user && recordLessonWatched) {
+          const lessonIdStr = activeVideoId.toString();
+          const pointsAwarded = await recordLessonWatched(courseId || 'unknown', lessonIdStr);
           
-          const allModulesCompleted = checkAllModulesCompleted();
-          if (allModulesCompleted && completeCourse) {
-            await completeCourse(courseId || 'unknown');
+          if (pointsAwarded) {
+            // Check if module is completed
+            const lessonModule = findModuleForLesson(activeVideoId);
+            if (lessonModule) {
+              const moduleId = courseData.modules.indexOf(lessonModule).toString();
+              const allModuleLessonsWatched = checkAllModuleLessonsWatched(lessonModule);
+              
+              if (allModuleLessonsWatched && completeModule) {
+                await completeModule(courseId || 'unknown', moduleId);
+                
+                const allModulesCompleted = checkAllModulesCompleted();
+                if (allModulesCompleted && completeCourse) {
+                  await completeCourse(courseId || 'unknown');
+                }
+              }
+            }
           }
         }
       }
-    } else if (!isAuthenticated) {
-      toast.info('התחבר כדי לצבור נקודות על הצפייה בשיעורים');
     }
   };
   
   const handleVideoEnded = async () => {
-    if (isAuthenticated && activeVideoId) {
+    if (isAuthenticated && activeVideoId && !videoMarkedAsWatched.current) {
+      videoMarkedAsWatched.current = true;
+      
+      // Award points if not already awarded earlier by the progress handler
+      if (!videoCompleted && recordLessonWatched) {
+        const lessonIdStr = activeVideoId.toString();
+        await recordLessonWatched(courseId || 'unknown', lessonIdStr);
+      }
+      
       toast.success('השיעור הושלם!', {
         description: 'המשך לשיעור הבא כדי להמשיך ללמוד',
         duration: 3000,
       });
+      
+      setVideoCompleted(true);
     }
   };
   
@@ -260,7 +311,7 @@ export const useCourseData = (courseId: string | undefined) => {
     }
     
     return userBadges.some(userBadge => 
-      userBadge.badge && userBadge.badge.name.includes(courseData.title.substring(0, 10))
+      userBadge.badge && userBadge.badge.name && userBadge.badge.name.includes(courseData.title.substring(0, 10))
     );
   };
 
@@ -275,7 +326,9 @@ export const useCourseData = (courseId: string | undefined) => {
     progressPercentage,
     userProgress,
     handleLessonClick,
+    handleVideoProgress,
     handleVideoEnded,
-    hasCourseCompletionBadge
+    hasCourseCompletionBadge,
+    videoCompleted
   };
 };

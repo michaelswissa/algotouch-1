@@ -61,10 +61,18 @@ export async function initCommunityStorage(): Promise<void> {
     const bucketExists = await ensureCommunityMediaBucketExists();
     
     if (!bucketExists) {
-      toast.error('שגיאה באתחול אחסון המדיה לקהילה');
+      toast.error('שגיאה באתחול אחסון המדיה לקהילה', {
+        duration: 5000,
+        position: 'top-center',
+        id: 'storage-init-error',
+      });
     }
   } catch (error) {
     console.error('Error initializing community storage:', error);
-    toast.error('שגיאה באתחול אחסון המדיה לקהילה');
+    toast.error('שגיאה באתחול אחסון המדיה לקהילה', {
+      duration: 5000,
+      position: 'top-center',
+      id: 'storage-init-error',
+    });
   }
 }

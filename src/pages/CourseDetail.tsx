@@ -27,8 +27,10 @@ const CourseDetailContent = () => {
     userProgress,
     activeVideoId,
     handleLessonClick,
+    handleVideoProgress,
     handleVideoEnded,
-    hasCourseCompletionBadge
+    hasCourseCompletionBadge,
+    videoCompleted
   } = useCourseData(courseId);
 
   if (!courseData) {
@@ -51,6 +53,8 @@ const CourseDetailContent = () => {
         videoTitle={videoTitle}
         duration={activeLesson?.duration || courseData.activeVideo?.duration}
         onEnded={handleVideoEnded}
+        onProgress={handleVideoProgress}
+        completed={videoCompleted}
       />
       
       <CourseContentTabs 
