@@ -447,6 +447,39 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_webhooks: {
+        Row: {
+          created_at: string | null
+          id: string
+          payload: Json
+          processed: boolean | null
+          processed_at: string | null
+          processing_attempts: number | null
+          processing_result: Json | null
+          webhook_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payload: Json
+          processed?: boolean | null
+          processed_at?: string | null
+          processing_attempts?: number | null
+          processing_result?: Json | null
+          webhook_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payload?: Json
+          processed?: boolean | null
+          processed_at?: string | null
+          processing_attempts?: number | null
+          processing_result?: Json | null
+          webhook_type?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number | null
@@ -1018,6 +1051,10 @@ export type Database = {
           removed_role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      retry_failed_webhooks: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       update_expired_trials: {
         Args: Record<PropertyKey, never>

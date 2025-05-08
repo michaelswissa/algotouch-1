@@ -63,7 +63,37 @@ serve(async (req) => {
       );
     }
 
-    // Check if user already has a subscription
+    // Check for any payment records first
+    // Enhanced to check payment_logs and payment_webhooks
+    const { data: paymentRecords, error: paymentError } = await supabaseClient
+      .from("payment_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+      
+    if (paymentError) {
+      console.warn("Error fetching payment records:", paymentError);
+    }
+
+    // If no payment records found in payment_logs, check payment_webhooks for any successful payments
+    let webhookPayments = [];
+    if (!paymentRecords || paymentRecords.length === 0) {
+      const { data: webhookData, error: webhookError } = await supabaseClient
+        .from("payment_webhooks")
+        .select("*")
+        .eq("processed", true)
+        .filter("payload->ReturnValue", "eq", userId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+        
+      if (!webhookError && webhookData && webhookData.length > 0) {
+        webhookPayments = webhookData;
+        console.log("Found webhook payment records for user:", webhookPayments);
+      }
+    }
+
+    // Check for existing subscription
     const { data: existingSub, error: subError } = await supabaseClient
       .from("subscriptions")
       .select("*")
@@ -75,24 +105,13 @@ serve(async (req) => {
       console.error("Error checking existing subscription:", subError);
       throw new Error(`Database error: ${subError.message}`);
     }
-
-    // Check for payment records to determine plan type
-    const { data: paymentRecords, error: paymentError } = await supabaseClient
-      .from("payment_logs")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(5);
-      
-    if (paymentError) {
-      console.warn("Error fetching payment records:", paymentError);
-    }
     
     // Determine plan type based on payment records
     let planType = "monthly"; // Default plan
+    let highestPayment = { amount: 0 };
     
     if (paymentRecords && paymentRecords.length > 0) {
-      const highestPayment = paymentRecords.reduce((max, record) => {
+      highestPayment = paymentRecords.reduce((max, record) => {
         return (record.amount > max.amount) ? record : max;
       }, { amount: 0 });
       
@@ -110,6 +129,26 @@ serve(async (req) => {
       }
       
       console.log(`Determined plan type from payments: ${planType}, highest amount: ${highestPayment.amount}`);
+    } else if (webhookPayments.length > 0) {
+      // Try to determine plan from webhook data
+      for (const webhookPayment of webhookPayments) {
+        if (webhookPayment.payload && webhookPayment.payload.Amount) {
+          const amount = Number(webhookPayment.payload.Amount);
+          if (amount > highestPayment.amount) {
+            highestPayment = { amount };
+            
+            // Determine plan type from amount
+            if (amount > 900) {
+              planType = "vip";
+            } else if (amount > 100) {
+              planType = "annual";
+            } else {
+              planType = "monthly";
+            }
+          }
+        }
+      }
+      console.log(`Determined plan type from webhook data: ${planType}, highest amount: ${highestPayment.amount}`);
     }
     
     const now = new Date();
@@ -125,8 +164,8 @@ serve(async (req) => {
       subscriptionExpiry.setFullYear(now.getFullYear() + 10); 
     }
 
-    // Generate dummy payment method info if needed
-    const paymentMethod = {
+    // Generate payment method info from available data
+    let paymentMethod = {
       lastFourDigits: "1234",
       expiryMonth: "12",
       expiryYear: "25"
@@ -142,6 +181,16 @@ serve(async (req) => {
         paymentMethod.expiryYear = cardInfo.expiryYear || cardInfo.year || "25";
         
         console.log("Using payment method from payment record:", paymentMethod);
+      }
+    } else if (webhookPayments.length > 0) {
+      // Try to extract card info from webhook payload
+      const latestWebhook = webhookPayments[0];
+      if (latestWebhook.payload) {
+        paymentMethod.lastFourDigits = latestWebhook.payload.Last4CardDigits || "1234";
+        paymentMethod.expiryMonth = latestWebhook.payload.CardMonth || "12";
+        paymentMethod.expiryYear = latestWebhook.payload.CardYear || "25";
+        
+        console.log("Using payment method from webhook data:", paymentMethod);
       }
     }
 
@@ -172,11 +221,25 @@ serve(async (req) => {
           updated_at: now.toISOString()
         })
         .eq("id", existingSub[0].id)
-        .select()
-        .single();
+        .select();
 
       if (updateError) {
         console.error("Error updating subscription:", updateError);
+        
+        // Log error to system_logs
+        await supabaseClient
+          .from("system_logs")
+          .insert({
+            level: "ERROR",
+            function_name: "debug-subscription",
+            message: `Failed to update subscription for user ${userId}`,
+            details: {
+              error: updateError.message,
+              subscription_id: existingSub[0].id,
+              user_id: userId
+            }
+          });
+          
         return new Response(
           JSON.stringify({ 
             error: "Failed to update subscription",
@@ -207,11 +270,25 @@ serve(async (req) => {
         });
 
       console.log("Subscription updated successfully:", updatedSub);
+      
+      // Log successful operation
+      await supabaseClient
+        .from("system_logs")
+        .insert({
+          level: "INFO",
+          function_name: "debug-subscription",
+          message: `Successfully updated subscription for user ${userId}`,
+          details: {
+            subscription_id: updatedSub[0].id,
+            plan_type: planType,
+            user_id: userId
+          }
+        });
 
       return new Response(
         JSON.stringify({
           message: "Subscription updated successfully",
-          subscription: updatedSub
+          subscription: updatedSub[0]
         }),
         { 
           status: 200,
@@ -230,11 +307,24 @@ serve(async (req) => {
           payment_method: paymentMethod,
           contract_signed: true
         })
-        .select()
-        .single();
+        .select();
 
       if (insertError) {
         console.error("Error creating subscription:", insertError);
+        
+        // Log error to system_logs
+        await supabaseClient
+          .from("system_logs")
+          .insert({
+            level: "ERROR",
+            function_name: "debug-subscription",
+            message: `Failed to create subscription for user ${userId}`,
+            details: {
+              error: insertError.message,
+              user_id: userId
+            }
+          });
+          
         return new Response(
           JSON.stringify({ 
             error: "Failed to create subscription",
@@ -264,11 +354,25 @@ serve(async (req) => {
         });
 
       console.log("New subscription created successfully:", newSub);
+      
+      // Log successful operation
+      await supabaseClient
+        .from("system_logs")
+        .insert({
+          level: "INFO",
+          function_name: "debug-subscription",
+          message: `Successfully created subscription for user ${userId}`,
+          details: {
+            subscription_id: newSub[0].id,
+            plan_type: planType,
+            user_id: userId
+          }
+        });
 
       return new Response(
         JSON.stringify({
           message: "Subscription created successfully",
-          subscription: newSub
+          subscription: newSub[0]
         }),
         { 
           status: 201,
@@ -278,6 +382,29 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error("Error in debug subscription function:", error);
+    
+    // Try to log the error to the database
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+        
+        await supabaseClient
+          .from("system_logs")
+          .insert({
+            level: "ERROR",
+            function_name: "debug-subscription",
+            message: error.message || "Unknown error",
+            details: {
+              stack: error.stack
+            }
+          });
+      }
+    } catch (logError) {
+      console.error("Failed to log error:", logError);
+    }
     
     return new Response(
       JSON.stringify({ 

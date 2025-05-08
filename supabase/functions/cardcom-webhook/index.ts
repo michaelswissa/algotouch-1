@@ -1,6 +1,7 @@
 
+// Debug edge function to help test and fix subscriptions
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 // Configure CORS headers
 const corsHeaders = {
@@ -38,39 +39,59 @@ serve(async (req) => {
     
     console.log('Received webhook notification:', JSON.stringify(payload));
 
-    try {
-      // Log the webhook data in Supabase payment_webhooks table
-      const { data: logData, error: logError } = await supabaseClient
-        .from('payment_webhooks')
-        .insert({
-          webhook_type: 'cardcom',
-          payload: payload,
-          processed: false,
-          processing_attempts: 0
-        })
-        .select();
-      
-      if (logError) {
-        console.error('Error logging webhook to payment_webhooks:', logError);
-        throw new Error(`Failed to log webhook: ${logError.message}`);
-      }
+    // Log the webhook data in payment_webhooks table
+    const { data: logData, error: logError } = await supabaseClient
+      .from('payment_webhooks')
+      .insert({
+        webhook_type: 'cardcom',
+        payload: payload,
+        processed: false,
+        processing_attempts: 0
+      })
+      .select();
+    
+    if (logError) {
+      console.error('Error logging webhook to payment_webhooks:', logError);
+      throw new Error(`Failed to log webhook: ${logError.message}`);
+    }
 
-      console.log('Webhook logged successfully with ID:', logData?.[0]?.id);
-      
+    console.log('Webhook logged successfully with ID:', logData?.[0]?.id);
+    
+    // Enhanced error handling for webhook processing
+    try {
       // Process the webhook based on the payload data
-      // CardCom webhook contains information about the transaction
       const { ResponseCode, LowProfileId, TranzactionId, ReturnValue } = payload;
       
       console.log(`Processing payment with ResponseCode: ${ResponseCode}, LowProfileId: ${LowProfileId}, ReturnValue: ${ReturnValue}`);
       
-      // Check for duplicate processing
+      // Improved duplicate payment checking
       const { data: existingPayment, error: checkError } = await supabaseClient
         .rpc('check_duplicate_payment_extended', { low_profile_id: LowProfileId });
         
       if (checkError) {
         console.error('Error checking for duplicate payment:', checkError);
-      } else if (existingPayment && existingPayment.exists) {
+        throw new Error(`Duplicate check failed: ${checkError.message}`);
+      } 
+      
+      if (existingPayment && existingPayment.exists) {
         console.log('Payment already processed:', existingPayment);
+        
+        // Mark the webhook as processed since we already handled this payment
+        if (logData && logData.length > 0) {
+          await supabaseClient
+            .from('payment_webhooks')
+            .update({
+              processed: true,
+              processed_at: new Date().toISOString(),
+              processing_result: { 
+                success: true, 
+                message: 'Webhook already processed',
+                payment_id: existingPayment.transaction_id
+              }
+            })
+            .eq('id', logData[0].id);
+        }
+        
         return new Response(
           JSON.stringify({ 
             success: true, 
@@ -84,11 +105,11 @@ serve(async (req) => {
         );
       }
 
-      // ReturnValue typically contains user ID or registration ID
+      // Only proceed with successful payments (ResponseCode === 0)
       if (ReturnValue && ResponseCode === 0) {
         console.log(`Processing successful payment for ReturnValue: ${ReturnValue}`);
         
-        // Check if this is a user ID
+        // Check if this is a temporary registration ID or user ID
         if (ReturnValue.startsWith('temp_reg_')) {
           // This is a temporary registration ID
           await processRegistrationPayment(supabaseClient, ReturnValue, payload);
@@ -146,13 +167,42 @@ serve(async (req) => {
           status: 200,
         }
       );
-    } catch (error) {
-      console.error('Error processing webhook (inner try/catch):', error);
+    } catch (processingError) {
+      console.error('Error processing webhook:', processingError);
+      
+      // Record the processing error but don't throw it
+      if (logData && logData.length > 0) {
+        await supabaseClient
+          .from('payment_webhooks')
+          .update({
+            processing_attempts: 1,
+            processing_result: { 
+              success: false, 
+              error: processingError.message || 'Unknown error'
+            }
+          })
+          .eq('id', logData[0].id);
+      }
+      
+      // Log the error to system_logs for monitoring
+      await supabaseClient
+        .from('system_logs')
+        .insert({
+          level: 'ERROR',
+          function_name: 'cardcom-webhook',
+          message: 'Error processing payment webhook',
+          details: {
+            error: processingError.message,
+            payload: payload
+          }
+        });
+      
+      // Still return 200 to acknowledge receipt (webhook best practice)
       return new Response(
         JSON.stringify({ 
           success: false, 
           message: 'Error processing webhook',
-          error: error.message
+          error: processingError.message
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -178,7 +228,7 @@ serve(async (req) => {
   }
 });
 
-// Process payment for registered user
+// Process payment for registered user - enhanced with better subscription handling
 async function processUserPayment(supabase, userId, payload) {
   console.log(`Processing payment for user: ${userId}`);
   
@@ -195,7 +245,7 @@ async function processUserPayment(supabase, userId, payload) {
       throw new Error(`User not found: ${userError.message}`);
     }
     
-    // Log payment in payment_logs
+    // Log payment in payment_logs with enhanced error handling
     const { data: paymentData, error: paymentLogError } = await supabase
       .from('payment_logs')
       .insert({
@@ -224,8 +274,27 @@ async function processUserPayment(supabase, userId, payload) {
 
     console.log('Payment log created:', paymentData);
     
-    // Create/update user's subscription status
-    await createOrUpdateSubscription(supabase, userId, payload);
+    // Create/update user's subscription status with enhanced error handling
+    try {
+      await createOrUpdateSubscription(supabase, userId, payload);
+      console.log('Subscription created or updated successfully for user:', userId);
+    } catch (subError) {
+      console.error('Failed to create/update subscription:', subError);
+      
+      // Log the subscription error but don't fail the entire payment process
+      await supabase
+        .from('payment_errors')
+        .insert({
+          user_id: userId,
+          error_message: `Subscription creation failed: ${subError.message}`,
+          error_code: 'subscription_creation_error',
+          request_data: { payload },
+        });
+        
+      // Attempt recovery - make sure payment is still recorded
+      console.log('Attempting subscription recovery...');
+      await forceCreateSubscription(supabase, userId, payload);
+    }
     
     // Update payment session if it exists
     await updatePaymentSession(supabase, payload.LowProfileId, userId, 'completed', payload.TranzactionId);
@@ -284,7 +353,14 @@ async function processRegistrationPayment(supabase, regId, payload) {
     // If registration data contains user_id, also update subscription
     if (regData && regData.length > 0 && regData[0].registration_data.userId) {
       const userId = regData[0].registration_data.userId;
-      await createOrUpdateSubscription(supabase, userId, payload);
+      
+      try {
+        await createOrUpdateSubscription(supabase, userId, payload);
+      } catch (subError) {
+        console.error('Failed to create/update subscription for registration:', subError);
+        // Attempt recovery
+        await forceCreateSubscription(supabase, userId, payload);
+      }
       
       // Log the payment in payment_logs
       await supabase
@@ -321,6 +397,72 @@ async function processRegistrationPayment(supabase, regId, payload) {
         request_data: { regId, payload },
         error_code: 'registration_payment_error'
       });
+  }
+}
+
+// Last resort function to force create a subscription when normal flow fails
+async function forceCreateSubscription(supabase, userId, payload) {
+  console.log(`Force creating subscription for user ${userId}`);
+  
+  try {
+    const planId = getPlanFromAmount(payload.Amount);
+    const now = new Date();
+    let periodEndsAt = null;
+    
+    // Set appropriate subscription period based on plan type
+    if (planId === 'monthly') {
+      periodEndsAt = new Date(now);
+      periodEndsAt.setMonth(periodEndsAt.getMonth() + 1);
+    } else if (planId === 'annual') {
+      periodEndsAt = new Date(now);
+      periodEndsAt.setFullYear(periodEndsAt.getFullYear() + 1);
+    } // VIP plans have no end date
+    
+    const cardInfo = {
+      lastFourDigits: payload.Last4CardDigits || '0000',
+      expiryMonth: payload.CardMonth || '12',
+      expiryYear: payload.CardYear || '25'
+    };
+    
+    // Create new subscription (overriding any existing ones)
+    const { data: newSub, error: insertError } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        plan_type: planId,
+        status: 'active',
+        current_period_ends_at: periodEndsAt?.toISOString(),
+        payment_method: cardInfo,
+        contract_signed: true,
+        contract_signed_at: now.toISOString()
+      })
+      .select();
+      
+    if (insertError) {
+      console.error('Error force creating subscription:', insertError);
+      throw insertError;
+    }
+    
+    // Log the recovery action
+    await supabase
+      .from('system_logs')
+      .insert({
+        level: 'INFO',
+        function_name: 'forceCreateSubscription',
+        message: `Force created subscription for user ${userId}`,
+        details: {
+          user_id: userId,
+          subscription_id: newSub[0].id,
+          plan_id: planId,
+          transaction_id: payload.TranzactionId
+        }
+      });
+      
+    console.log('Subscription force created successfully:', newSub);
+    return newSub[0];
+  } catch (error) {
+    console.error('Error in forceCreateSubscription:', error);
+    throw error;
   }
 }
 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface DebugPanelProps {
   showDebug?: boolean;
@@ -19,6 +20,38 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ showDebug = false }) => {
   const [isFixing, setIsFixing] = useState(false);
   const [isForceCreate, setIsForceCreate] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (showDebug && user?.id) {
+      loadPaymentHistory();
+    }
+  }, [showDebug, user?.id]);
+
+  const loadPaymentHistory = async () => {
+    if (!user?.id) return;
+    
+    setIsLoading(true);
+    try {
+      // Get payment logs to display in debugging panel
+      const { data, error } = await supabase
+        .from('payment_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+        
+      if (error) throw new Error(error.message);
+      
+      setPaymentHistory(data || []);
+    } catch (err: any) {
+      console.error('Failed to load payment history:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // This is for debugging purposes only to help users who may have payment issues
   const handleFixSubscription = async () => {
@@ -52,6 +85,9 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ showDebug = false }) => {
       // Refresh subscription data
       await refreshSubscription();
       
+      // Also refresh payment history
+      await loadPaymentHistory();
+      
       toast.success(data.message || 'המנוי הופעל בהצלחה');
     } catch (error: any) {
       console.error('Error fixing subscription:', error);
@@ -67,26 +103,87 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ showDebug = false }) => {
   return (
     <Card className="my-4 border-dashed border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <span>תיקון בעיות מנוי</span>
-          <Badge variant="outline" className="bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200">
-            Debug
-          </Badge>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <span>תיקון בעיות מנוי</span>
+            <Badge variant="outline" className="bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200">
+              Debug
+            </Badge>
+          </CardTitle>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? 'הסתר מידע מורחב' : 'הצג מידע מורחב'}
+          </Button>
+        </div>
         <CardDescription>
           אפשרות זו מיועדת לפתרון בעיות מנוי שלא הופעל כראוי אחרי תשלום מוצלח
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-yellow-700 dark:text-yellow-400">
+        <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-3">
           במידה וביצעת תשלום באתר אך המנוי לא הופעל באופן אוטומטי, ניתן לנסות להפעיל אותו ידנית.
         </p>
         
         {errorDetails && (
-          <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-md dark:bg-red-900/20 dark:border-red-800">
-            <p className="text-xs text-red-700 dark:text-red-400">
-              פרטי שגיאה: {errorDetails}
-            </p>
+          <Alert variant="destructive" className="mb-3">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>שגיאה בהפעלת המנוי</AlertTitle>
+            <AlertDescription className="text-xs">
+              {errorDetails}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {showAdvanced && (
+          <div className="mt-3 space-y-2">
+            <h4 className="text-sm font-medium">היסטוריית תשלומים אחרונה:</h4>
+            {isLoading ? (
+              <div className="flex justify-center py-2">
+                <Loader2 className="h-5 w-5 animate-spin text-yellow-500" />
+              </div>
+            ) : paymentHistory.length > 0 ? (
+              <div className="space-y-2">
+                {paymentHistory.map((payment, idx) => (
+                  <div 
+                    key={idx} 
+                    className="p-2 bg-white/50 dark:bg-gray-800/50 border border-yellow-200 dark:border-yellow-900 rounded-md text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">
+                        {payment.payment_status === 'completed' ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-amber-500 inline mr-1" />
+                        )}
+                        {payment.amount} ₪
+                      </span>
+                      <Badge 
+                        variant={payment.payment_status === 'completed' ? 'outline' : 'secondary'}
+                        className={payment.payment_status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+                      >
+                        {payment.payment_status}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 flex justify-between">
+                      <span>תוכנית: {payment.plan_id}</span>
+                      <span>
+                        {new Date(payment.created_at).toLocaleDateString('he-IL')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Alert variant="default" className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertDescription>
+                  לא נמצאו רשומות תשלום עבור המשתמש
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
       </CardContent>
