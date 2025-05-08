@@ -38,7 +38,7 @@ export default function CardcomRedirectPage() {
         if (data?.success) {
           toast.success('התשלום התקבל בהצלחה!');
           // Navigate to success page or dashboard
-          navigate('/dashboard');
+          navigate('/my-subscription');
         } else {
           setError(data?.message || 'אירעה שגיאה בתהליך אימות התשלום');
         }
@@ -88,8 +88,8 @@ export default function CardcomRedirectPage() {
           <p>פרטי העסקה נשמרו במערכת.</p>
         </CardContent>
         <CardFooter>
-          <Button onClick={() => navigate('/dashboard')} className="w-full">
-            המשך לדף הבית
+          <Button onClick={() => navigate('/my-subscription')} className="w-full">
+            צפייה במנוי שלי
           </Button>
         </CardFooter>
       </Card>
