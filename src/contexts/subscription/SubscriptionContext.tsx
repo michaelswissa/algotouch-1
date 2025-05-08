@@ -139,21 +139,28 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
       const currentPeriodEndsAt = data.current_period_ends_at ? new Date(data.current_period_ends_at) : null;
       
+      // Consider a subscription active if:
+      // 1. It's explicitly marked as 'active'
+      // 2. It's in trial period and that period hasn't ended
+      // 3. It has a valid period end date in the future and hasn't been cancelled
       const isActive = data.status === 'active';
       const isTrial = data.status === 'trial' && trialEndsAt && trialEndsAt > now;
       const isValidPeriod = currentPeriodEndsAt && currentPeriodEndsAt > now;
       const isCancelled = data.cancelled_at !== null && data.cancelled_at !== undefined;
       
-      const activeStatus = isActive || isTrial || (isValidPeriod && !isCancelled);
-      console.log(`Subscription status: ${activeStatus ? 'active' : 'inactive'}`, {
-        isActive,
-        isTrial,
-        isValidPeriod,
-        isCancelled,
+      // For debugging purposes - show more details about subscription status
+      console.log("Subscription status details:", {
         status: data.status,
         trialEndsAt: trialEndsAt?.toISOString(),
-        currentPeriodEndsAt: currentPeriodEndsAt?.toISOString()
+        currentPeriodEndsAt: currentPeriodEndsAt?.toISOString(),
+        isValidPeriod,
+        isTrial,
+        isActive,
+        isCancelled
       });
+      
+      const activeStatus = isActive || isTrial || (isValidPeriod && !isCancelled);
+      console.log(`Subscription status: ${activeStatus ? 'active' : 'inactive'}`);
       
       setHasActiveSubscription(activeStatus);
       setSubscriptionDetails(data);

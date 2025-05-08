@@ -24,6 +24,12 @@ interface Subscription {
   contract_signed?: boolean | null;
 }
 
+// Interface for cancellation data
+interface CancellationData {
+  reason?: string;
+  feedback?: string;
+}
+
 // Interface for processed subscription details
 export interface SubscriptionDetails {
   planName: string;
@@ -90,27 +96,41 @@ export const useSubscription = () => {
             setSubscription(formattedSubscription);
             
             // Try to fetch cancellation data if available
-            let cancellationData = null;
-            try {
-              // Check if subscription_cancellations table exists and has data for this subscription
-              const { data: cancelData, error: cancelError } = await supabase
-                .from('subscription_cancellations')
-                .select('*')
-                .eq('subscription_id', data.id)
-                .limit(1)
-                .maybeSingle();
-              
-              if (cancelError) {
-                console.error("Error fetching cancellation data:", cancelError);
+            let cancellationData: CancellationData | null = null;
+            
+            // Check if the subscription is cancelled before trying to fetch cancellation data
+            if (data.cancelled_at) {
+              try {
+                // Check if table exists first by checking for table definition
+                const { error: tableCheckError } = await supabase
+                  .from('subscription_cancellations')
+                  .select('id')
+                  .limit(1);
+                
+                // If no error, the table exists
+                if (!tableCheckError) {
+                  const { data: cancelData, error: cancelError } = await supabase
+                    .from('subscription_cancellations')
+                    .select('reason, feedback')
+                    .eq('subscription_id', data.id)
+                    .limit(1)
+                    .maybeSingle();
+                  
+                  if (cancelError) {
+                    console.error("Error fetching cancellation data:", cancelError);
+                  }
+                  
+                  if (cancelData) {
+                    console.log("Found cancellation data:", cancelData);
+                    cancellationData = cancelData;
+                  }
+                } else {
+                  console.log("subscription_cancellations table does not exist or is not accessible");
+                }
+              } catch (cancelError) {
+                console.error('Error fetching cancellation data:', cancelError);
+                // Continue even if this fails
               }
-              
-              if (cancelData) {
-                console.log("Found cancellation data:", cancelData);
-                cancellationData = cancelData;
-              }
-            } catch (cancelError) {
-              console.error('Error fetching cancellation data:', cancelError);
-              // Continue even if this fails
             }
             
             // Process the subscription details
@@ -133,7 +153,7 @@ export const useSubscription = () => {
     fetchSubscription();
   }, [user]);
 
-  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: any): SubscriptionDetails | null => {
+  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: CancellationData | null): SubscriptionDetails | null => {
     if (!sub) return null;
     
     const planName = sub.plan_type === 'annual' ? 'שנתי' : 
@@ -244,32 +264,22 @@ export const useSubscription = () => {
       
       // Create a record in subscription_cancellations table
       try {
-        // Check if table exists first
-        const { data: tableExists } = await supabase.rpc('check_row_exists', {
-          p_table_name: 'information_schema.tables',
-          p_column_name: 'table_name',
-          p_value: 'subscription_cancellations'
-        });
-        
-        console.log("Subscription_cancellations table exists:", tableExists);
-        
-        if (tableExists) {
-          const { error: cancelError } = await supabase
-            .from('subscription_cancellations')
-            .insert({
-              subscription_id: subscription.id,
-              user_id: user.id,
-              reason: reason,
-              feedback: feedback || null,
-              cancelled_at: new Date().toISOString()
-            });
-            
-          if (cancelError) {
-            console.error("Error recording cancellation reason:", cancelError);
-          }
+        // Try to insert cancellation reason
+        const { error: cancelError } = await supabase
+          .from('subscription_cancellations')
+          .insert({
+            subscription_id: subscription.id,
+            user_id: user.id,
+            reason: reason,
+            feedback: feedback || null,
+            cancelled_at: new Date().toISOString()
+          });
+          
+        if (cancelError) {
+          console.error("Error recording cancellation reason:", cancelError);
         }
       } catch (e) {
-        console.error("Error checking/creating cancellation record:", e);
+        console.error("Error creating cancellation record:", e);
         // Continue execution, this is not critical
       }
       

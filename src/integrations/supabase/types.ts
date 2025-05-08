@@ -659,6 +659,44 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_cancellations: {
+        Row: {
+          cancelled_at: string
+          created_at: string
+          feedback: string | null
+          id: string
+          reason: string
+          subscription_id: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          reason: string
+          subscription_id: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          reason?: string
+          subscription_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_cancellations_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           cancelled_at: string | null

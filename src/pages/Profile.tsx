@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -10,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { UserCircle, Lock, MapPin, CreditCard } from 'lucide-react';
+import { UserCircle, Lock, MapPin, CreditCard, Bug } from 'lucide-react';
 import UserSubscription from '@/components/UserSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { SubscriptionProvider } from '@/contexts/subscription/SubscriptionContext';
+import DebugPanel from '@/components/subscription/DebugPanel';
 
 interface ProfileData {
   first_name: string;
@@ -43,6 +43,24 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
+  const [showDebug, setShowDebug] = useState(false);
+
+  // Toggle debug mode when pressing Ctrl+Shift+D
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        setShowDebug(prev => !prev);
+        if (!showDebug) {
+          toast.info('מצב דיבאג הופעל', { duration: 2000 });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showDebug]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -155,6 +173,9 @@ const Profile = () => {
           <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
             <UserCircle size={28} className="text-primary" />
             <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">הפרופיל שלי</span>
+            {showDebug && (
+              <Bug size={16} className="text-yellow-500 animate-pulse ml-2" />
+            )}
           </h1>
           
           <div className="grid grid-cols-1 gap-8">
@@ -271,6 +292,9 @@ const Profile = () => {
                   <h2 className="text-xl font-semibold">המנוי שלי</h2>
                 </div>
                 <UserSubscription />
+                
+                {/* Debug panel - only visible in debug mode */}
+                <DebugPanel showDebug={showDebug} />
               </TabsContent>
               
               <TabsContent value="security">
