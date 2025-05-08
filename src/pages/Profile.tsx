@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth';
@@ -167,195 +167,193 @@ const Profile = () => {
   };
 
   return (
-    <Layout>
+    <div className="tradervue-container py-8" dir="rtl">
       <SubscriptionProvider>
-        <div className="tradervue-container py-8" dir="rtl">
-          <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
-            <UserCircle size={28} className="text-primary" />
-            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">הפרופיל שלי</span>
-            {showDebug && (
-              <Bug size={16} className="text-yellow-500 animate-pulse ml-2" />
-            )}
-          </h1>
-          
-          <div className="grid grid-cols-1 gap-8">
-            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="mb-4">
-                <TabsTrigger value="personal">פרטים אישיים</TabsTrigger>
-                <TabsTrigger value="subscription">המנוי שלי</TabsTrigger>
-                <TabsTrigger value="security">אבטחה</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="personal">
-                <Card className="glass-card-2025">
-                  <CardHeader>
-                    <CardTitle>פרטים אישיים</CardTitle>
-                    <CardDescription>עדכן את פרטיך האישיים וקשר</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="first_name">שם פרטי</Label>
-                        <Input 
-                          id="first_name" 
-                          name="first_name" 
-                          value={profileData.first_name} 
-                          onChange={handleInputChange} 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="last_name">שם משפחה</Label>
-                        <Input 
-                          id="last_name" 
-                          name="last_name" 
-                          value={profileData.last_name} 
-                          onChange={handleInputChange} 
-                        />
-                      </div>
-                    </div>
-                    
+        <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
+          <UserCircle size={28} className="text-primary" />
+          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">הפרופיל שלי</span>
+          {showDebug && (
+            <Bug size={16} className="text-yellow-500 animate-pulse ml-2" />
+          )}
+        </h1>
+        
+        <div className="grid grid-cols-1 gap-8">
+          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="personal">פרטים אישיים</TabsTrigger>
+              <TabsTrigger value="subscription">המנוי שלי</TabsTrigger>
+              <TabsTrigger value="security">אבטחה</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="personal">
+              <Card className="glass-card-2025">
+                <CardHeader>
+                  <CardTitle>פרטים אישיים</CardTitle>
+                  <CardDescription>עדכן את פרטיך האישיים וקשר</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email">דוא"ל</Label>
-                      <Input id="email" value={user?.email || ''} disabled />
-                      <p className="text-xs text-muted-foreground">לא ניתן לשנות את כתובת האימייל</p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">טלפון</Label>
+                      <Label htmlFor="first_name">שם פרטי</Label>
                       <Input 
-                        id="phone" 
-                        name="phone" 
-                        value={profileData.phone} 
+                        id="first_name" 
+                        name="first_name" 
+                        value={profileData.first_name} 
                         onChange={handleInputChange} 
                       />
                     </div>
-                    
-                    <Separator className="my-4" />
-                    
-                    <h3 className="text-lg font-medium flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      כתובת
-                    </h3>
-                    
                     <div className="space-y-2">
-                      <Label htmlFor="street">רחוב ומספר</Label>
+                      <Label htmlFor="last_name">שם משפחה</Label>
                       <Input 
-                        id="street" 
-                        name="street" 
-                        value={profileData.street} 
+                        id="last_name" 
+                        name="last_name" 
+                        value={profileData.last_name} 
                         onChange={handleInputChange} 
                       />
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="city">עיר</Label>
-                        <Input 
-                          id="city" 
-                          name="city" 
-                          value={profileData.city} 
-                          onChange={handleInputChange} 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="postal_code">מיקוד</Label>
-                        <Input 
-                          id="postal_code" 
-                          name="postal_code" 
-                          value={profileData.postal_code} 
-                          onChange={handleInputChange} 
-                        />
-                      </div>
-                    </div>
-                    
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="email">דוא"ל</Label>
+                    <Input id="email" value={user?.email || ''} disabled />
+                    <p className="text-xs text-muted-foreground">לא ניתן לשנות את כתובת האימייל</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">טלפון</Label>
+                    <Input 
+                      id="phone" 
+                      name="phone" 
+                      value={profileData.phone} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+                  
+                  <Separator className="my-4" />
+                  
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    כתובת
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="street">רחוב ומספר</Label>
+                    <Input 
+                      id="street" 
+                      name="street" 
+                      value={profileData.street} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="country">מדינה</Label>
+                      <Label htmlFor="city">עיר</Label>
                       <Input 
-                        id="country" 
-                        name="country" 
-                        value={profileData.country} 
+                        id="city" 
+                        name="city" 
+                        value={profileData.city} 
                         onChange={handleInputChange} 
                       />
                     </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button onClick={handleSaveProfile} disabled={isSaving}>
-                      {isSaving ? 'שומר שינויים...' : 'שמור שינויים'}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="subscription">
-                <div className="flex items-center mb-4">
-                  <CreditCard className="h-5 w-5 mr-2 text-primary" />
-                  <h2 className="text-xl font-semibold">המנוי שלי</h2>
-                </div>
-                <UserSubscription />
-                
-                {/* Debug panel - only visible in debug mode */}
-                <DebugPanel showDebug={showDebug} />
-              </TabsContent>
-              
-              <TabsContent value="security">
-                <Card className="glass-card-2025">
-                  <CardHeader>
-                    <CardTitle>אבטחה</CardTitle>
-                    <CardDescription>נהל את הגדרות האבטחה שלך</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <h3 className="text-lg font-medium flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-primary" />
-                      שינוי סיסמה
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="current-password">סיסמה נוכחית</Label>
-                        <Input 
-                          id="current-password" 
-                          type="password" 
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="new-password">סיסמה חדשה</Label>
-                        <Input 
-                          id="new-password" 
-                          type="password" 
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="confirm-password">אימות סיסמה חדשה</Label>
-                        <Input 
-                          id="confirm-password" 
-                          type="password" 
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postal_code">מיקוד</Label>
+                      <Input 
+                        id="postal_code" 
+                        name="postal_code" 
+                        value={profileData.postal_code} 
+                        onChange={handleInputChange} 
+                      />
                     </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      onClick={handleChangePassword} 
-                      disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-                    >
-                      {changingPassword ? 'מעדכן סיסמה...' : 'עדכן סיסמה'}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="country">מדינה</Label>
+                    <Input 
+                      id="country" 
+                      name="country" 
+                      value={profileData.country} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={handleSaveProfile} disabled={isSaving}>
+                    {isSaving ? 'שומר שינויים...' : 'שמור שינויים'}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="subscription">
+              <div className="flex items-center mb-4">
+                <CreditCard className="h-5 w-5 mr-2 text-primary" />
+                <h2 className="text-xl font-semibold">המנוי שלי</h2>
+              </div>
+              <UserSubscription />
+              
+              {/* Debug panel - only visible in debug mode */}
+              <DebugPanel showDebug={showDebug} />
+            </TabsContent>
+            
+            <TabsContent value="security">
+              <Card className="glass-card-2025">
+                <CardHeader>
+                  <CardTitle>אבטחה</CardTitle>
+                  <CardDescription>נהל את הגדרות האבטחה שלך</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-primary" />
+                    שינוי סיסמה
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="current-password">סיסמה נוכחית</Label>
+                      <Input 
+                        id="current-password" 
+                        type="password" 
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">סיסמה חדשה</Label>
+                      <Input 
+                        id="new-password" 
+                        type="password" 
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">אימות סיסמה חדשה</Label>
+                      <Input 
+                        id="confirm-password" 
+                        type="password" 
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    onClick={handleChangePassword} 
+                    disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                  >
+                    {changingPassword ? 'מעדכן סיסמה...' : 'עדכן סיסמה'}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </SubscriptionProvider>
-    </Layout>
+    </div>
   );
 };
 

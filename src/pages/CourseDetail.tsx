@@ -3,6 +3,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import CourseHeader from '@/components/courses/CourseHeader';
 import CourseContentTabs from '@/components/courses/CourseContentTabs';
+import CourseVideoPlayer from '@/components/courses/CourseVideoPlayer';
 import { Card } from '@/components/ui/card';
 import { useCourseData } from '@/hooks/useCourseData';
 
@@ -16,11 +17,16 @@ const CourseDetail = () => {
     userProgress, 
     handleLessonClick,
     progressPercentage,
-    hasCourseCompletionBadge
+    hasCourseCompletionBadge,
+    handleVideoEnded,
+    handleVideoProgress
   } = useCourseData(courseId);
 
   const watchedLessons = userProgress?.lessonsWatched || [];
   const completedModules = userProgress?.modulesCompleted || [];
+  
+  // Find the active lesson to display in the video player
+  const activeLesson = courseData.lessons?.find(lesson => lesson.id === activeVideoId);
 
   return (
     <div className="space-y-6">
@@ -32,6 +38,18 @@ const CourseDetail = () => {
         isAuthenticated={true} 
         hasCourseCompletionBadge={!!hasCourseCompletionBadge()}
       />
+      
+      {/* Video Player - Add this back */}
+      {activeLesson && (
+        <CourseVideoPlayer 
+          videoUrl={activeLesson.videoUrl}
+          videoTitle={activeLesson.title}
+          duration={activeLesson.duration}
+          onEnded={handleVideoEnded}
+          onProgress={handleVideoProgress}
+          completed={watchedLessons.includes(activeLesson.id)}
+        />
+      )}
       
       <Card className="overflow-hidden">
         <CourseContentTabs 
