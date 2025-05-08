@@ -7,12 +7,31 @@ import { LoadingPage } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define interface for payment verification response
+interface VerifyPaymentResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    paymentData: {
+      transactionId: string;
+      amount: number;
+    }
+  };
+}
+
+// Define the webhook processing result structure
+interface WebhookProcessingResult {
+  success: boolean;
+  message?: string;
+  reason?: string;
+}
+
 export default function CardcomRedirectPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [paymentResult, setPaymentResult] = useState<VerifyPaymentResponse | null>(null);
 
   useEffect(() => {
     async function handleRedirect() {
@@ -42,19 +61,22 @@ export default function CardcomRedirectPage() {
         if (webhookData && webhookData.length > 0) {
           console.log('Payment already processed by webhook:', webhookData[0]);
           
+          // Type assert the processing_result to our expected structure
+          const processingResult = webhookData[0].processing_result as WebhookProcessingResult;
+          
           // Set payment result based on webhook data
           setPaymentResult({
-            success: webhookData[0].processing_result?.success || false,
-            message: webhookData[0].processing_result?.message || 'Payment processed',
+            success: processingResult.success || false,
+            message: processingResult.message || 'Payment processed',
             data: webhookData[0].processing_result
           });
           
-          if (webhookData[0].processing_result?.success) {
+          if (processingResult.success) {
             toast.success('התשלום התקבל בהצלחה!');
             navigate('/my-subscription');
             return;
           } else {
-            setError(webhookData[0].processing_result?.reason || 'אירעה שגיאה בתהליך התשלום');
+            setError(processingResult.reason || 'אירעה שגיאה בתהליך התשלום');
             setIsLoading(false);
             return;
           }
@@ -64,21 +86,25 @@ export default function CardcomRedirectPage() {
         // This will trigger if the webhook hasn't been received/processed yet
         console.log('No webhook found, calling direct verification with CardCom API');
         
-        const { data, error: functionError } = await supabase.functions.invoke('verify-cardcom-payment', {
-          body: { lowProfileId, source: 'redirect-page' }
-        });
+        const { data: rawData, error: functionError } = await supabase.functions.invoke(
+          'verify-cardcom-payment',
+          { body: { lowProfileId, source: 'redirect-page' } }
+        );
 
         if (functionError) {
           throw new Error(functionError.message);
         }
 
-        if (data?.success) {
+        // Type assert the response data
+        const data = rawData as VerifyPaymentResponse;
+
+        if (data.success) {
           setPaymentResult(data);
           toast.success('התשלום התקבל בהצלחה!');
           // Navigate to success page or dashboard
           navigate('/my-subscription');
         } else {
-          setError(data?.message || 'אירעה שגיאה בתהליך אימות התשלום');
+          setError(data.message || 'אירעה שגיאה בתהליך אימות התשלום');
         }
       } catch (err: any) {
         console.error('Error processing redirect:', err);
