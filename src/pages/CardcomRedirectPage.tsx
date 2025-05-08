@@ -61,14 +61,14 @@ export default function CardcomRedirectPage() {
         if (webhookData && webhookData.length > 0) {
           console.log('Payment already processed by webhook:', webhookData[0]);
           
-          // Type assert the processing_result to our expected structure
-          const processingResult = webhookData[0].processing_result as WebhookProcessingResult;
+          // Type assert the processing_result to our expected structure using the safer two-step approach
+          const processingResult = (webhookData[0].processing_result as unknown) as WebhookProcessingResult;
           
           // Set payment result based on webhook data
           setPaymentResult({
             success: processingResult.success || false,
             message: processingResult.message || 'Payment processed',
-            data: webhookData[0].processing_result
+            data: (webhookData[0].processing_result as unknown) as typeof paymentResult?.data
           });
           
           if (processingResult.success) {
@@ -95,8 +95,8 @@ export default function CardcomRedirectPage() {
           throw new Error(functionError.message);
         }
 
-        // Type assert the response data
-        const data = rawData as VerifyPaymentResponse;
+        // Type assert the response data using the safer two-step approach
+        const data = (rawData as unknown) as VerifyPaymentResponse;
 
         if (data.success) {
           setPaymentResult(data);
