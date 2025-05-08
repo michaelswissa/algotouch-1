@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { enhancedEmotions } from './data/enhanced-emotions';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface EmotionButtonsProps {
   selectedEmotion: string;
@@ -26,14 +27,22 @@ const EmotionButtons: React.FC<EmotionButtonsProps> = ({
   return (
     <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
       {enhancedEmotions.map(emotion => (
-        <Button
-          key={emotion.id}
-          className={`h-auto py-2 text-white flex flex-col items-center justify-center ${getEmotionColor(emotion)}`}
-          onClick={() => setSelectedEmotion(emotion.id)}
-          variant="ghost"
-        >
-          <span className="text-sm font-medium">{emotion.label}</span>
-        </Button>
+        <TooltipProvider key={emotion.id}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                className={`h-auto py-2 text-white flex flex-col items-center justify-center ${getEmotionColor(emotion)}`}
+                onClick={() => setSelectedEmotion(emotion.id)}
+                variant="ghost"
+              >
+                <span className="text-sm font-medium">{emotion.label}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{emotion.description || emotion.label}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       ))}
     </div>
   );

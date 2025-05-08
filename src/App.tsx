@@ -20,128 +20,131 @@ import NotFound from './pages/NotFound';
 import { AuthProvider } from './contexts/auth';
 import { SubscriptionProvider } from './contexts/subscription/SubscriptionContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { TooltipProvider } from './components/ui/tooltip';
 
 function App() {
   return (
     <AuthProvider>
       <SubscriptionProvider>
-        <Routes>
-          {/* Public route */}
-          <Route path="/auth" element={
-            <ProtectedRoute requireAuth={false} publicPaths={['/auth']}>
-              <Auth />
-            </ProtectedRoute>
-          } />
+        <TooltipProvider>
+          <Routes>
+            {/* Public route */}
+            <Route path="/auth" element={
+              <ProtectedRoute requireAuth={false} publicPaths={['/auth']}>
+                <Auth />
+              </ProtectedRoute>
+            } />
 
-          {/* Protected routes with Layout */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Layout>
-                <Profile />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/subscription" element={
-            <ProtectedRoute publicPaths={['/subscription']}>
-              <Layout>
-                <Subscription />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/my-subscription" element={
-            <ProtectedRoute>
-              <Layout>
-                <MySubscriptionPage />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/monthly-report" element={
-            <ProtectedRoute>
-              <Layout>
-                <MonthlyReport />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/calendar" element={
-            <ProtectedRoute>
-              <Layout>
-                <Calendar />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/trade-journal" element={
-            <ProtectedRoute>
-              <Layout>
-                <TradeJournal />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/trades" element={
-            <ProtectedRoute>
-              <Layout>
-                <Trades />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/blog" element={
-            <ProtectedRoute>
-              <Layout>
-                <Blog />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/community" element={
-            <ProtectedRoute>
-              <Layout>
-                <Community />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/courses" element={
-            <ProtectedRoute>
-              <Layout>
-                <Courses />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/courses/:courseId" element={
-            <ProtectedRoute>
-              <Layout>
-                <CourseDetail />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/ai-assistant" element={
-            <ProtectedRoute>
-              <Layout>
-                <AIAssistant />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            {/* Protected routes with Layout */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Profile />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/subscription" element={
+              <ProtectedRoute publicPaths={['/subscription']}>
+                <Layout>
+                  <Subscription />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/my-subscription" element={
+              <ProtectedRoute>
+                <Layout>
+                  <MySubscriptionPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/monthly-report" element={
+              <ProtectedRoute>
+                <Layout>
+                  <MonthlyReport />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/calendar" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Calendar />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/trade-journal" element={
+              <ProtectedRoute>
+                <Layout>
+                  <TradeJournal />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/trades" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Trades />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/blog" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Blog />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/community" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Community />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/courses" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Courses />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/courses/:courseId" element={
+              <ProtectedRoute>
+                <Layout>
+                  <CourseDetail />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-assistant" element={
+              <ProtectedRoute>
+                <Layout>
+                  <AIAssistant />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          {/* 404 route */}
-          <Route path="*" element={
-            <ProtectedRoute>
-              <Layout>
-                <NotFound />
-              </Layout>
-            </ProtectedRoute>
-          } />
-        </Routes>
+            {/* 404 route */}
+            <Route path="*" element={
+              <ProtectedRoute>
+                <Layout>
+                  <NotFound />
+                </Layout>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </TooltipProvider>
       </SubscriptionProvider>
     </AuthProvider>
   );
