@@ -20,4 +20,27 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // Optimize chunks and prevent dynamic import failures
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-components': [
+            '@/components/ui/button',
+            '@/components/ui/card',
+            '@/components/ui/tabs',
+            '@/components/ui/input'
+          ],
+          'auth': ['@/contexts/auth/AuthProvider', '@/hooks/useSecureAuth'],
+          'supabase': ['@supabase/supabase-js', '@/lib/supabase-client']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000,
+    // Add source maps in development for better debugging
+    sourcemap: mode === 'development',
+    // Improve error handling in production
+    reportCompressedSize: true,
+  }
 }));

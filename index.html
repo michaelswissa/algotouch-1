@@ -3,25 +3,67 @@
 <html lang="he" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AlgoTouch.AI - מערכת למסחר אלגוריתמי</title>
-    <meta name="description" content="מערכת מתקדמת למסחר אלגוריתמי" />
-    <meta name="author" content="AlgoTouch.AI" />
-
-    <meta property="og:title" content="AlgoTouch.AI - מערכת למסחר אלגוריתמי" />
-    <meta property="og:description" content="מערכת מתקדמת למסחר אלגוריתמי" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@algotouch_ai" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <title>AlgoTouch - Platform for Algorithmic Trading</title>
+    <meta name="description" content="פלטפורמה לניהול מסחר אלגוריתמי" />
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Handle module loading errors at the document level -->
+    <script>
+      window.moduleLoadErrors = [];
+      window.addEventListener('error', function(event) {
+        if (event.message && event.message.includes('Failed to fetch dynamically imported module')) {
+          window.moduleLoadErrors.push({
+            message: event.message,
+            time: new Date().toISOString()
+          });
+          
+          // Check if this is a blocking error (causing blank screen)
+          const isBlocking = event.error && event.error.blankScreen === true;
+          if (isBlocking) {
+            // Show error message to user
+            document.addEventListener('DOMContentLoaded', function() {
+              const errorDiv = document.createElement('div');
+              errorDiv.style.position = 'fixed';
+              errorDiv.style.top = '0';
+              errorDiv.style.left = '0';
+              errorDiv.style.width = '100%';
+              errorDiv.style.padding = '20px';
+              errorDiv.style.backgroundColor = '#f87171';
+              errorDiv.style.color = 'white';
+              errorDiv.style.textAlign = 'center';
+              errorDiv.style.zIndex = '9999';
+              errorDiv.innerText = 'אירעה שגיאה בטעינת האפליקציה. אנא רענן את הדף.';
+              
+              document.body.appendChild(errorDiv);
+              
+              // Add reload button
+              const reloadBtn = document.createElement('button');
+              reloadBtn.innerText = 'טען מחדש';
+              reloadBtn.style.marginLeft = '10px';
+              reloadBtn.style.padding = '5px 10px';
+              reloadBtn.style.border = 'none';
+              reloadBtn.style.backgroundColor = 'white';
+              reloadBtn.style.color = '#b91c1c';
+              reloadBtn.style.borderRadius = '4px';
+              reloadBtn.style.cursor = 'pointer';
+              reloadBtn.onclick = function() {
+                window.location.reload();
+              };
+              errorDiv.appendChild(reloadBtn);
+            });
+          }
+        }
+      });
+    </script>
+    <!-- GPT Engineer script for Select feature -->
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
   </head>
-
   <body>
     <div id="root"></div>
-    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
   </body>
 </html>

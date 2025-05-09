@@ -8,6 +8,7 @@ import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized } = useAuth();
@@ -82,26 +83,28 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4 dark:bg-background dark:text-foreground" dir="rtl">
-      <div className="w-full max-w-md space-y-6">
-        <AuthHeader />
-        
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="signup">הרשמה</TabsTrigger>
-            <TabsTrigger value="login">התחברות</TabsTrigger>
-          </TabsList>
+    <ErrorBoundary>
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4 dark:bg-background dark:text-foreground" dir="rtl">
+        <div className="w-full max-w-md space-y-6">
+          <AuthHeader />
           
-          <TabsContent value="login">
-            <LoginForm />
-          </TabsContent>
-          
-          <TabsContent value="signup">
-            <SignupForm />
-          </TabsContent>
-        </Tabs>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="signup">הרשמה</TabsTrigger>
+              <TabsTrigger value="login">התחברות</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <LoginForm />
+            </TabsContent>
+            
+            <TabsContent value="signup">
+              <SignupForm />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 

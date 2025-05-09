@@ -14,6 +14,7 @@ const IframeRedirect = () => {
   const webhookUrl = searchParams.get('webhookUrl') || '';
   const productName = searchParams.get('productName') || 'AlgoTouch Subscription';
   const returnValue = searchParams.get('returnValue') || '';
+  const operation = searchParams.get('operation') as 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly' || 'ChargeAndCreateToken';
   
   if (!terminalNumber || !apiName || !amount || !successUrl || !errorUrl || !webhookUrl) {
     return (
@@ -42,6 +43,7 @@ const IframeRedirect = () => {
         productName={productName}
         returnValue={returnValue}
         language="he"
+        operation={operation}
       />
     </div>
   );

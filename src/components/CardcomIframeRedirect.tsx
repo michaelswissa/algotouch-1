@@ -1,7 +1,9 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase-client';
 
 interface CardcomIframeRedirectProps {
   terminalNumber: number;
@@ -11,8 +13,9 @@ interface CardcomIframeRedirectProps {
   errorUrl: string;
   webhookUrl: string;
   productName?: string;
-  language?: string;
   returnValue?: string;
+  language?: string;
+  operation?: 'ChargeOnly' | 'ChargeAndCreateToken' | 'CreateTokenOnly';
 }
 
 const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
@@ -23,24 +26,22 @@ const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
   errorUrl,
   webhookUrl,
   productName = 'AlgoTouch Subscription',
+  returnValue = '',
   language = 'he',
-  returnValue = ''
+  operation = 'ChargeAndCreateToken'
 }) => {
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const createLowProfile = async () => {
+    const createIframeRedirect = async () => {
       try {
-        setLoading(true);
+        setIsLoading(true);
         
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/iframe-redirect`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        // Call the iframe-redirect function
+        const { data, error } = await supabase.functions.invoke('iframe-redirect', {
+          body: {
             terminalNumber,
             apiName,
             amount,
@@ -48,67 +49,75 @@ const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
             failedUrl: errorUrl,
             webhookUrl,
             productName,
+            returnValue,
             language,
-            returnValue
-          })
+            operation
+          }
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create payment page');
-        }
-
-        const data = await response.json();
         
-        if (data.ResponseCode !== 0) {
-          throw new Error(data.Description || 'Error creating payment page');
+        if (error) {
+          throw new Error(error.message || 'אירעה שגיאה ביצירת עמוד התשלום');
         }
         
-        setRedirectUrl(data.Url);
-        
-        // Automatically redirect after a brief delay
-        setTimeout(() => {
-          window.location.href = data.Url;
-        }, 1500);
-        
-      } catch (error) {
-        console.error('Payment initialization error:', error);
-        setError(error instanceof Error ? error.message : 'Failed to initialize payment');
+        if (data && data.Url) {
+          setPaymentUrl(data.Url);
+        } else {
+          throw new Error('לא התקבל קישור תקין ממערכת הסליקה');
+        }
+      } catch (err: any) {
+        console.error('Error creating iframe redirect:', err);
+        setError(err.message || 'אירעה שגיאה ביצירת עמוד התשלום');
+        toast.error('שגיאה בהתחברות למערכת הסליקה');
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
-    createLowProfile();
-  }, [terminalNumber, apiName, amount, successUrl, errorUrl, webhookUrl, productName, language, returnValue]);
+    createIframeRedirect();
+  }, [terminalNumber, apiName, amount, successUrl, errorUrl, webhookUrl, productName, returnValue, language, operation]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center p-8">
+          <Spinner size="lg" />
+          <p className="mt-4 text-center">מתחבר למערכת הסליקה...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (error) {
     return (
       <Card>
+        <CardContent className="p-6">
+          <div className="text-red-500 mb-4 text-center">
+            <p>אירעה שגיאה בהתחברות למערכת הסליקה</p>
+            <p className="text-sm text-muted-foreground mt-2">{error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!paymentUrl) {
+    return (
+      <Card>
         <CardContent className="p-6 text-center">
-          <h2 className="text-xl font-semibold mb-4 text-red-500">שגיאה בהפניה לדף התשלום</h2>
-          <p>{error}</p>
+          <p className="text-red-500">לא ניתן ליצור קישור לתשלום</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="p-6 text-center">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center gap-4">
-            <Spinner size="lg" />
-            <p className="text-lg">מפנה לדף התשלום...</p>
-          </div>
-        ) : redirectUrl ? (
-          <div className="flex flex-col items-center justify-center gap-4">
-            <p className="text-lg">מפנה לדף התשלום...</p>
-            <a href={redirectUrl} className="text-primary hover:underline">לחץ כאן אם אינך מועבר אוטומטית</a>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+    <div className="w-full h-[600px] max-h-[80vh] overflow-hidden rounded-lg shadow-lg border">
+      <iframe 
+        src={paymentUrl} 
+        className="w-full h-full border-none"
+        title="תשלום מאובטח"
+      />
+    </div>
   );
 };
 
