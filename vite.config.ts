@@ -33,8 +33,16 @@ export default defineConfig(({ mode }) => ({
             '@/components/ui/input'
           ],
           'auth': ['@/contexts/auth/AuthProvider', '@/hooks/useSecureAuth'],
+          'pages': [
+            '@/pages/Auth',
+            '@/pages/Dashboard',
+            '@/pages/IframeRedirect',
+            '@/pages/Calendar'
+          ],
           'supabase': ['@supabase/supabase-js', '@/lib/supabase-client']
-        }
+        },
+        // Prevent code-splitting for critical route components
+        inlineDynamicImports: false
       }
     },
     chunkSizeWarningLimit: 1000,

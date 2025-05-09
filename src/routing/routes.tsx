@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Route, Navigate } from 'react-router-dom';
+import { Route } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-// Import all pages statically
+// Import all pages statically to prevent dynamic import errors
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
