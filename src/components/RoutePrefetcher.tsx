@@ -20,7 +20,7 @@ const RoutePrefetcher: React.FC = () => {
     // Only prefetch after initial load is complete
     if (location.pathname === '/') return;
     
-    // Prefetch logging only - actual module prefetching was causing issues
+    // Prefetch logging only - actual module prefetching is disabled to prevent dynamic import issues
     setTimeout(() => {
       console.debug('Routes that would be prefetched:', 
         commonRoutes.filter(route => route !== location.pathname));

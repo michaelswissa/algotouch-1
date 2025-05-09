@@ -3,6 +3,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+
+// Direct imports without lazy loading
 import Dashboard from "./pages/Dashboard";
 import CalendarPage from "./pages/Calendar";
 import TradeJournal from "./pages/TradeJournal";

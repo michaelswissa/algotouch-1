@@ -8,7 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadingPage } from '@/components/ui/spinner';
 import PageTransition from '@/components/PageTransition';
 
-// Import your pages directly instead of lazily
+// Import pages directly instead of using lazy imports
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
