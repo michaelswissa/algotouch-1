@@ -7,8 +7,6 @@ import LoginForm from '@/components/auth/LoginForm';
 import SignupForm from '@/components/auth/SignupForm';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
-
-// Import useAuth from the index file rather than directly from AuthContext
 import { useAuth } from '@/contexts/auth';
 
 const Auth = () => {
@@ -20,10 +18,14 @@ const Auth = () => {
 
   // Get initial tab from URL if present
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const tab = params.get('tab');
-    if (tab === 'signup') {
-      setActiveTab('signup');
+    try {
+      const params = new URLSearchParams(location.search);
+      const tab = params.get('tab');
+      if (tab === 'signup') {
+        setActiveTab('signup');
+      }
+    } catch (error) {
+      console.error("Error parsing URL params:", error);
     }
   }, [location]);
 
@@ -36,9 +38,9 @@ const Auth = () => {
 
   // Check if there's valid registration data in session storage
   useEffect(() => {
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      if (storedData) {
         const data = JSON.parse(storedData);
         const registrationTime = new Date(data.registrationTime);
         const now = new Date();
@@ -54,10 +56,10 @@ const Auth = () => {
           sessionStorage.removeItem('registration_data');
           toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
         }
-      } catch (error) {
-        console.error("Error parsing registration data:", error);
-        sessionStorage.removeItem('registration_data');
       }
+    } catch (error) {
+      console.error("Error parsing registration data:", error);
+      sessionStorage.removeItem('registration_data');
     }
   }, [navigate, location.state]);
 

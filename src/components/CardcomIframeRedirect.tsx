@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent } from './ui/card';
-import { Button } from './ui/button';
-import { Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 
 interface CardcomIframeRedirectProps {
   terminalNumber: number;
@@ -23,112 +22,94 @@ const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
   successUrl,
   errorUrl,
   webhookUrl,
-  productName = "AlgoTouch Subscription",
-  language = "he",
-  returnValue = ""
+  productName = 'AlgoTouch Subscription',
+  language = 'he',
+  returnValue = ''
 }) => {
   const [loading, setLoading] = useState(true);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
-  // Function to create the low profile URL
-  const createLowProfileUrl = async () => {
-    try {
-      setLoading(true);
-      // Building request body
-      const requestBody = {
-        TerminalNumber: terminalNumber,
-        ApiName: apiName,
-        Amount: amount,
-        SuccessRedirectUrl: successUrl,
-        FailedRedirectUrl: errorUrl,
-        WebHookUrl: webhookUrl,
-        ProductName: productName,
-        Language: language,
-        ReturnValue: returnValue,
-        UIDefinition: {
-          IsHideCardOwnerName: false,
-          IsHideCardOwnerPhone: false,
-          IsCardOwnerPhoneRequired: true,
-          IsHideCardOwnerEmail: false,
-          IsCardOwnerEmailRequired: true
+  useEffect(() => {
+    const createLowProfile = async () => {
+      try {
+        setLoading(true);
+        
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/iframe-redirect`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            terminalNumber,
+            apiName,
+            amount,
+            successUrl,
+            failedUrl: errorUrl,
+            webhookUrl,
+            productName,
+            language,
+            returnValue
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create payment page');
         }
-      };
 
-      console.log("Creating payment URL with:", { 
-        terminalNumber, apiName, amount, 
-        successUrl: successUrl.substring(0, 30) + '...',
-        errorUrl: errorUrl.substring(0, 30) + '...',
-      });
-
-      // Make the API call to Cardcom
-      const response = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/Create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      const data = await response.json();
-      console.log("Cardcom API response:", data);
-
-      if (data.ResponseCode === 0) {
-        // Success - redirect to the URL
+        const data = await response.json();
+        
+        if (data.ResponseCode !== 0) {
+          throw new Error(data.Description || 'Error creating payment page');
+        }
+        
         setRedirectUrl(data.Url);
-      } else {
-        // Error
-        setError(`Error: ${data.Description || 'Unknown error'}`);
+        
+        // Automatically redirect after a brief delay
+        setTimeout(() => {
+          window.location.href = data.Url;
+        }, 1500);
+        
+      } catch (error) {
+        console.error('Payment initialization error:', error);
+        setError(error instanceof Error ? error.message : 'Failed to initialize payment');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error creating payment URL:', err);
-      setError('Error creating payment URL. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  React.useEffect(() => {
-    createLowProfileUrl();
-  }, []);
-
-  if (loading) {
-    return (
-      <Card className="w-full">
-        <CardContent className="flex flex-col items-center justify-center p-6">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="mt-4 text-center">מעבר למסך התשלום, אנא המתן...</p>
-        </CardContent>
-      </Card>
-    );
-  }
+    createLowProfile();
+  }, [terminalNumber, apiName, amount, successUrl, errorUrl, webhookUrl, productName, language, returnValue]);
 
   if (error) {
     return (
-      <Card className="w-full">
-        <CardContent className="flex flex-col items-center justify-center p-6">
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={createLowProfileUrl}>נסה שוב</Button>
+      <Card>
+        <CardContent className="p-6 text-center">
+          <h2 className="text-xl font-semibold mb-4 text-red-500">שגיאה בהפניה לדף התשלום</h2>
+          <p>{error}</p>
         </CardContent>
       </Card>
     );
   }
 
-  if (redirectUrl) {
-    // Use an iframe to load the Cardcom payment page
-    return (
-      <div className="w-full h-[600px] border rounded-lg overflow-hidden">
-        <iframe 
-          src={redirectUrl}
-          title="Cardcom Payment"
-          className="w-full h-full"
-          allow="payment"
-        />
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <Card>
+      <CardContent className="p-6 text-center">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center gap-4">
+            <Spinner size="lg" />
+            <p className="text-lg">מפנה לדף התשלום...</p>
+          </div>
+        ) : redirectUrl ? (
+          <div className="flex flex-col items-center justify-center gap-4">
+            <p className="text-lg">מפנה לדף התשלום...</p>
+            <a href={redirectUrl} className="text-primary hover:underline">לחץ כאן אם אינך מועבר אוטומטית</a>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
 };
 
 export default CardcomIframeRedirect;

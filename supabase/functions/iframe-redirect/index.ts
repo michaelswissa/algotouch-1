@@ -62,6 +62,8 @@ serve(async (req) => {
       }
     };
 
+    console.log("Sending request to Cardcom:", JSON.stringify(cardcomRequestBody));
+
     // Call Cardcom API to create low profile page
     const response = await fetch("https://secure.cardcom.solutions/api/v1/LowProfile/Create", {
       method: "POST",
@@ -73,6 +75,8 @@ serve(async (req) => {
 
     // Parse the response
     const data = await response.json();
+    
+    console.log("Received response from Cardcom:", JSON.stringify(data));
     
     // Return the response
     return new Response(
@@ -87,6 +91,8 @@ serve(async (req) => {
     );
   } catch (error) {
     // Handle errors
+    console.error("Error in iframe-redirect function:", error);
+    
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",

@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const IframeRedirect = () => {
   const [searchParams] = useSearchParams();
-  const terminalNumber = parseInt(searchParams.get('terminalNumber') || '0');
+  const terminalNumber = parseInt(searchParams.get('terminalNumber') || '0', 10);
   const apiName = searchParams.get('apiName') || '';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const successUrl = searchParams.get('successUrl') || '';
