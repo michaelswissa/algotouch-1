@@ -3,12 +3,12 @@ import React from 'react';
 import { Route } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-// Import Auth page directly to prevent dynamic imports
+// Import Auth and Dashboard pages directly to prevent dynamic imports
 import Auth from '@/pages/Auth';
+import Dashboard from '@/pages/Dashboard';
 
 // Import all other pages statically
 import Index from '@/pages/Index';
-import Dashboard from '@/pages/Dashboard';
 import Calendar from '@/pages/Calendar';
 import TradeJournal from '@/pages/TradeJournal';
 import MonthlyReport from '@/pages/MonthlyReport';

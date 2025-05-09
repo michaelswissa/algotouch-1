@@ -11,6 +11,7 @@ interface State {
   error: Error | null;
   isModuleError: boolean;
   isAuthError: boolean;
+  isDashboardError: boolean;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -20,7 +21,8 @@ class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       isModuleError: false,
-      isAuthError: false
+      isAuthError: false,
+      isDashboardError: false
     };
   }
 
@@ -28,18 +30,25 @@ class ErrorBoundary extends Component<Props, State> {
     // Check if it's a module loading error
     const isModuleError = error.message && 
       (error.message.includes('Failed to fetch dynamically imported module') ||
-       error.message.includes('Importing a module script failed'));
+       error.message.includes('Importing a module script failed') ||
+       error.message.includes('Loading chunk'));
     
     // Check if it's specifically the Auth module
     const isAuthError = error.message && 
       error.message.includes('Auth-') && 
       error.message.includes('Failed to fetch');
        
+    // Check if it's specifically the Dashboard module
+    const isDashboardError = error.message && 
+      error.message.includes('Dashboard-') && 
+      error.message.includes('Failed to fetch');
+       
     return {
       hasError: true,
       error,
       isModuleError,
-      isAuthError
+      isAuthError,
+      isDashboardError
     };
   }
 
@@ -49,6 +58,16 @@ class ErrorBoundary extends Component<Props, State> {
     // Special handling for Auth module errors
     if (this.state.isAuthError) {
       console.log('Auth module failed to load, redirecting to home...');
+      // Delay to allow logging to complete
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+      return;
+    }
+    
+    // Special handling for Dashboard module errors
+    if (this.state.isDashboardError) {
+      console.log('Dashboard module failed to load, redirecting to home...');
       // Delay to allow logging to complete
       setTimeout(() => {
         window.location.href = '/';
@@ -72,8 +91,8 @@ class ErrorBoundary extends Component<Props, State> {
             if (event.data.success) {
               console.log('Module recovery successful, reloading...');
               window.location.reload();
-            } else if (this.state.isAuthError) {
-              // If Auth recovery failed, redirect to home
+            } else if (this.state.isAuthError || this.state.isDashboardError) {
+              // If critical module recovery failed, redirect to home
               window.location.href = '/';
             }
           }
@@ -90,8 +109,8 @@ class ErrorBoundary extends Component<Props, State> {
 
   // Custom retry logic
   handleRetry = () => {
-    if (this.state.isAuthError) {
-      // For Auth errors, go to homepage
+    if (this.state.isAuthError || this.state.isDashboardError) {
+      // For critical module errors, go to homepage
       window.location.href = '/';
     } else if (this.state.isModuleError) {
       console.log('Manual retry triggered, clearing cache and reloading...');
@@ -147,6 +166,44 @@ class ErrorBoundary extends Component<Props, State> {
             <h2 className="text-xl font-bold mb-2">שגיאה בטעינת עמוד ההתחברות</h2>
             <p className="text-muted-foreground mb-4">
               אירעה שגיאה בטעינת עמוד ההתחברות. אנו מפנים אותך לעמוד הראשי.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={this.handleGoHome}
+                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+              >
+                חזור לעמוד הבית
+              </button>
+            </div>
+          </div>
+        );
+      }
+      
+      // Custom fallback UI for Dashboard module errors
+      if (this.state.isDashboardError) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+            <div className="mb-6 text-orange-500">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mx-auto"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2">שגיאה בטעינת לוח הבקרה</h2>
+            <p className="text-muted-foreground mb-4">
+              אירעה שגיאה בטעינת לוח הבקרה. אנו מפנים אותך לעמוד הראשי.
             </p>
             <div className="flex flex-col gap-3">
               <button

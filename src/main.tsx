@@ -66,7 +66,11 @@ if ('serviceWorker' in navigator) {
 // Direct failsafe for module loading (without service worker)
 function setupDirectFailsafe() {
   window.addEventListener('error', (event) => {
-    if (event.message && event.message.includes('Failed to fetch dynamically imported module')) {
+    if (event.message && (
+      event.message.includes('Failed to fetch dynamically imported module') ||
+      event.message.includes('Loading chunk') ||
+      event.message.includes('Loading CSS chunk')
+    )) {
       console.error('Module loading error detected:', event.message);
       
       // If on Auth page and Auth module fails, redirect to home
@@ -75,7 +79,15 @@ function setupDirectFailsafe() {
         setTimeout(() => {
           window.location.href = '/';
         }, 1000);
-      } else {
+      }
+      // If on Dashboard page and Dashboard module fails, redirect to home
+      else if (window.location.pathname.includes('/dashboard')) {
+        console.log('Dashboard module failed to load, redirecting to home page...');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
+      }
+      else {
         // For other pages, just reload
         setTimeout(() => {
           window.location.reload();
@@ -85,17 +97,26 @@ function setupDirectFailsafe() {
   });
 }
 
-// Prefetch Auth module immediately
-function prefetchAuthModule() {
+// Prefetch critical modules immediately
+function prefetchCriticalModules() {
   try {
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.as = 'script';
-    link.href = '/assets/Auth.js'; // Adjust the path as necessary
-    document.head.appendChild(link);
-    console.log('Prefetching Auth module');
+    // Prefetch Auth module
+    const authLink = document.createElement('link');
+    authLink.rel = 'prefetch';
+    authLink.as = 'script';
+    authLink.href = '/assets/index.js'; // Main bundle should include Auth now
+    document.head.appendChild(authLink);
+    
+    // Prefetch Dashboard module
+    const dashboardLink = document.createElement('link');
+    dashboardLink.rel = 'prefetch';
+    dashboardLink.as = 'script'; 
+    dashboardLink.href = '/assets/index.js'; // Main bundle should include Dashboard now
+    document.head.appendChild(dashboardLink);
+    
+    console.log('Prefetching critical modules');
   } catch (e) {
-    console.warn('Failed to prefetch Auth module:', e);
+    console.warn('Failed to prefetch critical modules:', e);
   }
 }
 
@@ -113,11 +134,15 @@ root.render(
 );
 
 // Prefetch critical modules
-prefetchAuthModule();
+prefetchCriticalModules();
 
 // Add global catch for uncaught module loading errors
 window.addEventListener('error', (event) => {
-  if (event.message && event.message.includes('Failed to fetch dynamically imported module')) {
+  if (event.message && (
+    event.message.includes('Failed to fetch dynamically imported module') ||
+    event.message.includes('Loading chunk') ||
+    event.message.includes('Loading CSS chunk')
+  )) {
     console.error('Module loading error detected:', event.message);
     
     // Attempt to recover via service worker if possible

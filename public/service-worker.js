@@ -2,16 +2,17 @@
 // Enhanced service worker for caching and error recovery
 
 // Cache name with version - increment this to force cache busting
-const CACHE_NAME = 'algotouch-cache-v3';
+const CACHE_NAME = 'algotouch-cache-v4';
 
-// Critical files to cache - prioritize Auth component
+// Critical files to cache - prioritize Auth and Dashboard components
 const urlsToCache = [
   '/',
   '/index.html',
   '/assets/index.css',
   '/assets/index.js',
-  // Explicitly include Auth in the initial cache
+  // Explicitly include critical routes in the initial cache
   '/auth',
+  '/dashboard',
 ];
 
 // Install the service worker and cache initial assets
@@ -60,8 +61,9 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('/api/') || 
       event.request.url.includes('/functions/')) return;
   
-  // For Auth module and JS files, use network-first strategy
+  // For Auth and Dashboard modules and JS files, use network-first strategy
   if (event.request.url.includes('Auth') || 
+      event.request.url.includes('Dashboard') ||
       event.request.url.endsWith('.js') || 
       event.request.url.includes('/assets/')) {
     
@@ -84,10 +86,18 @@ self.addEventListener('fetch', (event) => {
               return cachedResponse;
             }
             
-            // If not in cache either, return a special fallback for Auth module
+            // If not in cache either, return a special fallback for critical modules
             if (event.request.url.includes('Auth')) {
               return new Response(
                 'console.error("Auth module failed to load; redirecting to base URL");' +
+                'setTimeout(() => window.location.href = "/", 1000);', 
+                {headers: { 'Content-Type': 'application/javascript' }}
+              );
+            }
+            
+            if (event.request.url.includes('Dashboard')) {
+              return new Response(
+                'console.error("Dashboard module failed to load; redirecting to base URL");' +
                 'setTimeout(() => window.location.href = "/", 1000);', 
                 {headers: { 'Content-Type': 'application/javascript' }}
               );
@@ -198,20 +208,30 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Preload Auth component in the background
+// Preload critical components in the background
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // Prefetch Auth related assets
-      return fetch('/auth', {
-        mode: 'no-cors',
-        credentials: 'include'
-      })
-      .then(response => {
-        return cache.put('/auth', response);
-      })
-      .catch(err => console.warn('Auth prefetch failed, will retry on demand:', err));
+      // Prefetch critical assets
+      return Promise.all([
+        fetch('/auth', {
+          mode: 'no-cors',
+          credentials: 'include'
+        })
+        .then(response => {
+          return cache.put('/auth', response);
+        })
+        .catch(err => console.warn('Auth prefetch failed, will retry on demand:', err)),
+        
+        fetch('/dashboard', {
+          mode: 'no-cors',
+          credentials: 'include'
+        })
+        .then(response => {
+          return cache.put('/dashboard', response);
+        })
+        .catch(err => console.warn('Dashboard prefetch failed, will retry on demand:', err))
+      ]);
     })
   );
 });
-

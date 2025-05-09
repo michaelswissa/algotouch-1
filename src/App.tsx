@@ -8,20 +8,25 @@ import PageTransition from '@/components/PageTransition';
 import { generateRouteComponents } from './routing/routes';
 import ErrorBoundary from './components/ErrorBoundary';
 
-// Explicitly prefetch Auth component
-const prefetchAuthComponent = () => {
+// Explicitly prefetch critical components
+const prefetchCriticalComponents = () => {
   try {
-    // Create a prefetch link
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = '/auth';
-    document.head.appendChild(link);
+    // Create prefetch links
+    const authLink = document.createElement('link');
+    authLink.rel = 'prefetch';
+    authLink.href = '/auth';
+    document.head.appendChild(authLink);
+    
+    const dashboardLink = document.createElement('link');
+    dashboardLink.rel = 'prefetch';
+    dashboardLink.href = '/dashboard';
+    document.head.appendChild(dashboardLink);
     
     // Also try to prefetch the JS directly
     const scriptLink = document.createElement('link');
     scriptLink.rel = 'prefetch';
     scriptLink.as = 'script';
-    scriptLink.href = '/assets/index.js'; // Main bundle should include Auth now
+    scriptLink.href = '/assets/index.js'; // Main bundle should include Auth and Dashboard now
     document.head.appendChild(scriptLink);
   } catch (e) {
     console.warn('Prefetch failed:', e);
@@ -33,8 +38,8 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.add('dark');
     
-    // Prefetch auth component
-    prefetchAuthComponent();
+    // Prefetch critical components
+    prefetchCriticalComponents();
   }, []);
   
   return (
