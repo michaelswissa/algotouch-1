@@ -3,9 +3,11 @@ import React from 'react';
 import { Route } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-// Import all pages statically to prevent dynamic import errors
-import Index from '@/pages/Index';
+// Import Auth page directly to prevent dynamic imports
 import Auth from '@/pages/Auth';
+
+// Import all other pages statically
+import Index from '@/pages/Index';
 import Dashboard from '@/pages/Dashboard';
 import Calendar from '@/pages/Calendar';
 import TradeJournal from '@/pages/TradeJournal';
@@ -26,7 +28,7 @@ import IframeRedirect from '@/pages/IframeRedirect';
 import NotFound from '@/pages/NotFound';
 import ContractDetails from '@/pages/ContractDetails';
 
-// Define route configurations all in one place
+// Define route configurations
 export const routes = [
   // Public routes
   {

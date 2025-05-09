@@ -10,6 +10,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   isModuleError: boolean;
+  isAuthError: boolean;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -18,7 +19,8 @@ class ErrorBoundary extends Component<Props, State> {
     this.state = {
       hasError: false,
       error: null,
-      isModuleError: false
+      isModuleError: false,
+      isAuthError: false
     };
   }
 
@@ -27,16 +29,32 @@ class ErrorBoundary extends Component<Props, State> {
     const isModuleError = error.message && 
       (error.message.includes('Failed to fetch dynamically imported module') ||
        error.message.includes('Importing a module script failed'));
+    
+    // Check if it's specifically the Auth module
+    const isAuthError = error.message && 
+      error.message.includes('Auth-') && 
+      error.message.includes('Failed to fetch');
        
     return {
       hasError: true,
       error,
-      isModuleError
+      isModuleError,
+      isAuthError
     };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error("Uncaught error:", error, errorInfo);
+    
+    // Special handling for Auth module errors
+    if (this.state.isAuthError) {
+      console.log('Auth module failed to load, redirecting to home...');
+      // Delay to allow logging to complete
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+      return;
+    }
     
     // Try to recover from module loading errors
     if (this.state.isModuleError && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -54,6 +72,9 @@ class ErrorBoundary extends Component<Props, State> {
             if (event.data.success) {
               console.log('Module recovery successful, reloading...');
               window.location.reload();
+            } else if (this.state.isAuthError) {
+              // If Auth recovery failed, redirect to home
+              window.location.href = '/';
             }
           }
         });
@@ -69,7 +90,10 @@ class ErrorBoundary extends Component<Props, State> {
 
   // Custom retry logic
   handleRetry = () => {
-    if (this.state.isModuleError) {
+    if (this.state.isAuthError) {
+      // For Auth errors, go to homepage
+      window.location.href = '/';
+    } else if (this.state.isModuleError) {
       console.log('Manual retry triggered, clearing cache and reloading...');
       
       // Clear browser cache for this domain (if supported)
@@ -90,9 +114,52 @@ class ErrorBoundary extends Component<Props, State> {
       window.location.reload();
     }
   };
+  
+  // Go to homepage bypassing Auth
+  handleGoHome = () => {
+    window.location.href = '/';
+  };
 
   render(): ReactNode {
     if (this.state.hasError) {
+      // Custom fallback UI for Auth module errors
+      if (this.state.isAuthError) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+            <div className="mb-6 text-orange-500">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mx-auto"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2">שגיאה בטעינת עמוד ההתחברות</h2>
+            <p className="text-muted-foreground mb-4">
+              אירעה שגיאה בטעינת עמוד ההתחברות. אנו מפנים אותך לעמוד הראשי.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={this.handleGoHome}
+                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+              >
+                חזור לעמוד הבית
+              </button>
+            </div>
+          </div>
+        );
+      }
+      
       // Custom fallback UI for module loading errors
       if (this.state.isModuleError) {
         return (
@@ -128,6 +195,12 @@ class ErrorBoundary extends Component<Props, State> {
                 className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
               >
                 נסה שוב
+              </button>
+              <button
+                onClick={this.handleGoHome}
+                className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
+              >
+                חזור לעמוד הבית
               </button>
               <button 
                 onClick={() => {

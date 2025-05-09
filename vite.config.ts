@@ -21,27 +21,37 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Optimize chunks and prevent dynamic import failures
+    // Force inline critical modules
+    assetsInlineLimit: 10000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-components': [
-            '@/components/ui/button',
-            '@/components/ui/card',
-            '@/components/ui/tabs',
-            '@/components/ui/input'
-          ],
-          'auth': ['@/contexts/auth/AuthProvider', '@/hooks/useSecureAuth'],
-          'pages': [
-            '@/pages/Auth',
-            '@/pages/Dashboard',
-            '@/pages/IframeRedirect',
-            '@/pages/Calendar'
-          ],
-          'supabase': ['@supabase/supabase-js', '@/lib/supabase-client']
+        manualChunks: (id) => {
+          // Force Auth and related components to be in the main chunk
+          if (id.includes('Auth.tsx') || 
+              id.includes('auth/') || 
+              id.includes('LoginForm') || 
+              id.includes('SignupForm')) {
+            return 'index';
+          }
+          
+          // Group other chunks by category
+          if (id.includes('node_modules/react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+            return 'react-vendor';
+          }
+          if (id.includes('/components/ui/')) {
+            return 'ui-components';
+          }
+          if (id.includes('/contexts/auth/') || id.includes('/hooks/useSecureAuth')) {
+            return 'auth-core';
+          }
+          if (id.includes('/pages/') && !id.includes('Auth')) {
+            return 'pages';
+          }
+          if (id.includes('supabase')) {
+            return 'supabase';
+          }
         },
-        // Prevent code-splitting for critical route components
+        // Don't inline dynamic imports by default, but we force auth to be in main bundle
         inlineDynamicImports: false
       }
     },

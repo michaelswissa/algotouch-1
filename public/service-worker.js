@@ -1,27 +1,25 @@
 
 // Enhanced service worker for caching and error recovery
 
-// Cache name with version
-const CACHE_NAME = 'algotouch-cache-v2';
+// Cache name with version - increment this to force cache busting
+const CACHE_NAME = 'algotouch-cache-v3';
 
-// Files to cache - include Auth component and related files
+// Critical files to cache - prioritize Auth component
 const urlsToCache = [
   '/',
   '/index.html',
   '/assets/index.css',
-  // Main chunks
   '/assets/index.js',
-  '/assets/vendor.js',
-  '/assets/Auth.js',
-  '/assets/pages.js',
-  '/assets/auth.js',
-  // Critical UI components
-  '/favicon.ico',
+  // Explicitly include Auth in the initial cache
+  '/auth',
 ];
 
 // Install the service worker and cache initial assets
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing...');
+  // Force activation without waiting
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('Caching app shell and content');
@@ -33,6 +31,9 @@ self.addEventListener('install', (event) => {
 // Activate the service worker and clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('Service Worker activating...');
+  // Take control immediately
+  event.waitUntil(clients.claim());
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -47,7 +48,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Enhanced fetch handler with preload for critical modules
+// Network-first strategy for JavaScript modules
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
@@ -59,10 +60,11 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('/api/') || 
       event.request.url.includes('/functions/')) return;
   
-  // Special handling for JavaScript files and Auth module
-  if (event.request.url.endsWith('.js') || 
-      event.request.url.includes('/assets/Auth') ||
-      event.request.url.includes('/assets/pages')) {
+  // For Auth module and JS files, use network-first strategy
+  if (event.request.url.includes('Auth') || 
+      event.request.url.endsWith('.js') || 
+      event.request.url.includes('/assets/')) {
+    
     event.respondWith(
       fetch(event.request)
         .then(response => {
@@ -75,20 +77,47 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          console.log('Service Worker: Serving from cache after network failure:', event.request.url);
+          console.log('Service Worker: Falling back to cache for:', event.request.url);
           // If network fetch fails, try to get from cache
           return caches.match(event.request).then(cachedResponse => {
             if (cachedResponse) {
               return cachedResponse;
             }
-            // If not in cache either, return a simple fallback for JS files
+            
+            // If not in cache either, return a special fallback for Auth module
+            if (event.request.url.includes('Auth')) {
+              return new Response(
+                'console.error("Auth module failed to load; redirecting to base URL");' +
+                'setTimeout(() => window.location.href = "/", 1000);', 
+                {headers: { 'Content-Type': 'application/javascript' }}
+              );
+            }
+            
+            // For other JS files
             if (event.request.url.endsWith('.js')) {
-              return new Response('console.warn("Module load failed, triggering app reload");setTimeout(()=>window.location.reload(),2000);', {
-                headers: { 'Content-Type': 'application/javascript' }
-              });
+              return new Response(
+                'console.warn("Module load failed; reloading app");' +
+                'setTimeout(() => window.location.reload(), 1000);', 
+                {headers: { 'Content-Type': 'application/javascript' }}
+              );
             }
           });
         })
+    );
+    return;
+  }
+  
+  // For HTML navigation requests (routes), use cache-first for speed
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (!response || response.status !== 200) {
+            return caches.match('/');
+          }
+          return response;
+        })
+        .catch(() => caches.match('/'))
     );
     return;
   }
@@ -101,15 +130,12 @@ self.addEventListener('fetch', (event) => {
           return response; // Return cached response
         }
         
-        // Clone the request before using it (requests are one-time use)
         return fetch(event.request.clone())
           .then((response) => {
-            // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
+            if(!response || response.status !== 200) {
               return response;
             }
             
-            // Clone the response to save it in cache
             const responseToCache = response.clone();
             caches.open(CACHE_NAME)
               .then(cache => {
@@ -121,25 +147,32 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Enhanced module recovery logic
+// Listen for messages from the client
 self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  
   if (event.data && event.data.type === 'RETRY_FAILED_MODULES') {
     console.log('Service Worker: Attempting to recover failed modules', event.data.modules);
-    // Attempt to prefetch critical modules that failed to load
     const moduleUrls = event.data.modules || [];
     
-    // Invalidate cache for these modules first
+    // First, invalidate cache for these modules
     caches.open(CACHE_NAME).then((cache) => {
       moduleUrls.forEach(url => {
         cache.delete(url).then(() => console.log('Cache invalidated for:', url));
       });
       
-      // Then try to fetch fresh copies
+      // Then fetch fresh copies
       Promise.all(
         moduleUrls.map(url => 
-          fetch(url, { cache: 'reload' })
+          fetch(url, { 
+            cache: 'reload',
+            mode: 'no-cors', // Try to bypass CORS issues
+            credentials: 'include' // Include credentials if needed
+          })
             .then(response => {
-              if (response.ok) {
+              if (response.ok || response.type === 'opaque') {
                 cache.put(url, response);
                 console.log('Module recovered successfully:', url);
                 return true;
@@ -165,16 +198,20 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Preload critical resources in the background
+// Preload Auth component in the background
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // Try to preload Auth component and related assets
-      return cache.addAll([
-        '/assets/Auth.js',
-        '/assets/auth.js',
-        '/assets/pages.js'
-      ]).catch(err => console.warn('Preload failed, will retry on demand:', err));
+      // Prefetch Auth related assets
+      return fetch('/auth', {
+        mode: 'no-cors',
+        credentials: 'include'
+      })
+      .then(response => {
+        return cache.put('/auth', response);
+      })
+      .catch(err => console.warn('Auth prefetch failed, will retry on demand:', err));
     })
   );
 });
+
