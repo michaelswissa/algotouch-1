@@ -16,14 +16,14 @@ interface CardcomIframeRedirectProps {
   returnValue?: string;
 }
 
-export const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
+const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
   terminalNumber,
   apiName,
   amount,
   successUrl,
   errorUrl,
   webhookUrl,
-  productName = "TraderVue Subscription",
+  productName = "AlgoTouch Subscription",
   language = "he",
   returnValue = ""
 }) => {
@@ -55,6 +55,12 @@ export const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
         }
       };
 
+      console.log("Creating payment URL with:", { 
+        terminalNumber, apiName, amount, 
+        successUrl: successUrl.substring(0, 30) + '...',
+        errorUrl: errorUrl.substring(0, 30) + '...',
+      });
+
       // Make the API call to Cardcom
       const response = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/Create', {
         method: 'POST',
@@ -65,6 +71,7 @@ export const CardcomIframeRedirect: React.FC<CardcomIframeRedirectProps> = ({
       });
 
       const data = await response.json();
+      console.log("Cardcom API response:", data);
 
       if (data.ResponseCode === 0) {
         // Success - redirect to the URL

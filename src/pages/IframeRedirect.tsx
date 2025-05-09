@@ -12,7 +12,7 @@ const IframeRedirect = () => {
   const successUrl = searchParams.get('successUrl') || '';
   const errorUrl = searchParams.get('errorUrl') || '';
   const webhookUrl = searchParams.get('webhookUrl') || '';
-  const productName = searchParams.get('productName') || 'TraderVue Subscription';
+  const productName = searchParams.get('productName') || 'AlgoTouch Subscription';
   const returnValue = searchParams.get('returnValue') || '';
   
   if (!terminalNumber || !apiName || !amount || !successUrl || !errorUrl || !webhookUrl) {

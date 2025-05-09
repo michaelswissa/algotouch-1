@@ -9,27 +9,28 @@ import { LoadingPage } from '@/components/ui/spinner';
 import RoutePrefetcher from '@/components/RoutePrefetcher';
 import PageTransition from '@/components/PageTransition';
 
-// Import your pages lazily to avoid circular dependencies
-const Index = React.lazy(() => import('./pages/Index'));
-const Auth = React.lazy(() => import('./pages/Auth'));
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const Subscription = React.lazy(() => import('./pages/Subscription'));
-const MySubscriptionPage = React.lazy(() => import('./pages/MySubscriptionPage'));
-const ContractDetails = React.lazy(() => import('./pages/ContractDetails'));
-const Calendar = React.lazy(() => import('./pages/Calendar'));
-const TradeJournal = React.lazy(() => import('./pages/TradeJournal'));
-const MonthlyReport = React.lazy(() => import('./pages/MonthlyReport'));
-const Blog = React.lazy(() => import('./pages/Blog'));
-const BlogPost = React.lazy(() => import('./pages/BlogPost'));
-const Community = React.lazy(() => import('./pages/Community'));
-const Courses = React.lazy(() => import('./pages/Courses'));
-const CourseDetail = React.lazy(() => import('./pages/CourseDetail'));
-const AIAssistant = React.lazy(() => import('./pages/AIAssistant'));
-const NewTrade = React.lazy(() => import('./pages/NewTrade'));
-const Journal = React.lazy(() => import('./pages/Journal'));
-const Profile = React.lazy(() => import('./pages/Profile'));
-const PaymentHandling = React.lazy(() => import('./pages/PaymentHandling'));
-const NotFound = React.lazy(() => import('./pages/NotFound'));
+// Import your pages eagerly instead of lazily to avoid dynamic import issues
+import Index from './pages/Index';
+import Auth from './pages/Auth';
+import Dashboard from './pages/Dashboard';
+import Subscription from './pages/Subscription';
+import MySubscriptionPage from './pages/MySubscriptionPage';
+import ContractDetails from './pages/ContractDetails';
+import Calendar from './pages/Calendar';
+import TradeJournal from './pages/TradeJournal';
+import MonthlyReport from './pages/MonthlyReport';
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
+import Community from './pages/Community';
+import Courses from './pages/Courses';
+import CourseDetail from './pages/CourseDetail';
+import AIAssistant from './pages/AIAssistant';
+import NewTrade from './pages/NewTrade';
+import Journal from './pages/Journal';
+import Profile from './pages/Profile';
+import PaymentHandling from './pages/PaymentHandling';
+import NotFound from './pages/NotFound';
+import IframeRedirect from './pages/IframeRedirect';
 
 // Add dark mode by default
 document.documentElement.classList.add('dark');
@@ -47,6 +48,9 @@ const RouteTransitionManager = () => {
               <Auth />
             </ProtectedRoute>
           } />
+          
+          {/* Iframe redirection page - public */}
+          <Route path="/iframe-redirect" element={<IframeRedirect />} />
           
           {/* Subscription routes */}
           <Route path="/subscription/:planId" element={

@@ -9,43 +9,39 @@ const commonRoutes = [
   '/courses',
   '/trade-journal',
   '/calendar',
-  '/profile'
+  '/profile',
+  '/my-subscription'
 ];
 
 const RoutePrefetcher: React.FC = () => {
   const location = useLocation();
   
   useEffect(() => {
-    // Don't prefetch on initial load to avoid slowing down first render
-    if (location.key === 'default') return;
+    // Only prefetch after initial load is complete
+    if (location.pathname === '/') return;
     
-    // Wait until idle to prefetch
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => prefetchRoutes());
-    } else {
-      // Fallback for browsers that don't support requestIdleCallback
-      setTimeout(() => prefetchRoutes(), 1000);
-    }
+    // Wait until idle to prefetch with a small delay
+    setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(() => prefetchRoutes());
+      } else {
+        // Fallback for browsers that don't support requestIdleCallback
+        setTimeout(() => prefetchRoutes(), 200);
+      }
+    }, 300);
   }, [location]);
   
   const prefetchRoutes = () => {
     // Get routes that aren't the current route
     const routesToPrefetch = commonRoutes.filter(route => route !== location.pathname);
     
-    // Prefetch the modules for these routes
+    // Log prefetching activity for debugging
+    console.log('Prefetching routes:', routesToPrefetch);
+    
+    // We're not actually prefetching modules anymore as that was causing issues
+    // Instead we'll just log that we would prefetch these routes
     routesToPrefetch.forEach(route => {
-      // Using it directly from the modules in App.tsx
-      try {
-        const moduleName = route === '/' ? 'Index' 
-          : route.substring(1).charAt(0).toUpperCase() + route.substring(2);
-        
-        // Dynamic import to trigger preload
-        import(`../pages/${moduleName}.tsx`).catch(() => {
-          // Ignore errors - this is just prefetching
-        });
-      } catch (e) {
-        // Ignore errors in prefetch
-      }
+      console.debug(`Would prefetch route: ${route}`);
     });
   };
   
