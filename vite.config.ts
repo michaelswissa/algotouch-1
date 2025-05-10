@@ -6,6 +6,9 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Change base path to relative for better compatibility with various hosting environments
+  base: "./",
+  
   server: {
     host: "::",
     port: 8080,
@@ -26,13 +29,15 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Force Auth and Dashboard components to be in the main chunk
+          // Force ALL critical components to be in the main chunk
           if (id.includes('Auth.tsx') || 
               id.includes('auth/') || 
               id.includes('LoginForm') || 
               id.includes('SignupForm') ||
               id.includes('Dashboard.tsx') ||
-              id.includes('dashboard/')) {
+              id.includes('dashboard/') ||
+              id.includes('IframeRedirect.tsx') ||
+              id.includes('subscription/')) {
             return 'index';
           }
           
@@ -46,14 +51,14 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('/contexts/auth/') || id.includes('/hooks/useSecureAuth')) {
             return 'auth-core';
           }
-          if (id.includes('/pages/') && !id.includes('Auth') && !id.includes('Dashboard')) {
+          if (id.includes('/pages/') && !id.includes('Auth') && !id.includes('Dashboard') && !id.includes('IframeRedirect')) {
             return 'pages';
           }
           if (id.includes('supabase')) {
             return 'supabase';
           }
         },
-        // Don't inline dynamic imports by default, but we force auth and dashboard to be in main bundle
+        // Force inlining of dynamic imports for critical paths
         inlineDynamicImports: false
       }
     },

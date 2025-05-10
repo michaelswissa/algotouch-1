@@ -73,28 +73,41 @@ function setupDirectFailsafe() {
     )) {
       console.error('Module loading error detected:', event.message);
       
+      // Clear cache by appending a timestamp to requested URLs
+      if (typeof window.__VITE_TIMESTAMP__ === 'undefined') {
+        window.__VITE_TIMESTAMP__ = Date.now();
+        console.log('Setting cache buster timestamp:', window.__VITE_TIMESTAMP__);
+      }
+      
       // If on Auth page and Auth module fails, redirect to home
       if (window.location.pathname.includes('/auth')) {
         console.log('Auth module failed to load, redirecting to home page...');
         setTimeout(() => {
-          window.location.href = '/';
+          window.location.href = '/?t=' + window.__VITE_TIMESTAMP__;
         }, 1000);
       }
       // If on Dashboard page and Dashboard module fails, redirect to home
       else if (window.location.pathname.includes('/dashboard')) {
         console.log('Dashboard module failed to load, redirecting to home page...');
         setTimeout(() => {
-          window.location.href = '/';
+          window.location.href = '/?t=' + window.__VITE_TIMESTAMP__;
         }, 1000);
       }
       else {
-        // For other pages, just reload
+        // For other pages, just reload with cache buster
         setTimeout(() => {
-          window.location.reload();
+          window.location.href = window.location.pathname + '?t=' + window.__VITE_TIMESTAMP__;
         }, 1000);
       }
     }
   });
+}
+
+// Add TypeScript declaration for window object
+declare global {
+  interface Window {
+    __VITE_TIMESTAMP__?: number;
+  }
 }
 
 // Prefetch critical modules immediately
@@ -104,14 +117,14 @@ function prefetchCriticalModules() {
     const authLink = document.createElement('link');
     authLink.rel = 'prefetch';
     authLink.as = 'script';
-    authLink.href = '/assets/index.js'; // Main bundle should include Auth now
+    authLink.href = './assets/index.js'; // Main bundle should include Auth now with relative path
     document.head.appendChild(authLink);
     
     // Prefetch Dashboard module
     const dashboardLink = document.createElement('link');
     dashboardLink.rel = 'prefetch';
     dashboardLink.as = 'script'; 
-    dashboardLink.href = '/assets/index.js'; // Main bundle should include Dashboard now
+    dashboardLink.href = './assets/index.js'; // Main bundle should include Dashboard now with relative path
     document.head.appendChild(dashboardLink);
     
     console.log('Prefetching critical modules');
