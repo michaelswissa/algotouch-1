@@ -83,7 +83,20 @@ const Auth = () => {
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={
+      <div className="flex min-h-screen items-center justify-center bg-red-50 dark:bg-red-900/20 p-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">שגיאה בטעינת עמוד ההתחברות</h2>
+          <p className="mb-4">אירעה שגיאה בטעינת העמוד. אנא נסה שוב מאוחר יותר.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+          >
+            נסה שוב
+          </button>
+        </div>
+      </div>
+    }>
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4 dark:bg-background dark:text-foreground" dir="rtl">
         <div className="w-full max-w-md space-y-6">
           <AuthHeader />
