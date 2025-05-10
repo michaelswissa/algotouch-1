@@ -1,3 +1,4 @@
+
 /**
  * Module loader utility with retry and diagnostic capabilities
  */
@@ -20,6 +21,19 @@ const addVersionParam = (url: string): string => {
   return `${url}${separator}v=${Date.now()}`;
 };
 
+// Check if storage is available (e.g., localStorage, sessionStorage)
+const isStorageAvailable = (type: 'localStorage' | 'sessionStorage') => {
+  try {
+    const storage = window[type];
+    const x = '__storage_test__';
+    storage.setItem(x, x);
+    storage.removeItem(x);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
 /**
  * Load a module with retry logic
  */
@@ -28,6 +42,23 @@ export const loadModuleWithRetry = async <T>(
   moduleName: string
 ): Promise<T> => {
   try {
+    console.log(`Attempting to load module: ${moduleName}`);
+    
+    // Try to check if we previously failed to load this module
+    if (isStorageAvailable('sessionStorage')) {
+      const failedModules = sessionStorage.getItem('failedModules');
+      if (failedModules && failedModules.includes(moduleName)) {
+        console.log(`Previously failed loading ${moduleName}, clearing cache...`);
+        // Add cache-busting parameter to the current URL
+        if (window.location.href.indexOf('t=') === -1) {
+          const sep = window.location.href.includes('?') ? '&' : '?';
+          window.location.href = `${window.location.href}${sep}t=${Date.now()}`;
+          // This will cause page reload, preventing further execution
+        }
+      }
+    }
+    
+    // Try loading the module
     return await importFn();
   } catch (error) {
     console.error(`Failed to load module: ${moduleName}`, error);
@@ -78,6 +109,20 @@ export const loadModuleWithRetry = async <T>(
     }
     
     console.error(`Failed to load ${moduleName} after ${MAX_RETRIES} attempts`);
+    
+    // Record the failed module in sessionStorage if available
+    if (isStorageAvailable('sessionStorage')) {
+      try {
+        const failedModules = JSON.parse(sessionStorage.getItem('failedModules') || '[]');
+        if (!failedModules.includes(moduleName)) {
+          failedModules.push(moduleName);
+          sessionStorage.setItem('failedModules', JSON.stringify(failedModules));
+        }
+      } catch (e) {
+        console.error('Failed to record failed module:', e);
+      }
+    }
+    
     throw error;
   }
 };
@@ -111,5 +156,12 @@ export const checkCriticalModules = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Critical module health check failed:', error);
     return false;
+  }
+};
+
+// Function to clear all failed module records
+export const clearFailedModuleRecords = () => {
+  if (isStorageAvailable('sessionStorage')) {
+    sessionStorage.removeItem('failedModules');
   }
 };

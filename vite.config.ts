@@ -41,7 +41,13 @@ export default defineConfig(({ mode }) => ({
               id.includes('Dashboard.tsx') ||
               id.includes('dashboard/') ||
               id.includes('IframeRedirect.tsx') ||
-              id.includes('subscription/')) {
+              id.includes('subscription/') ||
+              // Also include community and course components in the main bundle
+              id.includes('community/') ||
+              id.includes('courses/') ||
+              id.includes('Courses.tsx') ||
+              id.includes('CourseDetail.tsx') ||
+              id.includes('CourseCard.tsx')) {
             return 'index';
           }
           
@@ -52,7 +58,7 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('/components/ui/')) {
             return 'ui-components';
           }
-          if (id.includes('/pages/') && !id.includes('Auth') && !id.includes('Dashboard') && !id.includes('IframeRedirect')) {
+          if (id.includes('/pages/') && !id.includes('Auth') && !id.includes('Dashboard') && !id.includes('IframeRedirect') && !id.includes('Courses') && !id.includes('CourseDetail')) {
             return 'pages';
           }
         },

@@ -60,23 +60,35 @@ export async function ensureCommunityMediaBucketExists(): Promise<boolean> {
 export async function initCommunityStorage(): Promise<void> {
   try {
     console.log('Initializing community storage...');
+    
+    // Instead of immediately showing an error toast, check if we're on a page that needs storage
+    // This way, we can avoid showing errors on pages that don't need the storage bucket
     const bucketExists = await ensureCommunityMediaBucketExists();
     
     if (!bucketExists) {
-      toast.error('שגיאה באתחול אחסון המדיה לקהילה', {
-        duration: 5000,
-        position: 'top-center',
-        id: 'storage-init-error',
-      });
+      // Only show error if we're on a page that actually needs the storage
+      console.warn('Community storage bucket not available - will retry when needed');
+      
+      // We'll only show the toast if actually trying to use storage features
+      if (window.location.pathname.includes('/community')) {
+        toast.error('שגיאה באתחול אחסון המדיה לקהילה', {
+          duration: 5000,
+          position: 'top-center',
+          id: 'storage-init-error',
+        });
+      }
     } else {
       console.log('Community storage initialized successfully');
     }
   } catch (error) {
     console.error('Error initializing community storage:', error);
-    toast.error('שגיאה באתחול אחסון המדיה לקהילה', {
-      duration: 5000,
-      position: 'top-center',
-      id: 'storage-init-error',
-    });
+    // Only show error toast if we're on a community-related page
+    if (window.location.pathname.includes('/community')) {
+      toast.error('שגיאה באתחול אחסון המדיה לקהילה', {
+        duration: 5000,
+        position: 'top-center',
+        id: 'storage-init-error',
+      });
+    }
   }
 }

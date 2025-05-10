@@ -6,8 +6,9 @@ import {
   getCommunityPosts, registerCommunityPost, getPostById, likePost, uploadPostMedia,
   getPostComments, addComment, getAllTags, createTag, addTagsToPost,
   getUserBadges, getAllBadges, getUserReputation, getUserReputationPoints,
-  getUserCourseProgress, initCommunityStorage
+  getUserCourseProgress
 } from '@/lib/community';
+import { initCommunityStorage } from '@/lib/community/storage-service';
 import { Comment, Post, Tag, UserBadge, UserStreak, Badge, CourseProgress } from '@/lib/community/types';
 import { toast } from 'sonner';
 import { useCourseActions } from './useCourseActions';
@@ -30,6 +31,7 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [activePostComments, setActivePostComments] = useState<Comment[]>([]);
   const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
+  const [storageInitialized, setStorageInitialized] = useState(false);
 
   // Initialize course actions
   const { 
@@ -44,36 +46,52 @@ export const CommunityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  // Initialize on mount
+  // Initialize on mount - separated into individual effects for better error isolation
   useEffect(() => {
-    const init = async () => {
+    const initStorage = async () => {
       try {
-        await initCommunityStorage();
-        await fetchTags();
-        await fetchPosts();
-        await fetchAllBadges();
+        // Only initialize storage if we're on a community or courses page
+        if (window.location.pathname.includes('/community') || 
+            window.location.pathname.includes('/courses')) {
+          await initCommunityStorage();
+          setStorageInitialized(true);
+        }
       } catch (error) {
-        console.error('Error initializing community:', error);
+        console.error('Error initializing community storage:', error);
+        // Don't block other initialization if storage fails
       }
     };
     
-    init();
+    initStorage();
+  }, []);
+  
+  // Separate effects for different data types to isolate failures
+  useEffect(() => {
+    fetchTags().catch(err => console.error('Error fetching tags:', err));
+  }, []);
+  
+  useEffect(() => {
+    fetchPosts().catch(err => console.error('Error fetching posts:', err));
+  }, []);
+  
+  useEffect(() => {
+    fetchAllBadges().catch(err => console.error('Error fetching badges:', err));
   }, []);
   
   // Fetch current user's data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      fetchUserBadges(user.id);
-      fetchUserReputation(user.id);
-      fetchUserCourseProgress(user.id);
+      fetchUserBadges(user.id).catch(err => console.error('Error fetching user badges:', err));
+      fetchUserReputation(user.id).catch(err => console.error('Error fetching user reputation:', err));
+      fetchUserCourseProgress(user.id).catch(err => console.error('Error fetching course progress:', err));
     }
   }, [isAuthenticated, user]);
   
   // Fetch post details when activePostId changes
   useEffect(() => {
     if (activePostId) {
-      fetchActivePost(activePostId);
-      fetchComments(activePostId);
+      fetchActivePost(activePostId).catch(err => console.error('Error fetching active post:', err));
+      fetchComments(activePostId).catch(err => console.error('Error fetching comments:', err));
     } else {
       setActivePost(null);
       setActivePostComments([]);

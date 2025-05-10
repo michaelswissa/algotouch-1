@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Layout from '@/components/Layout';
 import { CommunityProvider } from '@/contexts/community/CommunityContext';
 import { useParams } from 'react-router-dom';
 import { useCourseData } from '@/hooks/useCourseData';
 import { LoadingPage } from '@/components/ui/spinner';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Import course components
 import CourseHeader from '@/components/courses/CourseHeader';
@@ -75,9 +76,26 @@ const CourseDetailContent = () => {
 
 const CourseDetail = () => {
   return (
-    <CommunityProvider>
-      <CourseDetailContent />
-    </CommunityProvider>
+    <ErrorBoundary fallback={
+      <Layout>
+        <div className="flex flex-col items-center justify-center p-6 text-center">
+          <h2 className="text-2xl font-bold mb-4">שגיאה בטעינת הקורס</h2>
+          <p className="mb-4">אנו מתנצלים, אך אירעה שגיאה בטעינת נתוני הקורס.</p>
+          <button 
+            onClick={() => window.location.href = '/courses'} 
+            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+          >
+            חזור לרשימת הקורסים
+          </button>
+        </div>
+      </Layout>
+    }>
+      <Suspense fallback={<LoadingPage message="טוען את הקורס..." />}>
+        <CommunityProvider>
+          <CourseDetailContent />
+        </CommunityProvider>
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
