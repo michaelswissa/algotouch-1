@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => ({
             return 'pages';
           }
         },
-        // Force inlining of dynamic imports for critical paths
+        // Force inlining of dynamic imports for critical paths to prevent loading errors
         inlineDynamicImports: false
       }
     },
