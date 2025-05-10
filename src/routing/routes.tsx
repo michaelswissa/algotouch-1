@@ -140,11 +140,22 @@ export const routes = [
 
 // Helper function to generate Route components from route config
 export const generateRouteComponents = () => {
-  return routes.map((route, index) => (
-    <Route
-      key={`route-${index}-${route.path}`}
-      path={route.path}
-      element={route.element}
-    />
-  ));
+  try {
+    return routes.map((route, index) => (
+      <Route
+        key={`route-${index}-${route.path}`}
+        path={route.path}
+        element={route.element}
+      />
+    ));
+  } catch (error) {
+    console.error("Failed to generate route components:", error);
+    // Fallback to basic routes if there's an error
+    return [
+      <Route key="home" path="/" element={<Index />} />,
+      <Route key="dashboard" path="/dashboard" element={<Dashboard />} />,
+      <Route key="auth" path="/auth" element={<Auth />} />,
+      <Route key="not-found" path="*" element={<NotFound />} />
+    ];
+  }
 };

@@ -2,17 +2,17 @@
 // Enhanced service worker for caching and error recovery
 
 // Cache name with version - increment this to force cache busting
-const CACHE_NAME = 'algotouch-cache-v4';
+const CACHE_NAME = 'algotouch-cache-v5';
 
 // Critical files to cache - prioritize Auth and Dashboard components
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/assets/index.css',
-  '/assets/index.js',
-  // Explicitly include critical routes in the initial cache
-  '/auth',
-  '/dashboard',
+  './',
+  './index.html',
+  './assets/index.css',
+  './assets/index.js',
+  './assets/vendor-react.js',
+  './assets/ui-components.js',
+  './assets/pages.js',
 ];
 
 // Install the service worker and cache initial assets
@@ -47,6 +47,11 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  
+  // Preload critical assets after activation
+  event.waitUntil(
+    preloadCriticalAssets()
+  );
 });
 
 // Network-first strategy for JavaScript modules
@@ -61,14 +66,29 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('/api/') || 
       event.request.url.includes('/functions/')) return;
   
-  // For Auth and Dashboard modules and JS files, use network-first strategy
-  if (event.request.url.includes('Auth') || 
-      event.request.url.includes('Dashboard') ||
-      event.request.url.endsWith('.js') || 
+  // For JS module files, always use network-first with cache fallback
+  if (event.request.url.endsWith('.js') || 
       event.request.url.includes('/assets/')) {
     
+    // Add cache buster for JS files
+    const url = new URL(event.request.url);
+    const originalUrl = event.request.url;
+    
+    // Add timestamp if not already present
+    if (!url.searchParams.has('v')) {
+      url.searchParams.set('v', Date.now().toString());
+    }
+    
+    const modifiedRequest = new Request(url.toString(), {
+      method: event.request.method,
+      headers: event.request.headers,
+      mode: event.request.mode,
+      credentials: event.request.credentials,
+      redirect: event.request.redirect
+    });
+    
     event.respondWith(
-      fetch(event.request)
+      fetch(modifiedRequest)
         .then(response => {
           // Clone the response to save it in cache
           const responseToCache = response.clone();
@@ -79,32 +99,19 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          console.log('Service Worker: Falling back to cache for:', event.request.url);
+          console.log('Service Worker: Falling back to cache for:', originalUrl);
           // If network fetch fails, try to get from cache
           return caches.match(event.request).then(cachedResponse => {
             if (cachedResponse) {
               return cachedResponse;
             }
             
-            // If not in cache either, return a special fallback for critical modules
-            if (event.request.url.includes('Auth')) {
-              return new Response(
-                'console.error("Auth module failed to load; redirecting to base URL");' +
-                'setTimeout(() => window.location.href = "/", 1000);', 
-                {headers: { 'Content-Type': 'application/javascript' }}
-              );
+            // Special fallbacks for critical modules
+            if (originalUrl.includes('index.js')) {
+              return Response.redirect('./index.html');
             }
             
-            if (event.request.url.includes('Dashboard')) {
-              return new Response(
-                'console.error("Dashboard module failed to load; redirecting to base URL");' +
-                'setTimeout(() => window.location.href = "/", 1000);', 
-                {headers: { 'Content-Type': 'application/javascript' }}
-              );
-            }
-            
-            // For other JS files
-            if (event.request.url.endsWith('.js')) {
+            if (originalUrl.includes('.js')) {
               return new Response(
                 'console.warn("Module load failed; reloading app");' +
                 'setTimeout(() => window.location.reload(), 1000);', 
@@ -117,17 +124,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // For HTML navigation requests (routes), use cache-first for speed
+  // For HTML navigation requests, use cache-first for speed
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then(response => {
           if (!response || response.status !== 200) {
-            return caches.match('/');
+            return caches.match('./index.html');
           }
           return response;
         })
-        .catch(() => caches.match('/'))
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }
@@ -167,22 +174,21 @@ self.addEventListener('message', (event) => {
     console.log('Service Worker: Attempting to recover failed modules', event.data.modules);
     const moduleUrls = event.data.modules || [];
     
-    // First, invalidate cache for these modules
+    // Invalidate cache for these modules
     caches.open(CACHE_NAME).then((cache) => {
       moduleUrls.forEach(url => {
         cache.delete(url).then(() => console.log('Cache invalidated for:', url));
       });
       
-      // Then fetch fresh copies
+      // Fetch fresh copies
       Promise.all(
         moduleUrls.map(url => 
           fetch(url, { 
             cache: 'reload',
-            mode: 'no-cors', // Try to bypass CORS issues
-            credentials: 'include' // Include credentials if needed
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           })
             .then(response => {
-              if (response.ok || response.type === 'opaque') {
+              if (response.ok) {
                 cache.put(url, response);
                 console.log('Module recovered successfully:', url);
                 return true;
@@ -206,32 +212,69 @@ self.addEventListener('message', (event) => {
       });
     });
   }
+  
+  if (event.data && event.data.type === 'CHECK_UPDATES') {
+    console.log('Checking for updates to cached resources');
+    updateCachedResources();
+  }
 });
 
-// Preload critical components in the background
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // Prefetch critical assets
-      return Promise.all([
-        fetch('/auth', {
-          mode: 'no-cors',
-          credentials: 'include'
-        })
-        .then(response => {
-          return cache.put('/auth', response);
-        })
-        .catch(err => console.warn('Auth prefetch failed, will retry on demand:', err)),
+// Preload critical assets in background
+async function preloadCriticalAssets() {
+  const cache = await caches.open(CACHE_NAME);
+  
+  // Critical JavaScript chunks
+  const criticalAssets = [
+    './assets/index.js',
+    './assets/vendor-react.js',
+    './assets/ui-components.js',
+    './assets/pages.js'
+  ];
+  
+  return Promise.allSettled(
+    criticalAssets.map(async (asset) => {
+      try {
+        const response = await fetch(asset, { 
+          cache: 'reload',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         
-        fetch('/dashboard', {
-          mode: 'no-cors',
-          credentials: 'include'
-        })
-        .then(response => {
-          return cache.put('/dashboard', response);
-        })
-        .catch(err => console.warn('Dashboard prefetch failed, will retry on demand:', err))
-      ]);
+        if (response.ok) {
+          await cache.put(asset, response);
+          console.log('Successfully preloaded:', asset);
+        }
+      } catch (err) {
+        console.warn('Failed to preload asset:', asset, err);
+      }
     })
   );
-});
+}
+
+// Update cached resources when needed
+async function updateCachedResources() {
+  const cache = await caches.open(CACHE_NAME);
+  
+  // Get all cached URLs
+  const cachedRequests = await cache.keys();
+  const jsRequests = cachedRequests.filter(req => 
+    req.url.endsWith('.js') || req.url.endsWith('.css'));
+  
+  // Update each JS/CSS resource
+  return Promise.allSettled(
+    jsRequests.map(async (request) => {
+      try {
+        const freshResponse = await fetch(request, { 
+          cache: 'reload', 
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (freshResponse.ok) {
+          await cache.put(request, freshResponse);
+          console.log('Updated cached resource:', request.url);
+        }
+      } catch (err) {
+        console.warn('Failed to update cached resource:', request.url, err);
+      }
+    })
+  );
+}

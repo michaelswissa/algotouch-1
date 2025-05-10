@@ -7,35 +7,42 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import PageTransition from '@/components/PageTransition';
 import { generateRouteComponents } from './routing/routes';
 import ErrorBoundary from './components/ErrorBoundary';
+import { moduleHealthMonitor } from './lib/moduleHealthCheck';
 
 // Explicitly prefetch critical components
 const prefetchCriticalComponents = () => {
   try {
-    // Create prefetch links
-    const authLink = document.createElement('link');
-    authLink.rel = 'prefetch';
-    authLink.href = '/auth';
-    document.head.appendChild(authLink);
+    // Create prefetch links with relative paths
+    const criticalPaths = [
+      { path: './auth', type: 'document' },
+      { path: './dashboard', type: 'document' },
+      { path: './assets/index.js', type: 'script' },
+      { path: './assets/vendor-react.js', type: 'script' },
+      { path: './assets/ui-components.js', type: 'script' }
+    ];
     
-    const dashboardLink = document.createElement('link');
-    dashboardLink.rel = 'prefetch';
-    dashboardLink.href = '/dashboard';
-    document.head.appendChild(dashboardLink);
-    
-    // Also try to prefetch the JS directly
-    const scriptLink = document.createElement('link');
-    scriptLink.rel = 'prefetch';
-    scriptLink.as = 'script';
-    scriptLink.href = '/assets/index.js'; // Main bundle should include Auth and Dashboard now
-    document.head.appendChild(scriptLink);
+    criticalPaths.forEach(({ path, type }) => {
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      if (type === 'script') link.as = 'script';
+      
+      // Add cache busting parameter
+      const cacheBuster = window.__VITE_TIMESTAMP__ || Date.now();
+      link.href = `${path}?v=${cacheBuster}`;
+      
+      document.head.appendChild(link);
+    });
   } catch (e) {
     console.warn('Prefetch failed:', e);
   }
 };
 
 function App() {
-  // Add dark mode by default
+  // Initialize module health monitoring
   useEffect(() => {
+    moduleHealthMonitor.initialize();
+    
+    // Add dark mode by default
     document.documentElement.classList.add('dark');
     
     // Prefetch critical components
@@ -59,11 +66,23 @@ function App() {
               <h2 className="text-xl font-bold mb-2">שגיאה בטעינת האפליקציה</h2>
               <p className="text-muted-foreground mb-4">אירעה שגיאה בטעינת האפליקציה</p>
               <div className="flex gap-3">
-                <button onClick={() => window.location.href = "/"} className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors">
+                <button onClick={() => window.location.href = "./"} className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors">
                   חזור לעמוד הראשי
                 </button>
-                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors">
-                  רענן את הדף
+                <button onClick={() => {
+                  // Clear caches before reload
+                  if ('caches' in window) {
+                    caches.keys().then(names => {
+                      names.forEach(name => {
+                        caches.delete(name);
+                      });
+                    });
+                  }
+                  // Add timestamp to bust cache
+                  const timestamp = Date.now();
+                  window.location.href = `./?t=${timestamp}`;
+                }} className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors">
+                  נקה מטמון ורענן
                 </button>
               </div>
             </div>

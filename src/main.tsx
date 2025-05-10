@@ -4,14 +4,31 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initializeErrorHandler } from './lib/errorHandler';
+import { checkCriticalModules } from './lib/moduleLoader';
 
 // Initialize global error handler
 initializeErrorHandler();
+
+// Cache buster timestamp for all dynamic imports
+window.__VITE_TIMESTAMP__ = Date.now();
 
 // Enhanced service worker registration with failsafe mechanisms
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
+      // First check if critical modules are available
+      const modulesAvailable = await checkCriticalModules();
+      if (!modulesAvailable) {
+        console.warn('Critical modules health check failed, clearing caches');
+        // Clear all caches if modules aren't available
+        if ('caches' in window) {
+          const cacheKeys = await caches.keys();
+          await Promise.all(
+            cacheKeys.map(key => caches.delete(key))
+          );
+        }
+      }
+      
       // Try to unregister any existing service workers first to prevent conflicts
       const registrations = await navigator.serviceWorker.getRegistrations();
       for (let registration of registrations) {
@@ -19,9 +36,9 @@ if ('serviceWorker' in navigator) {
         console.log('Unregistered previous service worker');
       }
       
-      // Register fresh service worker
-      const registration = await navigator.serviceWorker.register('/service-worker.js', {
-        scope: '/',
+      // Register fresh service worker with relative path
+      const registration = await navigator.serviceWorker.register('./service-worker.js', {
+        scope: './',
         updateViaCache: 'none' // Never use cache for the service worker itself
       });
       console.log('ServiceWorker registered with scope:', registration.scope);
@@ -74,29 +91,35 @@ function setupDirectFailsafe() {
       console.error('Module loading error detected:', event.message);
       
       // Clear cache by appending a timestamp to requested URLs
-      if (typeof window.__VITE_TIMESTAMP__ === 'undefined') {
-        window.__VITE_TIMESTAMP__ = Date.now();
-        console.log('Setting cache buster timestamp:', window.__VITE_TIMESTAMP__);
-      }
+      window.__VITE_TIMESTAMP__ = Date.now();
+      console.log('Setting cache buster timestamp:', window.__VITE_TIMESTAMP__);
       
-      // If on Auth page and Auth module fails, redirect to home
-      if (window.location.pathname.includes('/auth')) {
-        console.log('Auth module failed to load, redirecting to home page...');
-        setTimeout(() => {
-          window.location.href = '/?t=' + window.__VITE_TIMESTAMP__;
-        }, 1000);
-      }
-      // If on Dashboard page and Dashboard module fails, redirect to home
-      else if (window.location.pathname.includes('/dashboard')) {
+      // Extract module URL to detect which module failed
+      const moduleUrl = event.message.match(/https?:\/\/[^'\s]+\.js/)?.[0] || '';
+      const isDashboardModule = moduleUrl.includes('Dashboard') || 
+                               window.location.pathname.includes('/dashboard');
+      const isAuthModule = moduleUrl.includes('Auth') || 
+                          window.location.pathname.includes('/auth');
+      
+      // Handle specific module failures
+      if (isDashboardModule) {
         console.log('Dashboard module failed to load, redirecting to home page...');
         setTimeout(() => {
-          window.location.href = '/?t=' + window.__VITE_TIMESTAMP__;
+          window.location.href = `./?t=${window.__VITE_TIMESTAMP__}`;
+        }, 1000);
+      }
+      else if (isAuthModule) {
+        console.log('Auth module failed to load, redirecting to home page...');
+        setTimeout(() => {
+          window.location.href = `./?t=${window.__VITE_TIMESTAMP__}`;
         }, 1000);
       }
       else {
         // For other pages, just reload with cache buster
         setTimeout(() => {
-          window.location.href = window.location.pathname + '?t=' + window.__VITE_TIMESTAMP__;
+          // Use relative paths consistently
+          const path = window.location.pathname === '/' ? './' : '.' + window.location.pathname;
+          window.location.href = `${path}?t=${window.__VITE_TIMESTAMP__}`;
         }, 1000);
       }
     }
@@ -106,26 +129,26 @@ function setupDirectFailsafe() {
 // Add TypeScript declaration for window object
 declare global {
   interface Window {
-    __VITE_TIMESTAMP__?: number;
+    __VITE_TIMESTAMP__: number;
   }
 }
 
-// Prefetch critical modules immediately
+// Prefetch critical modules immediately using relative paths
 function prefetchCriticalModules() {
   try {
-    // Prefetch Auth module
-    const authLink = document.createElement('link');
-    authLink.rel = 'prefetch';
-    authLink.as = 'script';
-    authLink.href = './assets/index.js'; // Main bundle should include Auth now with relative path
-    document.head.appendChild(authLink);
+    const criticalModules = [
+      './assets/index.js',
+      './assets/vendor-react.js',
+      './assets/ui-components.js'
+    ];
     
-    // Prefetch Dashboard module
-    const dashboardLink = document.createElement('link');
-    dashboardLink.rel = 'prefetch';
-    dashboardLink.as = 'script'; 
-    dashboardLink.href = './assets/index.js'; // Main bundle should include Dashboard now with relative path
-    document.head.appendChild(dashboardLink);
+    criticalModules.forEach(module => {
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'script';
+      link.href = `${module}?v=${window.__VITE_TIMESTAMP__}`; // Add cache buster
+      document.head.appendChild(link);
+    });
     
     console.log('Prefetching critical modules');
   } catch (e) {
@@ -162,11 +185,31 @@ window.addEventListener('error', (event) => {
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
       const moduleUrl = event.message.match(/https?:\/\/[^'\s]+\.js/)?.[0];
       if (moduleUrl) {
+        console.log('Asking service worker to retry failed module:', moduleUrl);
         navigator.serviceWorker.controller.postMessage({
           type: 'RETRY_FAILED_MODULES',
           modules: [moduleUrl]
+        });
+        
+        // Listen for success/failure
+        navigator.serviceWorker.addEventListener('message', (msgEvent) => {
+          if (msgEvent.data?.type === 'MODULE_PREFETCH_RESULT') {
+            if (msgEvent.data.success) {
+              console.log('Module recovery successful, reloading...');
+              window.location.reload();
+            }
+          }
         });
       }
     }
   }
 });
+
+// Check for updated resources periodically
+setInterval(() => {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CHECK_UPDATES'
+    });
+  }
+}, 60000); // Check every minute

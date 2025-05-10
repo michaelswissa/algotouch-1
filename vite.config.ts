@@ -6,7 +6,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Change base path to relative for better compatibility with various hosting environments
+  // Use relative paths for better compatibility with various hosting environments
   base: "./",
   
   server: {
@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => ({
     assetsInlineLimit: 10000,
     rollupOptions: {
       output: {
+        // Use consistent filenames without hashes for better caching and debugging
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]',
         manualChunks: (id) => {
           // Force ALL critical components to be in the main chunk
           if (id.includes('Auth.tsx') || 
@@ -43,19 +47,13 @@ export default defineConfig(({ mode }) => ({
           
           // Group other chunks by category
           if (id.includes('node_modules/react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-            return 'react-vendor';
+            return 'vendor-react';
           }
           if (id.includes('/components/ui/')) {
             return 'ui-components';
           }
-          if (id.includes('/contexts/auth/') || id.includes('/hooks/useSecureAuth')) {
-            return 'auth-core';
-          }
           if (id.includes('/pages/') && !id.includes('Auth') && !id.includes('Dashboard') && !id.includes('IframeRedirect')) {
             return 'pages';
-          }
-          if (id.includes('supabase')) {
-            return 'supabase';
           }
         },
         // Force inlining of dynamic imports for critical paths
