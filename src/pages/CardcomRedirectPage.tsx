@@ -6,60 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LoadingPage } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase-client';
-
-// Define interfaces for CardCom responses
-interface CardcomPayload {
-  ResponseCode: number;
-  Description?: string;
-  LowProfileId: string;
-  TranzactionId?: string | number;
-  ReturnValue?: string;
-  TokenInfo?: {
-    Token: string;
-    TokenExDate: string;
-    CardYear?: number;
-    CardMonth?: number;
-    TokenApprovalNumber?: string;
-  };
-  TranzactionInfo?: {
-    ResponseCode: number;
-    TranzactionId: number;
-    Amount: number;
-    Last4CardDigits: string;
-    CardMonth: number;
-    CardYear: number;
-    ApprovalNumber?: string;
-    CardInfo?: string;
-    CardName?: string;
-  };
-  Operation?: string;
-  UIValues?: any;
-}
-
-// Interface for the verify-cardcom-payment response
-interface VerifyPaymentResponse {
-  success: boolean;
-  message?: string;
-  paymentDetails?: {
-    transactionId: number;
-    amount: number;
-    cardLastDigits: string;
-    approvalNumber: string;
-    cardType: string;
-    cardExpiry: string;
-    cardOwnerName: string;
-    cardOwnerEmail: string;
-    cardOwnerPhone: string;
-  };
-  tokenInfo?: {
-    token: string;
-    expiryDate: string;
-    approvalNumber: string;
-  };
-  registrationId?: string;
-  error?: string;
-  details?: any;
-}
+import { CardcomPayload, CardcomWebhookPayload, CardcomVerifyResponse } from '@/types/payment';
 
 export default function CardcomRedirectPage() {
   const location = useLocation();
@@ -95,7 +42,7 @@ export default function CardcomRedirectPage() {
 
         if (!webhookError && webhookData && webhookData.processed) {
           // Cast the payload to our known type
-          const payload = webhookData.payload as unknown as CardcomPayload;
+          const payload = webhookData.payload as unknown as CardcomWebhookPayload;
           
           // Payment was already processed by webhook
           console.log('Payment already processed by webhook:', payload);
@@ -116,7 +63,7 @@ export default function CardcomRedirectPage() {
         }
 
         // Step 2: Call Supabase function to verify payment if webhook hasn't processed it
-        const { data, error: functionError } = await supabase.functions.invoke<VerifyPaymentResponse>('verify-cardcom-payment', {
+        const { data, error: functionError } = await supabase.functions.invoke<CardcomVerifyResponse>('verify-cardcom-payment', {
           body: { lowProfileId }
         });
 
