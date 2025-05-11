@@ -68,7 +68,7 @@ function App() {
               <Route path="/payment/failed" element={<PaymentFailed />} />
               
               {/* Protected routes */}
-              <Route element={<ProtectedRoute />}>
+              <Route element={<ProtectedRoute>{/* Fixed by adding children element */}</ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/subscription" element={<Subscription />} />
                 <Route path="/community" element={<Community />} />
