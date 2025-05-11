@@ -7,7 +7,7 @@ import UserBadges from '@/components/community/UserBadges';
 import { useCommunity } from '@/contexts/community/CommunityContext';
 import { Flame, Trophy, Award, BadgeCheck, Calendar, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -36,21 +36,19 @@ const UserLevelBadge = ({ level }: { level: number }) => {
   };
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge className={cn("ml-2 text-white", getBadgeColor(level))}>
-            <span className="flex items-center">
-              {getBadgeIcon(level)}
-              <span>רמה {level}</span>
-            </span>
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>השגת רמה {level} בזכות פעילותך בקהילה</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge className={cn("ml-2 text-white", getBadgeColor(level))}>
+          <span className="flex items-center">
+            {getBadgeIcon(level)}
+            <span>רמה {level}</span>
+          </span>
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>השגת רמה {level} בזכות פעילותך בקהילה</p>
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -62,25 +60,23 @@ const UserStreakDisplay = ({ streak }: { streak: { currentStreak: number; lastAc
   const timeAgo = formatDistanceToNow(lastActivityDate, { locale: he, addSuffix: true });
   
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex flex-col items-center justify-center bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
-            <div className="flex items-center gap-1">
-              <Flame className="h-5 w-5 text-orange-500" />
-              <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{streak.currentStreak}</span>
-            </div>
-            <div className="text-xs text-orange-600 dark:text-orange-300">ימים רצופים</div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex flex-col items-center justify-center bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
+          <div className="flex items-center gap-1">
+            <Flame className="h-5 w-5 text-orange-500" />
+            <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{streak.currentStreak}</span>
           </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <div className="space-y-1">
-            <p>פעילות אחרונה: {timeAgo}</p>
-            <p className="text-xs">שמור על הרצף שלך בעזרת התחברות יומית!</p>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <div className="text-xs text-orange-600 dark:text-orange-300">ימים רצופים</div>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="space-y-1">
+          <p>פעילות אחרונה: {timeAgo}</p>
+          <p className="text-xs">שמור על הרצף שלך בעזרת התחברות יומית!</p>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 };
 

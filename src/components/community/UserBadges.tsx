@@ -2,7 +2,7 @@
 import React from 'react';
 import { Award, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -67,52 +67,50 @@ export default function UserBadges({
         if (!isEarned && !showLocked) return null;
         
         return (
-          <TooltipProvider key={badge.id}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div 
-                  className={cn(
-                    "flex flex-col items-center justify-center w-16 h-16 rounded-lg transition-all",
-                    isEarned 
-                      ? "bg-primary/10 hover:bg-primary/20 cursor-help" 
-                      : "bg-gray-100 opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <div className="relative">
-                    {!isEarned && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Lock className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className={cn(
-                      isEarned ? "text-primary" : "text-muted-foreground opacity-40"
-                    )}>
-                      {getBadgeIcon(badge.icon)}
-                    </div>
-                  </div>
-                  <div className="text-xs mt-1 font-medium text-center line-clamp-1">
-                    {badge.name}
-                  </div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <div className="space-y-1">
-                  <p className="font-semibold">{badge.name}</p>
-                  <p className="text-sm">{badge.description}</p>
-                  {isEarned && earnedBadgesMap[badge.id]?.earned_at && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      הושג ב-{formatDate(earnedBadgesMap[badge.id].earned_at)}
-                    </p>
-                  )}
+          <Tooltip key={badge.id}>
+            <TooltipTrigger asChild>
+              <div 
+                className={cn(
+                  "flex flex-col items-center justify-center w-16 h-16 rounded-lg transition-all",
+                  isEarned 
+                    ? "bg-primary/10 hover:bg-primary/20 cursor-help" 
+                    : "bg-gray-100 opacity-50 cursor-not-allowed"
+                )}
+              >
+                <div className="relative">
                   {!isEarned && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      דרושות {badge.points_required} נקודות כדי לקבל תג זה
-                    </p>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-muted-foreground" />
+                    </div>
                   )}
+                  <div className={cn(
+                    isEarned ? "text-primary" : "text-muted-foreground opacity-40"
+                  )}>
+                    {getBadgeIcon(badge.icon)}
+                  </div>
                 </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+                <div className="text-xs mt-1 font-medium text-center line-clamp-1">
+                  {badge.name}
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <div className="space-y-1">
+                <p className="font-semibold">{badge.name}</p>
+                <p className="text-sm">{badge.description}</p>
+                {isEarned && earnedBadgesMap[badge.id]?.earned_at && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    הושג ב-{formatDate(earnedBadgesMap[badge.id].earned_at)}
+                  </p>
+                )}
+                {!isEarned && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    דרושות {badge.points_required} נקודות כדי לקבל תג זה
+                  </p>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
         )}
       )}
     </div>
