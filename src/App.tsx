@@ -1,6 +1,6 @@
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { ThemeProvider } from '@/contexts/theme';
@@ -68,7 +68,7 @@ function App() {
               <Route path="/payment/failed" element={<PaymentFailed />} />
               
               {/* Protected routes */}
-              <Route element={<ProtectedRoute>{/* Fixed by adding children element */}</ProtectedRoute>}>
+              <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/subscription" element={<Subscription />} />
                 <Route path="/community" element={<Community />} />
