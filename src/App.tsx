@@ -6,26 +6,24 @@ import { Spinner } from '@/components/ui/spinner';
 import { ThemeProvider } from '@/contexts/theme';
 import { AuthProvider } from '@/contexts/auth';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { loadModuleWithRetry } from '@/lib/moduleLoader';
 
 // Eagerly loaded routes for critical paths
 import Auth from '@/pages/Auth';
+import Dashboard from '@/pages/Dashboard';
+import IframeRedirect from '@/pages/IframeRedirect';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentFailed from '@/pages/PaymentFailed';
 
-// Payment routes
-const IframeRedirect = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/IframeRedirect'), 'IframeRedirect')
-);
-const PaymentSuccess = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/PaymentSuccess'), 'PaymentSuccess')
-);
-const PaymentFailed = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/PaymentFailed'), 'PaymentFailed')
-);
+// Lazy loaded routes with retry utility
+const loadModuleWithRetry = (importFn, name) => {
+  console.log(`Loading module: ${name}`);
+  return importFn().catch(error => {
+    console.error(`Error loading ${name}:`, error);
+    throw error;
+  });
+};
 
-// Lazy loaded routes
-const Dashboard = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/Dashboard'), 'Dashboard')
-);
+// Lazy loaded less critical routes
 const Subscription = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/Subscription'), 'Subscription')
 );
@@ -59,10 +57,10 @@ function App() {
         <BrowserRouter>
           <Suspense fallback={<LoadingPage />}>
             <Routes>
-              {/* Public routes */}
+              {/* Public routes - eagerly loaded */}
               <Route path="/auth" element={<Auth />} />
               
-              {/* Payment routes */}
+              {/* Payment routes - eagerly loaded */}
               <Route path="/payment/redirect" element={<IframeRedirect />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/failed" element={<PaymentFailed />} />
