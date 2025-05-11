@@ -1,175 +1,161 @@
 
-import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from 'sonner';
+import Layout from '@/components/Layout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-// Define interface for CreateLowProfile parameters
-interface IframeRedirectProps {
+interface PaymentFormProps {
   terminalNumber: number;
   apiName: string;
-  operation?: string;
-  returnValue?: string;
   amount: number;
   successRedirectUrl: string;
   failedRedirectUrl: string;
   webHookUrl: string;
+  operation?: string;
   productName?: string;
   language?: string;
-  isoCoinId?: number;
+  returnValue?: string;
 }
 
-const IframeRedirect: React.FC = () => {
-  const location = useLocation();
+const IframeRedirect = () => {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializePayment = async () => {
+    const createLowProfilePayment = async () => {
       try {
-        // Get payment parameters from URL search params or from state
-        const searchParams = new URLSearchParams(location.search);
-        const paymentData = location.state?.paymentData || {};
+        setIsLoading(true);
         
-        // Merge URL parameters and state data
-        const paymentParams: IframeRedirectProps = {
-          terminalNumber: parseInt(searchParams.get('terminalNumber') || paymentData.terminalNumber?.toString() || '0'),
-          apiName: searchParams.get('apiName') || paymentData.apiName || '',
-          amount: parseFloat(searchParams.get('amount') || paymentData.amount?.toString() || '0'),
-          successRedirectUrl: searchParams.get('successRedirectUrl') || paymentData.successRedirectUrl || window.location.origin + '/payment/success',
-          failedRedirectUrl: searchParams.get('failedRedirectUrl') || paymentData.failedRedirectUrl || window.location.origin + '/payment/error',
-          webHookUrl: searchParams.get('webHookUrl') || paymentData.webHookUrl || window.location.origin + '/api/payment-webhook',
-          operation: searchParams.get('operation') || paymentData.operation || 'ChargeOnly',
-          returnValue: searchParams.get('returnValue') || paymentData.returnValue,
-          productName: searchParams.get('productName') || paymentData.productName,
-          language: searchParams.get('language') || paymentData.language || 'he',
-          isoCoinId: parseInt(searchParams.get('isoCoinId') || paymentData.isoCoinId?.toString() || '1'),
-        };
+        // Parse payment parameters from URL
+        const terminalNumber = Number(searchParams.get('terminalNumber') || 0);
+        const apiName = searchParams.get('apiName') || '';
+        const amount = Number(searchParams.get('amount') || 0);
+        const returnValue = searchParams.get('returnValue') || '';
         
-        // Validate required parameters
-        if (!paymentParams.terminalNumber || !paymentParams.apiName || !paymentParams.amount) {
-          throw new Error('Missing required payment parameters');
+        // Base host for redirects
+        const host = window.location.origin;
+        
+        // Required parameters validation
+        if (!terminalNumber || !apiName || !amount) {
+          setError('חסרים פרמטרים נדרשים לביצוע התשלום');
+          setIsLoading(false);
+          return;
         }
 
-        console.log('Creating payment iframe with params:', paymentParams);
-        
-        // Here you would normally call your backend API to create the payment URL
-        // For now, we'll simulate a successful response
-        const simulatedResponse = {
-          url: `https://secure.cardcom.solutions/Interface/LowProfile.aspx?TerminalNumber=${paymentParams.terminalNumber}&APIName=${paymentParams.apiName}&Amount=${paymentParams.amount}&Language=${paymentParams.language}`,
-          lowProfileId: 'simulated-low-profile-id'
+        const paymentData: PaymentFormProps = {
+          terminalNumber,
+          apiName,
+          amount,
+          successRedirectUrl: `${host}/payment/success`,
+          failedRedirectUrl: `${host}/payment/failed`,
+          webHookUrl: `${host}/api/payment/webhook`,
+          operation: searchParams.get('operation') || 'ChargeOnly',
+          productName: searchParams.get('productName') || 'הזמנה',
+          language: searchParams.get('language') || 'he',
+          returnValue
         };
         
-        // In a production environment, you would make an API call instead:
-        /*
-        const response = await fetch('/api/create-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(paymentParams)
-        });
+        // Mock API call - in production this should call your backend
+        console.log('Creating payment with parameters:', paymentData);
         
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to create payment');
-        }
+        // Simulate API response with a redirect URL
+        // In production, this would be the actual Cardcom iframe URL returned from your API
+        setTimeout(() => {
+          const mockIframeUrl = `https://secure.cardcom.solutions/External/LowProfile.aspx?LowProfileId=${btoa(JSON.stringify(paymentData))}`;
+          setIframeUrl(mockIframeUrl);
+          setIsLoading(false);
+        }, 1500);
         
-        const data = await response.json();
-        */
-        
-        // Store payment ID in session for later verification
-        sessionStorage.setItem('paymentLowProfileId', simulatedResponse.lowProfileId);
-        
-        // Set the redirect URL
-        setRedirectUrl(simulatedResponse.url);
-        setLoading(false);
-      } catch (err) {
-        console.error('Payment initialization error:', err);
-        setError((err as Error).message || 'Failed to initialize payment');
-        setLoading(false);
+      } catch (error) {
+        console.error('Error creating payment:', error);
+        setError('אירעה שגיאה בעת יצירת העסקה');
+        setIsLoading(false);
       }
     };
 
-    initializePayment();
-  }, [location]);
+    createLowProfilePayment();
+  }, [searchParams, navigate]);
 
-  // Handle manual redirect
-  const handleRedirect = () => {
-    if (redirectUrl) {
-      window.location.href = redirectUrl;
-    }
+  const handleBack = () => {
+    navigate(-1);
   };
-
-  // Handle cancel
-  const handleCancel = () => {
-    navigate('/');
-  };
-
-  if (loading) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center">
-        <Card className="w-[350px]">
-          <CardHeader>
-            <CardTitle>מעבר לעמוד התשלום</CardTitle>
-            <CardDescription>מתחבר למערכת הסליקה, אנא המתן...</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center p-6">
-            <Spinner className="h-16 w-16" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (error) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center">
-        <Card className="w-[350px]">
-          <CardHeader>
-            <CardTitle>שגיאה</CardTitle>
-            <CardDescription>לא ניתן ליצור את עמוד התשלום</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center text-red-500">{error}</div>
-            <div className="flex justify-center">
-              <Button onClick={handleCancel}>חזרה לדף הבית</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-[70vh]">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">שגיאה בעיבוד התשלום</CardTitle>
+              <CardDescription className="text-center">{error}</CardDescription>
+            </CardHeader>
+            <CardFooter className="flex justify-center">
+              <Button onClick={handleBack}>חזור</Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </Layout>
     );
   }
 
-  // Auto-redirect after a short delay
-  useEffect(() => {
-    if (redirectUrl) {
-      const timer = setTimeout(() => {
-        window.location.href = redirectUrl;
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [redirectUrl]);
-
   return (
-    <div className="flex h-screen flex-col items-center justify-center">
-      <Card className="w-[350px]">
-        <CardHeader>
-          <CardTitle>מעבר לעמוד התשלום</CardTitle>
-          <CardDescription>עוברים למערכת הסליקה, לחץ המשך אם אינך מועבר אוטומטית</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-center">
-            <Button onClick={handleRedirect}>המשך לתשלום</Button>
-          </div>
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleCancel}>ביטול</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <ErrorBoundary fallback={
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-[70vh]">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">שגיאה בטעינת עמוד התשלום</CardTitle>
+              <CardDescription className="text-center">אירעה שגיאה בטעינת עמוד התשלום. אנא נסו שוב מאוחר יותר.</CardDescription>
+            </CardHeader>
+            <CardFooter className="flex justify-center">
+              <Button onClick={() => window.location.reload()}>נסה שוב</Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </Layout>
+    }>
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-full">
+          {isLoading ? (
+            <div className="flex flex-col items-center gap-4">
+              <Spinner size="lg" />
+              <p>מעבד תשלום...</p>
+            </div>
+          ) : iframeUrl ? (
+            <div className="w-full max-w-4xl h-[80vh]">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-center">מסך תשלום</CardTitle>
+                  <CardDescription className="text-center">אנא השלימו את פרטי התשלום במסך שנטען</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <iframe 
+                    src={iframeUrl}
+                    className="w-full h-[600px] border-none"
+                    title="Payment Form"
+                  />
+                </CardContent>
+                <CardFooter className="flex justify-center">
+                  <Button variant="outline" onClick={handleBack}>ביטול</Button>
+                </CardFooter>
+              </Card>
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className="mb-4">לא ניתן לטעון את עמוד התשלום</p>
+              <Button onClick={handleBack}>חזור</Button>
+            </div>
+          )}
+        </div>
+      </Layout>
+    </ErrorBoundary>
   );
 };
 

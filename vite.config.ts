@@ -33,6 +33,15 @@ export default defineConfig(({ mode }) => ({
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
         manualChunks: (id) => {
+          // Force React and ReactDOM to be in the same chunk to avoid initialization issues
+          if (id.includes('node_modules/react') || 
+              id.includes('react-dom') ||
+              id.includes('scheduler') ||
+              id.includes('@remix-run/router') ||
+              id.includes('react-router')) {
+            return 'vendor-react';
+          }
+          
           // Force ALL critical components to be in the main chunk
           if (id.includes('Auth.tsx') || 
               id.includes('auth/') || 
@@ -42,6 +51,9 @@ export default defineConfig(({ mode }) => ({
               id.includes('dashboard/') ||
               id.includes('IframeRedirect.tsx') ||
               id.includes('subscription/') ||
+              id.includes('payment/') ||
+              id.includes('PaymentSuccess.tsx') ||
+              id.includes('PaymentFailed.tsx') ||
               // Also include community and course components in the main bundle
               id.includes('community/') ||
               id.includes('courses/') ||
@@ -51,18 +63,24 @@ export default defineConfig(({ mode }) => ({
             return 'index';
           }
           
-          // Group other chunks by category
-          if (id.includes('node_modules/react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+          // Group UI components to ensure they load together with React
+          if (id.includes('/components/ui/')) {
             return 'vendor-react';
           }
-          if (id.includes('/components/ui/')) {
-            return 'ui-components';
-          }
-          if (id.includes('/pages/') && !id.includes('Auth') && !id.includes('Dashboard') && !id.includes('IframeRedirect') && !id.includes('Courses') && !id.includes('CourseDetail')) {
+          
+          // Group other chunks by category
+          if (id.includes('/pages/') && 
+              !id.includes('Auth') && 
+              !id.includes('Dashboard') && 
+              !id.includes('IframeRedirect') && 
+              !id.includes('Courses') && 
+              !id.includes('CourseDetail') && 
+              !id.includes('PaymentSuccess') && 
+              !id.includes('PaymentFailed')) {
             return 'pages';
           }
         },
-        // Force inlining of dynamic imports for critical paths to prevent loading errors
+        // Prevent dynamic imports for critical paths
         inlineDynamicImports: false
       }
     },

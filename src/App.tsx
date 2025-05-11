@@ -1,101 +1,91 @@
 
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes } from 'react-router-dom';
+import React, { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { AuthProvider } from './contexts/auth/AuthProvider';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import PageTransition from '@/components/PageTransition';
-import { generateRouteComponents } from './routing/routes';
-import ErrorBoundary from './components/ErrorBoundary';
-import { moduleHealthMonitor } from './lib/moduleHealthCheck';
+import { Spinner } from '@/components/ui/spinner';
+import { ThemeProvider } from '@/contexts/theme';
+import { AuthProvider } from '@/contexts/auth';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { loadModuleWithRetry } from '@/lib/moduleLoader';
 
-// Explicitly prefetch critical components
-const prefetchCriticalComponents = () => {
-  try {
-    // Create prefetch links with relative paths
-    const criticalPaths = [
-      { path: './auth', type: 'document' },
-      { path: './dashboard', type: 'document' },
-      { path: './assets/index.js', type: 'script' },
-      { path: './assets/vendor-react.js', type: 'script' },
-      { path: './assets/ui-components.js', type: 'script' }
-    ];
-    
-    criticalPaths.forEach(({ path, type }) => {
-      const link = document.createElement('link');
-      link.rel = 'prefetch';
-      if (type === 'script') link.as = 'script';
-      
-      // Add cache busting parameter
-      const cacheBuster = window.__VITE_TIMESTAMP__ || Date.now();
-      link.href = `${path}?v=${cacheBuster}`;
-      
-      document.head.appendChild(link);
-    });
-  } catch (e) {
-    console.warn('Prefetch failed:', e);
-  }
-};
+// Eagerly loaded routes for critical paths
+import Auth from '@/pages/Auth';
+
+// Payment routes
+const IframeRedirect = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/IframeRedirect'), 'IframeRedirect')
+);
+const PaymentSuccess = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/PaymentSuccess'), 'PaymentSuccess')
+);
+const PaymentFailed = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/PaymentFailed'), 'PaymentFailed')
+);
+
+// Lazy loaded routes
+const Dashboard = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Dashboard'), 'Dashboard')
+);
+const Subscription = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Subscription'), 'Subscription')
+);
+const Community = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Community'), 'Community')
+);
+const Courses = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Courses'), 'Courses')
+);
+const CourseDetail = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/CourseDetail'), 'CourseDetail')
+);
+const Account = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Account'), 'Account')
+);
+const NotFound = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/NotFound'), 'NotFound')
+);
+
+// Loading component for Suspense
+const LoadingPage = () => (
+  <div className="flex h-screen w-full items-center justify-center">
+    <Spinner size="lg" />
+  </div>
+);
 
 function App() {
-  // Initialize module health monitoring
-  useEffect(() => {
-    moduleHealthMonitor.initialize();
-    
-    // Add dark mode by default
-    document.documentElement.classList.add('dark');
-    
-    // Prefetch critical components
-    prefetchCriticalComponents();
-  }, []);
-  
   return (
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster position="top-center" richColors />
-        <Router>
-          <ErrorBoundary fallback={
-            <div className="h-screen flex flex-col items-center justify-center p-4">
-              <div className="mb-6 text-red-500">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold mb-2">שגיאה בטעינת האפליקציה</h2>
-              <p className="text-muted-foreground mb-4">אירעה שגיאה בטעינת האפליקציה</p>
-              <div className="flex gap-3">
-                <button onClick={() => window.location.href = "./"} className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors">
-                  חזור לעמוד הראשי
-                </button>
-                <button onClick={() => {
-                  // Clear caches before reload
-                  if ('caches' in window) {
-                    caches.keys().then(names => {
-                      names.forEach(name => {
-                        caches.delete(name);
-                      });
-                    });
-                  }
-                  // Add timestamp to bust cache
-                  const timestamp = Date.now();
-                  window.location.href = `./?t=${timestamp}`;
-                }} className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors">
-                  נקה מטמון ורענן
-                </button>
-              </div>
-            </div>
-          }>
-            <PageTransition>
-              <Routes>
-                {generateRouteComponents()}
-              </Routes>
-            </PageTransition>
-          </ErrorBoundary>
-        </Router>
-      </TooltipProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Suspense fallback={<LoadingPage />}>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/auth" element={<Auth />} />
+              
+              {/* Payment routes */}
+              <Route path="/payment/redirect" element={<IframeRedirect />} />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/failed" element={<PaymentFailed />} />
+              
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/subscription" element={<Subscription />} />
+                <Route path="/community" element={<Community />} />
+                <Route path="/courses" element={<Courses />} />
+                <Route path="/courses/:courseId" element={<CourseDetail />} />
+                <Route path="/account" element={<Account />} />
+              </Route>
+              
+              {/* Default & catch-all routes */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+          <Toaster richColors position="top-center" dir="rtl" />
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
