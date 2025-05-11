@@ -99,3 +99,72 @@ export interface CardcomVerifyResponse {
   error?: string;
   details?: any;
 }
+
+// Add new interfaces for Cardcom's API responses
+export interface CardcomWebhookPayload {
+  ResponseCode: number;
+  Description?: string;
+  LowProfileId: string;
+  TranzactionId?: number | string;
+  ReturnValue?: string;
+  Operation?: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly" | "SuspendedDeal" | "Do3DSAndSubmit";
+  TokenInfo?: CardcomTokenInfo;
+  TranzactionInfo?: CardcomTransactionInfo;
+  UIValues?: CardcomUIValues;
+  DocumentInfo?: CardcomDocumentInfo;
+}
+
+export interface CardcomTokenInfo {
+  Token: string;
+  TokenExDate: string;
+  CardYear?: number;
+  CardMonth?: number;
+  TokenApprovalNumber?: string;
+  CardOwnerIdentityNumber?: string;
+}
+
+export interface CardcomTransactionInfo {
+  ResponseCode: number;
+  Description?: string;
+  TranzactionId: number;
+  TerminalNumber: number;
+  Amount: number;
+  CoinId: number;
+  CardMonth: number;
+  CardYear: number;
+  ApprovalNumber?: string;
+  CardInfo?: string;
+  Last4CardDigits: string | number;
+  CardOwnerName?: string;
+  CardOwnerEmail?: string;
+  CardOwnerPhone?: string;
+  CardOwnerIdentityNumber?: string;
+}
+
+export interface CardcomUIValues {
+  CardOwnerEmail?: string;
+  CardOwnerName?: string;
+  CardOwnerPhone?: string;
+  CardOwnerIdentityNumber?: string;
+  NumOfPayments?: number;
+  CardYear?: number;
+  CardMonth?: number;
+  CustomFields?: Array<{Id: number, Value: string}>;
+  IsAbroadCard?: boolean;
+}
+
+export interface CardcomDocumentInfo {
+  ResponseCode: number;
+  Description: string;
+  DocumentType: string;
+  DocumentNumber: number;
+  AccountId?: number;
+  DocumentUrl?: string;
+}
+
+// API configuration response
+export interface CardcomConfigResponse {
+  terminalNumber: string;
+  apiName: string;
+  hasApiPassword: boolean;
+}

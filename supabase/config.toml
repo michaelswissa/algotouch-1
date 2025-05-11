@@ -97,6 +97,9 @@ verify_jwt = true
 [functions.get-cardcom-config]
 verify_jwt = true
 
+[functions.process-payment-data]
+verify_jwt = true
+
 # Configure secrets for the project
 [secrets]
 CARDCOM_TERMINAL = "Stored in Edge Function Secrets"
