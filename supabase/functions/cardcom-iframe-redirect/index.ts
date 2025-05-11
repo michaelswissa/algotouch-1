@@ -47,7 +47,7 @@ serve(async (req) => {
     const {
       terminalNumber = Deno.env.get('CARDCOM_TERMINAL'),
       apiName = Deno.env.get('CARDCOM_USERNAME'),
-      operation = "ChargeOnly", // Default to charge only
+      operation = "ChargeAndCreateToken", // Default to charge AND create token (changed from ChargeOnly)
       amount,
       returnValue,
       webHookUrl,
@@ -83,7 +83,7 @@ serve(async (req) => {
           operationString = "CreateTokenOnly";
           break;
         default:
-          operationString = "ChargeOnly";
+          operationString = "ChargeAndCreateToken"; // Changed default to ChargeAndCreateToken
       }
     }
 
@@ -112,6 +112,9 @@ serve(async (req) => {
       ...(uiDefinition || {})
     };
 
+    // Construct the webhook URL - use the full URL for the Edge Function
+    const webhookUrl = webHookUrl || `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
+
     // Prepare the request payload for LowProfile Create
     const payload = {
       TerminalNumber: parseInt(terminalNumber),
@@ -122,7 +125,7 @@ serve(async (req) => {
       // All redirects go through our internal redirect page
       SuccessRedirectUrl: `${redirectUrl}?success=true&plan=${planId || ''}`,
       FailedRedirectUrl: `${redirectUrl}?error=true&plan=${planId || ''}`,
-      WebHookUrl: webHookUrl || null,
+      WebHookUrl: webhookUrl,
       ProductName: productName || 'Product Purchase',
       Language: language,
       ISOCoinId: isoCoinId,
@@ -135,7 +138,8 @@ serve(async (req) => {
       phone: enhancedUiDefinition.CardOwnerPhoneValue,
       idNumber: enhancedUiDefinition.CardOwnerIdValue,
       operation: operationString,
-      amount: amount || 0
+      amount: amount || 0,
+      webhookUrl: webhookUrl
     });
 
     // Make the API request
@@ -160,6 +164,34 @@ serve(async (req) => {
     }
 
     console.log(`Created CardCom payment session: ${result.LowProfileId}`);
+
+    // Save the payment session to database for tracking
+    try {
+      const { data: sessionData, error: sessionError } = await supabaseClient
+        .from('payment_sessions')
+        .insert({
+          user_id: returnValue || null,
+          low_profile_id: result.LowProfileId,
+          amount: amount,
+          plan_id: planId || null,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour expiry
+          payment_details: {
+            operation: operationString,
+            userDetails: {
+              name: cardOwnerName,
+              email: cardOwnerEmail,
+              phone: cardOwnerPhone
+            }
+          }
+        });
+
+      if (sessionError) {
+        console.error('Error saving payment session:', sessionError);
+      }
+    } catch (saveError) {
+      console.error('Error saving payment session:', saveError);
+      // Do not throw - continue even if session save fails
+    }
 
     // Return the payment URL and ID
     return new Response(

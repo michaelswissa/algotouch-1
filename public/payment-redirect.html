@@ -60,7 +60,7 @@
     }
 
     // Process the response
-    function processResponse() {
+    async function processResponse() {
       const params = getUrlParams();
       const statusElement = document.getElementById('status');
       const messageElement = document.getElementById('message');
@@ -68,28 +68,65 @@
       console.log('Processing payment redirect with params:', params);
       
       // Check if this is a success response
-      if (params.success === 'true' || params.ResponseCode === '0') {
+      const isSuccess = params.success === 'true' || params.ResponseCode === '0';
+      
+      // Extract LowProfileId from parameters - might come as LowProfileId or lowProfileId
+      const lowProfileId = params.LowProfileId || params.lowProfileId;
+      
+      if (isSuccess) {
         statusElement.textContent = 'התשלום התקבל בהצלחה!';
         messageElement.textContent = 'מעביר אותך לדף הבא...';
         
         // Store payment data in session storage to handle page reload scenarios
         const paymentData = {
           timestamp: new Date().toISOString(),
-          lowProfileId: params.LowProfileId || params.lowProfileId,
+          lowProfileId: lowProfileId,
           transactionId: params.TranzactionId || params.txId,
-          plan: params.plan
+          plan: params.plan,
+          hasToken: !!params.Token
         };
         
         sessionStorage.setItem('payment_success_data', JSON.stringify(paymentData));
         
+        // If we have the lowProfileId, try to verify it server-side
+        if (lowProfileId) {
+          try {
+            const response = await fetch(`https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/verify-cardcom-payment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                // Include auth header if available
+                ...getAuthHeader()
+              },
+              body: JSON.stringify({ lowProfileId })
+            });
+            
+            const data = await response.json();
+            console.log('Payment verification result:', data);
+            
+            // If verification failed but we still have success params, continue anyway
+            // The CardcomRedirectPage component will handle fallback verification
+          } catch (error) {
+            console.error('Error verifying payment:', error);
+          }
+        }
+        
         // Send success message to parent
         window.parent.postMessage({
           type: 'cardcom-paid',
-          details: paymentData
+          details: {
+            ...paymentData,
+            params: params
+          }
         }, '*');
+        
+        // Redirect to dashboard or success page
+        setTimeout(() => {
+          window.location.href = `${window.location.origin}/cardcom-redirect?LowProfileId=${lowProfileId}&success=true`;
+        }, 1500);
       } 
       // Check if this is an error response
-      else if (params.error === 'true' || (params.ResponseCode && params.ResponseCode !== '0')) {
+      else {
         statusElement.textContent = 'שגיאה בתהליך התשלום';
         messageElement.textContent = params.Description || 'אנא נסה שנית';
         
@@ -99,6 +136,30 @@
           message: params.Description || 'Payment failed',
           code: params.ResponseCode || 'unknown'
         }, '*');
+        
+        // Redirect to error page
+        setTimeout(() => {
+          window.location.href = `${window.location.origin}/cardcom-redirect?error=true&message=${encodeURIComponent(params.Description || 'שגיאה בתהליך התשלום')}`;
+        }, 1500);
+      }
+    }
+
+    // Helper function to get auth header if available
+    function getAuthHeader() {
+      try {
+        // Try to get Supabase auth token from localStorage
+        const supabaseAuth = localStorage.getItem('supabase.auth.token');
+        if (supabaseAuth) {
+          const parsedAuth = JSON.parse(supabaseAuth);
+          if (parsedAuth?.currentSession?.access_token) {
+            return {
+              'Authorization': `Bearer ${parsedAuth.currentSession.access_token}`
+            };
+          }
+        }
+        return {};
+      } catch (e) {
+        return {};
       }
     }
 

@@ -65,6 +65,9 @@ export const usePaymentInitialization = (
         amount: getPlanAmount(selectedPlan)
       });
 
+      // Set the webhook URL to the full Supabase Edge Function URL
+      const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
+
       // Prepare payload based on whether user is logged in or not
       const payload = {
         planId: selectedPlan,
@@ -74,7 +77,7 @@ export const usePaymentInitialization = (
         operationType, // Send numeric operation type (1, 2, or 3)
         origin: window.location.origin,
         amount: getPlanAmount(selectedPlan),
-        webHookUrl: `${window.location.origin}/api/payment-webhook`,
+        webHookUrl: webhookUrl,
         // Include registration data for account creation after payment
         registrationData: registrationData,
         // Add user details for payment form pre-fill
@@ -83,7 +86,9 @@ export const usePaymentInitialization = (
           email: userEmail,
           phone: userPhone,
           idNumber: userIdNumber
-        }
+        },
+        // Ensure we pass ReturnValue with user ID or temp ID
+        returnValue: user?.id || `temp_${Date.now()}`
       };
 
       const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
