@@ -8,6 +8,12 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase-client';
 import { CardcomPayload, CardcomWebhookPayload, CardcomVerifyResponse } from '@/types/payment';
 
+// Define a specific interface for the payment webhook row to avoid deep recursion
+interface PaymentWebhookRow {
+  payload: CardcomWebhookPayload;
+  processed: boolean;
+}
+
 export default function CardcomRedirectPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -33,18 +39,17 @@ export default function CardcomRedirectPage() {
         // Step 1: First check if this payment has already been processed via webhook
         // by checking the payment_webhooks table
         const { data: webhookData, error: webhookError } = await supabase
-          .from('payment_webhooks')
-          .select('*')
+          .from<PaymentWebhookRow>('payment_webhooks')
+          .select('payload, processed')
           .eq('payload->LowProfileId', lowProfileId)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
 
         if (!webhookError && webhookData && webhookData.processed) {
-          // Cast the payload to our known type
-          const payload = webhookData.payload as unknown as CardcomWebhookPayload;
-          
           // Payment was already processed by webhook
+          const payload = webhookData.payload;
+          
           console.log('Payment already processed by webhook:', payload);
           setPaymentDetails({
             source: 'webhook',
