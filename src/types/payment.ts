@@ -1,4 +1,3 @@
-
 export interface TokenData {
   token?: string;
   lastFourDigits: string;
@@ -79,6 +78,7 @@ export interface CardcomPaymentResponse {
 
 export interface CardcomVerifyResponse {
   success: boolean;
+  message?: string; // Added the missing message property
   paymentDetails?: {
     transactionId: number;
     amount: number;
@@ -101,6 +101,19 @@ export interface CardcomVerifyResponse {
 }
 
 // Add new interfaces for Cardcom's API responses
+export interface CardcomPayload {
+  ResponseCode: number;
+  Description?: string;
+  LowProfileId: string;
+  TranzactionId?: number | string;
+  ReturnValue?: string;
+  Operation?: "ChargeOnly" | "ChargeAndCreateToken" | "CreateTokenOnly" | "SuspendedDeal" | "Do3DSAndSubmit";
+  TokenInfo?: CardcomTokenInfo;
+  TranzactionInfo?: CardcomTransactionInfo;
+  UIValues?: CardcomUIValues;
+  DocumentInfo?: CardcomDocumentInfo;
+}
+
 export interface CardcomWebhookPayload {
   ResponseCode: number;
   Description?: string;
@@ -139,6 +152,7 @@ export interface CardcomTransactionInfo {
   CardOwnerEmail?: string;
   CardOwnerPhone?: string;
   CardOwnerIdentityNumber?: string;
+  CardName?: string;
 }
 
 export interface CardcomUIValues {
