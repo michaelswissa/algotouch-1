@@ -3,7 +3,7 @@ import React from 'react';
 import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
-import { EconomicCalendarSection } from '@/components/calendar/EconomicCalendarSection';
+import EconomicCalendarSection from '@/components/calendar/EconomicCalendarSection';
 
 interface TradeDay {
   date: string;

@@ -54,8 +54,8 @@ export default defineConfig(({ mode }) => ({
               id.includes('payment/') ||
               id.includes('PaymentSuccess.tsx') ||
               id.includes('PaymentFailed.tsx') ||
-              // Also include community and course components in the main bundle
-              id.includes('community/') ||
+              id.includes('calendar/') ||  // Include all calendar components in main bundle
+              id.includes('Community.tsx') ||
               id.includes('courses/') ||
               id.includes('Courses.tsx') ||
               id.includes('CourseDetail.tsx') ||
@@ -81,12 +81,12 @@ export default defineConfig(({ mode }) => ({
           }
         },
         // Prevent dynamic imports for critical paths
-        inlineDynamicImports: false
+        inlineDynamicImports: true
       }
     },
     chunkSizeWarningLimit: 1000,
     // Add source maps in development for better debugging
-    sourcemap: mode === 'development',
+    sourcemap: true,
     // Improve error handling in production
     reportCompressedSize: true,
   }
