@@ -3,7 +3,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart } from 'lucide-react';
 
-const EconomicCalendarSection = () => {
+// Using a function declaration instead of a const arrow function
+// This helps prevent temporal dead zone issues
+function EconomicCalendarSection() {
   return (
     <div className="mt-8 col-span-3 w-full mx-[2px] px-[167px]">
       <Card className="glass-card-2025 overflow-hidden hover-glow my-0 px-0">
@@ -31,6 +33,6 @@ const EconomicCalendarSection = () => {
       </Card>
     </div>
   );
-};
+}
 
 export default EconomicCalendarSection;

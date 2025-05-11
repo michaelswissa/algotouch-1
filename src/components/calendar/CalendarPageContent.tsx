@@ -3,6 +3,7 @@ import React from 'react';
 import { YearCalendarView } from '@/components/calendar/YearCalendarView';
 import { MonthCalendarSection } from '@/components/calendar/MonthCalendarSection';
 import { RecentActivitySection } from '@/components/calendar/RecentActivitySection';
+// Import the component using default import syntax to be more explicit
 import EconomicCalendarSection from '@/components/calendar/EconomicCalendarSection';
 
 interface TradeDay {
@@ -26,7 +27,8 @@ interface CalendarPageContentProps {
   tradesByDay: Record<string, any>;
 }
 
-export const CalendarPageContent = ({
+// Use function declaration for the main component for cleaner initialization
+export function CalendarPageContent({
   viewMode,
   currentMonth,
   currentYear,
@@ -38,7 +40,7 @@ export const CalendarPageContent = ({
   handleBackToYear,
   tradeDays,
   tradesByDay
-}: CalendarPageContentProps) => {
+}: CalendarPageContentProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {viewMode === 'year' ? (
@@ -69,4 +71,4 @@ export const CalendarPageContent = ({
       <EconomicCalendarSection />
     </div>
   );
-};
+}

@@ -5,7 +5,8 @@ import { CalendarPageHeader } from '@/components/calendar/CalendarPageHeader';
 import { CalendarPageContent } from '@/components/calendar/CalendarPageContent';
 import { useCalendar } from '@/hooks/use-calendar';
 
-const CalendarPage = () => {
+// Use function declaration for the component
+function CalendarPage() {
   const { 
     viewMode,
     currentMonth,
@@ -73,6 +74,6 @@ const CalendarPage = () => {
       </div>
     </Layout>
   );
-};
+}
 
 export default CalendarPage;

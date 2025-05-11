@@ -32,56 +32,8 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
-        manualChunks: (id) => {
-          // Force React and ReactDOM to be in the same chunk to avoid initialization issues
-          if (id.includes('node_modules/react') || 
-              id.includes('react-dom') ||
-              id.includes('scheduler') ||
-              id.includes('@remix-run/router') ||
-              id.includes('react-router')) {
-            return 'vendor-react';
-          }
-          
-          // Force ALL critical components to be in the main chunk
-          if (id.includes('Auth.tsx') || 
-              id.includes('auth/') || 
-              id.includes('LoginForm') || 
-              id.includes('SignupForm') ||
-              id.includes('Dashboard.tsx') ||
-              id.includes('dashboard/') ||
-              id.includes('IframeRedirect.tsx') ||
-              id.includes('subscription/') ||
-              id.includes('payment/') ||
-              id.includes('PaymentSuccess.tsx') ||
-              id.includes('PaymentFailed.tsx') ||
-              id.includes('calendar/') ||  // Include all calendar components in main bundle
-              id.includes('Community.tsx') ||
-              id.includes('courses/') ||
-              id.includes('Courses.tsx') ||
-              id.includes('CourseDetail.tsx') ||
-              id.includes('CourseCard.tsx')) {
-            return 'index';
-          }
-          
-          // Group UI components to ensure they load together with React
-          if (id.includes('/components/ui/')) {
-            return 'vendor-react';
-          }
-          
-          // Group other chunks by category
-          if (id.includes('/pages/') && 
-              !id.includes('Auth') && 
-              !id.includes('Dashboard') && 
-              !id.includes('IframeRedirect') && 
-              !id.includes('Courses') && 
-              !id.includes('CourseDetail') && 
-              !id.includes('PaymentSuccess') && 
-              !id.includes('PaymentFailed')) {
-            return 'pages';
-          }
-        },
-        // Prevent dynamic imports for critical paths
-        inlineDynamicImports: true
+        // Remove manualChunks when using inlineDynamicImports to avoid the conflict
+        // We're prioritizing a simpler bundling strategy with fewer chunks
       }
     },
     chunkSizeWarningLimit: 1000,
