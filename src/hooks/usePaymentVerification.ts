@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase-client';
 import { CardcomPayload, CardcomVerifyResponse, CardcomWebhookPayload } from '@/types/payment';
+import { PaymentLogger } from '@/services/logging/paymentLogger';
+import { PaymentMonitor } from '@/services/monitoring/paymentMonitor';
 
 // Define a specific interface for the payment webhook row to avoid deep recursion
 interface PaymentWebhookRow {
@@ -31,12 +33,15 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
     async function verifyPayment() {
       try {
         if (!lowProfileId) {
+          PaymentLogger.warning('Missing LowProfileId in payment verification', 'payment-verification');
           setError('לא התקבלו נתונים מספיקים מהשרת');
           setIsLoading(false);
           return;
         }
 
-        console.log('Processing payment redirect with LowProfileId:', lowProfileId);
+        const tracking = PaymentMonitor.startTracking(lowProfileId);
+        PaymentMonitor.logVerificationAttempt(lowProfileId, 'redirect');
+        PaymentLogger.info('Processing payment redirect', 'payment-verification', { lowProfileId });
 
         // Step 1: First check if this payment has already been processed via webhook
         const { data: webhookData, error: webhookError } = await supabase
@@ -51,7 +56,11 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
           // Payment was already processed by webhook
           const payload = webhookData.payload as CardcomWebhookPayload;
           
-          console.log('Payment already processed by webhook:', payload);
+          PaymentLogger.info('Payment already processed by webhook', 'payment-verification', { 
+            lowProfileId, 
+            responseCode: payload.ResponseCode
+          }, payload.ReturnValue);
+          
           setPaymentDetails({
             source: 'webhook',
             details: payload,
@@ -59,28 +68,41 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
           });
           
           if (payload.ResponseCode === 0) {
+            PaymentMonitor.logVerificationSuccess(lowProfileId, 'webhook-record', payload, payload.ReturnValue);
             toast.success('התשלום התקבל בהצלחה!');
             navigate('/dashboard');
           } else {
+            PaymentMonitor.logVerificationFailure(lowProfileId, 'webhook-record', {
+              code: payload.ResponseCode,
+              message: payload.Description
+            }, payload.ReturnValue);
             setError(payload.Description || 'אירעה שגיאה בתהליך התשלום');
           }
+          tracking.endTracking();
           setIsLoading(false);
           return;
         }
 
         // Step 2: Call Supabase function to verify payment if webhook hasn't processed it
+        PaymentLogger.info('Attempting verification via edge function', 'payment-verification', { lowProfileId });
         const { data, error: functionError } = await supabase.functions.invoke<CardcomVerifyResponse>('verify-cardcom-payment', {
           body: { lowProfileId }
         });
 
         if (functionError) {
-          console.error('Error calling verify-cardcom-payment:', functionError);
+          PaymentLogger.error('Error calling verify-cardcom-payment edge function', 'payment-verification', { 
+            lowProfileId, 
+            error: functionError 
+          });
+          
           // Fallback: Call the CardCom API directly as last resort
           await verifyCardcomPaymentDirectly(lowProfileId);
+          tracking.endTracking();
           return;
         }
 
         if (data?.success) {
+          PaymentMonitor.logVerificationSuccess(lowProfileId, 'edge-function', data, data.registrationId);
           setPaymentDetails({
             source: 'edge-function',
             details: data,
@@ -90,10 +112,18 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
           // Navigate to success page or dashboard
           navigate('/dashboard');
         } else {
+          PaymentMonitor.logVerificationFailure(lowProfileId, 'edge-function', {
+            message: data?.message || 'Unknown error',
+            details: data?.error
+          });
           setError(data?.message || 'אירעה שגיאה בתהליך אימות התשלום');
         }
+        tracking.endTracking();
       } catch (err: any) {
-        console.error('Error processing redirect:', err);
+        PaymentLogger.error('Exception during payment verification', 'payment-verification', {
+          lowProfileId,
+          error: err?.message || String(err)
+        });
         setError('אירעה שגיאה בעת עיבוד נתוני התשלום');
       } finally {
         setIsLoading(false);
@@ -108,8 +138,8 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
   }, [lowProfileId, navigate]);
 
   async function verifyCardcomPaymentDirectly(lowProfileId: string) {
+    PaymentLogger.info('Attempting direct CardCom API verification', 'direct-api', { lowProfileId });
     try {
-      console.log('Attempting direct verification with CardCom API');
       // Get terminal and API credentials from environment or session storage
       const { data: configData, error: configError } = await supabase.functions.invoke<{
         terminalNumber: string;
@@ -120,10 +150,17 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
       });
 
       if (configError || !configData?.terminalNumber || !configData?.apiName) {
-        throw new Error('Unable to retrieve CardCom configuration');
+        const errorMessage = 'Unable to retrieve CardCom configuration';
+        PaymentLogger.error(errorMessage, 'direct-api', { lowProfileId, error: configError });
+        throw new Error(errorMessage);
       }
 
       // Call the CardCom API to verify the payment directly
+      PaymentLogger.info('Calling CardCom API directly', 'direct-api', { 
+        lowProfileId, 
+        terminalNumber: configData.terminalNumber 
+      });
+      
       const response = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult', {
         method: 'POST',
         headers: {
@@ -137,11 +174,16 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
       });
 
       const lpResult = await response.json() as CardcomPayload;
-      console.log('Direct CardCom API response:', lpResult);
+      PaymentLogger.info('Received CardCom API response', 'direct-api', { 
+        lowProfileId, 
+        responseCode: lpResult.ResponseCode,
+        description: lpResult.Description
+      }, lpResult.ReturnValue);
       
       if (lpResult.ResponseCode === 0) {
         // Save the result to our database
         await saveCardcomPaymentData(lpResult);
+        PaymentMonitor.logVerificationSuccess(lowProfileId, 'direct-api', lpResult, lpResult.ReturnValue);
         
         setPaymentDetails({
           source: 'direct-api',
@@ -152,22 +194,35 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
         toast.success('התשלום התקבל בהצלחה!');
         navigate('/dashboard');
       } else {
+        PaymentMonitor.logVerificationFailure(lowProfileId, 'direct-api', {
+          code: lpResult.ResponseCode,
+          message: lpResult.Description
+        }, lpResult.ReturnValue);
+        
         setError(lpResult.Description || 'אירעה שגיאה באימות התשלום');
         setIsLoading(false);
       }
     } catch (error: any) {
-      console.error('Error in direct CardCom verification:', error);
+      PaymentLogger.error('Exception during direct CardCom verification', 'direct-api', {
+        lowProfileId,
+        error: error?.message || String(error)
+      });
+      
       setError('שגיאה באימות התשלום מול שרת הסליקה');
       setIsLoading(false);
     }
   }
 
   async function saveCardcomPaymentData(paymentData: CardcomPayload) {
+    const userId = paymentData.ReturnValue;
+    
     try {
-      const userId = paymentData.ReturnValue;
-      
       // Save payment data for user
       if (userId && !userId.startsWith('temp_')) {
+        PaymentLogger.info('Saving payment data', 'data-storage', { 
+          lowProfileId: paymentData.LowProfileId 
+        }, userId);
+        
         // Process data like the webhook would
         await supabase.functions.invoke('process-payment-data', {
           body: {
@@ -176,9 +231,17 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
             source: 'redirect-fallback'
           }
         });
+        
+        PaymentLogger.success('Payment data saved successfully', 'data-storage', { 
+          lowProfileId: paymentData.LowProfileId,
+          transactionId: paymentData.TranzactionId
+        }, userId, paymentData.TranzactionId?.toString());
       }
-    } catch (error) {
-      console.error('Error saving payment data:', error);
+    } catch (error: any) {
+      PaymentLogger.error('Error saving payment data', 'data-storage', {
+        lowProfileId: paymentData.LowProfileId,
+        error: error?.message || String(error)
+      }, userId);
     }
   }
 

@@ -36,6 +36,35 @@ interface CardcomResponse {
   };
 }
 
+// Logger function for edge function
+async function logPaymentEvent(
+  supabaseClient: any, 
+  level: string, 
+  message: string, 
+  context: string, 
+  data: any,
+  userId?: string,
+  transactionId?: string
+) {
+  try {
+    await supabaseClient
+      .from('payment_logs')
+      .insert({
+        level,
+        message,
+        context,
+        payment_data: data || {},
+        user_id: userId || 'system',
+        transaction_id: transactionId || 'none',
+        source: 'edge-function'
+      });
+  } catch (error) {
+    // Fallback to console logging if database logging fails
+    console.error('Error logging to database:', error);
+    console.log(`[${level}] [${context}] ${message}`, data);
+  }
+}
+
 // Main server function
 serve(async (req) => {
   // Handle OPTIONS (preflight) request
@@ -46,9 +75,12 @@ serve(async (req) => {
     });
   }
 
+  const requestStartTime = Date.now();
+  let supabaseClient;
+
   try {
     // Create a Supabase client with service role for admin access
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
@@ -65,7 +97,13 @@ serve(async (req) => {
       throw new Error('Missing lowProfileId parameter');
     }
     
-    console.log(`Verifying payment for lowProfileId: ${lowProfileId}`);
+    await logPaymentEvent(
+      supabaseClient, 
+      'info', 
+      `Verifying payment for lowProfileId: ${lowProfileId}`,
+      'verify-cardcom-payment',
+      { lowProfileId }
+    );
 
     // Get CardCom API credentials from environment variables
     const terminalNumber = Deno.env.get('CARDCOM_TERMINAL');
@@ -76,7 +114,14 @@ serve(async (req) => {
     }
 
     // First check if we already have this payment in our database
-    console.log('Checking for existing webhook data');
+    await logPaymentEvent(
+      supabaseClient, 
+      'info', 
+      'Checking for existing webhook data',
+      'verify-cardcom-payment',
+      { lowProfileId }
+    );
+
     const { data: existingWebhook, error: webhookError } = await supabaseClient
       .from('payment_webhooks')
       .select('*')
@@ -90,7 +135,19 @@ serve(async (req) => {
       const webhookData = existingWebhook.payload as unknown as CardcomResponse;
       
       if (webhookData.ResponseCode === 0) {
-        console.log('Payment already verified via webhook:', existingWebhook.id);
+        await logPaymentEvent(
+          supabaseClient, 
+          'info', 
+          `Payment already verified via webhook: ${existingWebhook.id}`,
+          'verify-cardcom-payment',
+          { 
+            lowProfileId,
+            webhookId: existingWebhook.id,
+            responseCode: webhookData.ResponseCode
+          },
+          webhookData.ReturnValue,
+          webhookData.TranzactionId?.toString()
+        );
         
         // Extract payment details
         const paymentDetails = webhookData.TranzactionInfo ? {
@@ -131,7 +188,14 @@ serve(async (req) => {
     }
 
     // If no webhook data found, call CardCom API to verify payment
-    console.log('No webhook data found, calling CardCom API');
+    await logPaymentEvent(
+      supabaseClient, 
+      'info', 
+      'No webhook data found, calling CardCom API',
+      'verify-cardcom-payment',
+      { lowProfileId }
+    );
+
     const cardcomResponse = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult', {
       method: 'POST',
       headers: {
@@ -149,7 +213,20 @@ serve(async (req) => {
     }
     
     const cardcomData = await cardcomResponse.json() as CardcomResponse;
-    console.log('CardCom API response:', JSON.stringify(cardcomData));
+    
+    await logPaymentEvent(
+      supabaseClient, 
+      'info', 
+      'CardCom API response received',
+      'verify-cardcom-payment',
+      { 
+        lowProfileId,
+        responseCode: cardcomData.ResponseCode,
+        description: cardcomData.Description
+      },
+      cardcomData.ReturnValue,
+      cardcomData.TranzactionId?.toString()
+    );
     
     if (cardcomData.ResponseCode !== 0) {
       throw new Error(`Payment verification failed: ${cardcomData.Description || 'Unknown error'}`);
@@ -172,10 +249,24 @@ serve(async (req) => {
       .single();
     
     if (saveError) {
-      console.error('Error saving webhook data:', saveError);
+      await logPaymentEvent(
+        supabaseClient,
+        'error',
+        'Error saving webhook data',
+        'verify-cardcom-payment',
+        { lowProfileId, error: saveError },
+        cardcomData.ReturnValue
+      );
       // Continue anyway as this is not critical
     } else {
-      console.log('Saved verification data to webhooks table:', savedWebhook.id);
+      await logPaymentEvent(
+        supabaseClient,
+        'info',
+        `Saved verification data to webhooks table: ${savedWebhook.id}`,
+        'verify-cardcom-payment',
+        { lowProfileId, webhookId: savedWebhook.id },
+        cardcomData.ReturnValue
+      );
     }
 
     // Process the payment data (save token, update subscription, etc.)
@@ -190,9 +281,28 @@ serve(async (req) => {
             source: 'verify-cardcom-payment'
           }
         });
-        console.log(`Payment data processed for user: ${userId}`);
+        
+        await logPaymentEvent(
+          supabaseClient,
+          'info',
+          `Payment data processed for user: ${userId}`,
+          'verify-cardcom-payment',
+          { lowProfileId },
+          userId,
+          cardcomData.TranzactionId?.toString()
+        );
       } catch (processError) {
-        console.error('Error processing payment data:', processError);
+        await logPaymentEvent(
+          supabaseClient,
+          'error',
+          'Error processing payment data',
+          'verify-cardcom-payment',
+          { 
+            lowProfileId, 
+            error: processError instanceof Error ? processError.message : String(processError) 
+          },
+          userId
+        );
         // Continue anyway, as we'll still return success to the client
       }
     }
@@ -214,6 +324,22 @@ serve(async (req) => {
       approvalNumber: cardcomData.TokenInfo.TokenApprovalNumber || ''
     } : undefined;
 
+    // Log total execution time
+    const executionTime = Date.now() - requestStartTime;
+    await logPaymentEvent(
+      supabaseClient,
+      'success',
+      `Payment verification completed successfully in ${executionTime}ms`,
+      'verify-cardcom-payment',
+      { 
+        lowProfileId, 
+        executionTime,
+        transactionId: cardcomData.TranzactionId
+      },
+      cardcomData.ReturnValue,
+      cardcomData.TranzactionId?.toString()
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -229,7 +355,18 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Error verifying payment:', error);
+    // Log error with details
+    if (supabaseClient) {
+      await logPaymentEvent(
+        supabaseClient,
+        'error',
+        `Error verifying payment: ${error.message || 'Unknown error'}`,
+        'verify-cardcom-payment',
+        { error: error.message || String(error) }
+      );
+    } else {
+      console.error('Error verifying payment:', error);
+    }
     
     return new Response(
       JSON.stringify({
