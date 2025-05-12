@@ -145,6 +145,123 @@ export class PaymentDebugger {
   }
 
   /**
+   * Get failed webhooks to retry processing
+   */
+  static async getFailedWebhooks(limit: number = 10): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('payment_webhooks')
+        .select('*')
+        .eq('processed', false)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error fetching failed webhooks:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching failed webhooks:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Manually process a webhook that failed
+   */
+  static async retryWebhook(webhookId: string): Promise<boolean> {
+    try {
+      // Call the process-webhook edge function
+      const { error } = await supabase.functions.invoke('process-webhook', {
+        body: { webhookId }
+      });
+      
+      if (error) {
+        console.error('Error retrying webhook:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Exception retrying webhook:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Find user by email
+   */
+  static async findUserByEmail(email: string): Promise<any> {
+    try {
+      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
+      
+      if (error) {
+        console.error('Error finding user by email:', error);
+        return null;
+      }
+      
+      return data?.user || null;
+    } catch (error) {
+      console.error('Exception finding user by email:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Manually create subscription and token for a user
+   */
+  static async createSubscriptionForUser(userId: string, paymentData: any): Promise<boolean> {
+    try {
+      // Create subscription record
+      const { error: subError } = await supabase
+        .from('subscriptions')
+        .upsert({
+          user_id: userId,
+          status: 'active',
+          payment_method: 'cardcom',
+          payment_details: paymentData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (subError) {
+        console.error('Error creating subscription:', subError);
+        return false;
+      }
+      
+      // If we have token info, create a token record
+      if (paymentData.token_info?.token) {
+        const { error: tokenError } = await supabase
+          .from('recurring_payments')
+          .insert({
+            user_id: userId,
+            token: paymentData.token_info.token,
+            token_expiry: paymentData.token_info.expiry,
+            token_approval_number: paymentData.token_info.approval,
+            last_4_digits: paymentData.card_info?.last4 || null,
+            card_type: paymentData.card_info?.card_type || null,
+            status: 'active',
+            is_valid: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+          
+        if (tokenError) {
+          console.error('Error creating token:', tokenError);
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Exception creating subscription:', error);
+      return false;
+    }
+  }
+
+  /**
    * Map database log format to UI log format
    */
   private static mapDbLogToUiLog(dbLog: any): PaymentLog {

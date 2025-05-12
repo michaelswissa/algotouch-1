@@ -68,6 +68,9 @@ export const usePaymentInitialization = (
       // Set the webhook URL to the full Supabase Edge Function URL
       const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
 
+      // Generate a temp registration ID with consistent format
+      const tempRegistrationId = user?.id || `temp_reg_${Date.now()}`;
+
       // Prepare payload based on whether user is logged in or not
       const payload = {
         planId: selectedPlan,
@@ -87,8 +90,8 @@ export const usePaymentInitialization = (
           phone: userPhone,
           idNumber: userIdNumber
         },
-        // Ensure we pass ReturnValue with user ID or temp ID
-        returnValue: user?.id || `temp_${Date.now()}`
+        // Ensure we pass ReturnValue with user ID or standardized temp ID
+        returnValue: tempRegistrationId
       };
 
       const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
@@ -101,8 +104,8 @@ export const usePaymentInitialization = (
 
       if (data?.url) {
         // Store temporary registration ID if available
-        if (data.tempRegistrationId) {
-          localStorage.setItem('temp_registration_id', data.tempRegistrationId);
+        if (tempRegistrationId.startsWith('temp_reg_')) {
+          localStorage.setItem('temp_registration_id', tempRegistrationId);
         }
         
         setPaymentUrl(data.url);

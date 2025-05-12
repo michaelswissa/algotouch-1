@@ -58,6 +58,7 @@ serve(async (req) => {
       ReturnValue,
       TokenInfo,
       TranzactionInfo,
+      UIValues,
       Operation 
     } = payload;
     
@@ -69,33 +70,233 @@ serve(async (req) => {
       ReturnValue,
       hasTokenInfo: !!TokenInfo,
       hasTranzactionInfo: !!TranzactionInfo,
+      hasUIValues: !!UIValues,
       Operation
     });
 
-    // ReturnValue typically contains user ID or registration ID
-    if (ReturnValue && ResponseCode === 0) {
-      // Check if this is a user ID
-      if (ReturnValue.startsWith('temp_reg_')) {
-        // This is a temporary registration ID
-        await processRegistrationPayment(supabaseClient, ReturnValue, payload);
-      } else {
-        // This is a user ID
-        await processUserPayment(supabaseClient, ReturnValue, payload);
+    let processingResult = {
+      success: false,
+      message: 'Not processed',
+      details: null
+    };
+
+    // Only process successful transactions
+    if (ResponseCode === 0) {
+      try {
+        // Check if ReturnValue is a valid user ID or temp registration ID
+        if (ReturnValue) {
+          if (ReturnValue.startsWith('temp_reg_')) {
+            // This is a temporary registration ID
+            await processRegistrationPayment(supabaseClient, ReturnValue, payload);
+            processingResult = { 
+              success: true, 
+              message: 'Processed registration payment', 
+              details: { registrationId: ReturnValue }
+            };
+          } else if (ReturnValue.startsWith('temp_')) {
+            // Handle ReturnValue with temp_ prefix but no reg_ part
+            // This happens with the current implementation
+            console.log('Handling non-standard temp_ ReturnValue:', ReturnValue);
+            
+            // Try to find a user by email first (fallback mechanism)
+            let userId = null;
+            if (UIValues && UIValues.CardOwnerEmail) {
+              const email = UIValues.CardOwnerEmail;
+              console.log('Attempting to find user by email:', email);
+              
+              // Look up user by email
+              const { data: userData, error: userError } = await supabaseClient.auth.admin
+                .listUsers();
+              
+              if (!userError && userData) {
+                const matchingUser = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+                if (matchingUser) {
+                  userId = matchingUser.id;
+                  console.log(`Found user with email ${email}, ID: ${userId}`);
+                }
+              }
+              
+              if (userError) {
+                console.error('Error looking up user by email:', userError);
+              }
+              
+              if (userId) {
+                // Process as a regular user payment
+                await processUserPayment(supabaseClient, userId, payload);
+                processingResult = { 
+                  success: true, 
+                  message: 'Processed user payment via email lookup', 
+                  details: { userId, email }
+                };
+              } else {
+                // Store as a temp registration with extracted ID
+                const tempId = `temp_reg_${ReturnValue.substring(5)}`;
+                await processRegistrationPayment(supabaseClient, tempId, payload);
+                processingResult = { 
+                  success: true, 
+                  message: 'Processed as temp registration (converted format)', 
+                  details: { tempId }
+                };
+              }
+            } else {
+              // No email available, try to convert the temp_ to temp_reg_ format
+              const tempId = `temp_reg_${ReturnValue.substring(5)}`;
+              await processRegistrationPayment(supabaseClient, tempId, payload);
+              processingResult = { 
+                success: true, 
+                message: 'Processed as temp registration (converted format)', 
+                details: { tempId }
+              };
+            }
+          } else {
+            // Try to process as a regular user ID
+            try {
+              // Validate if this is a valid UUID
+              const isValidUuid = 
+                ReturnValue.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) !== null;
+              
+              if (isValidUuid) {
+                // This is likely a user ID
+                await processUserPayment(supabaseClient, ReturnValue, payload);
+                processingResult = { 
+                  success: true, 
+                  message: 'Processed user payment', 
+                  details: { userId: ReturnValue }
+                };
+              } else {
+                // Not a UUID, try to find user by email
+                if (UIValues && UIValues.CardOwnerEmail) {
+                  const email = UIValues.CardOwnerEmail;
+                  console.log('ReturnValue not UUID. Attempting to find user by email:', email);
+                  
+                  // Look up user by email
+                  const { data: userData, error: userError } = await supabaseClient.auth.admin
+                    .listUsers();
+                  
+                  if (!userError && userData) {
+                    const matchingUser = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+                    if (matchingUser) {
+                      const userId = matchingUser.id;
+                      console.log(`Found user with email ${email}, ID: ${userId}`);
+                      
+                      // Process as a regular user payment
+                      await processUserPayment(supabaseClient, userId, payload);
+                      processingResult = { 
+                        success: true, 
+                        message: 'Processed user payment via email lookup', 
+                        details: { userId, email }
+                      };
+                    } else {
+                      console.log(`No user found with email ${email}`);
+                      processingResult = {
+                        success: false,
+                        message: 'User not found by email, and ReturnValue is not valid',
+                        details: { ReturnValue, email }
+                      };
+                    }
+                  }
+                  
+                  if (userError) {
+                    console.error('Error looking up user by email:', userError);
+                    processingResult = {
+                      success: false,
+                      message: 'Error looking up user by email',
+                      details: { error: userError }
+                    };
+                  }
+                } else {
+                  console.error('Invalid ReturnValue and no email to look up user:', ReturnValue);
+                  processingResult = {
+                    success: false,
+                    message: 'Invalid ReturnValue and no email available',
+                    details: { ReturnValue }
+                  };
+                }
+              }
+            } catch (processError) {
+              console.error('Error processing user payment:', processError);
+              processingResult = {
+                success: false,
+                message: 'Error processing user payment',
+                details: { error: processError.message, ReturnValue }
+              };
+            }
+          }
+        } else {
+          // No ReturnValue, try to use email
+          if (UIValues && UIValues.CardOwnerEmail) {
+            const email = UIValues.CardOwnerEmail;
+            console.log('No ReturnValue. Attempting to find user by email:', email);
+            
+            // Look up user by email
+            const { data: userData, error: userError } = await supabaseClient.auth.admin
+              .listUsers();
+            
+            if (!userError && userData) {
+              const matchingUser = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+              if (matchingUser) {
+                const userId = matchingUser.id;
+                console.log(`Found user with email ${email}, ID: ${userId}`);
+                
+                // Process as a regular user payment
+                await processUserPayment(supabaseClient, userId, payload);
+                processingResult = { 
+                  success: true, 
+                  message: 'Processed user payment via email lookup', 
+                  details: { userId, email }
+                };
+              } else {
+                console.log(`No user found with email ${email}`);
+                processingResult = {
+                  success: false,
+                  message: 'User not found by email, and no ReturnValue',
+                  details: { email }
+                };
+              }
+            }
+            
+            if (userError) {
+              console.error('Error looking up user by email:', userError);
+              processingResult = {
+                success: false,
+                message: 'Error looking up user by email',
+                details: { error: userError }
+              };
+            }
+          } else {
+            console.error('No ReturnValue and no email to look up user');
+            processingResult = {
+              success: false,
+              message: 'No ReturnValue and no email available',
+              details: null
+            };
+          }
+        }
+      } catch (processingError) {
+        console.error('Error during webhook processing:', processingError);
+        processingResult = {
+          success: false,
+          message: 'Error during webhook processing',
+          details: { error: processingError.message }
+        };
       }
+    } else {
+      // Failed transaction
+      processingResult = {
+        success: false,
+        message: `Transaction failed with code ${ResponseCode}`,
+        details: { ResponseCode, Description: payload.Description }
+      };
     }
 
-    // Mark webhook as processed
+    // Mark webhook as processed and store the result
     if (logData && logData.length > 0) {
       await supabaseClient
         .from('payment_webhooks')
         .update({ 
           processed: true,
           processed_at: new Date().toISOString(),
-          processing_result: { 
-            success: true,
-            timestamp: new Date().toISOString(),
-            details: `Processed ${Operation} for ReturnValue: ${ReturnValue}`
-          }
+          processing_result: processingResult
         })
         .eq('id', logData[0].id);
     }
@@ -104,7 +305,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Webhook received and processed' 
+        message: 'Webhook received and processed',
+        processingResult
       }),
       {
         headers: { 'Content-Type': 'application/json' },
@@ -170,6 +372,7 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
   
   if (error) {
     console.error('Error updating user subscription:', error);
+    throw new Error(`Failed to update subscription: ${error.message}`);
   }
 
   // If we have token info, store it in recurring_payments table
@@ -193,12 +396,16 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
         
       if (tokenError) {
         console.error('Error storing token:', tokenError);
+        throw new Error(`Failed to store token: ${tokenError.message}`);
       } else {
         console.log('Token stored successfully');
       }
     } catch (tokenSaveError) {
       console.error('Error in token storage:', tokenSaveError);
+      throw tokenSaveError;
     }
+  } else if (payload.ResponseCode === 0 && (operation === "ChargeAndCreateToken" || operation === "CreateTokenOnly")) {
+    console.error('Missing TokenInfo in successful token operation', { operation, ResponseCode: payload.ResponseCode });
   }
 
   // Log the payment in user_payment_logs
@@ -239,32 +446,124 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
 async function processRegistrationPayment(supabase: any, regId: string, payload: any) {
   console.log(`Processing payment for registration: ${regId}`);
   
-  // Mark the payment as verified in the registration data
-  const { error } = await supabase
-    .from('temp_registration_data')
-    .update({ 
-      payment_verified: true,
-      payment_details: {
-        transaction_id: payload.TranzactionId,
-        low_profile_id: payload.LowProfileId,
-        amount: payload.Amount,
-        response_code: payload.ResponseCode,
-        card_info: payload.TranzactionInfo ? {
-          last4: payload.TranzactionInfo.Last4CardDigits,
-          expiry: `${payload.TranzactionInfo.CardMonth}/${payload.TranzactionInfo.CardYear}`
-        } : null,
-        token_info: payload.TokenInfo ? {
-          token: payload.TokenInfo.Token,
-          expiry: payload.TokenInfo.TokenExDate,
-          approval: payload.TokenInfo.TokenApprovalNumber
-        } : null
-      },
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', regId);
+  // Extract the actual ID from the temp_reg_ prefix
+  const actualId = regId.startsWith('temp_reg_') ? regId.substring(9) : regId;
   
-  if (error) {
-    console.error('Error updating registration payment status:', error);
+  // Mark the payment as verified in the registration data
+  try {
+    const { error } = await supabase
+      .from('temp_registration_data')
+      .update({ 
+        payment_verified: true,
+        payment_details: {
+          transaction_id: payload.TranzactionId,
+          low_profile_id: payload.LowProfileId,
+          amount: payload.Amount,
+          response_code: payload.ResponseCode,
+          card_info: payload.TranzactionInfo ? {
+            last4: payload.TranzactionInfo.Last4CardDigits,
+            expiry: `${payload.TranzactionInfo.CardMonth}/${payload.TranzactionInfo.CardYear}`
+          } : null,
+          token_info: payload.TokenInfo ? {
+            token: payload.TokenInfo.Token,
+            expiry: payload.TokenInfo.TokenExDate,
+            approval: payload.TokenInfo.TokenApprovalNumber
+          } : null
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', actualId);
+  
+    if (error) {
+      // If we couldn't find the record with the exact ID, try alternative formats
+      console.error('Error updating registration payment status:', error);
+      
+      // Try to find registration by partial match (without prefix)
+      const { data: regData, error: searchError } = await supabase
+        .from('temp_registration_data')
+        .select('id, registration_data')
+        .filter('id', 'ilike', `%${actualId.substring(0, 8)}%`)
+        .limit(1);
+      
+      if (!searchError && regData && regData.length > 0) {
+        // Found a matching registration
+        const matchedRegId = regData[0].id;
+        console.log(`Found matching registration ID: ${matchedRegId}`);
+        
+        // Update the found registration
+        const { error: updateError } = await supabase
+          .from('temp_registration_data')
+          .update({ 
+            payment_verified: true,
+            payment_details: {
+              transaction_id: payload.TranzactionId,
+              low_profile_id: payload.LowProfileId,
+              amount: payload.Amount,
+              response_code: payload.ResponseCode,
+              card_info: payload.TranzactionInfo ? {
+                last4: payload.TranzactionInfo.Last4CardDigits,
+                expiry: `${payload.TranzactionInfo.CardMonth}/${payload.TranzactionInfo.CardYear}`
+              } : null,
+              token_info: payload.TokenInfo ? {
+                token: payload.TokenInfo.Token,
+                expiry: payload.TokenInfo.TokenExDate,
+                approval: payload.TokenInfo.TokenApprovalNumber
+              } : null
+            },
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', matchedRegId);
+          
+        if (updateError) {
+          console.error('Error updating matched registration:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Still can't find any matching registration, create a new one
+        if (payload.UIValues && payload.UIValues.CardOwnerEmail) {
+          console.log('Creating new temp registration with email:', payload.UIValues.CardOwnerEmail);
+          
+          const { error: insertError } = await supabase
+            .from('temp_registration_data')
+            .insert({
+              id: actualId,
+              registration_data: {
+                email: payload.UIValues.CardOwnerEmail,
+                userData: {
+                  fullName: payload.UIValues.CardOwnerName || '',
+                  phone: payload.UIValues.CardOwnerPhone || '',
+                  idNumber: payload.UIValues.CardOwnerIdentityNumber || ''
+                },
+                paymentToken: payload.TokenInfo ? {
+                  token: payload.TokenInfo.Token,
+                  expiry: payload.TokenInfo.TokenExDate,
+                  last4Digits: payload.TranzactionInfo?.Last4CardDigits || ''
+                } : null,
+                registrationTime: new Date().toISOString()
+              },
+              payment_verified: true,
+              payment_details: {
+                transaction_id: payload.TranzactionId,
+                low_profile_id: payload.LowProfileId,
+                amount: payload.Amount,
+                response_code: payload.ResponseCode,
+                operation: payload.Operation
+              },
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+            });
+            
+          if (insertError) {
+            console.error('Error creating new registration:', insertError);
+            throw insertError;
+          }
+        } else {
+          throw error; // No way to create a registration without email
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error processing registration payment:', error);
+    throw error;
   }
 }
 
