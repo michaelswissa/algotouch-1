@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -204,14 +203,8 @@ export class PaymentDebugger {
   /**
    * Find user by email
    */
-  static async findUserByEmail(email: string): Promise<any> {
+  static async findUserByEmail(email: string): Promise<{ id: string; email: string | null } | null> {
     try {
-      // Use explicit types to avoid deep type instantiation issues
-      interface SimpleProfileResult {
-        id: string;
-        email: string | null;
-      }
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
@@ -223,7 +216,16 @@ export class PaymentDebugger {
         return null;
       }
       
-      return data as SimpleProfileResult | null;
+      // If data is null, return null directly
+      if (!data) {
+        return null;
+      }
+      
+      // Otherwise return the data
+      return {
+        id: data.id,
+        email: data.email
+      };
     } catch (error) {
       console.error('Exception finding user by email:', error);
       return null;
