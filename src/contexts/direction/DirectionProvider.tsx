@@ -7,14 +7,12 @@ interface DirectionContextValue {
   dir: Direction;
 }
 
-const DirectionContext = createContext<DirectionContextValue | null>(null);
+// Create context with a default value to avoid null checks
+const DirectionContext = createContext<DirectionContextValue>({ dir: 'rtl' });
 
 export function useDirection() {
   const context = useContext(DirectionContext);
-  if (context === null) {
-    throw new Error('useDirection must be used within a DirectionProvider');
-  }
-  return context;
+  return context; // No need to check for null now
 }
 
 interface DirectionProviderProps {

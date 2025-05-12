@@ -120,19 +120,18 @@ export class PaymentDebugger {
       // Process the data to count occurrences
       const errorCounts: Record<string, number> = {};
       
-      data?.forEach(item => {
-        // Safely extract message from payment_data
-        let message = 'Unknown error';
-        
-        if (item.payment_data && 
-            typeof item.payment_data === 'object' && 
-            'message' in item.payment_data) {
-          const msgData = item.payment_data.message;
-          message = typeof msgData === 'string' ? msgData : 'Unknown error';
-        }
-        
-        errorCounts[message] = (errorCounts[message] || 0) + 1;
-      });
+      // Simplified approach to avoid excessive type instantiation
+      if (data) {
+        data.forEach(item => {
+          let message = 'Unknown error';
+          
+          if (item.payment_data && typeof item.payment_data === 'object') {
+            message = String(item.payment_data.message || 'Unknown error');
+          }
+          
+          errorCounts[message] = (errorCounts[message] || 0) + 1;
+        });
+      }
       
       // Convert to array of objects sorted by count
       return Object.entries(errorCounts)
@@ -237,7 +236,7 @@ export class PaymentDebugger {
       }
       
       // If we have token info, create a token record
-      if (paymentData.token_info?.token) {
+      if (paymentData?.token_info?.token) {
         // Ensure all required fields are present
         if (!paymentData.token_info.token || !paymentData.token_info.expiry) {
           console.error('Missing required token information', paymentData.token_info);
