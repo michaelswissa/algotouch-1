@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -196,14 +195,11 @@ export class PaymentDebugger {
   static async findUserByEmail(email: string): Promise<any> {
     try {
       // Fix the type instantiation issue by avoiding complex type inferencing
-      const query = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
-        .eq('email', email);
-        
-      // Use a separate call to single() to avoid deep type instantiation
-      const result = await query.single();
-      const { data, error } = result;
+        .eq('email', email)
+        .maybeSingle();
       
       if (error) {
         console.error('Error finding user by email:', error);

@@ -104,8 +104,8 @@ const CoursesPageContent = () => {
   );
 };
 
-// Change CoursesPage to Courses to match the import in App.tsx
-const CoursesPage = () => {
+// Export as default Courses (the name App.tsx expects)
+const Courses = () => {
   return (
     <Layout>
       <div className="tradervue-container py-6 max-w-6xl mx-auto">
@@ -130,8 +130,7 @@ const CoursesPage = () => {
   );
 };
 
-// Export as Courses (the name App.tsx expects) instead of CoursesPage
-export default CoursesPage;
+export default Courses;
 
-// Add a named export that re-exports the component as Courses
-export { CoursesPage as Courses };
+// Add named exports for internal use
+export { Courses as CoursesPage };
