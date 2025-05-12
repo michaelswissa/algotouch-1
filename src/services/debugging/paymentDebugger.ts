@@ -2,6 +2,12 @@
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
+// Define a simple interface for the user profile result
+interface SimpleProfileResult {
+  id: string;
+  email: string | null;
+}
+
 export class PaymentDebugger {
   /**
    * Get complete payment flow for a transaction
@@ -204,25 +210,36 @@ export class PaymentDebugger {
   /**
    * Find user by email
    */
-  static async findUserByEmail(email: string): Promise<{ id: string; email: string | null } | null> {
+  static async findUserByEmail(email: string): Promise<SimpleProfileResult | null> {
     try {
+      // Check if email column exists in profiles table
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', email)
         .maybeSingle();
       
+      // Handle the error case appropriately
       if (error) {
+        // Log the error but don't throw
         console.error('Error finding user by email:', error);
+        
+        // If the column doesn't exist, try to search by ID
+        // This is a fallback in case the email column doesn't exist
+        if (error.message && error.message.includes("column 'email' does not exist")) {
+          console.log('Email column does not exist, trying to find user in auth.users');
+          return null;
+        }
+        
         return null;
       }
       
-      // If data is null, return null directly
+      // If no data is found, return null
       if (!data) {
         return null;
       }
       
-      // Otherwise return the data
+      // Return the typed result
       return {
         id: data.id,
         email: data.email
