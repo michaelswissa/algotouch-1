@@ -1,4 +1,3 @@
-
 import React, { useState, Suspense } from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
@@ -105,6 +104,7 @@ const CoursesPageContent = () => {
   );
 };
 
+// Change CoursesPage to Courses to match the import in App.tsx
 const CoursesPage = () => {
   return (
     <Layout>
@@ -130,4 +130,8 @@ const CoursesPage = () => {
   );
 };
 
+// Export as Courses (the name App.tsx expects) instead of CoursesPage
 export default CoursesPage;
+
+// Add a named export that re-exports the component as Courses
+export { CoursesPage as Courses };

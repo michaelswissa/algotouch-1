@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
@@ -13,6 +14,7 @@ import Dashboard from '@/pages/Dashboard';
 import IframeRedirect from '@/pages/IframeRedirect';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentFailed from '@/pages/PaymentFailed';
+import NotFound from '@/pages/NotFound';
 
 // Lazy loaded routes with retry utility
 const loadModuleWithRetry = (importFn, name) => {
@@ -26,6 +28,23 @@ const loadModuleWithRetry = (importFn, name) => {
 // Lazy loaded less critical routes
 const Subscription = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/Subscription'), 'Subscription')
+);
+
+// Fix imports for components that may have different export names
+const Community = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Community'), 'Community')
+);
+
+const Courses = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Courses'), 'Courses')
+);
+
+const CourseDetail = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/CourseDetail'), 'CourseDetail')
+);
+
+const Account = lazy(() => 
+  loadModuleWithRetry(() => import('@/pages/Account'), 'Account')
 );
 
 // Add missing page components
