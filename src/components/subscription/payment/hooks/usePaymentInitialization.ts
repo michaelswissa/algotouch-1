@@ -15,6 +15,7 @@ export const usePaymentInitialization = (
   const { user } = useAuth();
   const [isLoading, setIsLoadingState] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
   
   // Use either the external loading state or the internal one
   const setIsLoading = setIsLoadingExternal || setIsLoadingState;
@@ -22,10 +23,14 @@ export const usePaymentInitialization = (
   // Automatically create iframe payment URL on component mount
   useEffect(() => {
     initiateCardcomPayment();
+    // Intentionally empty dependency array - we want this to run only once on mount
   }, []);
 
   const initiateCardcomPayment = async () => {
+    // Reset states before starting
     setIsLoading(true);
+    setInitError(null);
+    
     try {
       // Define operation types based on plan
       // 1: ChargeOnly - for one-time VIP payment
@@ -46,7 +51,7 @@ export const usePaymentInitialization = (
 
       if (!user && !registrationData) {
         toast.error('נדרשים פרטי הרשמה כדי להמשיך');
-        setIsLoading(false);
+        setInitError('נדרשים פרטי הרשמה');
         return;
       }
 
@@ -56,20 +61,24 @@ export const usePaymentInitialization = (
       const userPhone = userData?.phone || registrationData?.userData?.phone || '';
       const userIdNumber = userData?.idNumber || registrationData?.userData?.idNumber || '';
 
-      console.log('Sending user details to payment system:', {
+      // Log payment initialization parameters for debugging
+      console.log('Payment initialization parameters:', {
+        plan: selectedPlan,
         fullName: userFullName,
         email: userEmail,
         phone: userPhone,
         idNumber: userIdNumber,
         operationType,
-        amount: getPlanAmount(selectedPlan)
+        amount: getPlanAmount(selectedPlan),
+        userId: user?.id || 'guest'
       });
 
       // Set the webhook URL to the full Supabase Edge Function URL
       const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
 
       // Generate a temp registration ID with consistent format
-      const tempRegistrationId = user?.id || `temp_reg_${Date.now()}`;
+      // Always use temp_reg_ prefix for guest checkout ReturnValue for consistency with webhook
+      const tempRegistrationId = user?.id || `temp_reg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       // Prepare payload based on whether user is logged in or not
       const payload = {
@@ -77,7 +86,7 @@ export const usePaymentInitialization = (
         userId: user?.id,
         fullName: userFullName,
         email: userEmail,
-        operationType, // Send numeric operation type (1, 2, or 3)
+        operationType, 
         origin: window.location.origin,
         amount: getPlanAmount(selectedPlan),
         webHookUrl: webhookUrl,
@@ -99,13 +108,21 @@ export const usePaymentInitialization = (
       });
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(error.message || 'שגיאה ביצירת עסקה');
       }
 
       if (data?.url) {
         // Store temporary registration ID if available
         if (tempRegistrationId.startsWith('temp_reg_')) {
           localStorage.setItem('temp_registration_id', tempRegistrationId);
+          
+          // Also log important information to help with debugging
+          console.log('Payment initiated with:', {
+            tempRegistrationId,
+            planId: selectedPlan,
+            operation: operationType,
+            email: userEmail
+          });
         }
         
         setPaymentUrl(data.url);
@@ -114,6 +131,7 @@ export const usePaymentInitialization = (
       }
     } catch (error: any) {
       console.error('Error initiating Cardcom payment:', error);
+      setInitError(error.message || 'שגיאה ביצירת עסקה');
       toast.error(error.message || 'שגיאה ביצירת עסקה');
     } finally {
       setIsLoading(false);
@@ -137,6 +155,7 @@ export const usePaymentInitialization = (
   return {
     isLoading,
     paymentUrl,
+    initError,
     initiateCardcomPayment
   };
 };

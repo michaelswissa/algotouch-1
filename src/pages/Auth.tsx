@@ -101,7 +101,7 @@ const Auth = () => {
         <div className="w-full max-w-md space-y-6">
           <AuthHeader />
           
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')}>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'signup')} defaultValue="login">
             <TabsList className="grid grid-cols-2 w-full">
               <TabsTrigger value="signup">הרשמה</TabsTrigger>
               <TabsTrigger value="login">התחברות</TabsTrigger>

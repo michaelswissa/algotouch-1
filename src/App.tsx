@@ -3,9 +3,11 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
-import { ThemeProvider } from '@/contexts/theme';
 import { AuthProvider } from '@/contexts/auth';
+import { DirectionProvider } from '@/contexts/direction/DirectionProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
+
+// Note: ThemeProvider has been moved to main.tsx, don't include it here
 
 // Eagerly loaded routes for critical paths
 import Auth from '@/pages/Auth';
@@ -13,6 +15,7 @@ import Dashboard from '@/pages/Dashboard';
 import IframeRedirect from '@/pages/IframeRedirect';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentFailed from '@/pages/PaymentFailed';
+import NotFound from '@/pages/NotFound';
 
 // Lazy loaded routes with retry utility
 const loadModuleWithRetry = (importFn, name) => {
@@ -27,20 +30,22 @@ const loadModuleWithRetry = (importFn, name) => {
 const Subscription = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/Subscription'), 'Subscription')
 );
+
+// Fix imports for components that may have different export names
 const Community = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/Community'), 'Community')
 );
+
 const Courses = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/Courses'), 'Courses')
 );
+
 const CourseDetail = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/CourseDetail'), 'CourseDetail')
 );
+
 const Account = lazy(() => 
   loadModuleWithRetry(() => import('@/pages/Account'), 'Account')
-);
-const NotFound = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/NotFound'), 'NotFound')
 );
 
 // Add missing page components
@@ -87,7 +92,7 @@ const LoadingPage = () => (
 
 function App() {
   return (
-    <ThemeProvider>
+    <DirectionProvider dir="rtl">
       <AuthProvider>
         <BrowserRouter>
           <Suspense fallback={<LoadingPage />}>
@@ -131,7 +136,7 @@ function App() {
           <Toaster richColors position="top-center" dir="rtl" />
         </BrowserRouter>
       </AuthProvider>
-    </ThemeProvider>
+    </DirectionProvider>
   );
 }
 

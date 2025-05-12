@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -6,6 +7,7 @@ import { sendWelcomeEmail } from '@/lib/email-service';
 
 // Improved authentication hook with better error handling and typed responses
 export function useSecureAuth() {
+  // Make sure we're using React's useState (not accidentally shadowed or imported wrong)
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
