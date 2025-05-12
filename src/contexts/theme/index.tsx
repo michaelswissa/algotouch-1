@@ -13,11 +13,7 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void;
 }
 
-// Create context with a default value instead of null
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'system',
-  setTheme: () => null,
-});
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({
   children,
@@ -51,7 +47,7 @@ export function ThemeProvider({
 
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;

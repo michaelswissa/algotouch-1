@@ -1,7 +1,7 @@
 
 import React, { useState, Suspense } from 'react';
 import Layout from '@/components/Layout';
-import CoursesComponent from '@/components/Courses';
+import Courses from '@/components/Courses';
 import { GraduationCap, BookOpen, Award, Users, LightbulbIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -98,18 +98,14 @@ const CoursesPageContent = () => {
             <p>אנא נסה שוב מאוחר יותר</p>
           </div>
         }>
-          <CoursesComponent 
-            onCourseClick={handleCourseClick} 
-            selectedCourseId={selectedCourseId} 
-          />
+          <Courses onCourseClick={handleCourseClick} selectedCourseId={selectedCourseId} />
         </ErrorBoundary>
       </div>
     </>
   );
 };
 
-// Export as default Courses (the name App.tsx expects)
-const Courses = () => {
+const CoursesPage = () => {
   return (
     <Layout>
       <div className="tradervue-container py-6 max-w-6xl mx-auto">
@@ -134,7 +130,4 @@ const Courses = () => {
   );
 };
 
-export default Courses;
-
-// Add named exports for internal use
-export { Courses as CoursesPage };
+export default CoursesPage;

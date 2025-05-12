@@ -8,7 +8,7 @@ interface CoursesComponentProps {
   selectedCourseId?: string | null;
 }
 
-export const coursesData: CourseProps[] = [
+const coursesData: CourseProps[] = [
   {
     title: "קורס אלגוטאצ' למתחילים",
     description: "לימוד שיטתי של מערכת אלגוטאצ' הכולל פתיחת חשבון, הגדרת המערכת, תפעול ומסחר, ועד ניהול כספים ומיסוי.",
@@ -87,8 +87,5 @@ const Courses = ({ onCourseClick, selectedCourseId }: CoursesComponentProps) => 
     </div>
   );
 };
-
-// Add coursesData as a static property to the component
-Courses.coursesData = coursesData;
 
 export default Courses;

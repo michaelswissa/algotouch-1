@@ -1,6 +1,6 @@
 
 import { supabase } from '@/lib/supabase-client';
-import { PaymentLog } from '@/types/payment-logs';
+import { PaymentLog, PaymentLogDB } from '@/types/payment-logs';
 
 export class PaymentDebugger {
   /**
@@ -120,18 +120,19 @@ export class PaymentDebugger {
       // Process the data to count occurrences
       const errorCounts: Record<string, number> = {};
       
-      // Simplified approach to avoid excessive type instantiation
-      if (data) {
-        data.forEach(item => {
-          let message = 'Unknown error';
-          
-          if (item.payment_data && typeof item.payment_data === 'object') {
-            message = String(item.payment_data.message || 'Unknown error');
-          }
-          
-          errorCounts[message] = (errorCounts[message] || 0) + 1;
-        });
-      }
+      data?.forEach(item => {
+        // Safely extract message from payment_data
+        let message = 'Unknown error';
+        
+        if (item.payment_data && 
+            typeof item.payment_data === 'object' && 
+            'message' in item.payment_data) {
+          const msgData = item.payment_data.message;
+          message = typeof msgData === 'string' ? msgData : 'Unknown error';
+        }
+        
+        errorCounts[message] = (errorCounts[message] || 0) + 1;
+      });
       
       // Convert to array of objects sorted by count
       return Object.entries(errorCounts)
@@ -194,19 +195,14 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      // Fix: Use a more direct approach to prevent deep type instantiation
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', email)
-        .maybeSingle();
+      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
       
       if (error) {
         console.error('Error finding user by email:', error);
         return null;
       }
       
-      return data;
+      return data?.user || null;
     } catch (error) {
       console.error('Exception finding user by email:', error);
       return null;
@@ -236,20 +232,14 @@ export class PaymentDebugger {
       }
       
       // If we have token info, create a token record
-      if (paymentData?.token_info?.token) {
-        // Ensure all required fields are present
-        if (!paymentData.token_info.token || !paymentData.token_info.expiry) {
-          console.error('Missing required token information', paymentData.token_info);
-          return false;
-        }
-        
+      if (paymentData.token_info?.token) {
         const { error: tokenError } = await supabase
           .from('recurring_payments')
           .insert({
             user_id: userId,
             token: paymentData.token_info.token,
             token_expiry: paymentData.token_info.expiry,
-            token_approval_number: paymentData.token_info.approval || '', // Provide empty string if null
+            token_approval_number: paymentData.token_info.approval,
             last_4_digits: paymentData.card_info?.last4 || null,
             card_type: paymentData.card_info?.card_type || null,
             status: 'active',
@@ -273,32 +263,30 @@ export class PaymentDebugger {
 
   /**
    * Map database log format to UI log format
-   * Fix: Simplified this method to avoid excessive type instantiation
    */
   private static mapDbLogToUiLog(dbLog: any): PaymentLog {
     // Create a safe accessor for the payment_data JSON field
-    const paymentData = typeof dbLog.payment_data === 'object' ? dbLog.payment_data : {};
+    const paymentData = dbLog.payment_data || {};
+    const safePaymentData = typeof paymentData === 'object' ? paymentData : {};
+    
+    // Safe getter function for JSON properties
+    const safeGet = (obj: any, key: string, defaultValue: string): string => {
+      if (!obj || typeof obj !== 'object') return defaultValue;
+      const val = obj[key];
+      return val !== undefined && val !== null ? String(val) : defaultValue;
+    };
     
     return {
       id: dbLog.id,
-      level: this.safeGetValue(paymentData, 'level', dbLog.payment_status || 'info'),
-      message: this.safeGetValue(paymentData, 'message', 'Payment log entry'),
-      context: this.safeGetValue(paymentData, 'context', 'payment-system'),
-      payment_data: paymentData.details || paymentData,
+      level: safeGet(safePaymentData, 'level', dbLog.payment_status || 'info'),
+      message: safeGet(safePaymentData, 'message', 'Payment log entry'),
+      context: safeGet(safePaymentData, 'context', 'payment-system'),
+      payment_data: safePaymentData.details || safePaymentData,
       user_id: dbLog.user_id,
       transaction_id: dbLog.transaction_id,
       created_at: dbLog.created_at,
-      session_id: this.safeGetValue(paymentData, 'session_id', undefined),
-      source: this.safeGetValue(paymentData, 'source', 'system')
+      session_id: safeGet(safePaymentData, 'session_id', undefined),
+      source: safeGet(safePaymentData, 'source', 'system')
     };
-  }
-  
-  /**
-   * Safe getter utility for JSON properties to prevent deep recursion
-   */
-  private static safeGetValue(obj: any, key: string, defaultValue: any): any {
-    if (!obj || typeof obj !== 'object') return defaultValue;
-    const val = obj[key];
-    return val !== undefined && val !== null ? String(val) : defaultValue;
   }
 }
