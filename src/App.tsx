@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
@@ -23,23 +22,6 @@ const loadModuleWithRetry = (importFn, name) => {
     throw error;
   });
 };
-
-// Create missing components referenced in routes
-const NotFound = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/NotFound'), 'NotFound')
-);
-const Community = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/Community'), 'Community')
-);
-const Courses = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/Courses'), 'Courses')
-);
-const CourseDetail = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/CourseDetail'), 'CourseDetail')
-);
-const Account = lazy(() => 
-  loadModuleWithRetry(() => import('@/pages/Account'), 'Account')
-);
 
 // Lazy loaded less critical routes
 const Subscription = lazy(() => 
