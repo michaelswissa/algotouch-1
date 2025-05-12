@@ -218,38 +218,38 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<SimpleProfileResult | null> {
     try {
-      // Check if email column exists in profiles table
-      const { data, error } = await supabase
+      // Use explicit type casting to handle the response more clearly
+      const result = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', email)
         .maybeSingle();
       
-      // Handle the error case appropriately
-      if (error) {
-        // Log the error but don't throw
-        console.error('Error finding user by email:', error);
+      // If there's an error with the column not existing
+      if (result.error) {
+        console.error('Error finding user by email:', result.error);
         
-        // If the column doesn't exist, try to search by ID
         // This is a fallback in case the email column doesn't exist
-        if (error.message && error.message.includes("column 'email' does not exist")) {
-          console.log('Email column does not exist, trying to find user in auth.users');
+        if (result.error.message && result.error.message.includes("column 'email' does not exist")) {
+          console.log('Email column does not exist in profiles table');
           return null;
         }
         
         return null;
       }
       
-      // If no data is found, return null
-      if (!data) {
-        return null;
+      // If we got data successfully
+      if (result.data) {
+        // Type assertion to ensure TypeScript understands the structure
+        const userData = result.data as { id: string; email?: string | null };
+        
+        return {
+          id: userData.id,
+          email: userData.email || null
+        };
       }
       
-      // Return the typed result
-      return {
-        id: data.id,
-        email: data.email
-      };
+      return null;
     } catch (error) {
       console.error('Exception finding user by email:', error);
       return null;
