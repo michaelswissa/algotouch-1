@@ -37,8 +37,9 @@ const Index = () => {
     
     // Also clear any session data that might be causing problems
     try {
-      // Get the default session key pattern based on project reference
-      const projectRef = new URL(supabase.getUrl()).hostname.split('.')[0];
+      // Extract project ref from the Supabase URL
+      const supabaseUrl = "https://ndhakvhrrkczgylcmyoc.supabase.co"; // Using the direct URL instead of getUrl()
+      const projectRef = supabaseUrl.split('//')[1].split('.')[0];
       const sessionKey = `sb-${projectRef}-auth-token`;
       
       if (localStorage.getItem(sessionKey)) {

@@ -206,7 +206,12 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      // Use a more direct approach to prevent deep type instantiation
+      // Use explicit types to avoid deep type instantiation issues
+      interface SimpleProfileResult {
+        id: string;
+        email: string | null;
+      }
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
@@ -218,7 +223,7 @@ export class PaymentDebugger {
         return null;
       }
       
-      return data;
+      return data as SimpleProfileResult | null;
     } catch (error) {
       console.error('Exception finding user by email:', error);
       return null;
