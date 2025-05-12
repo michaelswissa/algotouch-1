@@ -195,12 +195,13 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      // Fix the type inference issue by explicitly typing the result
+      // Fix the type instantiation issue by using a specific type annotation
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', email)
-        .maybeSingle<{ id: string; email: string }>();
+        // Using a simple inline type here to break the deep inference chain
+        .single<{ id: string; email: string }>();
       
       if (error) {
         console.error('Error finding user by email:', error);
