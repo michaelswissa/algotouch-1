@@ -1,13 +1,17 @@
 
 import React from 'react';
 import Layout from '@/components/Layout';
-import CommunityLeaderboard from './CommunityLeaderboard';
-import PostList from './PostList';
-import NewPostForm from './NewPostForm';
+import { CommunityLeaderboard } from './CommunityLeaderboard';
+import { PostList } from './PostList';
+import { NewPostForm } from './NewPostForm';
 import UserBadges from './UserBadges';
-import InfoCards from './InfoCards';
+import { InfoCards } from './InfoCards';
 
 const Community = () => {
+  // Providing dummy data for UserBadges to satisfy its props requirement
+  const dummyBadges = [];
+  const dummyAllBadges = [];
+
   return (
     <Layout>
       <div className="tradervue-container py-6 max-w-6xl mx-auto">
@@ -24,7 +28,10 @@ const Community = () => {
           <div className="space-y-6">
             <InfoCards />
             <CommunityLeaderboard />
-            <UserBadges />
+            <UserBadges 
+              earnedBadges={dummyBadges} 
+              allBadges={dummyAllBadges} 
+            />
           </div>
         </div>
       </div>
