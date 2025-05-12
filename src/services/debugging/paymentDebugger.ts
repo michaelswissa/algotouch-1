@@ -9,8 +9,8 @@ export class PaymentDebugger {
   static async getTransactionFlow(transactionId: string): Promise<PaymentLog[]> {
     try {
       const { data: logs, error } = await supabase
-        .from<PaymentLogDB>('payment_logs')
-        .select('id, user_id, transaction_id, payment_data, created_at, payment_status')
+        .from('payment_logs')
+        .select('id, user_id, transaction_id, payment_data, created_at, payment_status, amount, currency, plan_id')
         .eq('transaction_id', transactionId)
         .order('created_at', { ascending: true });
 
@@ -20,7 +20,7 @@ export class PaymentDebugger {
       }
 
       // Map database logs to UI format
-      return (logs || []).map(log => this.mapDbLogToUiLog(log));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
     } catch (error) {
       console.error('Exception fetching payment flow:', error);
       return [];
@@ -34,8 +34,8 @@ export class PaymentDebugger {
     try {
       // For session flow, we need to filter by session_id which is inside the payment_data JSON
       const { data: logs, error } = await supabase
-        .from<PaymentLogDB>('payment_logs')
-        .select('id, user_id, transaction_id, payment_data, created_at, payment_status')
+        .from('payment_logs')
+        .select('id, user_id, transaction_id, payment_data, created_at, payment_status, amount, currency, plan_id')
         .filter('payment_data->session_id', 'eq', sessionId)
         .order('created_at', { ascending: true });
 
@@ -44,7 +44,7 @@ export class PaymentDebugger {
         return [];
       }
 
-      return (logs || []).map(log => this.mapDbLogToUiLog(log));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
     } catch (error) {
       console.error('Exception fetching session flow:', error);
       return [];
@@ -57,8 +57,8 @@ export class PaymentDebugger {
   static async getUserPayments(userId: string): Promise<PaymentLog[]> {
     try {
       const { data: logs, error } = await supabase
-        .from<PaymentLogDB>('payment_logs')
-        .select('id, user_id, transaction_id, payment_data, created_at, payment_status')
+        .from('payment_logs')
+        .select('id, user_id, transaction_id, payment_data, created_at, payment_status, amount, currency, plan_id')
         .eq('user_id', userId)
         .eq('payment_status', 'success')
         .order('created_at', { ascending: false });
@@ -68,7 +68,7 @@ export class PaymentDebugger {
         return [];
       }
 
-      return (logs || []).map(log => this.mapDbLogToUiLog(log));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
     } catch (error) {
       console.error('Exception fetching user payments:', error);
       return [];
@@ -81,8 +81,8 @@ export class PaymentDebugger {
   static async getRecentErrors(limit: number = 10): Promise<PaymentLog[]> {
     try {
       const { data: logs, error } = await supabase
-        .from<PaymentLogDB>('payment_logs')
-        .select('id, user_id, transaction_id, payment_data, created_at, payment_status')
+        .from('payment_logs')
+        .select('id, user_id, transaction_id, payment_data, created_at, payment_status, amount, currency, plan_id')
         .eq('payment_status', 'error')
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -92,7 +92,7 @@ export class PaymentDebugger {
         return [];
       }
 
-      return (logs || []).map(log => this.mapDbLogToUiLog(log));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
     } catch (error) {
       console.error('Exception fetching recent errors:', error);
       return [];
@@ -105,7 +105,9 @@ export class PaymentDebugger {
   static async analyzeErrors(): Promise<any> {
     try {
       // Using RPC call instead of .group() which is not supported
-      const { data, error } = await supabase.rpc('analyze_payment_errors');
+      const { data, error } = await supabase
+        .rpc('analyze_payment_errors')
+        .select();
       
       if (error) {
         console.error('Error analyzing errors:', error);

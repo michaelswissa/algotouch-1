@@ -3,6 +3,8 @@
 CREATE OR REPLACE FUNCTION public.analyze_payment_errors()
 RETURNS TABLE (message text, count bigint) 
 LANGUAGE sql
+SECURITY DEFINER
+SET search_path = 'public'
 AS $$
   SELECT 
     payment_data->>'message' as message,

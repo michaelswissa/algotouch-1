@@ -9,7 +9,7 @@ export interface PaymentLogDB {
   amount: number;
   currency: string;
   payment_status: string;
-  payment_data: any;
+  payment_data: Json | null;
   plan_id: string;
   created_at: string;
 }
@@ -31,7 +31,11 @@ export interface PaymentLog {
 // Interface for webhook payment data to avoid deep type recursion
 export interface PaymentWebhookRow {
   id: string;
-  payload: any;
-  processed: boolean;
-  created_at: string;
+  payload: Json;
+  processed: boolean | null;
+  created_at: string | null;
+  processed_at?: string | null;
+  processing_attempts?: number | null;
+  processing_result?: Json | null;
+  webhook_type: string;
 }

@@ -39,9 +39,9 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
 
         // Step 1: First check if this payment has already been processed via webhook
         const { data: webhookData, error: webhookError } = await supabase
-          .from<PaymentWebhookRow>('payment_webhooks')
+          .from('payment_webhooks')
           .select('payload, processed')
-          .eq('payload->LowProfileId', lowProfileId)
+          .filter('payload->>LowProfileId', 'eq', lowProfileId)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();

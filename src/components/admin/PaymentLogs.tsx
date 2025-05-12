@@ -8,18 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PaymentDebugger } from '@/services/debugging/paymentDebugger';
 import { toast } from 'sonner';
-import { PaymentLog, PaymentLogDB } from '@/types/payment-logs';
-
-interface PaymentLog {
-  id: string;
-  level: string;
-  message: string;
-  context: string;
-  payment_data: any;
-  user_id: string;
-  transaction_id: string;
-  created_at: string;
-}
+import { PaymentLog } from '@/types/payment-logs';
 
 export default function PaymentLogs() {
   const [recentLogs, setRecentLogs] = useState<PaymentLog[]>([]);
@@ -95,8 +84,8 @@ export default function PaymentLogs() {
       user_id: dbLog.user_id,
       transaction_id: dbLog.transaction_id,
       created_at: dbLog.created_at,
-      session_id: paymentData.session_id,
-      source: paymentData.source || 'system'
+      source: paymentData.source || 'system',
+      session_id: paymentData.session_id
     };
   };
 
