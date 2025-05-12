@@ -105,19 +105,29 @@ export class PaymentLogger {
    */
   private static async storeLog(logEntry: LogEntry): Promise<void> {
     try {
+      // Map our logEntry to the structure expected by the payment_logs table
+      const dbEntry = {
+        payment_status: logEntry.level,
+        user_id: logEntry.userId,
+        transaction_id: logEntry.transactionId || 'none',
+        payment_data: {
+          message: logEntry.message,
+          context: logEntry.context,
+          details: logEntry.data || {},
+          session_id: logEntry.sessionId,
+          source: logEntry.source,
+          level: logEntry.level
+        },
+        // These are placeholder values that are needed by the database schema
+        amount: 0, // Using 0 for log entries that don't represent actual payments
+        plan_id: 'system_log', // Using 'system_log' for log entries that don't relate to a specific plan
+        currency: 'N/A'
+      };
+
       // Store logs in a payment_logs table
       const { error } = await supabase
         .from('payment_logs')
-        .insert({
-          level: logEntry.level,
-          message: logEntry.message,
-          context: logEntry.context,
-          payment_data: logEntry.data || {},
-          user_id: logEntry.userId,
-          transaction_id: logEntry.transactionId || 'none',
-          session_id: logEntry.sessionId,
-          source: logEntry.source
-        });
+        .insert(dbEntry);
 
       if (error) {
         console.error('Failed to store payment log:', error);

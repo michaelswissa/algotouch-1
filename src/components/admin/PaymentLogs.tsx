@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase-client';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PaymentDebugger } from '@/services/debugging/paymentDebugger';
 import { toast } from 'sonner';
+import { PaymentLog, PaymentLogDB } from '@/types/payment-logs';
 
 interface PaymentLog {
   id: string;
@@ -50,35 +50,54 @@ export default function PaymentLogs() {
         .limit(50);
         
       if (recentError) throw recentError;
-      setRecentLogs(recent || []);
+      // Map database logs to UI format
+      setRecentLogs(recent ? recent.map(mapDbLogToUiLog) : []);
       
       // Fetch error logs
       const { data: errors, error: errorLogsError } = await supabase
         .from('payment_logs')
         .select('*')
-        .eq('level', 'error')
+        .eq('payment_status', 'error')
         .order('created_at', { ascending: false })
         .limit(50);
         
       if (errorLogsError) throw errorLogsError;
-      setErrorLogs(errors || []);
+      setErrorLogs(errors ? errors.map(mapDbLogToUiLog) : []);
       
       // Fetch success logs
       const { data: successes, error: successLogsError } = await supabase
         .from('payment_logs')
         .select('*')
-        .eq('level', 'success')
+        .eq('payment_status', 'success')
         .order('created_at', { ascending: false })
         .limit(50);
         
       if (successLogsError) throw successLogsError;
-      setSuccessLogs(successes || []);
+      setSuccessLogs(successes ? successes.map(mapDbLogToUiLog) : []);
     } catch (error) {
       console.error('Error fetching logs:', error);
       toast.error('אירעה שגיאה בטעינת הלוגים');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Map database log to UI log format
+  const mapDbLogToUiLog = (dbLog: any): PaymentLog => {
+    const paymentData = dbLog.payment_data || {};
+    
+    return {
+      id: dbLog.id,
+      level: paymentData.level || dbLog.payment_status || 'info',
+      message: paymentData.message || 'Payment log entry',
+      context: paymentData.context || 'payment-system',
+      payment_data: paymentData.details || paymentData,
+      user_id: dbLog.user_id,
+      transaction_id: dbLog.transaction_id,
+      created_at: dbLog.created_at,
+      session_id: paymentData.session_id,
+      source: paymentData.source || 'system'
+    };
   };
 
   // Analyze error patterns
@@ -127,19 +146,19 @@ export default function PaymentLogs() {
     );
   };
 
-  // Render log level badge
+  // Render log level badge with corrected variants
   const renderLevelBadge = (level: string) => {
     switch (level) {
       case 'error':
         return <Badge variant="destructive">{level}</Badge>;
       case 'warning':
-        return <Badge variant="warning" className="bg-orange-500">{level}</Badge>;
+        return <Badge variant="outline" className="bg-orange-500 text-white">{level}</Badge>;
       case 'success':
-        return <Badge variant="success" className="bg-green-500">{level}</Badge>;
+        return <Badge variant="outline" className="bg-green-500 text-white">{level}</Badge>;
       case 'info':
         return <Badge variant="secondary">{level}</Badge>;
       default:
-        return <Badge>{level}</Badge>;
+        return <Badge variant="default">{level}</Badge>;
     }
   };
 

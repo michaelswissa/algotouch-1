@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -6,12 +5,7 @@ import { supabase } from '@/lib/supabase-client';
 import { CardcomPayload, CardcomVerifyResponse, CardcomWebhookPayload } from '@/types/payment';
 import { PaymentLogger } from '@/services/logging/paymentLogger';
 import { PaymentMonitor } from '@/services/monitoring/paymentMonitor';
-
-// Define a specific interface for the payment webhook row to avoid deep recursion
-interface PaymentWebhookRow {
-  payload: CardcomWebhookPayload;
-  processed: boolean;
-}
+import { PaymentWebhookRow } from '@/types/payment-logs';
 
 interface UsePaymentVerificationProps {
   lowProfileId: string | null;
@@ -45,7 +39,7 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
 
         // Step 1: First check if this payment has already been processed via webhook
         const { data: webhookData, error: webhookError } = await supabase
-          .from('payment_webhooks')
+          .from<PaymentWebhookRow>('payment_webhooks')
           .select('payload, processed')
           .eq('payload->LowProfileId', lowProfileId)
           .order('created_at', { ascending: false })
@@ -54,7 +48,8 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
 
         if (!webhookError && webhookData && webhookData.processed) {
           // Payment was already processed by webhook
-          const payload = webhookData.payload as CardcomWebhookPayload;
+          // We need to safely cast the payload to our expected type
+          const payload = webhookData.payload as unknown as CardcomWebhookPayload;
           
           PaymentLogger.info('Payment already processed by webhook', 'payment-verification', { 
             lowProfileId, 
