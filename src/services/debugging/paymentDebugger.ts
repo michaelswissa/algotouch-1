@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -101,7 +102,7 @@ export class PaymentDebugger {
   /**
    * Analyze common error patterns
    */
-  static async analyzeErrors(): Promise<any> {
+  static async analyzeErrors(): Promise<{ message: string; count: number }[]> {
     try {
       // Using direct SQL query to get error messages
       const { data, error } = await supabase
