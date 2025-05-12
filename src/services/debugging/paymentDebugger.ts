@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -194,7 +195,6 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      // Fix the type instantiation issue by avoiding complex type inferencing
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')

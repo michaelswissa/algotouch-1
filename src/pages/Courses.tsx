@@ -1,6 +1,7 @@
+
 import React, { useState, Suspense } from 'react';
 import Layout from '@/components/Layout';
-import Courses from '@/components/Courses';
+import CoursesComponent from '@/components/Courses';
 import { GraduationCap, BookOpen, Award, Users, LightbulbIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -97,7 +98,10 @@ const CoursesPageContent = () => {
             <p>אנא נסה שוב מאוחר יותר</p>
           </div>
         }>
-          <Courses onCourseClick={handleCourseClick} selectedCourseId={selectedCourseId} />
+          <CoursesComponent 
+            onCourseClick={handleCourseClick} 
+            selectedCourseId={selectedCourseId} 
+          />
         </ErrorBoundary>
       </div>
     </>
