@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -9,6 +10,7 @@ import { PaymentWebhookRow } from '@/types/payment-logs';
 
 interface UsePaymentVerificationProps {
   lowProfileId: string | null;
+  skipVerification?: boolean;
 }
 
 interface PaymentVerificationResult {
@@ -17,22 +19,27 @@ interface PaymentVerificationResult {
   paymentDetails: any;
 }
 
-export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationProps): PaymentVerificationResult {
+export function usePaymentVerification({ 
+  lowProfileId, 
+  skipVerification = false 
+}: UsePaymentVerificationProps): PaymentVerificationResult {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!skipVerification);
   const [error, setError] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
 
   useEffect(() => {
+    // Skip verification if requested or if no ID is provided
+    if (skipVerification || !lowProfileId) {
+      setIsLoading(false);
+      if (!lowProfileId) {
+        setError('חסר מזהה תשלום');
+      }
+      return;
+    }
+
     async function verifyPayment() {
       try {
-        if (!lowProfileId) {
-          PaymentLogger.warning('Missing LowProfileId in payment verification', 'payment-verification');
-          setError('לא התקבלו נתונים מספיקים מהשרת');
-          setIsLoading(false);
-          return;
-        }
-
         const tracking = PaymentMonitor.startTracking(lowProfileId);
         PaymentMonitor.logVerificationAttempt(lowProfileId, 'redirect');
         PaymentLogger.info('Processing payment redirect', 'payment-verification', { lowProfileId });
@@ -130,7 +137,7 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
     } else {
       setIsLoading(false);
     }
-  }, [lowProfileId, navigate]);
+  }, [lowProfileId, navigate, skipVerification]);
 
   async function verifyCardcomPaymentDirectly(lowProfileId: string) {
     PaymentLogger.info('Attempting direct CardCom API verification', 'direct-api', { lowProfileId });
@@ -195,7 +202,6 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
         }, lpResult.ReturnValue);
         
         setError(lpResult.Description || 'אירעה שגיאה באימות התשלום');
-        setIsLoading(false);
       }
     } catch (error: any) {
       PaymentLogger.error('Exception during direct CardCom verification', 'direct-api', {
@@ -204,6 +210,7 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
       });
       
       setError('שגיאה באימות התשלום מול שרת הסליקה');
+    } finally {
       setIsLoading(false);
     }
   }
