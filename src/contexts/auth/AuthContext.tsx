@@ -10,6 +10,7 @@ const defaultValue: AuthContextType = {
   loading: true,
   isAuthenticated: false,
   initialized: false,
+  error: null,
   signIn: async () => { throw new Error('AuthContext not initialized') },
   signUp: async () => { throw new Error('AuthContext not initialized') },
   signOut: async () => { throw new Error('AuthContext not initialized') },

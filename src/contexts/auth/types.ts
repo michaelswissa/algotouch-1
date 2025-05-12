@@ -7,6 +7,7 @@ export type AuthState = {
   loading: boolean;
   initialized: boolean;
   isAuthenticated: boolean;
+  error: Error | null;
 };
 
 export type AuthContextType = AuthState & {

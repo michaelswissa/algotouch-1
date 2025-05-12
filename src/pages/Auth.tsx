@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Auth = () => {
-  const { isAuthenticated, loading, initialized } = useAuth();
+  const { isAuthenticated, loading, initialized, error } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
@@ -64,6 +64,18 @@ const Auth = () => {
     }
   }, [navigate, location.state]);
 
+  // Store any auth error in localStorage for the error page
+  useEffect(() => {
+    if (error) {
+      try {
+        localStorage.setItem('auth_error', error.message || 'Unknown auth error');
+        navigate('/auth-error', { replace: true });
+      } catch (e) {
+        console.error('Failed to store auth error:', e);
+      }
+    }
+  }, [error, navigate]);
+
   // Show loading state while auth is initializing
   if (!initialized || loading) {
     return (
@@ -89,10 +101,10 @@ const Auth = () => {
           <h2 className="text-2xl font-bold mb-4">שגיאה בטעינת עמוד ההתחברות</h2>
           <p className="mb-4">אירעה שגיאה בטעינת העמוד. אנא נסה שוב מאוחר יותר.</p>
           <button 
-            onClick={() => window.location.reload()} 
+            onClick={() => navigate('/auth-error')} 
             className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
           >
-            נסה שוב
+            פרטי שגיאה
           </button>
         </div>
       </div>

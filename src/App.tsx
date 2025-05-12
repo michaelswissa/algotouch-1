@@ -16,6 +16,7 @@ import IframeRedirect from '@/pages/IframeRedirect';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentFailed from '@/pages/PaymentFailed';
 import NotFound from '@/pages/NotFound';
+import AuthLoadError from '@/pages/AuthLoadError';
 
 // Lazy loaded routes with retry utility
 const loadModuleWithRetry = (importFn, name) => {
@@ -92,11 +93,21 @@ const LoadingPage = () => (
 
 function App() {
   return (
-    <DirectionProvider dir="rtl">
-      <AuthProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingPage />}>
-            <Routes>
+    <BrowserRouter>
+      <DirectionProvider dir="rtl">
+        <Suspense fallback={<LoadingPage />}>
+          <Routes>
+            {/* Auth Error Route */}
+            <Route path="/auth-error" element={<AuthLoadError />} />
+            
+            {/* Auth Provider wrapped routes */}
+            <Route
+              element={
+                <AuthProvider>
+                  <Outlet />
+                </AuthProvider>
+              }
+            >
               {/* Public routes - eagerly loaded */}
               <Route path="/auth" element={<Auth />} />
               
@@ -131,12 +142,12 @@ function App() {
               {/* Default & catch-all routes */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-          <Toaster richColors position="top-center" dir="rtl" />
-        </BrowserRouter>
-      </AuthProvider>
-    </DirectionProvider>
+            </Route>
+          </Routes>
+        </Suspense>
+        <Toaster richColors position="top-center" dir="rtl" />
+      </DirectionProvider>
+    </BrowserRouter>
   );
 }
 
