@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -195,19 +194,15 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      // Fix: Replace the invalid getUserByEmail method with a query to profiles table
+      // Fix the type inference issue by explicitly typing the result
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', email)
-        .single();
+        .maybeSingle<{ id: string; email: string }>();
       
       if (error) {
         console.error('Error finding user by email:', error);
-        return null;
-      }
-      
-      if (!data) {
         return null;
       }
       
