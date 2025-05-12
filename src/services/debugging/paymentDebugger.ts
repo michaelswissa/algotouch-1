@@ -20,7 +20,7 @@ export class PaymentDebugger {
       }
 
       // Map database logs to UI format
-      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log));
     } catch (error) {
       console.error('Exception fetching payment flow:', error);
       return [];
@@ -44,7 +44,7 @@ export class PaymentDebugger {
         return [];
       }
 
-      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log));
     } catch (error) {
       console.error('Exception fetching session flow:', error);
       return [];
@@ -68,7 +68,7 @@ export class PaymentDebugger {
         return [];
       }
 
-      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log));
     } catch (error) {
       console.error('Exception fetching user payments:', error);
       return [];
@@ -92,7 +92,7 @@ export class PaymentDebugger {
         return [];
       }
 
-      return (logs || []).map(log => this.mapDbLogToUiLog(log as PaymentLogDB));
+      return (logs || []).map(log => this.mapDbLogToUiLog(log));
     } catch (error) {
       console.error('Exception fetching recent errors:', error);
       return [];
@@ -104,10 +104,10 @@ export class PaymentDebugger {
    */
   static async analyzeErrors(): Promise<any> {
     try {
-      // Using direct SQL function call instead of RPC
+      // Using direct SQL query to get error messages
       const { data, error } = await supabase
         .from('payment_logs')
-        .select('payment_data->message as message')
+        .select('payment_data')
         .eq('payment_status', 'error')
         .order('created_at', { ascending: false })
         .limit(100);
@@ -119,8 +119,18 @@ export class PaymentDebugger {
       
       // Process the data to count occurrences
       const errorCounts: Record<string, number> = {};
+      
       data?.forEach(item => {
-        const message = item.message || 'Unknown error';
+        // Safely extract message from payment_data
+        let message = 'Unknown error';
+        
+        if (item.payment_data && 
+            typeof item.payment_data === 'object' && 
+            'message' in item.payment_data) {
+          const msgData = item.payment_data.message;
+          message = typeof msgData === 'string' ? msgData : 'Unknown error';
+        }
+        
         errorCounts[message] = (errorCounts[message] || 0) + 1;
       });
       
@@ -137,26 +147,29 @@ export class PaymentDebugger {
   /**
    * Map database log format to UI log format
    */
-  private static mapDbLogToUiLog(dbLog: PaymentLogDB): PaymentLog {
+  private static mapDbLogToUiLog(dbLog: any): PaymentLog {
     // Create a safe accessor for the payment_data JSON field
-    const getPaymentData = (log: PaymentLogDB) => {
-      const data = log.payment_data || {};
-      return typeof data === 'object' ? data : {};
-    };
+    const paymentData = dbLog.payment_data || {};
+    const safePaymentData = typeof paymentData === 'object' ? paymentData : {};
     
-    const paymentData = getPaymentData(dbLog);
+    // Safe getter function for JSON properties
+    const safeGet = (obj: any, key: string, defaultValue: string): string => {
+      if (!obj || typeof obj !== 'object') return defaultValue;
+      const val = obj[key];
+      return val !== undefined && val !== null ? String(val) : defaultValue;
+    };
     
     return {
       id: dbLog.id,
-      level: paymentData.level ? String(paymentData.level) : dbLog.payment_status || 'info',
-      message: paymentData.message ? String(paymentData.message) : 'Payment log entry',
-      context: paymentData.context ? String(paymentData.context) : 'payment-system',
-      payment_data: paymentData.details || paymentData,
+      level: safeGet(safePaymentData, 'level', dbLog.payment_status || 'info'),
+      message: safeGet(safePaymentData, 'message', 'Payment log entry'),
+      context: safeGet(safePaymentData, 'context', 'payment-system'),
+      payment_data: safePaymentData.details || safePaymentData,
       user_id: dbLog.user_id,
       transaction_id: dbLog.transaction_id,
       created_at: dbLog.created_at,
-      session_id: paymentData.session_id ? String(paymentData.session_id) : undefined,
-      source: paymentData.source ? String(paymentData.source) : 'system'
+      session_id: safeGet(safePaymentData, 'session_id', undefined),
+      source: safeGet(safePaymentData, 'source', 'system')
     };
   }
 }

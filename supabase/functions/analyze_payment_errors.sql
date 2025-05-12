@@ -7,7 +7,7 @@ SECURITY DEFINER
 SET search_path = 'public'
 AS $$
   SELECT 
-    payment_data->>'message' as message,
+    COALESCE(payment_data->>'message', 'Unknown error') as message,
     COUNT(*) as count
   FROM 
     payment_logs

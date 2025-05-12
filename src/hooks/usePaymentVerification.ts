@@ -40,7 +40,7 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
         // Step 1: First check if this payment has already been processed via webhook
         const { data: webhookData, error: webhookError } = await supabase
           .from('payment_webhooks')
-          .select('payload, processed')
+          .select('*')
           .filter('payload->>LowProfileId', 'eq', lowProfileId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -49,7 +49,7 @@ export function usePaymentVerification({ lowProfileId }: UsePaymentVerificationP
         if (!webhookError && webhookData && webhookData.processed) {
           // Payment was already processed by webhook
           // We need to safely cast the payload to our expected type
-          const payload = webhookData.payload as unknown as CardcomWebhookPayload;
+          const payload = webhookData.payload as any;
           
           PaymentLogger.info('Payment already processed by webhook', 'payment-verification', { 
             lowProfileId, 
