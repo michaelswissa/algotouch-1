@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -237,13 +238,19 @@ export class PaymentDebugger {
       
       // If we have token info, create a token record
       if (paymentData.token_info?.token) {
+        // Ensure all required fields are present
+        if (!paymentData.token_info.token || !paymentData.token_info.expiry) {
+          console.error('Missing required token information', paymentData.token_info);
+          return false;
+        }
+        
         const { error: tokenError } = await supabase
           .from('recurring_payments')
           .insert({
             user_id: userId,
             token: paymentData.token_info.token,
             token_expiry: paymentData.token_info.expiry,
-            token_approval_number: paymentData.token_info.approval,
+            token_approval_number: paymentData.token_info.approval || '', // Provide empty string if null
             last_4_digits: paymentData.card_info?.last4 || null,
             card_type: paymentData.card_info?.card_type || null,
             status: 'active',

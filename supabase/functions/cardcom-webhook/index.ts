@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
@@ -82,9 +83,17 @@ serve(async (req) => {
     // Only process successful transactions
     if (ResponseCode === 0) {
       try {
-        // FIX: Simplify ReturnValue check - treat both temp_reg_ and plain temp_ as guest registrations
-        if (ReturnValue) {
-          if (ReturnValue.startsWith('temp_reg_') || ReturnValue.startsWith('temp_')) {
+        // Validate token information if this is a token operation
+        if ((Operation === "ChargeAndCreateToken" || Operation === "CreateTokenOnly") && !TokenInfo?.Token) {
+          console.error('Token operation missing required TokenInfo.Token:', Operation);
+          processingResult = {
+            success: false, 
+            message: 'Missing required token information for token operation',
+            details: { operation: Operation }
+          };
+        } else if (ReturnValue) {
+          // Consistent check for temp registration IDs - only check for temp_reg_ prefix
+          if (ReturnValue.startsWith('temp_reg_')) {
             // This is a temporary registration ID - process as guest checkout
             await processRegistrationPayment(supabaseClient, ReturnValue, payload);
             processingResult = { 
@@ -111,7 +120,7 @@ serve(async (req) => {
                 .from('profiles')
                 .select('id')
                 .eq('email', email.toLowerCase())
-                .single();
+                .maybeSingle<{ id: string }>();
               
               if (!usersError && usersData) {
                 const userId = usersData.id;
@@ -152,7 +161,7 @@ serve(async (req) => {
               .from('profiles')
               .select('id')
               .eq('email', email.toLowerCase())
-              .single();
+              .maybeSingle<{ id: string }>();
             
             if (!usersError && usersData) {
               const userId = usersData.id;
@@ -258,7 +267,7 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
       status: (operation === "CreateTokenOnly") ? 'trial' : 'active',
       payment_method: 'cardcom',
       last_payment_date: new Date().toISOString(),
-      // If we have token information and it's a ChareAndCreateToken or CreateTokenOnly operation
+      // If we have token information and it's a ChargeAndCreateToken or CreateTokenOnly operation
       // then store the token in the payment_method column
       payment_details: {
         transaction_id: payload.TranzactionId,
@@ -290,6 +299,11 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
     console.log(`Storing token for user: ${userId}, token: ${tokenInfo.Token}`);
     
     try {
+      // Ensure all required fields are present and valid
+      if (!tokenInfo.TokenExDate) {
+        throw new Error('Missing TokenExDate in token information');
+      }
+      
       // Save the token to recurring_payments
       const { error: tokenError } = await supabase
         .from('recurring_payments')
@@ -297,7 +311,7 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
           user_id: userId,
           token: tokenInfo.Token,
           token_expiry: parseCardcomDateString(tokenInfo.TokenExDate),
-          token_approval_number: tokenInfo.TokenApprovalNumber,
+          token_approval_number: tokenInfo.TokenApprovalNumber || '', // Ensure it's never null
           last_4_digits: transactionInfo?.Last4CardDigits || null,
           card_type: transactionInfo?.CardInfo || null,
           status: 'active',

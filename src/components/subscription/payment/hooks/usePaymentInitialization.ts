@@ -69,7 +69,7 @@ export const usePaymentInitialization = (
       const webhookUrl = `https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-webhook`;
 
       // Generate a temp registration ID with consistent format
-      // FIX: Use a consistent temp_reg_ prefix for guest checkout ReturnValue
+      // Always use temp_reg_ prefix for guest checkout ReturnValue for consistency with webhook
       const tempRegistrationId = user?.id || `temp_reg_${Date.now()}`;
 
       // Prepare payload based on whether user is logged in or not
@@ -107,6 +107,14 @@ export const usePaymentInitialization = (
         // Store temporary registration ID if available
         if (tempRegistrationId.startsWith('temp_reg_')) {
           localStorage.setItem('temp_registration_id', tempRegistrationId);
+          
+          // Also log important information to help with debugging
+          console.log('Payment initiated with:', {
+            tempRegistrationId,
+            planId: selectedPlan,
+            operation: operationType,
+            email: userEmail
+          });
         }
         
         setPaymentUrl(data.url);
