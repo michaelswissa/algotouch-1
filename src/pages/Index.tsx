@@ -8,7 +8,7 @@ const Index = () => {
   // Clear any stale registration data when landing on the index page
   useEffect(() => {
     // Log supabase client configuration for debugging
-    console.log('Supabase client initialized with URL:', supabase.supabaseUrl);
+    console.log('Supabase client initialized');
     
     // Check if Supabase connection is working
     const checkSupabaseConnection = async () => {
@@ -37,7 +37,10 @@ const Index = () => {
     
     // Also clear any session data that might be causing problems
     try {
-      const sessionKey = `sb-${supabase.supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+      // Get the default session key pattern based on project reference
+      const projectRef = new URL(supabase.getUrl()).hostname.split('.')[0];
+      const sessionKey = `sb-${projectRef}-auth-token`;
+      
       if (localStorage.getItem(sessionKey)) {
         console.log('Found existing Supabase session in localStorage');
       }

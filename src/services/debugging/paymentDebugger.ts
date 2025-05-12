@@ -120,16 +120,28 @@ export class PaymentDebugger {
       // Process the data to count occurrences
       const errorCounts: Record<string, number> = {};
       
-      // Simplified approach to avoid excessive type instantiation
-      if (data) {
+      // Safely process payment_data
+      if (data && data.length > 0) {
         data.forEach(item => {
-          let message = 'Unknown error';
+          let errorMessage = 'Unknown error';
           
-          if (item.payment_data && typeof item.payment_data === 'object') {
-            message = String(item.payment_data.message || 'Unknown error');
+          if (item.payment_data) {
+            // Handle both object and string representations
+            if (typeof item.payment_data === 'object') {
+              const paymentData = item.payment_data as Record<string, unknown>;
+              errorMessage = String(paymentData.message || errorMessage);
+            } else if (typeof item.payment_data === 'string') {
+              try {
+                const parsed = JSON.parse(item.payment_data);
+                errorMessage = String(parsed.message || errorMessage);
+              } catch (e) {
+                // If it's not valid JSON, use it as is
+                errorMessage = String(item.payment_data).substring(0, 100);
+              }
+            }
           }
           
-          errorCounts[message] = (errorCounts[message] || 0) + 1;
+          errorCounts[errorMessage] = (errorCounts[errorMessage] || 0) + 1;
         });
       }
       
@@ -194,7 +206,7 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      // Fix: Use a more direct approach to prevent deep type instantiation
+      // Use a more direct approach to prevent deep type instantiation
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
@@ -273,11 +285,12 @@ export class PaymentDebugger {
 
   /**
    * Map database log format to UI log format
-   * Fix: Simplified this method to avoid excessive type instantiation
    */
   private static mapDbLogToUiLog(dbLog: any): PaymentLog {
     // Create a safe accessor for the payment_data JSON field
-    const paymentData = typeof dbLog.payment_data === 'object' ? dbLog.payment_data : {};
+    const paymentData = typeof dbLog.payment_data === 'object' && dbLog.payment_data !== null 
+      ? dbLog.payment_data 
+      : {};
     
     return {
       id: dbLog.id,
@@ -294,7 +307,7 @@ export class PaymentDebugger {
   }
   
   /**
-   * Safe getter utility for JSON properties to prevent deep recursion
+   * Safe getter utility for JSON properties
    */
   private static safeGetValue(obj: any, key: string, defaultValue: any): any {
     if (!obj || typeof obj !== 'object') return defaultValue;
