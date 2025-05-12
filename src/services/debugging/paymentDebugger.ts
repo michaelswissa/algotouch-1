@@ -195,6 +195,7 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
+      // Fix the type instantiation issue by using maybeSingle() instead of single()
       const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
