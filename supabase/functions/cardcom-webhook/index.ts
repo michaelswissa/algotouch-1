@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
@@ -83,159 +82,39 @@ serve(async (req) => {
     // Only process successful transactions
     if (ResponseCode === 0) {
       try {
-        // Check if ReturnValue is a valid user ID or temp registration ID
+        // FIX: Simplify ReturnValue check - treat both temp_reg_ and plain temp_ as guest registrations
         if (ReturnValue) {
-          if (ReturnValue.startsWith('temp_reg_')) {
-            // This is a temporary registration ID
+          if (ReturnValue.startsWith('temp_reg_') || ReturnValue.startsWith('temp_')) {
+            // This is a temporary registration ID - process as guest checkout
             await processRegistrationPayment(supabaseClient, ReturnValue, payload);
             processingResult = { 
               success: true, 
               message: 'Processed registration payment', 
               details: { registrationId: ReturnValue }
             };
-          } else if (ReturnValue.startsWith('temp_')) {
-            // Handle ReturnValue with temp_ prefix but no reg_ part
-            // This happens with the current implementation
-            console.log('Handling non-standard temp_ ReturnValue:', ReturnValue);
-            
-            // Try to find a user by email first (fallback mechanism)
-            let userId = null;
+          } else if (ReturnValue.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+            // This is a UUID - process as user payment
+            await processUserPayment(supabaseClient, ReturnValue, payload);
+            processingResult = { 
+              success: true, 
+              message: 'Processed user payment', 
+              details: { userId: ReturnValue }
+            };
+          } else {
+            // Fallback to email lookup if ReturnValue is not recognized
             if (UIValues && UIValues.CardOwnerEmail) {
               const email = UIValues.CardOwnerEmail;
               console.log('Attempting to find user by email:', email);
               
               // Look up user by email
-              const { data: userData, error: userError } = await supabaseClient.auth.admin
-                .listUsers();
+              const { data: usersData, error: usersError } = await supabaseClient
+                .from('profiles')
+                .select('id')
+                .eq('email', email.toLowerCase())
+                .single();
               
-              if (!userError && userData) {
-                const matchingUser = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-                if (matchingUser) {
-                  userId = matchingUser.id;
-                  console.log(`Found user with email ${email}, ID: ${userId}`);
-                }
-              }
-              
-              if (userError) {
-                console.error('Error looking up user by email:', userError);
-              }
-              
-              if (userId) {
-                // Process as a regular user payment
-                await processUserPayment(supabaseClient, userId, payload);
-                processingResult = { 
-                  success: true, 
-                  message: 'Processed user payment via email lookup', 
-                  details: { userId, email }
-                };
-              } else {
-                // Store as a temp registration with extracted ID
-                const tempId = `temp_reg_${ReturnValue.substring(5)}`;
-                await processRegistrationPayment(supabaseClient, tempId, payload);
-                processingResult = { 
-                  success: true, 
-                  message: 'Processed as temp registration (converted format)', 
-                  details: { tempId }
-                };
-              }
-            } else {
-              // No email available, try to convert the temp_ to temp_reg_ format
-              const tempId = `temp_reg_${ReturnValue.substring(5)}`;
-              await processRegistrationPayment(supabaseClient, tempId, payload);
-              processingResult = { 
-                success: true, 
-                message: 'Processed as temp registration (converted format)', 
-                details: { tempId }
-              };
-            }
-          } else {
-            // Try to process as a regular user ID
-            try {
-              // Validate if this is a valid UUID
-              const isValidUuid = 
-                ReturnValue.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) !== null;
-              
-              if (isValidUuid) {
-                // This is likely a user ID
-                await processUserPayment(supabaseClient, ReturnValue, payload);
-                processingResult = { 
-                  success: true, 
-                  message: 'Processed user payment', 
-                  details: { userId: ReturnValue }
-                };
-              } else {
-                // Not a UUID, try to find user by email
-                if (UIValues && UIValues.CardOwnerEmail) {
-                  const email = UIValues.CardOwnerEmail;
-                  console.log('ReturnValue not UUID. Attempting to find user by email:', email);
-                  
-                  // Look up user by email
-                  const { data: userData, error: userError } = await supabaseClient.auth.admin
-                    .listUsers();
-                  
-                  if (!userError && userData) {
-                    const matchingUser = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-                    if (matchingUser) {
-                      const userId = matchingUser.id;
-                      console.log(`Found user with email ${email}, ID: ${userId}`);
-                      
-                      // Process as a regular user payment
-                      await processUserPayment(supabaseClient, userId, payload);
-                      processingResult = { 
-                        success: true, 
-                        message: 'Processed user payment via email lookup', 
-                        details: { userId, email }
-                      };
-                    } else {
-                      console.log(`No user found with email ${email}`);
-                      processingResult = {
-                        success: false,
-                        message: 'User not found by email, and ReturnValue is not valid',
-                        details: { ReturnValue, email }
-                      };
-                    }
-                  }
-                  
-                  if (userError) {
-                    console.error('Error looking up user by email:', userError);
-                    processingResult = {
-                      success: false,
-                      message: 'Error looking up user by email',
-                      details: { error: userError }
-                    };
-                  }
-                } else {
-                  console.error('Invalid ReturnValue and no email to look up user:', ReturnValue);
-                  processingResult = {
-                    success: false,
-                    message: 'Invalid ReturnValue and no email available',
-                    details: { ReturnValue }
-                  };
-                }
-              }
-            } catch (processError) {
-              console.error('Error processing user payment:', processError);
-              processingResult = {
-                success: false,
-                message: 'Error processing user payment',
-                details: { error: processError.message, ReturnValue }
-              };
-            }
-          }
-        } else {
-          // No ReturnValue, try to use email
-          if (UIValues && UIValues.CardOwnerEmail) {
-            const email = UIValues.CardOwnerEmail;
-            console.log('No ReturnValue. Attempting to find user by email:', email);
-            
-            // Look up user by email
-            const { data: userData, error: userError } = await supabaseClient.auth.admin
-              .listUsers();
-            
-            if (!userError && userData) {
-              const matchingUser = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-              if (matchingUser) {
-                const userId = matchingUser.id;
+              if (!usersError && usersData) {
+                const userId = usersData.id;
                 console.log(`Found user with email ${email}, ID: ${userId}`);
                 
                 // Process as a regular user payment
@@ -249,18 +128,49 @@ serve(async (req) => {
                 console.log(`No user found with email ${email}`);
                 processingResult = {
                   success: false,
-                  message: 'User not found by email, and no ReturnValue',
-                  details: { email }
+                  message: 'User not found by email, and ReturnValue is not valid',
+                  details: { ReturnValue, email }
                 };
               }
-            }
-            
-            if (userError) {
-              console.error('Error looking up user by email:', userError);
+            } else {
+              console.error('Invalid ReturnValue and no email to look up user:', ReturnValue);
               processingResult = {
                 success: false,
-                message: 'Error looking up user by email',
-                details: { error: userError }
+                message: 'Invalid ReturnValue and no email available',
+                details: { ReturnValue }
+              };
+            }
+          }
+        } else {
+          // No ReturnValue, try to use email
+          if (UIValues && UIValues.CardOwnerEmail) {
+            const email = UIValues.CardOwnerEmail;
+            console.log('No ReturnValue. Attempting to find user by email:', email);
+            
+            // Look up user by email
+            const { data: usersData, error: usersError } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('email', email.toLowerCase())
+              .single();
+            
+            if (!usersError && usersData) {
+              const userId = usersData.id;
+              console.log(`Found user with email ${email}, ID: ${userId}`);
+              
+              // Process as a regular user payment
+              await processUserPayment(supabaseClient, userId, payload);
+              processingResult = { 
+                success: true, 
+                message: 'Processed user payment via email lookup', 
+                details: { userId, email }
+              };
+            } else {
+              console.log(`No user found with email ${email}`);
+              processingResult = {
+                success: false,
+                message: 'User not found by email, and no ReturnValue',
+                details: { email }
               };
             }
           } else {

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog, PaymentLogDB } from '@/types/payment-logs';
 
@@ -195,14 +194,31 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<any> {
     try {
-      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
+      // Replace the invalid getUserByEmail method with a query to profiles table
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
       
       if (error) {
         console.error('Error finding user by email:', error);
         return null;
       }
       
-      return data?.user || null;
+      if (!data) {
+        return null;
+      }
+      
+      // Fetch the user details using the found ID
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error('Error getting user details:', userError);
+        return null;
+      }
+      
+      return userData?.user || null;
     } catch (error) {
       console.error('Exception finding user by email:', error);
       return null;

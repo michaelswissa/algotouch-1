@@ -5,6 +5,7 @@ import App from './App.tsx';
 import './index.css';
 import { initializeErrorHandler } from './lib/errorHandler';
 import { checkCriticalModules } from './lib/moduleLoader';
+import { ThemeProvider } from '@/contexts/theme';
 
 // Initialize global error handler
 initializeErrorHandler();
@@ -162,10 +163,13 @@ if (!rootElement) {
   throw new Error("Root element not found. Check the index.html file.");
 }
 
+// Fix: Wrap App with ThemeProvider in the main entry file
 const root = createRoot(rootElement);
 root.render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>
 );
 
