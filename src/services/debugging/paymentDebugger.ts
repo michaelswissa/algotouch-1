@@ -8,6 +8,12 @@ interface SimpleProfileResult {
   email: string | null;
 }
 
+// Interface for error analysis results
+interface ErrorAnalysisItem {
+  message: string;
+  count: number;
+}
+
 export class PaymentDebugger {
   /**
    * Get complete payment flow for a transaction
@@ -108,7 +114,7 @@ export class PaymentDebugger {
   /**
    * Analyze common error patterns
    */
-  static async analyzeErrors(): Promise<{ message: string; count: number }[]> {
+  static async analyzeErrors(): Promise<ErrorAnalysisItem[]> {
     try {
       // Using direct SQL query to get error messages
       const { data, error } = await supabase
@@ -213,20 +219,20 @@ export class PaymentDebugger {
   static async findUserByEmail(email: string): Promise<SimpleProfileResult | null> {
     try {
       // Check if email column exists in profiles table
-      const { data, error } = await supabase
+      const result = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', email)
         .maybeSingle();
       
       // Handle the error case appropriately
-      if (error) {
+      if (result.error) {
         // Log the error but don't throw
-        console.error('Error finding user by email:', error);
+        console.error('Error finding user by email:', result.error);
         
         // If the column doesn't exist, try to search by ID
         // This is a fallback in case the email column doesn't exist
-        if (error.message && error.message.includes("column 'email' does not exist")) {
+        if (result.error.message && result.error.message.includes("column 'email' does not exist")) {
           console.log('Email column does not exist, trying to find user in auth.users');
           return null;
         }
@@ -235,14 +241,14 @@ export class PaymentDebugger {
       }
       
       // If no data is found, return null
-      if (!data) {
+      if (!result.data) {
         return null;
       }
       
       // Return the typed result
       return {
-        id: data.id,
-        email: data.email
+        id: result.data.id,
+        email: result.data.email
       };
     } catch (error) {
       console.error('Exception finding user by email:', error);
