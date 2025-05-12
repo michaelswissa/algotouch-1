@@ -6,6 +6,7 @@ import './index.css';
 import { initializeErrorHandler } from './lib/errorHandler';
 import { checkCriticalModules } from './lib/moduleLoader';
 import { ThemeProvider } from '@/contexts/theme';
+import React from 'react'; // Explicitly import React to ensure hooks work correctly
 
 // Initialize global error handler
 initializeErrorHandler();
