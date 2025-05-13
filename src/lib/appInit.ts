@@ -53,11 +53,26 @@ export function initializeApp(): void {
  * Show fallback UI in case of critical errors
  */
 function showFallbackUI(): void {
-  document.body.innerHTML = `
-    <div style="text-align:center;padding:2rem;">
-      <h1>Application Error</h1>
-      <p>Failed to initialize the application. Please try refreshing the page.</p>
-      <button onclick="window.location.reload()">Refresh Now</button>
-    </div>
-  `;
+  // Create simple HTML elements instead of using a template string
+  const errorDiv = document.createElement('div');
+  errorDiv.style.textAlign = 'center';
+  errorDiv.style.padding = '2rem';
+  
+  const errorTitle = document.createElement('h1');
+  errorTitle.textContent = 'Application Error';
+  errorDiv.appendChild(errorTitle);
+  
+  const errorMessage = document.createElement('p');
+  errorMessage.textContent = 'Failed to initialize the application. Please try refreshing the page.';
+  errorDiv.appendChild(errorMessage);
+  
+  const refreshButton = document.createElement('button');
+  refreshButton.textContent = 'Refresh Now';
+  refreshButton.onclick = () => window.location.reload();
+  errorDiv.appendChild(refreshButton);
+  
+  // Clear and set the body content
+  document.body.innerHTML = '';
+  document.body.appendChild(errorDiv);
 }
+
