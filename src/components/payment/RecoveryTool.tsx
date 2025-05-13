@@ -41,7 +41,7 @@ export const RecoveryTool: React.FC<RecoveryToolProps> = ({ onComplete }) => {
       setResult(data);
       
       if (data.success) {
-        toast.success(`Reprocessed ${data.results.length} webhooks successfully`);
+        toast.success(`Reprocessed ${data.results?.length || 0} webhooks successfully`);
         if (data.tokenStatus?.found) {
           toast.success('Token found and saved in system!');
         }
@@ -83,7 +83,7 @@ export const RecoveryTool: React.FC<RecoveryToolProps> = ({ onComplete }) => {
       setResult(data);
       
       if (data.success) {
-        toast.success(`Reprocessed ${data.results.length} webhooks successfully`);
+        toast.success(`Reprocessed ${data.results?.length || 0} webhooks successfully`);
         if (data.tokenStatus?.found) {
           toast.success('Token found and saved in system!');
         }

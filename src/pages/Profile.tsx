@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -10,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { UserCircle, Lock, MapPin } from 'lucide-react';
+import { UserCircle, Lock, MapPin, Wrench } from 'lucide-react';
 import UserSubscription from '@/components/UserSubscription';
+import RecoveryTool from '@/components/payment/RecoveryTool';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ProfileData {
@@ -41,6 +41,7 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -67,6 +68,16 @@ const Profile = () => {
               country: data.country || 'Israel',
             });
           }
+          
+          // Check if user is admin
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .maybeSingle();
+            
+          setIsAdmin(!!roleData);
         } catch (error) {
           console.error('Error fetching profile:', error);
           toast.error('שגיאה בטעינת פרטי פרופיל');
@@ -81,9 +92,16 @@ const Profile = () => {
     }
   }, [user]);
 
-  if (!loading && !isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
+  const handlePaymentRecovery = async (result: any) => {
+    if (result?.success) {
+      toast.success("Payment recovery completed successfully");
+      
+      // Refresh the page after a short delay to show updated subscription info
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -146,6 +164,10 @@ const Profile = () => {
     }
   };
 
+  if (!loading && !isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
+
   return (
     <Layout>
       <div className="tradervue-container py-8" dir="rtl">
@@ -160,6 +182,9 @@ const Profile = () => {
               <TabsList className="mb-4">
                 <TabsTrigger value="personal">פרטים אישיים</TabsTrigger>
                 <TabsTrigger value="security">אבטחה</TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger value="admin">כלי ניהול</TabsTrigger>
+                )}
               </TabsList>
               
               <TabsContent value="personal">
@@ -316,6 +341,26 @@ const Profile = () => {
                   </CardFooter>
                 </Card>
               </TabsContent>
+              
+              {isAdmin && (
+                <TabsContent value="admin">
+                  <Card className="glass-card-2025">
+                    <CardHeader>
+                      <CardTitle>כלי ניהול</CardTitle>
+                      <CardDescription>כלים מתקדמים למנהלי המערכת</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium flex items-center gap-2">
+                          <Wrench className="h-4 w-4 text-primary" />
+                          שחזור תשלומים
+                        </h3>
+                        <RecoveryTool onComplete={handlePaymentRecovery} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
           

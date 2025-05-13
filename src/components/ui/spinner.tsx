@@ -2,34 +2,30 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-export interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
-  size?: 'sm' | 'md' | 'lg';
+interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export function Spinner({ className, size = 'md', ...props }: SpinnerProps) {
+export const Spinner = ({ size = 'md', className, ...props }: SpinnerProps) => {
   const sizeClasses = {
-    sm: 'h-4 w-4 border-2',
-    md: 'h-8 w-8 border-3',
-    lg: 'h-12 w-12 border-4',
+    'xs': 'h-3 w-3 border-[1.5px]',
+    'sm': 'h-4 w-4 border-2',
+    'md': 'h-6 w-6 border-2',
+    'lg': 'h-8 w-8 border-[3px]',
+    'xl': 'h-10 w-10 border-4',
   };
-  
+
   return (
-    <div
+    <div 
       className={cn(
-        'animate-spin rounded-full border-t-primary border-solid border-background/20',
+        'animate-spin rounded-full border-solid border-t-transparent',
         sizeClasses[size],
+        'border-current opacity-75',
         className
       )}
       {...props}
-    />
-  );
-}
-
-export function LoadingPage({ message = 'טוען...' }: { message?: string }) {
-  return (
-    <div className="flex flex-col justify-center items-center min-h-screen gap-4">
-      <Spinner size="lg" />
-      {message && <p className="text-muted-foreground">{message}</p>}
+    >
+      <span className="sr-only">טוען...</span>
     </div>
   );
-}
+};

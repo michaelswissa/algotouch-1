@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
@@ -18,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client with service role
+    // Create Supabase client with service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -30,77 +31,78 @@ serve(async (req) => {
     );
 
     // Parse request body
-    const { email, lowProfileId } = await req.json();
-    
+    const { email, lowProfileId, userId: providedUserId } = await req.json();
+
     if (!email && !lowProfileId) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Either email or lowProfileId is required'
+          message: 'Either email or lowProfileId must be provided',
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
+          status: 400,
         }
       );
     }
 
-    // If email is provided, first find the user ID
-    let userId = null;
-    if (email) {
-      console.log(`Looking up user by email: ${email}`);
-      
-      // Get user by email through the dedicated function
-      const { data: userData, error: userError } = await supabaseClient.functions.invoke('get-user-by-email', {
-        body: { email: email.toLowerCase() }
-      });
-      
-      if (userError || !userData?.user) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Could not find user with the provided email',
-            error: userError?.message || 'User not found'
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404
-          }
-        );
+    // Find user either by email or directly from provided userId
+    let userId = providedUserId;
+    
+    if (!userId && email) {
+      // Look up user by email
+      const { data: userData, error: userError } = await supabaseClient
+        .from('auth.users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userError || !userData) {
+        // Try with auth API instead
+        const { data: authUser, error: authError } = await supabaseClient.auth.admin.listUsers({
+          filter: {
+            email: email
+          },
+        });
+        
+        if (authError || !authUser?.users || authUser.users.length === 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: `User not found with email: ${email}`,
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404,
+            }
+          );
+        }
+        
+        userId = authUser.users[0].id;
+      } else {
+        userId = userData.id;
       }
-
-      userId = userData.user.id;
-      console.log(`Found user ID: ${userId}`);
     }
 
-    // Find webhooks that might apply to this user
-    let query = supabaseClient
-      .from('payment_webhooks')
-      .select('*')
-      .eq('webhook_type', 'cardcom');
-      
-    // If we have a specific lowProfileId, use that as the primary filter
+    // Find payment webhooks
+    let webhookQuery = supabaseClient.from('payment_webhooks').select('*');
+    
     if (lowProfileId) {
-      query = query.filter('payload->LowProfileId', 'eq', lowProfileId);
-    }
-    // Otherwise if we have an email, use that to find related webhooks
-    else if (email) {
-      query = query.filter('payload->UIValues->CardOwnerEmail', 'ilike', email);
+      webhookQuery = webhookQuery.filter('payload->LowProfileId', 'eq', lowProfileId);
     }
     
-    const { data: webhooks, error: webhookError } = await query
-      .order('created_at', { ascending: false });
+    const { data: webhooks, error: webhookError } = await webhookQuery.order('created_at', { ascending: false });
 
     if (webhookError) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Error searching for webhooks',
-          error: webhookError.message
+          message: 'Error fetching webhooks',
+          error: webhookError.message,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
+          status: 500,
         }
       );
     }
@@ -109,114 +111,102 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'No matching webhooks found',
-          filters: { email, lowProfileId }
+          message: `No webhooks found${email ? ' for email: ' + email : lowProfileId ? ' for lowProfileId: ' + lowProfileId : ''}`,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404
+          status: 404,
         }
       );
     }
 
-    console.log(`Found ${webhooks.length} webhooks to reprocess`);
-
-    // For each webhook, call the cardcom-webhook function with the payload
-    // But potentially override the ReturnValue with the user ID we found
+    // Process each webhook
     const results = [];
-    for (const webhook of webhooks) {
-      console.log(`Reprocessing webhook ID: ${webhook.id}`);
-      
-      // Create a copy of the payload so we don't modify the original
-      const payloadCopy = JSON.parse(JSON.stringify(webhook.payload));
-      
-      // If we have a user ID and the webhook payload has TokenInfo, 
-      // override the ReturnValue to ensure it processes for the right user
-      if (userId && payloadCopy.TokenInfo && payloadCopy.TokenInfo.Token) {
-        console.log(`Overriding ReturnValue with user ID: ${userId}`);
-        payloadCopy.ReturnValue = userId;
-      }
-      
-      // Call the cardcom-webhook function with this payload
-      const response = await fetch(
-        `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-          },
-          body: JSON.stringify(payloadCopy)
-        }
-      );
-      
-      const responseJson = await response.json();
-      
-      // Add to results
-      results.push({
-        webhookId: webhook.id,
-        response: responseJson,
-        status: response.status,
-        success: response.ok
-      });
-      
-      // Update the webhook record to show it was reprocessed
-      await supabaseClient
-        .from('payment_webhooks')
-        .update({
-          processed: true,
-          processed_at: new Date().toISOString(),
-          processing_result: {
-            reprocessed: true,
-            reprocessedAt: new Date().toISOString(),
-            success: response.ok,
-            response: responseJson
-          }
-        })
-        .eq('id', webhook.id);
-    }
+    let tokenStatus = { found: false, saved: false };
 
-    // Now verify if we have created tokens in recurring_payments
-    let tokenStatus = { found: false, tokenData: null };
-    if (userId) {
-      const { data: tokens, error: tokenError } = await supabaseClient
-        .from('recurring_payments')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      
-      if (!tokenError && tokens && tokens.length > 0) {
-        tokenStatus = {
-          found: true,
-          tokenData: tokens[0]
-        };
+    for (const webhook of webhooks) {
+      try {
+        // If userId is provided, update ReturnValue in payload to associate with the user
+        if (userId && webhook.payload) {
+          webhook.payload.ReturnValue = userId;
+        }
+
+        // Process the webhook by calling process-webhook function
+        const processWebhookResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-webhook`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              webhookId: webhook.id,
+              userId: userId
+            }),
+          }
+        );
+
+        const processResult = await processWebhookResponse.json();
+        
+        // Check if webhook processing created a token
+        if (userId) {
+          const { data: tokenData } = await supabaseClient
+            .from('recurring_payments')
+            .select('token')
+            .eq('user_id', userId)
+            .maybeSingle();
+            
+          if (tokenData?.token) {
+            tokenStatus = { found: true, saved: true };
+          }
+        }
+        
+        results.push({
+          webhookId: webhook.id,
+          success: processResult.success,
+          result: processResult,
+        });
+
+        // If this was successful, we can break after processing one webhook
+        if (processResult.success) {
+          break;
+        }
+      } catch (err) {
+        console.error(`Error processing webhook ${webhook.id}:`, err);
+        results.push({
+          webhookId: webhook.id,
+          success: false,
+          error: err.message || String(err),
+        });
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Reprocessed ${results.length} webhooks`,
+        message: `Processed ${results.length} webhooks`,
         results,
-        tokenStatus
+        tokenStatus,
+        userId,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+        status: 200,
       }
     );
-  } catch (error) {
-    console.error('Error reprocessing webhooks:', error);
+  } catch (error: any) {
+    console.error('Error in reprocess-webhook-by-email:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        message: 'Error reprocessing webhooks',
-        error: error.message || String(error)
+        message: 'Error processing request',
+        error: error.message || String(error),
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        status: 500,
       }
     );
   }

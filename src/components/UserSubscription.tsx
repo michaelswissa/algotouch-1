@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/auth';
+import { supabase } from '@/lib/supabase-client';
 
 // Import our components
 import SubscriptionCard from './subscription/SubscriptionCard';
@@ -13,12 +15,45 @@ import SubscriptionFooter from './subscription/SubscriptionFooter';
 import LoadingSkeleton from './subscription/LoadingSkeleton';
 import ContractViewer from './subscription/ContractViewer';
 import DocumentsList from './subscription/DocumentsList';
+import SubscriptionManager from './payment/SubscriptionManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const UserSubscription = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { subscription, loading, details } = useSubscription();
   const [activeTab, setActiveTab] = useState('details');
+  const [hasUnprocessedPayment, setHasUnprocessedPayment] = useState(false);
+  
+  useEffect(() => {
+    // Check if there's an unprocessed payment for this user
+    const checkPaymentStatus = async () => {
+      if (!user?.id || !user?.email) return;
+      
+      try {
+        // Check for unprocessed webhooks with tokens
+        const { data, error } = await supabase
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', false)
+          .contains('payload', { Operation: 'ChargeAndCreateToken', ResponseCode: '0' })
+          .limit(1);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Found an unprocessed webhook with token
+          setHasUnprocessedPayment(true);
+        }
+      } catch (err) {
+        console.error('Error checking payment status:', err);
+      }
+    };
+    
+    if (!loading && !subscription) {
+      checkPaymentStatus();
+    }
+  }, [user, loading, subscription]);
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -41,6 +76,18 @@ const UserSubscription = () => {
             המשך להרשמה
           </Button>
         </div>
+      </SubscriptionCard>
+    );
+  }
+  
+  // If there's unprocessed payment but no subscription
+  if (hasUnprocessedPayment && !subscription && user?.email) {
+    return (
+      <SubscriptionCard 
+        title="עדכון פרטי מנוי" 
+        description="נראה שביצעת תשלום שלא הושלם לגמרי במערכת"
+      >
+        <SubscriptionManager userId={user.id} email={user.email} />
       </SubscriptionCard>
     );
   }
