@@ -115,15 +115,13 @@ serve(async (req) => {
               const email = UIValues.CardOwnerEmail;
               console.log('Attempting to find user by email:', email);
               
-              // Look up user by email
-              const { data: usersData, error: usersError } = await supabaseClient
-                .from('profiles')
-                .select('id')
-                .eq('email', email.toLowerCase())
-                .maybeSingle<{ id: string }>();
-              
-              if (!usersError && usersData) {
-                const userId = usersData.id;
+              // Call get-user-by-email function to look up user
+              const { data: userData, error: userError } = await supabaseClient.functions.invoke('get-user-by-email', {
+                body: { email: email.toLowerCase() }
+              });
+
+              if (!userError && userData?.user?.id) {
+                const userId = userData.user.id;
                 console.log(`Found user with email ${email}, ID: ${userId}`);
                 
                 // Process as a regular user payment
@@ -134,12 +132,38 @@ serve(async (req) => {
                   details: { userId, email }
                 };
               } else {
-                console.log(`No user found with email ${email}`);
-                processingResult = {
-                  success: false,
-                  message: 'User not found by email, and ReturnValue is not valid',
-                  details: { ReturnValue, email }
-                };
+                console.log(`No user found with email ${email} using get-user-by-email function`);
+                
+                // Direct lookup in auth.users table as fallback
+                const { data: authUsers, error: authError } = await supabaseClient.auth.admin.listUsers({
+                  filters: [
+                    {
+                      property: 'email',
+                      operator: 'eq',
+                      value: email.toLowerCase()
+                    }
+                  ]
+                });
+
+                if (!authError && authUsers?.users && authUsers.users.length > 0) {
+                  const userId = authUsers.users[0].id;
+                  console.log(`Found user with email ${email} directly in auth.users, ID: ${userId}`);
+                  
+                  // Process as a regular user payment
+                  await processUserPayment(supabaseClient, userId, payload);
+                  processingResult = { 
+                    success: true, 
+                    message: 'Processed user payment via direct auth.users lookup', 
+                    details: { userId, email }
+                  };
+                } else {
+                  console.log(`No user found with email ${email} in auth.users`);
+                  processingResult = {
+                    success: false,
+                    message: 'User not found by email via any method',
+                    details: { ReturnValue, email }
+                  };
+                }
               }
             } else {
               console.error('Invalid ReturnValue and no email to look up user:', ReturnValue);
@@ -156,15 +180,13 @@ serve(async (req) => {
             const email = UIValues.CardOwnerEmail;
             console.log('No ReturnValue. Attempting to find user by email:', email);
             
-            // Look up user by email
-            const { data: usersData, error: usersError } = await supabaseClient
-              .from('profiles')
-              .select('id')
-              .eq('email', email.toLowerCase())
-              .maybeSingle<{ id: string }>();
-            
-            if (!usersError && usersData) {
-              const userId = usersData.id;
+            // Call get-user-by-email function to look up user
+            const { data: userData, error: userError } = await supabaseClient.functions.invoke('get-user-by-email', {
+              body: { email: email.toLowerCase() }
+            });
+
+            if (!userError && userData?.user?.id) {
+              const userId = userData.user.id;
               console.log(`Found user with email ${email}, ID: ${userId}`);
               
               // Process as a regular user payment
@@ -175,12 +197,38 @@ serve(async (req) => {
                 details: { userId, email }
               };
             } else {
-              console.log(`No user found with email ${email}`);
-              processingResult = {
-                success: false,
-                message: 'User not found by email, and no ReturnValue',
-                details: { email }
-              };
+              console.log(`No user found with email ${email} using get-user-by-email function`);
+              
+              // Direct lookup in auth.users table as fallback
+              const { data: authUsers, error: authError } = await supabaseClient.auth.admin.listUsers({
+                filters: [
+                  {
+                    property: 'email',
+                    operator: 'eq',
+                    value: email.toLowerCase()
+                  }
+                ]
+              });
+
+              if (!authError && authUsers?.users && authUsers.users.length > 0) {
+                const userId = authUsers.users[0].id;
+                console.log(`Found user with email ${email} directly in auth.users, ID: ${userId}`);
+                
+                // Process as a regular user payment
+                await processUserPayment(supabaseClient, userId, payload);
+                processingResult = { 
+                  success: true, 
+                  message: 'Processed user payment via direct auth.users lookup', 
+                  details: { userId, email }
+                };
+              } else {
+                console.log(`No user found with email ${email} in auth.users`);
+                processingResult = {
+                  success: false,
+                  message: 'User not found by email via any method',
+                  details: { email }
+                };
+              }
             }
           } else {
             console.error('No ReturnValue and no email to look up user');
