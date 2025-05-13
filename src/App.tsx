@@ -5,9 +5,8 @@ import { Toaster } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { AuthProvider } from '@/contexts/auth';
 import { DirectionProvider } from '@/contexts/direction/DirectionProvider';
+import { StockDataProvider } from '@/contexts/stock/StockDataContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
-
-// Note: ThemeProvider has been moved to main.tsx and is now from next-themes
 
 // Eagerly loaded routes for critical paths
 import Auth from '@/pages/Auth';
@@ -104,7 +103,9 @@ function App() {
             <Route
               element={
                 <AuthProvider>
-                  <Outlet />
+                  <StockDataProvider refreshInterval={30000}>
+                    <Outlet />
+                  </StockDataProvider>
                 </AuthProvider>
               }
             >

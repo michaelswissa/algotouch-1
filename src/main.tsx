@@ -163,11 +163,11 @@ if (!rootElement) {
   throw new Error("Root element not found. Check the index.html file.");
 }
 
-// Updated to use the next-themes ThemeProvider
+// Updated to use the next-themes ThemeProvider with dark mode as default
 const root = createRoot(rootElement);
 root.render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="system">
+    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
       <App />
     </ThemeProvider>
   </StrictMode>

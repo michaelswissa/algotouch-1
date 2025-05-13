@@ -2,18 +2,83 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, RefreshCw, Clock, BookOpen, Newspaper } from 'lucide-react';
-import { useStockDataWithRefresh } from '@/lib/api/stocks';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import BlogSection from '@/components/BlogSection';
+import { useStockData } from '@/contexts/stock/StockDataContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-// Ensure proper imports to avoid circular dependencies
+const StockIndicesSection = () => {
+  const { stockData, loading, error, lastUpdated } = useStockData();
+  
+  // Format last updated time
+  const formattedStocksLastUpdated = lastUpdated 
+    ? format(lastUpdated, 'HH:mm:ss')
+    : 'לא ידוע';
+    
+  return (
+    <div className="mb-8">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <TrendingUp size={18} className="text-primary" />
+          <span>מדדים בזמן אמת</span>
+        </h2>
+        <div className="flex items-center text-sm text-muted-foreground">
+          <Clock size={14} className="mr-1" />
+          <span>עודכן לאחרונה: {formattedStocksLastUpdated}</span>
+        </div>
+      </div>
+      
+      {loading && stockData.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Card key={i} className="hover-scale">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-center animate-pulse">
+                  <div className="w-20 h-6 bg-muted rounded"></div>
+                  <div className="w-16 h-6 bg-muted rounded"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : error ? (
+        <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
+          <p className="text-red-600 dark:text-red-400">שגיאה בטעינת נתוני המדדים. נסה לרענן את הדף.</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stockData.map((index) => (
+            <Card key={index.symbol} className="hover-scale">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-foreground">{index.symbol}</h3>
+                    <p className="text-2xl font-medium mt-1">{index.price}</p>
+                  </div>
+                  <div className={`flex items-center text-lg ${index.isPositive ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
+                    {index.isPositive ? 
+                      <ArrowUpRight className="mr-1" size={20} /> : 
+                      <ArrowDownRight className="mr-1" size={20} />
+                    }
+                    <span>{index.changePercent} ({index.change})</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Dashboard component
 const Dashboard = () => {
   const { toast } = useToast();
-  const { stockData, loading: stocksLoading, error: stocksError, lastUpdated: stocksLastUpdated } = useStockDataWithRefresh(30000); // Refresh every 30 seconds
 
   const handleManualRefresh = () => {
     window.location.reload();
@@ -23,11 +88,6 @@ const Dashboard = () => {
       duration: 2000,
     });
   };
-
-  // Format last updated time
-  const formattedStocksLastUpdated = stocksLastUpdated 
-    ? format(stocksLastUpdated, 'HH:mm:ss')
-    : 'לא ידוע';
 
   return (
     <Layout>
@@ -48,59 +108,9 @@ const Dashboard = () => {
         </div>
         
         {/* Stock Indices Section - First for greater prominence */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <TrendingUp size={18} className="text-primary" />
-              <span>מדדים בזמן אמת</span>
-            </h2>
-            <div className="flex items-center text-sm text-muted-foreground">
-              <Clock size={14} className="mr-1" />
-              <span>עודכן לאחרונה: {formattedStocksLastUpdated}</span>
-            </div>
-          </div>
-          
-          {stocksLoading && stockData.length === 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <Card key={i} className="hover-scale">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center animate-pulse">
-                      <div className="w-20 h-6 bg-muted rounded"></div>
-                      <div className="w-16 h-6 bg-muted rounded"></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : stocksError ? (
-            <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/10">
-              <p className="text-red-600 dark:text-red-400">שגיאה בטעינת נתוני המדדים. נסה לרענן את הדף.</p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {stockData.map((index) => (
-                <Card key={index.symbol} className="hover-scale">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-bold text-foreground">{index.symbol}</h3>
-                        <p className="text-2xl font-medium mt-1">{index.price}</p>
-                      </div>
-                      <div className={`flex items-center text-lg ${index.isPositive ? 'text-tradervue-green' : 'text-tradervue-red'}`}>
-                        {index.isPositive ? 
-                          <ArrowUpRight className="mr-1" size={20} /> : 
-                          <ArrowDownRight className="mr-1" size={20} />
-                        }
-                        <span>{index.changePercent} ({index.change})</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+        <ErrorBoundary fallback={<div>שגיאה בטעינת נתוני מדד. אנא נסה לרענן את הדף.</div>}>
+          <StockIndicesSection />
+        </ErrorBoundary>
         
         {/* Blog Section */}
         <div className="mb-8">

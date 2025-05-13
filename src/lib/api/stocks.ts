@@ -1,5 +1,5 @@
 
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -75,32 +75,43 @@ export async function fetchStockIndices(): Promise<StockData[]> {
   }
 }
 
-// Function to refresh stock data periodically
+// Create a custom hook for stock data with refresh functionality
 export function useStockDataWithRefresh(refreshInterval = 15000) {
-  const [stockData, setStockData] = React.useState<StockData[]>([]);
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
-  const { toast } = useToast();
+  const [stockData, setStockData] = useState<StockData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const toast = useToast();
 
-  React.useEffect(() => {
+  useEffect(() => {
+    let isMounted = true;
+    
     const fetchData = async () => {
       try {
+        if (!isMounted) return;
+        
         setLoading(true);
         const data = await fetchStockIndices();
-        setStockData(data);
-        setLastUpdated(new Date());
-        setError(null);
+        
+        if (isMounted) {
+          setStockData(data);
+          setLastUpdated(new Date());
+          setError(null);
+        }
       } catch (err) {
-        setError('Failed to fetch stock data');
-        console.error(err);
-        toast({
-          title: "שגיאה בטעינת נתונים",
-          description: "לא ניתן להטעין את נתוני המדדים. נסה לרענן את הדף.",
-          variant: "destructive",
-        });
+        if (isMounted) {
+          setError('Failed to fetch stock data');
+          console.error(err);
+          toast?.toast({
+            title: "שגיאה בטעינת נתונים",
+            description: "לא ניתן להטעין את נתוני המדדים. נסה לרענן את הדף.",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -111,7 +122,10 @@ export function useStockDataWithRefresh(refreshInterval = 15000) {
     const intervalId = setInterval(fetchData, refreshInterval);
 
     // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, [refreshInterval, toast]);
 
   return { stockData, loading, error, lastUpdated };

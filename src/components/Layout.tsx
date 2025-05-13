@@ -11,10 +11,7 @@ interface LayoutProps {
 }
 
 const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
-  // Force dark mode always
-  React.useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
+  // We rely on ThemeProvider's forcedTheme="dark" instead of manual enforcement
 
   return (
     <TooltipProvider>
