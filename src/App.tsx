@@ -7,7 +7,7 @@ import { AuthProvider } from '@/contexts/auth';
 import { DirectionProvider } from '@/contexts/direction/DirectionProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-// Note: ThemeProvider has been moved to main.tsx, don't include it here
+// Note: ThemeProvider has been moved to main.tsx and is now from next-themes
 
 // Eagerly loaded routes for critical paths
 import Auth from '@/pages/Auth';

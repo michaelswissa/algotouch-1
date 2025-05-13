@@ -5,7 +5,7 @@ import App from './App.tsx';
 import './index.css';
 import { initializeErrorHandler } from './lib/errorHandler';
 import { checkCriticalModules } from './lib/moduleLoader';
-import { ThemeProvider } from '@/contexts/theme';
+import { ThemeProvider } from 'next-themes';
 
 // Initialize global error handler
 initializeErrorHandler();
@@ -163,11 +163,11 @@ if (!rootElement) {
   throw new Error("Root element not found. Check the index.html file.");
 }
 
-// Fix: Wrap App with ThemeProvider in the main entry file
+// Updated to use the next-themes ThemeProvider
 const root = createRoot(rootElement);
 root.render(
   <StrictMode>
-    <ThemeProvider>
+    <ThemeProvider attribute="class" defaultTheme="system">
       <App />
     </ThemeProvider>
   </StrictMode>
