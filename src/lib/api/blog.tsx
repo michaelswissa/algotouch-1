@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 
 // Blog posts with images using paths to the uploaded images
