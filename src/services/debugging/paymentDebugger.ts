@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase-client';
 import { PaymentLog } from '@/types/payment-logs';
 
@@ -218,30 +217,20 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<SimpleProfileResult | null> {
     try {
-      // Fetch user profile with proper error handling
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', email)
-        .maybeSingle();
+      // Call edge function to securely fetch user by email from auth.users
+      const { data, error } = await supabase.functions.invoke('get-user-by-email', {
+        body: { email }
+      });
       
-      // Handle error case - column might not exist
       if (error) {
         console.error('Error finding user by email:', error);
-        
-        // This is a fallback in case the email column doesn't exist
-        if (error.message && error.message.includes("column 'email' does not exist")) {
-          console.log('Email column does not exist in profiles table');
-        }
-        
         return null;
       }
       
-      // If we got data successfully
-      if (data) {
+      if (data?.user) {
         return {
-          id: data.id,
-          email: data.email || null
+          id: data.user.id,
+          email: data.user.email
         };
       }
       

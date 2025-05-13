@@ -12,6 +12,7 @@ interface CreateLowProfileRequest {
   productName?: string;
   language?: string;
   returnValue?: string;
+  operation?: string; // Add operation parameter
 }
 
 serve(async (req) => {
@@ -46,6 +47,8 @@ serve(async (req) => {
     const cardcomRequestBody = {
       TerminalNumber: requestData.terminalNumber,
       ApiName: requestData.apiName,
+      // Include the operation (e.g. ChargeAndCreateToken) for recurring payments
+      Operation: requestData.operation || "ChargeAndCreateToken",
       Amount: requestData.amount,
       SuccessRedirectUrl: requestData.successUrl,
       FailedRedirectUrl: requestData.failedUrl,
@@ -64,8 +67,8 @@ serve(async (req) => {
 
     console.log("Sending request to Cardcom:", JSON.stringify(cardcomRequestBody));
 
-    // Call Cardcom API to create low profile page
-    const response = await fetch("https://secure.cardcom.solutions/api/v1/LowProfile/Create", {
+    // Call Cardcom API to create low profile page (updated to v11)
+    const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

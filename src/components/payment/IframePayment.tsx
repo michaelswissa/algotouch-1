@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { supabase } from '@/lib/supabase-client';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase-client';
 
 interface IframePaymentProps {
   planId: string;
@@ -48,7 +48,7 @@ export const IframePayment: React.FC<IframePaymentProps> = ({
       // Determine operation type based on plan
       let operation = "ChargeOnly";
       if (planId === 'monthly') {
-        operation = "CreateTokenOnly"; // Token only for monthly (trial)
+        operation = "ChargeAndCreateToken"; // Charge (1₪) + token for monthly trial
       } else if (planId === 'annual') {
         operation = "ChargeAndCreateToken"; // Charge + token for annual
       }

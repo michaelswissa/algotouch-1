@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { useCommunity } from '@/contexts/community/CommunityContext';
@@ -102,7 +101,7 @@ export function CommentSection({ postId, comments }: CommentSectionProps) {
   return (
     <div className="mt-6">
       <Separator className="mb-4" />
-      <h3 className="text-lg font-medium mb-4">תגובות ({comments.length})</h3>
+      <h3 className="text-lg font-medium mb-4">תגובות ({comments?.length ?? 0})</h3>
       
       {/* New comment form */}
       <div className="flex items-start gap-3 mb-6">
@@ -149,7 +148,7 @@ export function CommentSection({ postId, comments }: CommentSectionProps) {
       </div>
       
       {/* Comments list */}
-      {comments.length > 0 ? (
+      {comments?.length > 0 ? (
         <div className="space-y-4">
           {comments.map((comment) => (
             <div key={comment.id} className="group">
