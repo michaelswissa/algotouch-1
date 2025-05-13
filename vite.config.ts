@@ -34,7 +34,11 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
-        // Remove manualChunks when using inlineDynamicImports to avoid the conflict
+        // Define manual chunks to ensure consistent chunk names
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'ui-components': ['lucide-react', '@radix-ui/react-toast', '@radix-ui/react-dialog']
+        }
       }
     },
     chunkSizeWarningLimit: 1000,
