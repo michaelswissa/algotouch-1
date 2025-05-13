@@ -6,10 +6,6 @@
 import './index.css';
 import { initializeApp } from './lib/appInit';
 import { initializeServiceWorker } from './lib/serviceWorkerInit';
-import { initializeErrorHandler } from './lib/errorHandler';
-
-// Initialize global error handler
-initializeErrorHandler();
 
 // Cache buster timestamp for all dynamic imports
 window.__VITE_TIMESTAMP__ = Date.now();

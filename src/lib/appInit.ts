@@ -3,7 +3,6 @@
  * Application initialization and setup
  */
 
-import { initializeErrorHandler } from './errorHandler';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
 import { ThemeProvider } from '@/contexts/theme';

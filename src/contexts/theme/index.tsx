@@ -1,6 +1,4 @@
 
-// This file provides compatibility with the old ThemeProvider system
-// while using next-themes under the hood
 import React from 'react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
