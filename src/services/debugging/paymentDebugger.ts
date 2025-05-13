@@ -218,34 +218,30 @@ export class PaymentDebugger {
    */
   static async findUserByEmail(email: string): Promise<SimpleProfileResult | null> {
     try {
-      // Use explicit type casting to handle the response more clearly
-      const result = await supabase
+      // Fetch user profile with proper error handling
+      const { data, error } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', email)
         .maybeSingle();
       
-      // If there's an error with the column not existing
-      if (result.error) {
-        console.error('Error finding user by email:', result.error);
+      // Handle error case - column might not exist
+      if (error) {
+        console.error('Error finding user by email:', error);
         
         // This is a fallback in case the email column doesn't exist
-        if (result.error.message && result.error.message.includes("column 'email' does not exist")) {
+        if (error.message && error.message.includes("column 'email' does not exist")) {
           console.log('Email column does not exist in profiles table');
-          return null;
         }
         
         return null;
       }
       
       // If we got data successfully
-      if (result.data) {
-        // Type assertion to ensure TypeScript understands the structure
-        const userData = result.data as { id: string; email?: string | null };
-        
+      if (data) {
         return {
-          id: userData.id,
-          email: userData.email || null
+          id: data.id,
+          email: data.email || null
         };
       }
       
