@@ -83,7 +83,7 @@ if ('serviceWorker' in navigator) {
 
 // Direct failsafe for module loading (without service worker)
 function setupDirectFailsafe() {
-  window.addEventListener('error', (event) => {
+  window.addEventListener('error', (event: ErrorEvent) => {
     if (event.message && (
       event.message.includes('Failed to fetch dynamically imported module') ||
       event.message.includes('Loading chunk') ||
@@ -167,7 +167,7 @@ if (!rootElement) {
 const root = createRoot(rootElement);
 root.render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <App />
     </ThemeProvider>
   </StrictMode>
@@ -177,7 +177,7 @@ root.render(
 prefetchCriticalModules();
 
 // Add global catch for uncaught module loading errors
-window.addEventListener('error', (event) => {
+window.addEventListener('error', (event: ErrorEvent) => {
   if (event.message && (
     event.message.includes('Failed to fetch dynamically imported module') ||
     event.message.includes('Loading chunk') ||
