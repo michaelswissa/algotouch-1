@@ -6,7 +6,7 @@
 import { initializeErrorHandler } from './errorHandler';
 import { createRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider } from '@/contexts/theme';
 import App from '../App';
 import { 
   prefetchCriticalModules,
@@ -29,7 +29,7 @@ export function initializeApp(): void {
     const root = createRoot(rootElement);
     root.render(
       <StrictMode>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <ThemeProvider>
           <App />
         </ThemeProvider>
       </StrictMode>
@@ -75,4 +75,3 @@ function showFallbackUI(): void {
   document.body.innerHTML = '';
   document.body.appendChild(errorDiv);
 }
-
