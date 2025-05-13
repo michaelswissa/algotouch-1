@@ -175,7 +175,7 @@ export function prefetchCriticalModules(): void {
       const link = document.createElement('link');
       link.rel = 'prefetch';
       link.as = 'script';
-      link.href = `${module}?v=${window.__VITE_TIMESTAMP__}`; // Add cache buster
+      link.href = module + (window.__VITE_TIMESTAMP__ ? `?v=${window.__VITE_TIMESTAMP__}` : ''); // Add cache buster
       document.head.appendChild(link);
     });
     
