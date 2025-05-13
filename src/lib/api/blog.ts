@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Blog posts with images using paths to the uploaded images
 export function useBlogPostsWithRefresh(refreshInterval = 120000) {
@@ -67,7 +67,7 @@ export function useBlogPostsWithRefresh(refreshInterval = 120000) {
   ]);
   
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<Error | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
