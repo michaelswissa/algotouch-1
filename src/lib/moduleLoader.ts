@@ -50,7 +50,8 @@ export const checkCriticalModules = async (): Promise<boolean> => {
     // List of critical module paths relative to base URL
     const criticalModules = [
       './assets/index.js',
-      './assets/vendor-react.js'
+      './assets/vendor-react.js',
+      './assets/ui-components.js'
     ];
     
     const baseUrl = window.location.origin;

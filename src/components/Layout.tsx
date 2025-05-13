@@ -11,11 +11,9 @@ interface LayoutProps {
 }
 
 const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
-  // We rely on ThemeProvider's forcedTheme="dark" instead of manual enforcement
-
   return (
     <TooltipProvider>
-      <div className="flex h-screen overflow-hidden dark:bg-background dark:text-foreground transition-all duration-300" dir="rtl">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground transition-all duration-300" dir="rtl">
         {!hideSidebar && <Sidebar />}
         <main className={cn(
           "flex-1 overflow-y-auto p-4 animate-fade-in bg-main-background bg-cover bg-center bg-fixed bg-no-repeat relative", 
