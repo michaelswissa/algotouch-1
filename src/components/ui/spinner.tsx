@@ -29,3 +29,25 @@ export const Spinner = ({ size = 'md', className, ...props }: SpinnerProps) => {
     </div>
   );
 };
+
+interface LoadingPageProps {
+  message?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export const LoadingPage = ({ message = 'טוען...', size = 'md' }: LoadingPageProps) => {
+  const spinnerSize = {
+    'sm': 'md',
+    'md': 'lg',
+    'lg': 'xl',
+  } as const;
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[300px] gap-4 p-6">
+      <Spinner size={spinnerSize[size]} />
+      {message && (
+        <p className="text-center text-muted-foreground">{message}</p>
+      )}
+    </div>
+  );
+};
