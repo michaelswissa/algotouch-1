@@ -11,12 +11,9 @@ interface LayoutProps {
 }
 
 const Layout = ({ children, className, hideSidebar = false }: LayoutProps) => {
-  // צריך להבטיח שה-dark mode יישאר קבוע
+  // Force dark mode always
   React.useEffect(() => {
-    // הוסף dark class לאלמנט html אם הוא לא קיים כבר
-    if (!document.documentElement.classList.contains('dark')) {
-      document.documentElement.classList.add('dark');
-    }
+    document.documentElement.classList.add('dark');
   }, []);
 
   return (

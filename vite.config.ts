@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom")
     },
   },
   build: {
@@ -33,7 +35,6 @@ export default defineConfig(({ mode }) => ({
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
         // Remove manualChunks when using inlineDynamicImports to avoid the conflict
-        // We're prioritizing a simpler bundling strategy with fewer chunks
       }
     },
     chunkSizeWarningLimit: 1000,
