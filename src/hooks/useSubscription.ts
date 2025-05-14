@@ -28,7 +28,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
     refreshSubscription
   } = useSubscriptionActions({
     userId: user?.id,
-    subscriptionId: subscription?.id,
+    subscriptionId: undefined, // Initialize with undefined instead of subscription.id
     onError: (error) => {
       setError(error.message || 'שגיאה בטעינת נתוני המנוי');
       toast.error(error.message || 'שגיאה בטעינת נתוני המנוי');

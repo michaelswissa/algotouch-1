@@ -10,7 +10,7 @@ interface ErrorDisplayProps {
   code?: string;
   onRetry?: () => void;
   onDismiss?: () => void;
-  variant?: 'default' | 'destructive' | 'outline';
+  variant?: 'default' | 'destructive' | 'warning' | 'success';
   showIcon?: boolean;
   className?: string;
 }
