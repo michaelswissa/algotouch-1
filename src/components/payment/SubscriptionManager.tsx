@@ -8,12 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 interface SubscriptionManagerProps {
   userId: string;
   email: string;
+  lowProfileId?: string;
   onComplete?: (success: boolean) => void;
 }
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ 
   userId,
   email,
+  lowProfileId,
   onComplete 
 }) => {
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,11 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       
       // Process webhook for this user
       const { data, error } = await supabase.functions.invoke('reprocess-webhook-by-email', {
-        body: { email }
+        body: { 
+          email,
+          lowProfileId,
+          userId 
+        }
       });
       
       if (error) throw error;

@@ -24,6 +24,7 @@ const UserSubscription = () => {
   const { subscription, loading, details } = useSubscription();
   const [activeTab, setActiveTab] = useState('details');
   const [hasUnprocessedPayment, setHasUnprocessedPayment] = useState(false);
+  const [specificLowProfileId, setSpecificLowProfileId] = useState('');
   
   useEffect(() => {
     // Check if there's an unprocessed payment for this user
@@ -31,18 +32,47 @@ const UserSubscription = () => {
       if (!user?.id || !user?.email) return;
       
       try {
-        // Check for unprocessed webhooks with tokens
-        const { data, error } = await supabase
+        // Check for unprocessed webhooks with tokens - Case 1: ChargeAndCreateToken with ResponseCode 0
+        const { data: tokenWebhooks, error: tokenError } = await supabase
           .from('payment_webhooks')
           .select('*')
           .eq('processed', false)
           .contains('payload', { Operation: 'ChargeAndCreateToken', ResponseCode: '0' })
           .limit(1);
           
-        if (error) throw error;
+        if (tokenError) throw tokenError;
         
-        if (data && data.length > 0) {
-          // Found an unprocessed webhook with token
+        // Case 2: Check for the specific LowProfileId we know has an issue
+        const knownLowProfileId = 'd8637470-0bed-4aa6-8ae9-7a68f0058400';
+        const { data: specificWebhooks, error: specificError } = await supabase
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', false)
+          .contains('payload', { LowProfileId: knownLowProfileId })
+          .limit(1);
+          
+        if (specificError) throw specificError;
+
+        // Case 3: Check for unprocessed webhooks that contain the user's email
+        const { data: emailWebhooks, error: emailError } = await supabase
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', false)
+          .or(`payload->TranzactionInfo->CardOwnerEmail.eq.${user.email},payload->UIValues->CardOwnerEmail.eq.${user.email}`)
+          .limit(1);
+          
+        if (emailError) throw emailError;
+        
+        // If any of the checks found an unprocessed webhook, show the subscription manager
+        if ((tokenWebhooks && tokenWebhooks.length > 0) || 
+            (specificWebhooks && specificWebhooks.length > 0) || 
+            (emailWebhooks && emailWebhooks.length > 0)) {
+          
+          // Store the LowProfileId if it's the specific one
+          if (specificWebhooks && specificWebhooks.length > 0) {
+            setSpecificLowProfileId(knownLowProfileId);
+          }
+          
           setHasUnprocessedPayment(true);
         }
       } catch (err) {
@@ -87,7 +117,11 @@ const UserSubscription = () => {
         title="עדכון פרטי מנוי" 
         description="נראה שביצעת תשלום שלא הושלם לגמרי במערכת"
       >
-        <SubscriptionManager userId={user.id} email={user.email} />
+        <SubscriptionManager 
+          userId={user.id} 
+          email={user.email} 
+          lowProfileId={specificLowProfileId || undefined} 
+        />
       </SubscriptionCard>
     );
   }
