@@ -20,7 +20,7 @@ export interface PaymentLog {
   level: string;
   message: string;
   context: string;
-  payment_data: any;
+  payment_data: Json;
   user_id: string;
   transaction_id: string;
   created_at: string;

@@ -51,7 +51,11 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         
         tradesByDay[dayKey].push({...trade});
       } catch (error) {
-        console.error('Error processing trade for calendar:', error, trade);
+        if (error instanceof Error) {
+          console.error('Error processing trade for calendar:', error.message, trade);
+        } else {
+          console.error('Unknown error processing trade for calendar:', String(error), trade);
+        }
       }
     });
     
@@ -101,7 +105,11 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
         
         tradesByDay[dayKey].push({...trade});
       } catch (error) {
-        console.error('Error processing trade for calendar:', error, trade);
+        if (error instanceof Error) {
+          console.error('Error processing trade for calendar:', error.message, trade);
+        } else {
+          console.error('Unknown error processing trade for calendar:', String(error), trade);
+        }
       }
     });
     
