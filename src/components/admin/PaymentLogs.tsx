@@ -160,6 +160,37 @@ export default function PaymentLogs() {
     }).format(date);
   };
 
+  // Helper function to safely extract error details from payment data
+  const getErrorDetails = (paymentData: any) => {
+    if (!paymentData) return '—';
+    
+    if (typeof paymentData === 'object' && paymentData !== null) {
+      // Check if error exists and extract it
+      if ('error' in paymentData) {
+        const errorData = paymentData.error;
+        if (typeof errorData === 'object' && errorData !== null) {
+          return JSON.stringify(errorData, null, 2);
+        } else if (errorData) {
+          return String(errorData);
+        }
+      }
+    }
+    return '—';
+  };
+  
+  // Helper function to safely extract amount from payment data
+  const getPaymentAmount = (paymentData: any) => {
+    if (!paymentData) return '—';
+    
+    if (typeof paymentData === 'object' && paymentData !== null && 'amount' in paymentData) {
+      const amount = paymentData.amount;
+      if (amount !== undefined && amount !== null) {
+        return `${amount} ₪`;
+      }
+    }
+    return '—';
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -195,6 +226,7 @@ export default function PaymentLogs() {
             <TabsTrigger value="patterns">דפוסי שגיאות</TabsTrigger>
           </TabsList>
 
+          {/* Recent logs tab */}
           <TabsContent value="recent">
             <div className="rounded-md border max-h-[500px] overflow-auto">
               <Table>
@@ -234,6 +266,7 @@ export default function PaymentLogs() {
             </div>
           </TabsContent>
 
+          {/* Errors tab */}
           <TabsContent value="errors">
             <div className="rounded-md border max-h-[500px] overflow-auto">
               <Table>
@@ -263,13 +296,9 @@ export default function PaymentLogs() {
                         <TableCell>{log.context}</TableCell>
                         <TableCell>{log.transaction_id}</TableCell>
                         <TableCell>
-                          {log.payment_data?.error ? (
-                            <pre className="text-xs overflow-auto max-w-xs">
-                              {typeof log.payment_data.error === 'object' 
-                                ? JSON.stringify(log.payment_data.error, null, 2) 
-                                : log.payment_data.error}
-                            </pre>
-                          ) : '—'}
+                          <pre className="text-xs overflow-auto max-w-xs">
+                            {getErrorDetails(log.payment_data)}
+                          </pre>
                         </TableCell>
                       </TableRow>
                     ))
@@ -279,6 +308,7 @@ export default function PaymentLogs() {
             </div>
           </TabsContent>
 
+          {/* Success tab */}
           <TabsContent value="success">
             <div className="rounded-md border max-h-[500px] overflow-auto">
               <Table>
@@ -308,7 +338,7 @@ export default function PaymentLogs() {
                         <TableCell>{log.transaction_id}</TableCell>
                         <TableCell>{log.user_id}</TableCell>
                         <TableCell>
-                          {log.payment_data?.amount ? `${log.payment_data.amount} ₪` : '—'}
+                          {getPaymentAmount(log.payment_data)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -318,6 +348,7 @@ export default function PaymentLogs() {
             </div>
           </TabsContent>
 
+          {/* Flow tab */}
           <TabsContent value="flow">
             <div className="rounded-md border max-h-[500px] overflow-auto">
               <Table>
@@ -340,7 +371,7 @@ export default function PaymentLogs() {
                       <TableCell colSpan={5} className="text-center">
                         {transactionId 
                           ? 'לא נמצאו נתונים עבור עסקה זו' 
-                          : 'הזן מזהה עסקה כדי לראות את רצף האירועים'}
+                          : 'הזן מזהה עסקה כדי לראות את רצף הא��רועים'}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -363,6 +394,7 @@ export default function PaymentLogs() {
             </div>
           </TabsContent>
 
+          {/* Patterns tab */}
           <TabsContent value="patterns">
             <div className="rounded-md border max-h-[500px] overflow-auto">
               <Table>
