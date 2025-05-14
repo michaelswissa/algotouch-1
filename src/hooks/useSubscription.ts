@@ -43,16 +43,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
         setError('שגיאה בטעינת נתוני המנוי');
       });
     }
-  }, [user, refreshSubscription]);
-
-  // Update subscription data when subscription changes and has an ID
-  useEffect(() => {
-    if (subscription?.id) {
-      // This effect will run after the subscription is loaded
-      // and ensures we have the latest data with the correct subscription ID
-      console.log('Subscription loaded with ID:', subscription.id);
-    }
-  }, [subscription]);
+  }, [user]);
 
   return { 
     subscription, 
