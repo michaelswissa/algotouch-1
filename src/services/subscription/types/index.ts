@@ -17,6 +17,7 @@ export interface Subscription {
   cancelled_at: string | null;
   payment_method: PaymentMethod | Json | null;
   contract_signed?: boolean | null;
+  token?: string | null;  // Adding the token property to match database schema
 }
 
 export interface CancellationData {
