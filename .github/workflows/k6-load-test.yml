@@ -1,0 +1,50 @@
+
+name: k6 Load Test
+
+on:
+  schedule:
+    # Run weekly on Wednesday at 3 AM
+    - cron: '0 3 * * 3'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  k6_load_test:
+    name: k6 Load Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run k6 load tests
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: load-testing/k6/dashboard.js
+          flags: --out json=results.json
+        env:
+          BASE_URL: "https://staging.algotouch.app"
+
+      - name: Run auth API load test
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: load-testing/k6/auth.js
+          flags: --out json=auth_results.json
+        env:
+          BASE_URL: "https://staging.algotouch.app"
+
+      - name: Run trade journal load test
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: load-testing/k6/trade-journal.js
+          flags: --out json=trade_journal_results.json
+        env:
+          BASE_URL: "https://staging.algotouch.app"
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: k6-results
+          path: |
+            results.json
+            auth_results.json
+            trade_journal_results.json
