@@ -1,0 +1,31 @@
+
+name: OWASP ZAP Scan
+
+on:
+  # Run after deployment to staging environment
+  workflow_run:
+    workflows: ["Deploy to Staging"]
+    types:
+      - completed
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.9.0
+        with:
+          target: 'https://staging.algotouch.app'  # Update with your staging URL
+          rules_file_name: '.github/zap-rules.tsv'
+          cmd_options: '-a'
+          
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: ZAP-Report
+          path: report.html
