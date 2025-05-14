@@ -17,6 +17,13 @@ import ContractViewer from './subscription/ContractViewer';
 import DocumentsList from './subscription/DocumentsList';
 import SubscriptionManager from './payment/SubscriptionManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+
+// Types for webhook checking functions
+interface WebhookCheckResult {
+  hasUnprocessedPayment: boolean;
+  specificLowProfileId: string;
+}
 
 const UserSubscription = () => {
   const navigate = useNavigate();
@@ -26,83 +33,137 @@ const UserSubscription = () => {
   const [hasUnprocessedPayment, setHasUnprocessedPayment] = useState(false);
   const [specificLowProfileId, setSpecificLowProfileId] = useState('');
   
-  useEffect(() => {
-    // Check if there's an unprocessed payment for this user
-    const checkPaymentStatus = async () => {
-      if (!user?.id || !user?.email) return;
-      
-      try {
-        // Case 1: Check for unprocessed webhooks with tokens - ChargeAndCreateToken with ResponseCode 0
-        const { data: tokenWebhooks, error: tokenError } = await supabase
-          .from('payment_webhooks')
-          .select('*')
-          .eq('processed', false)
-          .contains('payload', { Operation: 'ChargeAndCreateToken', ResponseCode: '0' })
-          .limit(1);
-          
-        if (tokenError) throw tokenError;
+  // Helper for checking token-based webhooks
+  const checkTokenWebhooks = async (): Promise<Partial<WebhookCheckResult>> => {
+    try {
+      const { data: tokenWebhooks, error: tokenError } = await supabase
+        .from('payment_webhooks')
+        .select('*')
+        .eq('processed', false)
+        .contains('payload', { Operation: 'ChargeAndCreateToken', ResponseCode: '0' })
+        .limit(1);
         
-        // Case 2: Check for the specific LowProfileId we know has an issue
-        const knownLowProfileId = 'd8637470-0bed-4aa6-8ae9-7a68f0058400';
-        const { data: specificWebhooks, error: specificError } = await supabase
+      if (tokenError) throw tokenError;
+      
+      if (tokenWebhooks && tokenWebhooks.length > 0) {
+        return { hasUnprocessedPayment: true };
+      }
+      
+      return { hasUnprocessedPayment: false };
+    } catch (error) {
+      console.error('Error checking token webhooks:', error);
+      return { hasUnprocessedPayment: false };
+    }
+  };
+  
+  // Helper for checking specific known webhook
+  const checkSpecificWebhooks = async (): Promise<Partial<WebhookCheckResult>> => {
+    try {
+      const knownLowProfileId = 'd8637470-0bed-4aa6-8ae9-7a68f0058400';
+      const { data: specificWebhooks, error: specificError } = await supabase
+        .from('payment_webhooks')
+        .select('*')
+        .eq('processed', false)
+        .contains('payload', { LowProfileId: knownLowProfileId })
+        .limit(1);
+        
+      if (specificError) throw specificError;
+      
+      if (specificWebhooks && specificWebhooks.length > 0) {
+        return { 
+          hasUnprocessedPayment: true,
+          specificLowProfileId: knownLowProfileId
+        };
+      }
+      
+      return { 
+        hasUnprocessedPayment: false,
+        specificLowProfileId: ''
+      };
+    } catch (error) {
+      console.error('Error checking specific webhooks:', error);
+      return { 
+        hasUnprocessedPayment: false,
+        specificLowProfileId: ''
+      };
+    }
+  };
+  
+  // Helper for checking email-based webhooks
+  const checkEmailWebhooks = async (userEmail: string): Promise<Partial<WebhookCheckResult>> => {
+    try {
+      // First attempt: look in TranzactionInfo.CardOwnerEmail
+      const { data: emailWebhooks, error: emailError } = await supabase
+        .from('payment_webhooks')
+        .select('*')
+        .eq('processed', false)
+        .filter('payload->TranzactionInfo->CardOwnerEmail', 'eq', userEmail)
+        .limit(1);
+        
+      if (emailError) {
+        console.error('Error checking email webhooks (TranzactionInfo):', emailError);
+        
+        // Second attempt: look in UIValues.CardOwnerEmail
+        const { data: altEmailWebhooks, error: altEmailError } = await supabase
           .from('payment_webhooks')
           .select('*')
           .eq('processed', false)
-          .contains('payload', { LowProfileId: knownLowProfileId })
+          .filter('payload->UIValues->CardOwnerEmail', 'eq', userEmail)
           .limit(1);
           
-        if (specificError) throw specificError;
-
-        // Case 3: Check for unprocessed webhooks that contain the user's email
-        // Fix: Use filter() instead of direct string interpolation for the email query
-        const { data: emailWebhooks, error: emailError } = await supabase
-          .from('payment_webhooks')
-          .select('*')
-          .eq('processed', false)
-          .filter('payload->TranzactionInfo->CardOwnerEmail', 'eq', user.email)
-          .limit(1);
-          
-        if (emailError) {
-          console.error('Error checking email webhooks (TranzactionInfo):', emailError);
-          // Try alternative path if the first one fails
-          const { data: altEmailWebhooks, error: altEmailError } = await supabase
-            .from('payment_webhooks')
-            .select('*')
-            .eq('processed', false)
-            .filter('payload->UIValues->CardOwnerEmail', 'eq', user.email)
-            .limit(1);
-            
-          if (altEmailError) {
-            console.error('Error checking email webhooks (UIValues):', altEmailError);
-          } else if (altEmailWebhooks && altEmailWebhooks.length > 0) {
-            setHasUnprocessedPayment(true);
-          }
-        } else if (emailWebhooks && emailWebhooks.length > 0) {
-          setHasUnprocessedPayment(true);
+        if (altEmailError) {
+          console.error('Error checking email webhooks (UIValues):', altEmailError);
+          return { hasUnprocessedPayment: false };
         }
         
-        // If any of the checks found an unprocessed webhook, show the subscription manager
-        if ((tokenWebhooks && tokenWebhooks.length > 0) || 
-            (specificWebhooks && specificWebhooks.length > 0)) {
+        if (altEmailWebhooks && altEmailWebhooks.length > 0) {
+          return { hasUnprocessedPayment: true };
+        }
+      } else if (emailWebhooks && emailWebhooks.length > 0) {
+        return { hasUnprocessedPayment: true };
+      }
+      
+      return { hasUnprocessedPayment: false };
+    } catch (error) {
+      console.error('Error in checkEmailWebhooks:', error);
+      return { hasUnprocessedPayment: false };
+    }
+  };
+  
+  // Main function to check for unprocessed payments
+  useEffect(() => {
+    const checkPaymentStatus = async () => {
+      if (!user?.id || !user?.email || loading || subscription) return;
+      
+      try {
+        // Run all webhook checks in parallel
+        const [tokenResults, specificResults, emailResults] = await Promise.all([
+          checkTokenWebhooks(),
+          checkSpecificWebhooks(),
+          checkEmailWebhooks(user.email)
+        ]);
+        
+        // Combine results
+        const hasUnprocessedPayment = 
+          tokenResults.hasUnprocessedPayment || 
+          specificResults.hasUnprocessedPayment || 
+          emailResults.hasUnprocessedPayment;
           
-          // Store the LowProfileId if it's the specific one
-          if (specificWebhooks && specificWebhooks.length > 0) {
-            setSpecificLowProfileId(knownLowProfileId);
-          }
-          
-          setHasUnprocessedPayment(true);
+        setHasUnprocessedPayment(!!hasUnprocessedPayment);
+        
+        if (specificResults.specificLowProfileId) {
+          setSpecificLowProfileId(specificResults.specificLowProfileId);
         }
       } catch (err) {
         console.error('Error checking payment status:', err);
+        toast.error('שגיאה בבדיקת סטטוס תשלום');
       }
     };
     
-    if (!loading && !subscription) {
-      checkPaymentStatus();
-    }
+    checkPaymentStatus();
   }, [user, loading, subscription]);
 
-  // Add a function to manually refresh subscription data
+  // Function to manually refresh subscription data
   const handleManualRefresh = async () => {
     if (refreshSubscription) {
       await refreshSubscription();
@@ -169,6 +230,17 @@ const UserSubscription = () => {
     );
   }
 
+  // Render subscription details
+  return <SubscriptionDetails 
+    subscription={subscription}
+    details={details}
+    activeTab={activeTab}
+    setActiveTab={setActiveTab}
+  />;
+};
+
+// Extract subscription details view to a separate component
+const SubscriptionDetails = ({ subscription, details, activeTab, setActiveTab }) => {
   const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
   const hasContract = subscription.contract_signed;
   const isCancelled = subscription.status === 'cancelled';
@@ -233,7 +305,7 @@ const UserSubscription = () => {
               <div className="text-center py-6">
                 <p className="text-muted-foreground mb-4">לא נמצא הסכם חתום</p>
                 <Button 
-                  onClick={() => navigate('/subscription')}
+                  onClick={() => window.location.href = '/subscription'}
                   variant="outline"
                 >
                   השלם את תהליך ההרשמה

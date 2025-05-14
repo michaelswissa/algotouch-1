@@ -7,6 +7,13 @@ import { he } from 'date-fns/locale';
 import { Json } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 
+// Enhanced interfaces for better type safety
+interface PaymentMethod {
+  lastFourDigits: string;
+  expiryMonth: string;
+  expiryYear: string;
+}
+
 // Interface for Subscription from Supabase
 interface Subscription {
   id: string;
@@ -15,12 +22,14 @@ interface Subscription {
   trial_ends_at: string | null;
   current_period_ends_at: string | null;
   cancelled_at: string | null;
-  payment_method: {
-    lastFourDigits: string;
-    expiryMonth: string;
-    expiryYear: string;
-  } | Json | null;
+  payment_method: PaymentMethod | Json | null;
   contract_signed?: boolean | null;
+}
+
+// Interface for cancellation data
+interface CancellationData {
+  reason: string;
+  feedback?: string;
 }
 
 // Interface for processed subscription details
@@ -31,11 +40,7 @@ export interface SubscriptionDetails {
   nextBillingDate: string;
   progressValue: number;
   daysLeft: number;
-  paymentMethod: {
-    lastFourDigits: string;
-    expiryMonth: string;
-    expiryYear: string;
-  } | null;
+  paymentMethod: PaymentMethod | null;
   cancellationReason?: string;
   cancellationFeedback?: string;
 }
@@ -46,6 +51,56 @@ export const useSubscription = () => {
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper function to format a date
+  const formatDate = (dateString: string): string => {
+    return format(parseISO(dateString), 'dd/MM/yyyy', { locale: he });
+  };
+
+  // Helper function to calculate days left
+  const calculateDaysLeft = (endDate: Date): number => {
+    return Math.max(0, differenceInDays(endDate, new Date()));
+  };
+
+  // Helper function to calculate progress value
+  const calculateProgress = (startDate: Date, endDate: Date, daysLeft: number): number => {
+    const totalDays = differenceInDays(endDate, startDate);
+    return Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
+  };
+
+  // Helper function to safely process payment method data
+  const processPaymentMethod = (paymentData: any): PaymentMethod | null => {
+    if (!paymentData) return null;
+    
+    // Check if payment_method has the expected structure
+    if (typeof paymentData === 'object' && paymentData.lastFourDigits) {
+      return {
+        lastFourDigits: paymentData.lastFourDigits,
+        expiryMonth: paymentData.expiryMonth,
+        expiryYear: paymentData.expiryYear
+      };
+    }
+    return null;
+  };
+
+  // Function to fetch cancellation data
+  const fetchCancellationData = async (subscriptionId: string): Promise<CancellationData | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-cancellation-data', {
+        body: { subscriptionId }
+      });
+      
+      if (error || !data || data.length === 0) return null;
+      
+      return {
+        reason: data[0].reason,
+        feedback: data[0].feedback
+      };
+    } catch (error) {
+      console.error('Error fetching cancellation data:', error);
+      return null;
+    }
+  };
 
   // Function to fetch subscription data
   const fetchSubscription = async (userId: string) => {
@@ -79,21 +134,8 @@ export const useSubscription = () => {
         };
         setSubscription(formattedSubscription);
         
-        // Try to fetch cancellation data if available
-        let cancellationData = null;
-        try {
-          // Check if subscription_cancellations table exists and has data for this subscription
-          const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
-            body: { subscriptionId: data.id }
-          });
-          
-          if (cancelData && cancelData.length > 0) {
-            cancellationData = cancelData;
-          }
-        } catch (cancelError) {
-          console.error('Error fetching cancellation data:', cancelError);
-          // Continue even if this fails
-        }
+        // Fetch cancellation data if available
+        const cancellationData = await fetchCancellationData(data.id);
         
         // Process the subscription details
         const subscriptionDetails = getSubscriptionDetails(formattedSubscription, cancellationData);
@@ -125,26 +167,48 @@ export const useSubscription = () => {
   }, [user]);
 
   const refreshSubscription = async () => {
-    if (!user?.id) return;
+    if (!user?.id) return false;
     
     setLoading(true);
     const result = await fetchSubscription(user.id);
     setLoading(false);
     
-    if (result.error) {
-      return false;
-    }
-    return true;
+    return !result.error;
   };
 
-  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: any): SubscriptionDetails | null => {
+  const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: CancellationData | null): SubscriptionDetails | null => {
     if (!sub) return null;
     
-    const planName = sub.plan_type === 'annual' ? 'שנתי' : 
-                     sub.plan_type === 'vip' ? 'VIP' : 'חודשי';
-    const planPrice = sub.plan_type === 'annual' ? '899' : 
-                      sub.plan_type === 'vip' ? '1499' : '99';
+    // Get plan name and price based on plan_type
+    const planInfo = getPlanInfo(sub.plan_type);
     
+    // Get status details based on subscription status
+    const statusInfo = getStatusInfo(sub);
+    
+    // Process payment method
+    const paymentMethodDetails = processPaymentMethod(sub.payment_method);
+    
+    return {
+      ...planInfo,
+      ...statusInfo,
+      paymentMethod: paymentMethodDetails,
+      cancellationReason: cancellationData?.reason,
+      cancellationFeedback: cancellationData?.feedback
+    };
+  };
+
+  // Helper to get plan information
+  const getPlanInfo = (planType: string) => {
+    const planName = planType === 'annual' ? 'שנתי' : 
+                     planType === 'vip' ? 'VIP' : 'חודשי';
+    const planPrice = planType === 'annual' ? '899' : 
+                      planType === 'vip' ? '1499' : '99';
+    
+    return { planName, planPrice };
+  };
+
+  // Helper to get status information
+  const getStatusInfo = (sub: Subscription) => {
     let statusText = '';
     let nextBillingDate = '';
     let progressValue = 0;
@@ -156,8 +220,8 @@ export const useSubscription = () => {
       
       if (sub.current_period_ends_at) {
         const periodEndDate = parseISO(sub.current_period_ends_at);
-        nextBillingDate = format(periodEndDate, 'dd/MM/yyyy', { locale: he });
-        daysLeft = Math.max(0, differenceInDays(periodEndDate, new Date()));
+        nextBillingDate = formatDate(sub.current_period_ends_at);
+        daysLeft = calculateDaysLeft(periodEndDate);
         progressValue = 100; // Show full progress for cancelled subscription
       } else {
         nextBillingDate = 'לא זמין';
@@ -167,58 +231,24 @@ export const useSubscription = () => {
     // Handle trial period
     else if (sub.status === 'trial' && sub.trial_ends_at) {
       const trialEndDate = parseISO(sub.trial_ends_at);
-      daysLeft = Math.max(0, differenceInDays(trialEndDate, new Date()));
+      daysLeft = calculateDaysLeft(trialEndDate);
       progressValue = Math.max(0, Math.min(100, (30 - daysLeft) / 30 * 100));
       
       statusText = 'בתקופת ניסיון';
-      nextBillingDate = format(trialEndDate, 'dd/MM/yyyy', { locale: he });
+      nextBillingDate = formatDate(sub.trial_ends_at);
     }
     // Handle active subscription
     else if (sub.current_period_ends_at) {
       const periodEndDate = parseISO(sub.current_period_ends_at);
       const periodStartDate = addMonths(periodEndDate, -1);
-      daysLeft = Math.max(0, differenceInDays(periodEndDate, new Date()));
-      const totalDays = differenceInDays(periodEndDate, periodStartDate);
-      progressValue = Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
+      daysLeft = calculateDaysLeft(periodEndDate);
+      progressValue = calculateProgress(periodStartDate, periodEndDate, daysLeft);
       
       statusText = 'פעיל';
-      nextBillingDate = format(periodEndDate, 'dd/MM/yyyy', { locale: he });
+      nextBillingDate = formatDate(sub.current_period_ends_at);
     }
     
-    // Process payment method safely
-    let paymentMethodDetails = null;
-    if (sub.payment_method) {
-      // Check if payment_method has the expected structure
-      const paymentMethod = sub.payment_method as any;
-      if (paymentMethod.lastFourDigits) {
-        paymentMethodDetails = {
-          lastFourDigits: paymentMethod.lastFourDigits,
-          expiryMonth: paymentMethod.expiryMonth,
-          expiryYear: paymentMethod.expiryYear
-        };
-      }
-    }
-    
-    // Add cancellation reason and feedback if available
-    let cancellationReason = undefined;
-    let cancellationFeedback = undefined;
-    
-    if (cancellationData && cancellationData[0]) {
-      cancellationReason = cancellationData[0].reason;
-      cancellationFeedback = cancellationData[0].feedback;
-    }
-    
-    return {
-      planName,
-      planPrice,
-      statusText,
-      nextBillingDate,
-      progressValue,
-      daysLeft,
-      paymentMethod: paymentMethodDetails,
-      cancellationReason,
-      cancellationFeedback
-    };
+    return { statusText, nextBillingDate, progressValue, daysLeft };
   };
 
   // Function to cancel subscription with enhanced error handling
@@ -241,45 +271,8 @@ export const useSubscription = () => {
         throw new Error(`אירעה שגיאה בביטול המנוי: ${error.message}`);
       }
       
-      // Refresh the subscription data
-      const { data: updatedData, error: fetchError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('id', subscription.id)
-        .single();
-        
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      if (updatedData) {
-        // Update local state with cancelled subscription
-        const updatedSubscription: Subscription = {
-          ...subscription,
-          status: updatedData.status,
-          cancelled_at: updatedData.cancelled_at
-        };
-        
-        setSubscription(updatedSubscription);
-        
-        // Try to fetch cancellation data
-        let cancellationData = null;
-        try {
-          const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
-            body: { subscriptionId: subscription.id }
-          });
-          
-          if (cancelData && cancelData.length > 0) {
-            cancellationData = cancelData;
-          }
-        } catch (cancelError) {
-          console.error('Error fetching cancellation data:', cancelError);
-        }
-        
-        // Update details with cancellation info
-        const updatedDetails = getSubscriptionDetails(updatedSubscription, cancellationData);
-        setDetails(updatedDetails);
-      }
+      // Refresh subscription data
+      await refreshSubscription();
       
       toast.success('המנוי בוטל בהצלחה');
       return true;
@@ -313,31 +306,8 @@ export const useSubscription = () => {
         throw new Error(`אירעה שגיאה בהפעלה מחדש של המנוי: ${error.message}`);
       }
       
-      // Refresh the subscription data
-      const { data: updatedData, error: fetchError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('id', subscription.id)
-        .single();
-        
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      if (updatedData) {
-        // Update local state with reactivated subscription
-        const updatedSubscription: Subscription = {
-          ...subscription,
-          status: updatedData.status,
-          cancelled_at: null
-        };
-        
-        setSubscription(updatedSubscription);
-        
-        // Update details
-        const updatedDetails = getSubscriptionDetails(updatedSubscription);
-        setDetails(updatedDetails);
-      }
+      // Refresh subscription data
+      await refreshSubscription();
       
       toast.success('המנוי הופעל מחדש בהצלחה');
       return true;
