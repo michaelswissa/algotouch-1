@@ -42,6 +42,14 @@ const UserSubscription = () => {
   const [specificLowProfileId, setSpecificLowProfileId] = useState('');
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   
+  // Clear registration data on component mount if subscription exists
+  useEffect(() => {
+    if (!loading && subscription) {
+      sessionStorage.removeItem('registration_data');
+      console.log('Registration data cleared due to existing subscription');
+    }
+  }, [loading, subscription]);
+  
   // Check for unprocessed payments when the component mounts or when the user changes
   useEffect(() => {
     const checkPaymentStatus = async () => {
@@ -70,6 +78,9 @@ const UserSubscription = () => {
             if (data?.success) {
               toast.success('עדכון פרטי המנוי הושלם בהצלחה');
               await refreshSubscription();
+            } else {
+              console.log('Auto-processing failed:', data?.message);
+              // Don't show error message yet, we'll just fallback to manual processing
             }
           } catch (err) {
             console.error('Auto-processing failed:', err);
@@ -84,11 +95,20 @@ const UserSubscription = () => {
     };
     
     // Clear any leftover registration data to avoid showing "complete registration" message
-    if (!loading && user?.id && !subscription) {
+    if (!loading && user?.id) {
       sessionStorage.removeItem('registration_data');
     }
     
     checkPaymentStatus();
+    
+    // Set up periodic refresh of subscription data
+    const refreshInterval = setInterval(() => {
+      if (user?.id && refreshSubscription) {
+        refreshSubscription().catch(console.error);
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(refreshInterval);
   }, [user, loading, subscription, checkForUnprocessedPayments, refreshSubscription]);
 
   // Function to manually refresh subscription data

@@ -1,295 +1,433 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { corsHeaders } from "../_shared/cors.ts";
 
-// Configure CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-};
+interface RequestBody {
+  email?: string;
+  lowProfileId?: string;
+  userId?: string;
+  forceRefresh?: boolean;
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
   }
 
   try {
-    // Create a Supabase client
-    const supabaseClient = createClient(
+    // Initialize Supabase client with service role (needed for admin operations)
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          persistSession: false,
-        },
-      }
+      { auth: { persistSession: false } }
     );
 
-    // Parse request body
-    const { email, userId, lowProfileId } = await req.json();
-
-    if (!email && !userId) {
+    // Parse request
+    const requestData: RequestBody = await req.json();
+    const { email, lowProfileId, userId, forceRefresh } = requestData;
+    
+    if (!email && !lowProfileId && !userId) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Missing required parameters: email or userId'
+        JSON.stringify({
+          success: false,
+          message: 'Must provide email, lowProfileId, or userId'
         }),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
-    // Log detailed information for debugging
-    console.log(`Processing webhook for: email=${email}, userId=${userId}, lowProfileId=${lowProfileId}`);
+    console.log('Processing webhook by email:', {
+      email,
+      lowProfileId,
+      userId,
+      forceRefresh
+    });
 
-    // Find the appropriate webhook to process
-    let webhookToProcess = null;
+    // Find unprocessed webhooks
+    let webhookQuery = supabaseAdmin.from('payment_webhooks')
+      .select('*')
+      .eq('processed', false)
+      .order('created_at', { ascending: false });
     
-    // First, try to find webhook by email if provided
-    if (email) {
-      const { data: emailWebhooks, error: emailError } = await supabaseClient
-        .from('payment_webhooks')
-        .select('*')
-        .or(`payload->TranzactionInfo->CardOwnerEmail.eq."${email}",payload->UIValues->CardOwnerEmail.eq."${email}"`)
-        .order('created_at', { ascending: false })
-        .limit(1);
-        
-      if (emailError) {
-        console.error("Error finding webhook by email:", emailError);
-      } else if (emailWebhooks && emailWebhooks.length > 0) {
-        console.log(`Found webhook by email: ${email}`, emailWebhooks[0].id);
-        webhookToProcess = emailWebhooks[0];
-      }
+    // Filter by specific lowProfileId if provided
+    if (lowProfileId) {
+      webhookQuery = webhookQuery.contains('payload', { LowProfileId: lowProfileId });
+    } 
+    // Otherwise filter by email
+    else if (email) {
+      webhookQuery = webhookQuery.or(`payload->TranzactionInfo->CardOwnerEmail.ilike.%${email}%,payload->UIValues->CardOwnerEmail.ilike.%${email}%`);
     }
     
-    // If no webhook found by email or email not provided, try lowProfileId
-    if (!webhookToProcess && lowProfileId) {
-      const { data: lowProfileWebhooks, error: lowProfileError } = await supabaseClient
-        .from('payment_webhooks')
-        .select('*')
-        .filter('payload->LowProfileId', 'eq', lowProfileId)
-        .order('created_at', { ascending: false })
-        .limit(1);
+    const { data: webhooks, error: webhookError } = await webhookQuery.limit(5);
         
-      if (lowProfileError) {
-        console.error("Error finding webhook by lowProfileId:", lowProfileError);
-      } else if (lowProfileWebhooks && lowProfileWebhooks.length > 0) {
-        console.log(`Found webhook by lowProfileId: ${lowProfileId}`, lowProfileWebhooks[0].id);
-        webhookToProcess = lowProfileWebhooks[0];
-      }
-    }
-    
-    // If still no webhook found, check for user's most recent payment logs
-    if (!webhookToProcess && userId) {
-      const { data: paymentLogs, error: logsError } = await supabaseClient
-        .from('user_payment_logs')
-        .select('token')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(5);
-        
-      if (logsError) {
-        console.error("Error finding payment logs:", logsError);
-      } else if (paymentLogs && paymentLogs.length > 0) {
-        // Try to find webhooks for each token
-        for (const log of paymentLogs) {
-          if (!log.token) continue;
-          
-          const { data: tokenWebhooks } = await supabaseClient
-            .from('payment_webhooks')
-            .select('*')
-            .filter('payload->LowProfileId', 'eq', log.token)
-            .order('created_at', { ascending: false })
-            .limit(1);
-            
-          if (tokenWebhooks && tokenWebhooks.length > 0) {
-            console.log(`Found webhook by payment log token: ${log.token}`, tokenWebhooks[0].id);
-            webhookToProcess = tokenWebhooks[0];
-            break;
-          }
+    if (webhookError) {
+      console.error('Error fetching webhooks:', webhookError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Error fetching webhooks: ' + webhookError.message
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      }
+      );
     }
-    
-    // If no webhook found at all, try to manually create subscription
-    if (!webhookToProcess) {
-      if (userId) {
-        console.log("No webhook found, attempting to create subscription manually");
-        
-        // Look for payment data in user_payment_logs
-        const { data: paymentData } = await supabaseClient
-          .from('user_payment_logs')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-          
-        if (paymentData && paymentData.length > 0) {
-          const payment = paymentData[0];
-          
-          // Check for token/recurring payment info
-          const { data: tokenData } = await supabaseClient
-            .from('recurring_payments')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          
-          // Create or update subscription manually
-          if (tokenData && tokenData.length > 0) {
-            const token = tokenData[0];
-            const paymentMethod = {
-              lastFourDigits: token.last_4_digits || '****',
-              expiryMonth: token.token_expiry ? token.token_expiry.substring(5, 7) : '**',
-              expiryYear: token.token_expiry ? token.token_expiry.substring(0, 4) : '****',
-              cardholderName: email || 'Card Holder'
-            };
-            
-            // Calculate current_period_ends_at (1 month from now)
-            const currentDate = new Date();
-            const nextMonth = new Date(currentDate.setMonth(currentDate.getMonth() + 1));
-            
-            // Try to create or update subscription
-            const { data: subData, error: subError } = await supabaseClient
-              .from('subscriptions')
-              .upsert({
-                user_id: userId,
-                plan_type: payment.payment_data?.plan_type || 'monthly',
-                status: 'active',
-                payment_method: paymentMethod,
-                created_at: new Date().toISOString(),
-                current_period_ends_at: nextMonth.toISOString(),
-              })
-              .select()
-              .single();
-              
-            if (subError) {
-              console.error("Error creating subscription manually:", subError);
-              return new Response(
-                JSON.stringify({ 
-                  success: false, 
-                  message: 'שגיאה ביצירת מנוי',
-                  error: subError.message
-                }),
-                {
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                  status: 500
-                }
-              );
-            }
-            
-            return new Response(
-              JSON.stringify({ 
-                success: true, 
-                message: 'מנוי נוצר ידנית',
-                subscription: subData
-              }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200
-              }
-            );
-          }
-        }
+
+    // If no unprocessed webhooks found
+    if (!webhooks || webhooks.length === 0) {
+      console.log('No unprocessed webhooks found');
+      
+      // If forceRefresh is true, try to sync subscription data anyway
+      if (forceRefresh && userId) {
+        await syncSubscriptionData(supabaseAdmin, userId, email);
         
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: 'לא נמצאו נתונים מספיקים ליצירת מנוי ידנית'
+          JSON.stringify({
+            success: true,
+            message: 'No unprocessed webhooks found but subscription data synced',
+            webhooksProcessed: 0
           }),
           {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         );
       }
       
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'לא נמצא webhook לעיבוד'
+        JSON.stringify({
+          success: false,
+          message: 'No unprocessed webhooks found'
         }),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
+
+    console.log(`Found ${webhooks.length} unprocessed webhooks`);
     
-    // Now we have a webhook to process
-    console.log("Processing webhook:", webhookToProcess.id);
-    
-    // Prepare the payload - set ReturnValue to userId if provided
-    const payload = { ...webhookToProcess.payload };
-    if (userId) {
-      payload.ReturnValue = userId;
-    }
-    
-    // Call the cardcom-webhook function to process
-    const webhookResponse = await fetch(
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-        },
-        body: JSON.stringify(payload)
+    // Process each webhook
+    const results = [];
+    for (const webhook of webhooks) {
+      // Extract data from webhook
+      const payload = webhook.payload;
+      const webhookEmail = payload?.UIValues?.CardOwnerEmail || payload?.TranzactionInfo?.CardOwnerEmail || email;
+      
+      // Find the user based on email
+      const lookupEmail = webhookEmail?.toLowerCase();
+      let targetUserId = userId;
+      
+      if (!targetUserId && lookupEmail) {
+        // Try to find user by email
+        const { data: users, error: userError } = await supabaseAdmin.auth.admin.listUsers({
+          filters: [{
+            property: 'email',
+            operator: 'eq',
+            value: lookupEmail
+          }]
+        });
+        
+        if (userError || !users?.users?.length) {
+          console.error('Error finding user by email or no user found:', userError || 'No user found');
+          continue;
+        }
+        
+        targetUserId = users.users[0].id;
       }
-    );
-    
-    if (!webhookResponse.ok) {
-      const errorText = await webhookResponse.text();
-      throw new Error(`Error processing webhook: ${errorText}`);
+      
+      if (!targetUserId) {
+        console.error('Could not determine target user ID');
+        continue;
+      }
+      
+      try {
+        // Process the webhook for this user
+        const result = await processWebhookForUser(supabaseAdmin, webhook, targetUserId);
+        results.push(result);
+        
+        // Mark webhook as processed
+        await supabaseAdmin
+          .from('payment_webhooks')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+            processing_result: {
+              success: true,
+              userId: targetUserId,
+              email: webhookEmail
+            }
+          })
+          .eq('id', webhook.id);
+          
+      } catch (processError) {
+        console.error('Error processing webhook:', processError);
+        results.push({
+          success: false,
+          webhook_id: webhook.id,
+          error: processError.message
+        });
+      }
     }
-
-    const webhookResult = await webhookResponse.json();
-
-    // Mark webhook as processed
-    if (webhookResult.success) {
-      await supabaseClient
-        .from('payment_webhooks')
-        .update({
-          processed: true,
-          processed_at: new Date().toISOString(),
-          processing_result: {
-            success: true,
-            message: 'Manually processed via API',
-            timestamp: new Date().toISOString()
-          }
-        })
-        .eq('id', webhookToProcess.id);
+    
+    // If we processed any webhooks successfully, sync subscription data
+    const anySuccess = results.some(r => r.success);
+    if (anySuccess && userId) {
+      await syncSubscriptionData(supabaseAdmin, userId, email);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'העיבוד הושלם בהצלחה',
-        result: webhookResult
+        message: `Processed ${results.filter(r => r.success).length} webhooks successfully`,
+        results
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
 
-  } catch (error: any) {
-    console.error('Error processing webhook:', error);
+  } catch (error) {
+    console.error('Error in webhook reprocessing:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        message: error.message || 'Error processing webhook',
-        error: error.toString()
+        message: `Error processing webhooks: ${error.message}`
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 });
+
+async function processWebhookForUser(supabase: any, webhook: any, userId: string) {
+  const payload = webhook.payload;
+  const lowProfileId = payload.LowProfileId;
+  const tokenInfo = payload.TokenInfo;
+  const transactionInfo = payload.TranzactionInfo;
+  const responseCode = payload.ResponseCode;
+  
+  console.log(`Processing webhook ${webhook.id} for user ${userId}`);
+  
+  // Check if this webhook has already been processed (duplicate check)
+  const { data: existingPayment } = await supabase
+    .from('user_payment_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('token', lowProfileId)
+    .limit(1);
+    
+  if (existingPayment && existingPayment.length > 0) {
+    console.log(`Payment already logged for this webhook (${lowProfileId})`);
+  } else {
+    // Log the payment
+    const { error: logError } = await supabase
+      .from('user_payment_logs')
+      .insert({
+        user_id: userId,
+        token: lowProfileId,
+        amount: transactionInfo?.Amount || 0,
+        status: responseCode === 0 ? 'payment_success' : 'payment_failed',
+        transaction_id: transactionInfo?.TranzactionId?.toString() || payload.TranzactionId?.toString(),
+        payment_data: {
+          operation: payload.Operation,
+          response_code: responseCode,
+          low_profile_id: lowProfileId,
+          card_info: transactionInfo ? {
+            last4: transactionInfo.Last4CardDigits,
+            expiry: `${transactionInfo.CardMonth}/${transactionInfo.CardYear}`
+          } : null,
+          token_info: tokenInfo ? {
+            token: tokenInfo.Token,
+            expiry: tokenInfo.TokenExDate
+          } : null
+        }
+      });
+      
+    if (logError) {
+      console.error('Error logging payment:', logError);
+    }
+  }
+  
+  // If we have token info, store it in recurring_payments
+  if (tokenInfo && tokenInfo.Token) {
+    const { data: existingToken } = await supabase
+      .from('recurring_payments')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('token', tokenInfo.Token)
+      .limit(1);
+      
+    if (existingToken && existingToken.length > 0) {
+      console.log(`Token ${tokenInfo.Token} already exists for user ${userId}`);
+      
+      // Update token validity
+      await supabase
+        .from('recurring_payments')
+        .update({
+          is_valid: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingToken[0].id);
+    } else {
+      // Insert new token
+      const { error: tokenError } = await supabase
+        .from('recurring_payments')
+        .insert({
+          user_id: userId,
+          token: tokenInfo.Token,
+          token_expiry: parseCardcomDateString(tokenInfo.TokenExDate),
+          token_approval_number: tokenInfo.TokenApprovalNumber || '',
+          last_4_digits: transactionInfo?.Last4CardDigits || null,
+          card_type: transactionInfo?.CardInfo || null,
+          status: 'active',
+          is_valid: true
+        });
+        
+      if (tokenError) {
+        console.error('Error storing token:', tokenError);
+      } else {
+        console.log('Token stored successfully');
+      }
+    }
+  }
+  
+  // Update subscription with token if available
+  if (tokenInfo?.Token) {
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+      
+    if (subscription) {
+      await supabase
+        .from('subscriptions')
+        .update({
+          token: tokenInfo.Token,
+          status: responseCode === 0 ? 'active' : subscription.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+    } else {
+      // Create new subscription if none exists
+      await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          plan_type: 'monthly', // Default plan type
+          status: responseCode === 0 ? 'active' : 'pending',
+          token: tokenInfo.Token,
+          payment_method: 'cardcom',
+          current_period_ends_at: calculatePeriodEnd(30), // Default to 30 days
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+    }
+  }
+  
+  return {
+    success: true,
+    webhook_id: webhook.id,
+    user_id: userId
+  };
+}
+
+// Function to sync subscription data between tables
+async function syncSubscriptionData(supabase: any, userId: string, email?: string) {
+  console.log(`Syncing subscription data for user ${userId}`);
+  
+  // Get subscription
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+    
+  if (!subscription) {
+    console.log(`No subscription found for user ${userId}`);
+    return;
+  }
+  
+  // Get recurring payment tokens
+  const { data: recurringPayments } = await supabase
+    .from('recurring_payments')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_valid', true)
+    .order('created_at', { ascending: false });
+    
+  if (!recurringPayments || recurringPayments.length === 0) {
+    console.log(`No valid recurring payment tokens found for user ${userId}`);
+    return;
+  }
+  
+  const latestToken = recurringPayments[0];
+  
+  // Sync token to subscription if needed
+  if (!subscription.token || subscription.token !== latestToken.token) {
+    console.log(`Updating subscription with latest token ${latestToken.token}`);
+    
+    await supabase
+      .from('subscriptions')
+      .update({
+        token: latestToken.token,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subscription.id);
+  }
+  
+  // Update current_period_ends_at if it's missing
+  if (!subscription.current_period_ends_at) {
+    console.log('Updating missing current_period_ends_at');
+    
+    // Default to 30 days from now
+    const nextPeriodEnd = calculatePeriodEnd(30);
+    
+    await supabase
+      .from('subscriptions')
+      .update({
+        current_period_ends_at: nextPeriodEnd,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subscription.id);
+  }
+}
+
+// Helper function to parse Cardcom date string format (YYYYMMDD) to ISO date
+function parseCardcomDateString(dateStr: string): string {
+  try {
+    if (!dateStr) return new Date().toISOString().split('T')[0];
+    
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    
+    // Return in YYYY-MM-DD format
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error('Error parsing date string:', error);
+    // Return current date as fallback
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+// Helper function to calculate next period end date
+function calculatePeriodEnd(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}

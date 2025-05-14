@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 interface UserData {
   phone?: string;
   idNumber?: string;
-  // Add other user data fields as needed
+  firstName?: string;
+  lastName?: string;
+  email?: string;
 }
 
 interface SubscriptionContextType {
@@ -20,6 +22,7 @@ interface SubscriptionContextType {
   subscriptionDetails: any | null;
   planType: string | null;
   userData: UserData | null;
+  lastRefreshed: Date | null;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -45,6 +48,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const [subscriptionDetails, setSubscriptionDetails] = useState<any | null>(null);
   const [planType, setPlanType] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   // Check subscription on user change
   useEffect(() => {
@@ -55,7 +59,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       // Get user profile data
       supabase
         .from('profiles')
-        .select('first_name, last_name, phone')
+        .select('first_name, last_name, phone, id_number')
         .eq('id', user.id)
         .single()
         .then(({ data, error }) => {
@@ -70,6 +74,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
               first_name?: string | null;
               last_name?: string | null;
               phone?: string | null;
+              id_number?: string | null;
             };
             
             if (profileData.first_name || profileData.last_name) {
@@ -79,13 +84,22 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
             // Set user data with available fields
             setUserData({
               phone: profileData.phone || '',
-              // For now, we'll use an empty string as id_number isn't available
-              idNumber: ''
+              idNumber: profileData.id_number || '',
+              firstName: profileData.first_name || '',
+              lastName: profileData.last_name || '',
+              email: user.email || ''
             });
 
             console.log('Profile data loaded:', profileData);
           }
         });
+        
+      // Set up periodic subscription check
+      const checkInterval = setInterval(() => {
+        checkUserSubscription(user.id);
+      }, 300000); // Every 5 minutes
+      
+      return () => clearInterval(checkInterval);
     } else {
       setHasActiveSubscription(false);
       setFullName(null);
@@ -94,6 +108,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setPlanType(null);
       setUserData(null);
       setIsCheckingSubscription(false);
+      setLastRefreshed(null);
     }
   }, [user]);
 
@@ -107,7 +122,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     try {
       setIsCheckingSubscription(true);
       
-      // Use single() instead of maybeSingle() to get clearer error messages
+      // Use maybeSingle to avoid errors if no subscription exists
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -124,6 +139,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         setHasActiveSubscription(false);
         setSubscriptionDetails(null);
         setPlanType(null);
+        setLastRefreshed(new Date());
         return;
       }
       
@@ -137,11 +153,40 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       const isValidPeriod = currentPeriodEndsAt && currentPeriodEndsAt > now;
       const isCancelled = data.cancelled_at !== null && data.cancelled_at !== undefined;
       
-      const activeStatus = isActive || isTrial || (isValidPeriod && !isCancelled);
+      const activeStatus = (isActive || isTrial || isValidPeriod) && !isCancelled;
       
       setHasActiveSubscription(activeStatus);
       setSubscriptionDetails(data);
       setPlanType(data.plan_type);
+      setLastRefreshed(new Date());
+      
+      // Check if we have a valid recurring payment token
+      if (isActive && !data.token) {
+        console.log('Active subscription without token, checking recurring_payments');
+        
+        // Try to find a token in recurring_payments
+        const { data: recurringPayments } = await supabase
+          .from('recurring_payments')
+          .select('token, token_expiry, is_valid')
+          .eq('user_id', userId)
+          .eq('is_valid', true)
+          .gte('token_expiry', new Date().toISOString().split('T')[0])
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (recurringPayments && recurringPayments.length > 0) {
+          console.log('Found valid token in recurring_payments, syncing to subscription');
+          
+          // Update subscription with token
+          await supabase
+            .from('subscriptions')
+            .update({
+              token: recurringPayments[0].token,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', data.id);
+        }
+      }
       
     } catch (error) {
       console.error('Error checking subscription:', error);
@@ -160,7 +205,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     email,
     subscriptionDetails,
     planType,
-    userData
+    userData,
+    lastRefreshed
   };
 
   return (
