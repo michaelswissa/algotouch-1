@@ -47,77 +47,95 @@ export const useSubscription = () => {
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      if (user?.id) {
-        try {
-          setError(null);
-          const { data, error } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (error) {
-            if (error.code === 'PGRST116') {
-              // No subscription found for user, this is not an error, just no subscription
-              setSubscription(null);
-              setDetails(null);
-              setLoading(false);
-              return;
-            }
-            throw error;
-          }
-          
-          // Convert Supabase data to our Subscription type
-          if (data) {
-            const formattedSubscription: Subscription = {
-              id: data.id,
-              plan_type: data.plan_type,
-              status: data.status,
-              trial_ends_at: data.trial_ends_at,
-              current_period_ends_at: data.current_period_ends_at,
-              cancelled_at: data.cancelled_at,
-              payment_method: data.payment_method,
-              contract_signed: data.contract_signed
-            };
-            setSubscription(formattedSubscription);
-            
-            // Try to fetch cancellation data if available
-            let cancellationData = null;
-            try {
-              // Check if subscription_cancellations table exists and has data for this subscription
-              const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
-                body: { subscriptionId: data.id }
-              });
-              
-              if (cancelData && cancelData.length > 0) {
-                cancellationData = cancelData;
-              }
-            } catch (cancelError) {
-              console.error('Error fetching cancellation data:', cancelError);
-              // Continue even if this fails
-            }
-            
-            // Process the subscription details
-            const subscriptionDetails = getSubscriptionDetails(formattedSubscription, cancellationData);
-            setDetails(subscriptionDetails);
-          }
-        } catch (error) {
-          console.error('Error fetching subscription:', error);
-          setError('שגיאה בטעינת נתוני המנוי');
-          // Show toast for unexpected errors
-          toast.error('שגיאה בטעינת נתוני המנוי');
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
+  // Function to fetch subscription data
+  const fetchSubscription = async (userId: string) => {
+    try {
+      setError(null);
+      console.log('Fetching subscription for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error in subscription query:', error);
+        throw error;
       }
-    };
-    
-    fetchSubscription();
+      
+      // Convert Supabase data to our Subscription type
+      if (data) {
+        console.log('Subscription data found:', data);
+        const formattedSubscription: Subscription = {
+          id: data.id,
+          plan_type: data.plan_type,
+          status: data.status,
+          trial_ends_at: data.trial_ends_at,
+          current_period_ends_at: data.current_period_ends_at,
+          cancelled_at: data.cancelled_at,
+          payment_method: data.payment_method,
+          contract_signed: data.contract_signed
+        };
+        setSubscription(formattedSubscription);
+        
+        // Try to fetch cancellation data if available
+        let cancellationData = null;
+        try {
+          // Check if subscription_cancellations table exists and has data for this subscription
+          const { data: cancelData } = await supabase.functions.invoke('get-cancellation-data', {
+            body: { subscriptionId: data.id }
+          });
+          
+          if (cancelData && cancelData.length > 0) {
+            cancellationData = cancelData;
+          }
+        } catch (cancelError) {
+          console.error('Error fetching cancellation data:', cancelError);
+          // Continue even if this fails
+        }
+        
+        // Process the subscription details
+        const subscriptionDetails = getSubscriptionDetails(formattedSubscription, cancellationData);
+        setDetails(subscriptionDetails);
+        return { subscription: formattedSubscription, details: subscriptionDetails };
+      } else {
+        console.log('No subscription found for user:', userId);
+        setSubscription(null);
+        setDetails(null);
+        return { subscription: null, details: null };
+      }
+    } catch (error: any) {
+      console.error('Error fetching subscription:', error);
+      setError('שגיאה בטעינת נתוני המנוי');
+      // Show toast for unexpected errors
+      toast.error('שגיאה בטעינת נתוני המנוי');
+      return { error: error.message || 'שגיאה בטעינת נתוני המנוי' };
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchSubscription(user.id).finally(() => setLoading(false));
+    } else {
+      setSubscription(null);
+      setDetails(null);
+      setLoading(false);
+    }
   }, [user]);
+
+  const refreshSubscription = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    const result = await fetchSubscription(user.id);
+    setLoading(false);
+    
+    if (result.error) {
+      return false;
+    }
+    return true;
+  };
 
   const getSubscriptionDetails = (sub: Subscription | null, cancellationData?: any): SubscriptionDetails | null => {
     if (!sub) return null;
@@ -341,6 +359,7 @@ export const useSubscription = () => {
     details, 
     error,
     cancelSubscription,
-    reactivateSubscription
+    reactivateSubscription,
+    refreshSubscription
   };
 };

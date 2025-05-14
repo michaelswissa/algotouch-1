@@ -107,6 +107,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     try {
       setIsCheckingSubscription(true);
       
+      // Use single() instead of maybeSingle() to get clearer error messages
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -114,6 +115,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         .maybeSingle();
         
       if (error) {
+        console.error('Error checking subscription:', error);
         throw error;
       }
       

@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 const UserSubscription = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { subscription, loading, details } = useSubscription();
+  const { subscription, loading, details, refreshSubscription } = useSubscription();
   const [activeTab, setActiveTab] = useState('details');
   const [hasUnprocessedPayment, setHasUnprocessedPayment] = useState(false);
   const [specificLowProfileId, setSpecificLowProfileId] = useState('');
@@ -32,7 +32,7 @@ const UserSubscription = () => {
       if (!user?.id || !user?.email) return;
       
       try {
-        // Check for unprocessed webhooks with tokens - Case 1: ChargeAndCreateToken with ResponseCode 0
+        // Case 1: Check for unprocessed webhooks with tokens - ChargeAndCreateToken with ResponseCode 0
         const { data: tokenWebhooks, error: tokenError } = await supabase
           .from('payment_webhooks')
           .select('*')
@@ -54,19 +54,36 @@ const UserSubscription = () => {
         if (specificError) throw specificError;
 
         // Case 3: Check for unprocessed webhooks that contain the user's email
+        // Fix: Use filter() instead of direct string interpolation for the email query
         const { data: emailWebhooks, error: emailError } = await supabase
           .from('payment_webhooks')
           .select('*')
           .eq('processed', false)
-          .or(`payload->TranzactionInfo->CardOwnerEmail.eq.${user.email},payload->UIValues->CardOwnerEmail.eq.${user.email}`)
+          .filter('payload->TranzactionInfo->CardOwnerEmail', 'eq', user.email)
           .limit(1);
           
-        if (emailError) throw emailError;
+        if (emailError) {
+          console.error('Error checking email webhooks (TranzactionInfo):', emailError);
+          // Try alternative path if the first one fails
+          const { data: altEmailWebhooks, error: altEmailError } = await supabase
+            .from('payment_webhooks')
+            .select('*')
+            .eq('processed', false)
+            .filter('payload->UIValues->CardOwnerEmail', 'eq', user.email)
+            .limit(1);
+            
+          if (altEmailError) {
+            console.error('Error checking email webhooks (UIValues):', altEmailError);
+          } else if (altEmailWebhooks && altEmailWebhooks.length > 0) {
+            setHasUnprocessedPayment(true);
+          }
+        } else if (emailWebhooks && emailWebhooks.length > 0) {
+          setHasUnprocessedPayment(true);
+        }
         
         // If any of the checks found an unprocessed webhook, show the subscription manager
         if ((tokenWebhooks && tokenWebhooks.length > 0) || 
-            (specificWebhooks && specificWebhooks.length > 0) || 
-            (emailWebhooks && emailWebhooks.length > 0)) {
+            (specificWebhooks && specificWebhooks.length > 0)) {
           
           // Store the LowProfileId if it's the specific one
           if (specificWebhooks && specificWebhooks.length > 0) {
@@ -84,6 +101,13 @@ const UserSubscription = () => {
       checkPaymentStatus();
     }
   }, [user, loading, subscription]);
+
+  // Add a function to manually refresh subscription data
+  const handleManualRefresh = async () => {
+    if (refreshSubscription) {
+      await refreshSubscription();
+    }
+  };
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -121,6 +145,7 @@ const UserSubscription = () => {
           userId={user.id} 
           email={user.email} 
           lowProfileId={specificLowProfileId || undefined} 
+          onComplete={handleManualRefresh}
         />
       </SubscriptionCard>
     );
