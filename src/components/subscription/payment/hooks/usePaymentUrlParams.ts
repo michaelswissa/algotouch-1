@@ -35,6 +35,9 @@ export const usePaymentUrlParams = (
           
           // Clear the stored payment data
           sessionStorage.removeItem('payment_success_data');
+          
+          // IMPORTANT: Clear registration data to prevent "complete registration" messages
+          sessionStorage.removeItem('registration_data');
         }
       } catch (error) {
         console.error('Error processing stored payment data:', error);
@@ -76,6 +79,9 @@ export const usePaymentUrlParams = (
           console.log('Completing payment without registration ID');
           onPaymentComplete();
         }
+        
+        // Clear registration data to prevent "complete registration" messages
+        sessionStorage.removeItem('registration_data');
       } else if (event.data?.type === 'cardcom-error') {
         console.error('Payment error:', event.data.message);
         toast.error('שגיאה בתהליך התשלום: ' + (event.data.message || 'אנא נסה שנית'));

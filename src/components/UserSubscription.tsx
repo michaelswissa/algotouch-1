@@ -5,6 +5,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth';
 import { supabase } from '@/lib/supabase-client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { RefreshCw } from 'lucide-react';
 
 // Import our components
 import SubscriptionCard from './subscription/SubscriptionCard';
@@ -28,140 +30,66 @@ interface WebhookCheckResult {
 const UserSubscription = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { subscription, loading, details, refreshSubscription } = useSubscription();
+  const { 
+    subscription, 
+    loading, 
+    details, 
+    refreshSubscription, 
+    checkForUnprocessedPayments 
+  } = useSubscription();
   const [activeTab, setActiveTab] = useState('details');
   const [hasUnprocessedPayment, setHasUnprocessedPayment] = useState(false);
   const [specificLowProfileId, setSpecificLowProfileId] = useState('');
+  const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   
-  // Helper for checking token-based webhooks
-  const checkTokenWebhooks = async (): Promise<Partial<WebhookCheckResult>> => {
-    try {
-      const { data: tokenWebhooks, error: tokenError } = await supabase
-        .from('payment_webhooks')
-        .select('*')
-        .eq('processed', false)
-        .contains('payload', { Operation: 'ChargeAndCreateToken', ResponseCode: '0' })
-        .limit(1);
-        
-      if (tokenError) throw tokenError;
-      
-      if (tokenWebhooks && tokenWebhooks.length > 0) {
-        return { hasUnprocessedPayment: true };
-      }
-      
-      return { hasUnprocessedPayment: false };
-    } catch (error) {
-      console.error('Error checking token webhooks:', error);
-      return { hasUnprocessedPayment: false };
-    }
-  };
-  
-  // Helper for checking specific known webhook
-  const checkSpecificWebhooks = async (): Promise<Partial<WebhookCheckResult>> => {
-    try {
-      const knownLowProfileId = 'd8637470-0bed-4aa6-8ae9-7a68f0058400';
-      const { data: specificWebhooks, error: specificError } = await supabase
-        .from('payment_webhooks')
-        .select('*')
-        .eq('processed', false)
-        .contains('payload', { LowProfileId: knownLowProfileId })
-        .limit(1);
-        
-      if (specificError) throw specificError;
-      
-      if (specificWebhooks && specificWebhooks.length > 0) {
-        return { 
-          hasUnprocessedPayment: true,
-          specificLowProfileId: knownLowProfileId
-        };
-      }
-      
-      return { 
-        hasUnprocessedPayment: false,
-        specificLowProfileId: ''
-      };
-    } catch (error) {
-      console.error('Error checking specific webhooks:', error);
-      return { 
-        hasUnprocessedPayment: false,
-        specificLowProfileId: ''
-      };
-    }
-  };
-  
-  // Helper for checking email-based webhooks
-  const checkEmailWebhooks = async (userEmail: string): Promise<Partial<WebhookCheckResult>> => {
-    try {
-      // First attempt: look in TranzactionInfo.CardOwnerEmail
-      const { data: emailWebhooks, error: emailError } = await supabase
-        .from('payment_webhooks')
-        .select('*')
-        .eq('processed', false)
-        .filter('payload->TranzactionInfo->CardOwnerEmail', 'eq', userEmail)
-        .limit(1);
-        
-      if (emailError) {
-        console.error('Error checking email webhooks (TranzactionInfo):', emailError);
-        
-        // Second attempt: look in UIValues.CardOwnerEmail
-        const { data: altEmailWebhooks, error: altEmailError } = await supabase
-          .from('payment_webhooks')
-          .select('*')
-          .eq('processed', false)
-          .filter('payload->UIValues->CardOwnerEmail', 'eq', userEmail)
-          .limit(1);
-          
-        if (altEmailError) {
-          console.error('Error checking email webhooks (UIValues):', altEmailError);
-          return { hasUnprocessedPayment: false };
-        }
-        
-        if (altEmailWebhooks && altEmailWebhooks.length > 0) {
-          return { hasUnprocessedPayment: true };
-        }
-      } else if (emailWebhooks && emailWebhooks.length > 0) {
-        return { hasUnprocessedPayment: true };
-      }
-      
-      return { hasUnprocessedPayment: false };
-    } catch (error) {
-      console.error('Error in checkEmailWebhooks:', error);
-      return { hasUnprocessedPayment: false };
-    }
-  };
-  
-  // Main function to check for unprocessed payments
+  // Check for unprocessed payments when the component mounts or when the user changes
   useEffect(() => {
     const checkPaymentStatus = async () => {
       if (!user?.id || !user?.email || loading || subscription) return;
       
       try {
-        // Run all webhook checks in parallel
-        const [tokenResults, specificResults, emailResults] = await Promise.all([
-          checkTokenWebhooks(),
-          checkSpecificWebhooks(),
-          checkEmailWebhooks(user.email)
-        ]);
+        // Check for unprocessed payments
+        const hasUnprocessed = await checkForUnprocessedPayments();
+        setHasUnprocessedPayment(hasUnprocessed);
         
-        // Combine results
-        const hasUnprocessedPayment = 
-          tokenResults.hasUnprocessedPayment || 
-          specificResults.hasUnprocessedPayment || 
-          emailResults.hasUnprocessedPayment;
+        // If there are unprocessed payments, try to auto-process them
+        if (hasUnprocessed) {
+          setIsAutoProcessing(true);
           
-        setHasUnprocessedPayment(!!hasUnprocessedPayment);
-        
-        if (specificResults.specificLowProfileId) {
-          setSpecificLowProfileId(specificResults.specificLowProfileId);
+          try {
+            // Process webhook for this user
+            const { data, error } = await supabase.functions.invoke('reprocess-webhook-by-email', {
+              body: { 
+                email: user.email,
+                userId: user.id 
+              }
+            });
+            
+            if (error) throw error;
+            
+            if (data?.success) {
+              toast.success('עדכון פרטי המנוי הושלם בהצלחה');
+              await refreshSubscription();
+            }
+          } catch (err) {
+            console.error('Auto-processing failed:', err);
+            // Don't show error message, we'll just fallback to manual processing
+          } finally {
+            setIsAutoProcessing(false);
+          }
         }
       } catch (err) {
         console.error('Error checking payment status:', err);
-        toast.error('שגיאה בבדיקת סטטוס תשלום');
       }
     };
     
+    // Clear any leftover registration data to avoid showing "complete registration" message
+    if (!loading && user?.id && !subscription) {
+      sessionStorage.removeItem('registration_data');
+    }
+    
     checkPaymentStatus();
-  }, [user, loading, subscription]);
+  }, [user, loading, subscription, checkForUnprocessedPayments, refreshSubscription]);
 
   // Function to manually refresh subscription data
   const handleManualRefresh = async () => {
@@ -170,31 +98,10 @@ const UserSubscription = () => {
     }
   };
 
-  if (loading) {
+  if (loading || isAutoProcessing) {
     return <LoadingSkeleton />;
   }
 
-  // Check if user has registration data in progress
-  const hasRegistrationInProgress = !!sessionStorage.getItem('registration_data');
-  
-  if (hasRegistrationInProgress) {
-    return (
-      <SubscriptionCard 
-        title="השלם את תהליך ההרשמה" 
-        description="התחלת את תהליך ההרשמה. אנא השלם את התהליך כדי לקבל גישה מלאה."
-      >
-        <div className="text-center py-6">
-          <Button 
-            onClick={() => navigate('/subscription')}
-            className="mx-auto"
-          >
-            המשך להרשמה
-          </Button>
-        </div>
-      </SubscriptionCard>
-    );
-  }
-  
   // If there's unprocessed payment but no subscription
   if (hasUnprocessedPayment && !subscription && user?.email) {
     return (
@@ -236,14 +143,34 @@ const UserSubscription = () => {
     details={details}
     activeTab={activeTab}
     setActiveTab={setActiveTab}
+    onRefresh={handleManualRefresh}
   />;
 };
 
 // Extract subscription details view to a separate component
-const SubscriptionDetails = ({ subscription, details, activeTab, setActiveTab }) => {
+const SubscriptionDetails = ({ 
+  subscription, 
+  details, 
+  activeTab, 
+  setActiveTab,
+  onRefresh 
+}) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
   const hasContract = subscription.contract_signed;
   const isCancelled = subscription.status === 'cancelled';
+  
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+      toast.success('נתוני המנוי עודכנו');
+    } catch (error) {
+      toast.error('שגיאה בעדכון נתוני המנוי');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <SubscriptionCard
@@ -251,6 +178,19 @@ const SubscriptionDetails = ({ subscription, details, activeTab, setActiveTab })
       description={`סטטוס: ${details?.statusText}`}
     >
       <>
+        <div className="flex justify-end mb-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            className="text-xs flex items-center gap-1"
+          >
+            <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>רענן נתונים</span>
+          </Button>
+        </div>
+      
         <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="my-2 w-full">
           <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="details">פרטי מנוי</TabsTrigger>
@@ -261,16 +201,12 @@ const SubscriptionDetails = ({ subscription, details, activeTab, setActiveTab })
           <TabsContent value="details" className="mt-4">
             {/* If subscription is cancelled, show a notice */}
             {isCancelled && (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                <div className="flex">
-                  <div>
-                    <p className="text-sm text-yellow-700">
-                      המנוי שלך בוטל ויישאר פעיל עד {details?.nextBillingDate}.
-                      לאחר מכן, לא תחויב יותר והגישה למערכת תיחסם.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <Alert variant="warning" className="mb-4">
+                <AlertDescription>
+                  המנוי שלך בוטל ויישאר פעיל עד {details?.nextBillingDate}.
+                  לאחר מכן, לא תחויב יותר והגישה למערכת תיחסם.
+                </AlertDescription>
+              </Alert>
             )}
             
             {subscription.status === 'trial' && details && (

@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom';
 import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
 import { useSubscriptionFlow } from './hooks/useSubscriptionFlow';
 import SubscriptionView from './views/SubscriptionView';
+import { toast } from 'sonner';
 
 const SubscriptionContent = () => {
   const {
@@ -19,6 +20,15 @@ const SubscriptionContent = () => {
     isAuthenticated,
     contractId
   } = useSubscriptionFlow();
+
+  // Clear registration data if the user already has an active subscription
+  useEffect(() => {
+    if (hasActiveSubscription) {
+      // Clear registration data to prevent showing "complete registration" message
+      sessionStorage.removeItem('registration_data');
+      toast.info('כבר יש לך מנוי פעיל');
+    }
+  }, [hasActiveSubscription]);
 
   // Additional validation every time the step changes
   useEffect(() => {

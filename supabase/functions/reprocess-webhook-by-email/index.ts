@@ -10,16 +10,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle OPTIONS (preflight) request
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders,
-      status: 204,
-    });
+    return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
   try {
-    // Create Supabase client with service role key
+    // Create a Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -31,327 +28,267 @@ serve(async (req) => {
     );
 
     // Parse request body
-    const { email, lowProfileId, userId: providedUserId } = await req.json();
+    const { email, userId, lowProfileId } = await req.json();
 
-    if (!email && !lowProfileId) {
+    if (!email && !userId) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Either email or lowProfileId must be provided',
+        JSON.stringify({ 
+          success: false, 
+          message: 'Missing required parameters: email or userId'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
+          status: 400
         }
       );
     }
 
-    console.log(`Processing webhook recovery request: email=${email}, lowProfileId=${lowProfileId}, providedUserId=${providedUserId}`);
+    // Log detailed information for debugging
+    console.log(`Processing webhook for: email=${email}, userId=${userId}, lowProfileId=${lowProfileId}`);
 
-    // Find user either by email or directly from provided userId
-    let userId = providedUserId;
+    // Find the appropriate webhook to process
+    let webhookToProcess = null;
     
-    if (!userId && email) {
-      // First try with auth API for more reliable user lookup
-      try {
-        const { data: authUser, error: authError } = await supabaseClient.auth.admin.listUsers({
-          filter: {
-            email: email
-          },
-        });
+    // First, try to find webhook by email if provided
+    if (email) {
+      const { data: emailWebhooks, error: emailError } = await supabaseClient
+        .from('payment_webhooks')
+        .select('*')
+        .or(`payload->TranzactionInfo->CardOwnerEmail.eq."${email}",payload->UIValues->CardOwnerEmail.eq."${email}"`)
+        .order('created_at', { ascending: false })
+        .limit(1);
         
-        if (!authError && authUser?.users && authUser.users.length > 0) {
-          userId = authUser.users[0].id;
-          console.log(`Found user with email ${email}: ${userId}`);
-        } else {
-          // Fallback to direct DB query
-          const { data: userData, error: userError } = await supabaseClient
-            .from('auth.users')
-            .select('id')
-            .eq('email', email)
-            .single();
-
-          if (!userError && userData) {
-            userId = userData.id;
-            console.log(`Found user with email ${email} (backup method): ${userId}`);
-          } else {
-            console.error(`User not found with email ${email}: `, authError || userError);
-          }
-        }
-      } catch (e) {
-        console.error("Error finding user by email:", e);
-      }
-      
-      if (!userId) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: `User not found with email: ${email}`,
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404,
-          }
-        );
+      if (emailError) {
+        console.error("Error finding webhook by email:", emailError);
+      } else if (emailWebhooks && emailWebhooks.length > 0) {
+        console.log(`Found webhook by email: ${email}`, emailWebhooks[0].id);
+        webhookToProcess = emailWebhooks[0];
       }
     }
-
-    // Find payment webhooks
-    let webhookQuery = supabaseClient.from('payment_webhooks').select('*');
     
-    if (lowProfileId) {
-      webhookQuery = webhookQuery.filter('payload->LowProfileId', 'eq', lowProfileId);
-    } else if (email) {
-      // Try different paths where email might be stored in the webhook payload
-      console.log(`Looking for webhooks with email ${email}`);
-      webhookQuery = webhookQuery.or(
-        `payload->TranzactionInfo->CardOwnerEmail.eq."${email}",payload->UIValues->CardOwnerEmail.eq."${email}"`
-      );
-    }
-    
-    const { data: webhooks, error: webhookError } = await webhookQuery.order('created_at', { ascending: false });
-
-    if (webhookError) {
-      console.error("Error fetching webhooks:", webhookError);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Error fetching webhooks',
-          error: webhookError.message,
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
-    }
-
-    if (!webhooks || webhooks.length === 0) {
-      console.log(`No webhooks found for email=${email}, lowProfileId=${lowProfileId}`);
-      
-      // If lowProfileId is provided, try direct call to CardCom API
-      if (lowProfileId) {
-        console.log(`Attempting direct CardCom API call with lowProfileId ${lowProfileId}`);
-        const terminalNumber = Deno.env.get('CARDCOM_TERMINAL');
-        const apiName = Deno.env.get('CARDCOM_USERNAME');
+    // If no webhook found by email or email not provided, try lowProfileId
+    if (!webhookToProcess && lowProfileId) {
+      const { data: lowProfileWebhooks, error: lowProfileError } = await supabaseClient
+        .from('payment_webhooks')
+        .select('*')
+        .filter('payload->LowProfileId', 'eq', lowProfileId)
+        .order('created_at', { ascending: false })
+        .limit(1);
         
-        if (terminalNumber && apiName) {
-          try {
-            const cardcomResponse = await fetch(
-              'https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult',
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  TerminalNumber: terminalNumber,
-                  ApiName: apiName,
-                  LowProfileId: lowProfileId
-                })
-              }
-            );
+      if (lowProfileError) {
+        console.error("Error finding webhook by lowProfileId:", lowProfileError);
+      } else if (lowProfileWebhooks && lowProfileWebhooks.length > 0) {
+        console.log(`Found webhook by lowProfileId: ${lowProfileId}`, lowProfileWebhooks[0].id);
+        webhookToProcess = lowProfileWebhooks[0];
+      }
+    }
+    
+    // If still no webhook found, check for user's most recent payment logs
+    if (!webhookToProcess && userId) {
+      const { data: paymentLogs, error: logsError } = await supabaseClient
+        .from('user_payment_logs')
+        .select('token')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
+      if (logsError) {
+        console.error("Error finding payment logs:", logsError);
+      } else if (paymentLogs && paymentLogs.length > 0) {
+        // Try to find webhooks for each token
+        for (const log of paymentLogs) {
+          if (!log.token) continue;
+          
+          const { data: tokenWebhooks } = await supabaseClient
+            .from('payment_webhooks')
+            .select('*')
+            .filter('payload->LowProfileId', 'eq', log.token)
+            .order('created_at', { ascending: false })
+            .limit(1);
             
-            if (cardcomResponse.ok) {
-              const cardcomData = await cardcomResponse.json();
-              console.log(`CardCom API response for ${lowProfileId}:`, cardcomData);
+          if (tokenWebhooks && tokenWebhooks.length > 0) {
+            console.log(`Found webhook by payment log token: ${log.token}`, tokenWebhooks[0].id);
+            webhookToProcess = tokenWebhooks[0];
+            break;
+          }
+        }
+      }
+    }
+    
+    // If no webhook found at all, try to manually create subscription
+    if (!webhookToProcess) {
+      if (userId) {
+        console.log("No webhook found, attempting to create subscription manually");
+        
+        // Look for payment data in user_payment_logs
+        const { data: paymentData } = await supabaseClient
+          .from('user_payment_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (paymentData && paymentData.length > 0) {
+          const payment = paymentData[0];
+          
+          // Check for token/recurring payment info
+          const { data: tokenData } = await supabaseClient
+            .from('recurring_payments')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          // Create or update subscription manually
+          if (tokenData && tokenData.length > 0) {
+            const token = tokenData[0];
+            const paymentMethod = {
+              lastFourDigits: token.last_4_digits || '****',
+              expiryMonth: token.token_expiry ? token.token_expiry.substring(5, 7) : '**',
+              expiryYear: token.token_expiry ? token.token_expiry.substring(0, 4) : '****',
+              cardholderName: email || 'Card Holder'
+            };
+            
+            // Calculate current_period_ends_at (1 month from now)
+            const currentDate = new Date();
+            const nextMonth = new Date(currentDate.setMonth(currentDate.getMonth() + 1));
+            
+            // Try to create or update subscription
+            const { data: subData, error: subError } = await supabaseClient
+              .from('subscriptions')
+              .upsert({
+                user_id: userId,
+                plan_type: payment.payment_data?.plan_type || 'monthly',
+                status: 'active',
+                payment_method: paymentMethod,
+                created_at: new Date().toISOString(),
+                current_period_ends_at: nextMonth.toISOString(),
+              })
+              .select()
+              .single();
               
-              // Create a webhook entry for this data
-              const { data: savedWebhook, error: saveError } = await supabaseClient
-                .from('payment_webhooks')
-                .insert({
-                  webhook_type: 'cardcom_manual_recovery',
-                  payload: { 
-                    ...cardcomData,
-                    ReturnValue: userId 
-                  },
-                  processed: false,
-                  created_at: new Date().toISOString(),
-                  processing_attempts: 0
-                })
-                .select()
-                .single();
-                
-              if (saveError) {
-                console.error("Error saving CardCom response as webhook:", saveError);
-                return new Response(
-                  JSON.stringify({
-                    success: false,
-                    message: 'Error saving CardCom response',
-                    error: saveError.message
-                  }),
-                  {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 500
-                  }
-                );
-              }
-              
-              // Process the newly created webhook
-              const processResponse = await fetch(
-                `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-webhook`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-                  },
-                  body: JSON.stringify({
-                    webhookId: savedWebhook.id,
-                    userId: userId
-                  })
-                }
-              );
-              
-              const processResult = await processResponse.json();
-              
+            if (subError) {
+              console.error("Error creating subscription manually:", subError);
               return new Response(
-                JSON.stringify({
-                  success: true,
-                  message: 'Created and processed webhook from CardCom API data',
-                  result: processResult,
-                  userId: userId
+                JSON.stringify({ 
+                  success: false, 
+                  message: 'שגיאה ביצירת מנוי',
+                  error: subError.message
                 }),
                 {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                  status: 200
+                  status: 500
                 }
               );
-            } else {
-              console.error(`CardCom API error: ${cardcomResponse.status} ${cardcomResponse.statusText}`);
             }
-          } catch (e) {
-            console.error("Error calling CardCom API:", e);
+            
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                message: 'מנוי נוצר ידנית',
+                subscription: subData
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200
+              }
+            );
           }
         }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: 'לא נמצאו נתונים מספיקים ליצירת מנוי ידנית'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404
+          }
+        );
       }
       
       return new Response(
-        JSON.stringify({
-          success: false,
-          message: `No webhooks found${email ? ' for email: ' + email : lowProfileId ? ' for lowProfileId: ' + lowProfileId : ''}`,
+        JSON.stringify({ 
+          success: false, 
+          message: 'לא נמצא webhook לעיבוד'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404,
+          status: 404
         }
       );
     }
-
-    // Process each webhook
-    const results = [];
-    let tokenStatus = { found: false, saved: false };
-    let successCount = 0;
-
-    console.log(`Found ${webhooks.length} webhook(s) to process.`);
-
-    for (const webhook of webhooks) {
-      try {
-        console.log(`Processing webhook ${webhook.id}`);
-        
-        // If userId is provided, update ReturnValue in payload to associate with the user
-        if (userId && webhook.payload) {
-          console.log(`Updating ReturnValue to ${userId} in webhook payload`);
-          webhook.payload.ReturnValue = userId;
-        }
-
-        // Process the webhook by calling process-webhook function
-        const processWebhookResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-webhook`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({
-              webhookId: webhook.id,
-              userId: userId
-            }),
-          }
-        );
-
-        const processResult = await processWebhookResponse.json();
-        console.log(`Process result for webhook ${webhook.id}:`, processResult);
-        
-        // Check if webhook processing created a token
-        if (userId) {
-          const { data: tokenData } = await supabaseClient
-            .from('recurring_payments')
-            .select('token')
-            .eq('user_id', userId)
-            .maybeSingle();
-            
-          if (tokenData?.token) {
-            console.log(`Token found for user ${userId}: ${tokenData.token}`);
-            tokenStatus = { found: true, saved: true };
-          }
-        }
-        
-        results.push({
-          webhookId: webhook.id,
-          success: processResult.success,
-          result: processResult,
-        });
-
-        // Count successful operations
-        if (processResult.success) {
-          successCount++;
-        }
-
-        // If this was successful, we can break after processing one webhook
-        if (processResult.success) {
-          break;
-        }
-      } catch (err) {
-        console.error(`Error processing webhook ${webhook.id}:`, err);
-        results.push({
-          webhookId: webhook.id,
-          success: false,
-          error: err.message || String(err),
-        });
+    
+    // Now we have a webhook to process
+    console.log("Processing webhook:", webhookToProcess.id);
+    
+    // Prepare the payload - set ReturnValue to userId if provided
+    const payload = { ...webhookToProcess.payload };
+    if (userId) {
+      payload.ReturnValue = userId;
+    }
+    
+    // Call the cardcom-webhook function to process
+    const webhookResponse = await fetch(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify(payload)
       }
+    );
+    
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      throw new Error(`Error processing webhook: ${errorText}`);
     }
 
-    // Check if we successfully created or updated a subscription
-    const { data: subscriptionData, error: subscriptionError } = await supabaseClient
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    const subscriptionCreated = !subscriptionError && !!subscriptionData;
-    
-    console.log(`Subscription check for user ${userId}:`, 
-      subscriptionCreated ? `Found: ${subscriptionData?.id}` : "Not found");
+    const webhookResult = await webhookResponse.json();
+
+    // Mark webhook as processed
+    if (webhookResult.success) {
+      await supabaseClient
+        .from('payment_webhooks')
+        .update({
+          processed: true,
+          processed_at: new Date().toISOString(),
+          processing_result: {
+            success: true,
+            message: 'Manually processed via API',
+            timestamp: new Date().toISOString()
+          }
+        })
+        .eq('id', webhookToProcess.id);
+    }
 
     return new Response(
       JSON.stringify({
-        success: successCount > 0,
-        message: `Processed ${webhooks.length} webhooks, ${successCount} successful`,
-        results,
-        tokenStatus,
-        userId,
-        subscriptionCreated,
-        subscriptionId: subscriptionCreated ? subscriptionData?.id : null
+        success: true,
+        message: 'העיבוד הושלם בהצלחה',
+        result: webhookResult
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 200
       }
     );
+
   } catch (error: any) {
-    console.error('Error in reprocess-webhook-by-email:', error);
+    console.error('Error processing webhook:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        message: 'Error processing request',
-        error: error.message || String(error),
+        message: error.message || 'Error processing webhook',
+        error: error.toString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 500
       }
     );
   }
