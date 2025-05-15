@@ -62,17 +62,24 @@ export const useSubscription = (): UseSubscriptionReturn => {
       // Manually filter webhooks that contain the user's email in the payload
       if (webhooks && webhooks.length > 0) {
         const userRelatedWebhooks = webhooks.filter(webhook => {
-          const payload = webhook.payload || {};
+          // Ensure payload is an object before accessing properties
+          if (typeof webhook.payload !== 'object' || webhook.payload === null) return false;
           
-          // Check if the email exists in TranzactionInfo.CardOwnerEmail
-          const tranzactionEmail = payload.TranzactionInfo?.CardOwnerEmail || '';
+          const payload = webhook.payload as Record<string, any>;
           
-          // Check if the email exists in UIValues.CardOwnerEmail
-          const uiValuesEmail = payload.UIValues?.CardOwnerEmail || '';
+          // Safely access nested properties
+          const tranzactionInfo = payload.TranzactionInfo || {};
+          const uiValues = payload.UIValues || {};
+          
+          const tranzactionEmail = typeof tranzactionInfo === 'object' ? 
+            (tranzactionInfo.CardOwnerEmail || '') : '';
+            
+          const uiValuesEmail = typeof uiValues === 'object' ? 
+            (uiValues.CardOwnerEmail || '') : '';
           
           // Return true if the email is found in either location
-          return tranzactionEmail.toLowerCase().includes(user.email.toLowerCase()) || 
-                 uiValuesEmail.toLowerCase().includes(user.email.toLowerCase());
+          return tranzactionEmail.toString().toLowerCase().includes(user.email.toLowerCase()) || 
+                 uiValuesEmail.toString().toLowerCase().includes(user.email.toLowerCase());
         });
         
         if (userRelatedWebhooks.length > 0) {
@@ -104,7 +111,10 @@ export const useSubscription = (): UseSubscriptionReturn => {
           if (tokenWebhooks && tokenWebhooks.length > 0) {
             // Manually filter to find webhooks matching this token
             const matchingWebhooks = tokenWebhooks.filter(webhook => {
-              const payload = webhook.payload || {};
+              // Ensure payload is an object before accessing properties
+              if (typeof webhook.payload !== 'object' || webhook.payload === null) return false;
+              
+              const payload = webhook.payload as Record<string, any>;
               return payload.LowProfileId === payment.token;
             });
             
