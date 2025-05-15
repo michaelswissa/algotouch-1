@@ -23,6 +23,7 @@ interface SubscriptionContextType {
   planType: string | null;
   userData: UserData | null;
   lastRefreshed: Date | null;
+  error: string | null;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -49,22 +50,28 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const [planType, setPlanType] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
 
   // Check subscription on user change
   useEffect(() => {
-    if (user?.id) {
-      checkUserSubscription(user.id);
-      setEmail(user.email || null);
-      
-      // Get user profile data
-      supabase
-        .from('profiles')
-        .select('first_name, last_name, phone, id_number')
-        .eq('id', user.id)
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Error fetching user profile:', error);
+    let checkInterval: number | undefined;
+    
+    const fetchData = async () => {
+      if (user?.id) {
+        try {
+          await checkUserSubscription(user.id);
+          setEmail(user.email || null);
+          
+          // Get user profile data
+          const { data, error: profileError } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, phone, id_number')
+            .eq('id', user.id)
+            .single();
+          
+          if (profileError) {
+            console.error('Error fetching user profile:', profileError);
             return;
           }
           
@@ -92,28 +99,51 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
             console.log('Profile data loaded:', profileData);
           }
-        });
-        
-      // Set up periodic subscription check
-      const checkInterval = setInterval(() => {
-        checkUserSubscription(user.id);
+        } catch (err) {
+          console.error('Error loading user data:', err);
+          if (retryCount < 3) {
+            setRetryCount(prev => prev + 1);
+          } else {
+            setError('שגיאה בטעינת נתוני המשתמש');
+          }
+        }
+      } else {
+        // Reset states when user is not logged in
+        setHasActiveSubscription(false);
+        setFullName(null);
+        setEmail(null);
+        setSubscriptionDetails(null);
+        setPlanType(null);
+        setUserData(null);
+        setIsCheckingSubscription(false);
+        setLastRefreshed(null);
+        setError(null);
+        setRetryCount(0);
+      }
+    };
+    
+    fetchData();
+    
+    // Set up periodic subscription check only if user is logged in
+    if (user?.id) {
+      checkInterval = window.setInterval(() => {
+        if (retryCount < 3) {
+          checkUserSubscription(user.id).catch(console.error);
+        }
       }, 300000); // Every 5 minutes
-      
-      return () => clearInterval(checkInterval);
-    } else {
-      setHasActiveSubscription(false);
-      setFullName(null);
-      setEmail(null);
-      setSubscriptionDetails(null);
-      setPlanType(null);
-      setUserData(null);
-      setIsCheckingSubscription(false);
-      setLastRefreshed(null);
     }
-  }, [user]);
+    
+    return () => {
+      if (checkInterval) {
+        window.clearInterval(checkInterval);
+      }
+    };
+  }, [user, retryCount]);
 
   const refreshSubscription = async () => {
     if (user?.id) {
+      setRetryCount(0); // Reset retry count on manual refresh
+      setError(null);
       await checkUserSubscription(user.id);
     }
   };
@@ -164,33 +194,50 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       if (isActive && !data.token) {
         console.log('Active subscription without token, checking recurring_payments');
         
-        // Try to find a token in recurring_payments
-        const { data: recurringPayments } = await supabase
-          .from('recurring_payments')
-          .select('token, token_expiry, is_valid')
-          .eq('user_id', userId)
-          .eq('is_valid', true)
-          .gte('token_expiry', new Date().toISOString().split('T')[0])
-          .order('created_at', { ascending: false })
-          .limit(1);
-          
-        if (recurringPayments && recurringPayments.length > 0) {
-          console.log('Found valid token in recurring_payments, syncing to subscription');
-          
-          // Update subscription with token
-          await supabase
-            .from('subscriptions')
-            .update({
-              token: recurringPayments[0].token,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', data.id);
+        try {
+          // Try to find a token in recurring_payments
+          const { data: recurringPayments, error: recurringError } = await supabase
+            .from('recurring_payments')
+            .select('token, token_expiry, is_valid')
+            .eq('user_id', userId)
+            .eq('is_valid', true)
+            .gte('token_expiry', new Date().toISOString().split('T')[0])
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (recurringError) {
+            console.error('Error checking recurring payments:', recurringError);
+            return;
+          }
+            
+          if (recurringPayments && recurringPayments.length > 0) {
+            console.log('Found valid token in recurring_payments, syncing to subscription');
+            
+            // Update subscription with token
+            const { error: updateError } = await supabase
+              .from('subscriptions')
+              .update({
+                token: recurringPayments[0].token,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', data.id);
+              
+            if (updateError) {
+              console.error('Error updating subscription with token:', updateError);
+            }
+          }
+        } catch (err) {
+          console.error('Error handling recurring payments check:', err);
         }
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking subscription:', error);
-      toast.error('שגיאה בבדיקת פרטי המנוי');
+      setError('שגיאה בבדיקת פרטי המנוי');
+      
+      if (retryCount >= 3) {
+        toast.error('שגיאה בבדיקת פרטי המנוי');
+      }
     } finally {
       setIsCheckingSubscription(false);
     }
@@ -206,7 +253,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     subscriptionDetails,
     planType,
     userData,
-    lastRefreshed
+    lastRefreshed,
+    error
   };
 
   return (

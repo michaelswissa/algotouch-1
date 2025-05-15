@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -44,6 +43,7 @@ const UserSubscription = () => {
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [maxRetriesReached, setMaxRetriesReached] = useState(false);
   
   // Clear registration data on component mount if subscription exists
   useEffect(() => {
@@ -64,6 +64,12 @@ const UserSubscription = () => {
         // If we already have a subscription or we've retried too many times, skip the check
         if (subscription && retryCount > 0) return;
         
+        // Don't check if we've already reached max retries
+        if (retryCount >= 3) {
+          setMaxRetriesReached(true);
+          return;
+        }
+        
         // Check for unprocessed payments
         const hasUnprocessed = await checkForUnprocessedPayments();
         setHasUnprocessedPayment(hasUnprocessed);
@@ -77,7 +83,8 @@ const UserSubscription = () => {
             const { data, error } = await supabase.functions.invoke('reprocess-webhook-by-email', {
               body: { 
                 email: user.email,
-                userId: user.id 
+                userId: user.id,
+                forceRefresh: retryCount > 0 // Add more force on retry
               }
             });
             
@@ -89,12 +96,10 @@ const UserSubscription = () => {
             } else {
               console.log('Auto-processing failed:', data?.message);
               setRetryCount(prev => prev + 1);
-              // Don't show error message yet, we'll just fallback to manual processing
             }
           } catch (err) {
             console.error('Auto-processing failed:', err);
             setRetryCount(prev => prev + 1);
-            // Don't show error message, we'll just fallback to manual processing
           } finally {
             setIsAutoProcessing(false);
           }
@@ -103,6 +108,10 @@ const UserSubscription = () => {
         console.error('Error checking payment status:', err);
         setCheckError('שגיאה בבדיקת סטטוס התשלום');
         setRetryCount(prev => prev + 1);
+        
+        if (retryCount + 1 >= 3) {
+          setMaxRetriesReached(true);
+        }
       }
     };
     
@@ -116,24 +125,38 @@ const UserSubscription = () => {
       checkPaymentStatus();
     }
     
-    // Set up periodic refresh of subscription data
-    const refreshInterval = setInterval(() => {
-      if (user?.id && refreshSubscription && retryCount < 3) {
-        refreshSubscription().catch(console.error);
-      }
-    }, 60000); // Check every minute
+    // Setup interval only if we haven't reached max retries
+    let refreshInterval: number | undefined;
+    if (retryCount < 3 && user?.id) {
+      refreshInterval = window.setInterval(() => {
+        if (user?.id && refreshSubscription) {
+          refreshSubscription().catch(console.error);
+        }
+      }, 60000); // Check every minute
+    }
     
-    return () => clearInterval(refreshInterval);
+    return () => {
+      if (refreshInterval) {
+        window.clearInterval(refreshInterval);
+      }
+    };
   }, [user, loading, subscription, checkForUnprocessedPayments, refreshSubscription, retryCount]);
 
   // Function to manually refresh subscription data
   const handleManualRefresh = async () => {
     if (refreshSubscription) {
       setRetryCount(0); // Reset retry count on manual refresh
+      setMaxRetriesReached(false); // Reset max retries flag
       try {
         await refreshSubscription();
         toast.success('הנתונים עודכנו בהצלחה');
         setCheckError(null);
+        
+        // Check for unprocessed payments again
+        if (user?.id && user?.email) {
+          const hasUnprocessed = await checkForUnprocessedPayments();
+          setHasUnprocessedPayment(hasUnprocessed);
+        }
       } catch (err) {
         console.error('Error refreshing subscription:', err);
         toast.error('שגיאה בעדכון הנתונים');
@@ -142,8 +165,8 @@ const UserSubscription = () => {
     }
   };
 
-  // If we have an error and retried too many times, show an error state to avoid infinite loading
-  if (checkError && retryCount >= 3) {
+  // Special state for when we've tried a few times and still can't load data
+  if (maxRetriesReached || (checkError && retryCount >= 3)) {
     return (
       <SubscriptionCard 
         title="שגיאה בטעינת פרטי המנוי" 
@@ -152,18 +175,39 @@ const UserSubscription = () => {
         <div className="p-6">
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>
-              {checkError}
+              {checkError || 'לא ניתן לטעון את פרטי המנוי לאחר מספר ניסיונות'}
             </AlertDescription>
           </Alert>
-          <Button 
-            onClick={handleManualRefresh}
-            className="w-full"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            נסה שוב
-          </Button>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
+          
+          <div className="flex gap-4 justify-center">
+            <Button 
+              onClick={handleManualRefresh}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              נסה שוב
+            </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/subscription')}
+            >
+              עבור לדף המנויים
+            </Button>
+          </div>
+          
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>אם הבעיה נמשכת, אנא נסה להתחבר מחדש או צור קשר עם התמיכה</p>
+            
+            {user?.email && (
+              <div className="mt-4">
+                <SubscriptionManager 
+                  userId={user.id} 
+                  email={user.email} 
+                  onComplete={handleManualRefresh}
+                />
+              </div>
+            )}
           </div>
         </div>
       </SubscriptionCard>
@@ -191,6 +235,7 @@ const UserSubscription = () => {
     );
   }
 
+  // If no subscription data was found
   if (!subscription) {
     return (
       <SubscriptionCard 

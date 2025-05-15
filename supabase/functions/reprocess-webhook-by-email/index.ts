@@ -60,16 +60,7 @@ serve(async (req) => {
         
       if (tableCheckError) {
         console.error('Error checking payment_webhooks table:', tableCheckError);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Error checking payment_webhooks table: ' + tableCheckError.message
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        throw new Error('Error checking payment_webhooks table: ' + tableCheckError.message);
       }
     } catch (tableError) {
       console.error('Exception when checking payment_webhooks table:', tableError);
@@ -85,23 +76,99 @@ serve(async (req) => {
       );
     }
 
-    // Find unprocessed webhooks
-    let webhookQuery = supabaseAdmin.from('payment_webhooks')
-      .select('*')
-      .eq('processed', false)
-      .order('created_at', { ascending: false });
+    // Find unprocessed webhooks - using proper JSON query syntax
+    let webhooks;
+    let webhookError;
     
-    // Filter by specific lowProfileId if provided
     if (lowProfileId) {
-      webhookQuery = webhookQuery.filter('payload->LowProfileId', 'eq', lowProfileId);
-    } 
-    // Otherwise filter by email
-    else if (email) {
-      webhookQuery = webhookQuery.or(`(payload->'TranzactionInfo'->>'CardOwnerEmail')::text ILIKE '%${email}%',(payload->'UIValues'->>'CardOwnerEmail')::text ILIKE '%${email}%'`);
+      // Filter by specific lowProfileId if provided
+      ({ data: webhooks, error: webhookError } = await supabaseAdmin
+        .from('payment_webhooks')
+        .select('*')
+        .eq('processed', false)
+        .eq('payload->>LowProfileId', lowProfileId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      );
+    } else if (email) {
+      try {
+        // Try first query approach
+        ({ data: webhooks, error: webhookError } = await supabaseAdmin
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', false)
+          .or(`payload->'TranzactionInfo'->>'CardOwnerEmail' ILIKE '%${email}%',payload->'UIValues'->>'CardOwnerEmail' ILIKE '%${email}%'`)
+          .order('created_at', { ascending: false })
+          .limit(5)
+        );
+        
+        if (webhookError) {
+          console.log('First query approach failed, trying alternative:', webhookError);
+          
+          // Try alternative approach
+          ({ data: webhooks, error: webhookError } = await supabaseAdmin
+            .from('payment_webhooks')
+            .select('*')
+            .eq('processed', false)
+            .order('created_at', { ascending: false })
+            .limit(10)
+          );
+          
+          // Manually filter by email
+          if (!webhookError && webhooks) {
+            webhooks = webhooks.filter((webhook: any) => {
+              const payload = webhook.payload || {};
+              const emailTranzaction = payload.TranzactionInfo?.CardOwnerEmail || '';
+              const emailUI = payload.UIValues?.CardOwnerEmail || '';
+              
+              return emailTranzaction.toLowerCase().includes(email.toLowerCase()) || 
+                    emailUI.toLowerCase().includes(email.toLowerCase());
+            });
+          }
+        }
+      } catch (jsonError) {
+        console.error('JSON query syntax error:', jsonError);
+        
+        // Fallback to simpler query if JSON queries fail
+        ({ data: webhooks, error: webhookError } = await supabaseAdmin
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', false)
+          .order('created_at', { ascending: false })
+          .limit(10)
+        );
+        
+        // Manually filter results
+        if (!webhookError && webhooks) {
+          webhooks = webhooks.filter((webhook: any) => {
+            try {
+              const payload = webhook.payload || {};
+              if (typeof payload === 'string') {
+                try {
+                  const parsedPayload = JSON.parse(payload);
+                  const emailFields = [
+                    parsedPayload.TranzactionInfo?.CardOwnerEmail,
+                    parsedPayload.UIValues?.CardOwnerEmail
+                  ];
+                  return emailFields.some(e => e && e.toLowerCase().includes(email.toLowerCase()));
+                } catch {
+                  return false;
+                }
+              } else {
+                const emailFields = [
+                  payload.TranzactionInfo?.CardOwnerEmail,
+                  payload.UIValues?.CardOwnerEmail
+                ];
+                return emailFields.some(e => e && e.toLowerCase().includes(email.toLowerCase()));
+              }
+            } catch {
+              return false;
+            }
+          });
+        }
+      }
     }
     
-    const { data: webhooks, error: webhookError } = await webhookQuery.limit(5);
-        
     if (webhookError) {
       console.error('Error fetching webhooks:', webhookError);
       return new Response(
@@ -116,27 +183,25 @@ serve(async (req) => {
       );
     }
 
+    // If no unprocessed webhooks found and forceRefresh is true, sync subscription data anyway
+    if ((!webhooks || webhooks.length === 0) && forceRefresh && userId) {
+      await syncSubscriptionData(supabaseAdmin, userId, email);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No unprocessed webhooks found but subscription data synced',
+          webhooksProcessed: 0
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
     // If no unprocessed webhooks found
     if (!webhooks || webhooks.length === 0) {
-      console.log('No unprocessed webhooks found');
-      
-      // If forceRefresh is true, try to sync subscription data anyway
-      if (forceRefresh && userId) {
-        await syncSubscriptionData(supabaseAdmin, userId, email);
-        
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'No unprocessed webhooks found but subscription data synced',
-            webhooksProcessed: 0
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      
       return new Response(
         JSON.stringify({
           success: false,
@@ -163,21 +228,31 @@ serve(async (req) => {
       let targetUserId = userId;
       
       if (!targetUserId && lookupEmail) {
-        // Try to find user by email
-        const { data: users, error: userError } = await supabaseAdmin.auth.admin.listUsers({
-          filters: [{
-            property: 'email',
-            operator: 'eq',
-            value: lookupEmail
-          }]
-        });
-        
-        if (userError || !users?.users?.length) {
-          console.error('Error finding user by email or no user found:', userError || 'No user found');
+        try {
+          // Try to find user by email
+          const { data: users, error: userError } = await supabaseAdmin.auth.admin.listUsers({
+            filters: [{
+              property: 'email',
+              operator: 'eq',
+              value: lookupEmail
+            }]
+          });
+          
+          if (userError) {
+            console.error('Error finding user by email:', userError);
+            continue;
+          }
+          
+          if (users?.users?.length) {
+            targetUserId = users.users[0].id;
+          } else {
+            console.error('No user found with email:', lookupEmail);
+            continue;
+          }
+        } catch (userLookupError) {
+          console.error('Error looking up user:', userLookupError);
           continue;
         }
-        
-        targetUserId = users.users[0].id;
       }
       
       if (!targetUserId) {
@@ -299,78 +374,90 @@ async function processWebhookForUser(supabase: any, webhook: any, userId: string
   
   // If we have token info, store it in recurring_payments
   if (tokenInfo && tokenInfo.Token) {
-    const { data: existingToken } = await supabase
-      .from('recurring_payments')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('token', tokenInfo.Token)
-      .limit(1);
-      
-    if (existingToken && existingToken.length > 0) {
-      console.log(`Token ${tokenInfo.Token} already exists for user ${userId}`);
-      
-      // Update token validity
-      await supabase
+    try {
+      const { data: existingToken } = await supabase
         .from('recurring_payments')
-        .update({
-          is_valid: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingToken[0].id);
-    } else {
-      // Insert new token
-      const { error: tokenError } = await supabase
-        .from('recurring_payments')
-        .insert({
-          user_id: userId,
-          token: tokenInfo.Token,
-          token_expiry: parseCardcomDateString(tokenInfo.TokenExDate),
-          token_approval_number: tokenInfo.TokenApprovalNumber || '',
-          last_4_digits: transactionInfo?.Last4CardDigits || null,
-          card_type: transactionInfo?.CardInfo || null,
-          status: 'active',
-          is_valid: true
-        });
+        .select('id')
+        .eq('user_id', userId)
+        .eq('token', tokenInfo.Token)
+        .limit(1);
         
-      if (tokenError) {
-        console.error('Error storing token:', tokenError);
+      if (existingToken && existingToken.length > 0) {
+        console.log(`Token ${tokenInfo.Token} already exists for user ${userId}`);
+        
+        // Update token validity
+        await supabase
+          .from('recurring_payments')
+          .update({
+            is_valid: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingToken[0].id);
       } else {
-        console.log('Token stored successfully');
+        // Insert new token - with proper error handling for required fields
+        const tokenExpiry = parseCardcomDateString(tokenInfo.TokenExDate || '20301231'); // Default to future date if missing
+        
+        const { error: tokenError } = await supabase
+          .from('recurring_payments')
+          .insert({
+            user_id: userId,
+            token: tokenInfo.Token,
+            token_expiry: tokenExpiry,
+            token_approval_number: tokenInfo.TokenApprovalNumber || '',
+            last_4_digits: transactionInfo?.Last4CardDigits || null,
+            card_type: transactionInfo?.CardInfo || null,
+            status: 'active',
+            is_valid: true
+          });
+          
+        if (tokenError) {
+          console.error('Error storing token:', tokenError);
+        } else {
+          console.log('Token stored successfully');
+        }
       }
+    } catch (tokenStoreError) {
+      console.error('Exception storing token:', tokenStoreError);
     }
   }
   
   // Update subscription with token if available
   if (tokenInfo?.Token) {
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-      
-    if (subscription) {
-      await supabase
+    try {
+      const { data: subscription } = await supabase
         .from('subscriptions')
-        .update({
-          token: tokenInfo.Token,
-          status: responseCode === 0 ? 'active' : subscription.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscription.id);
-    } else {
-      // Create new subscription if none exists
-      await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: userId,
-          plan_type: 'monthly', // Default plan type
-          status: responseCode === 0 ? 'active' : 'pending',
-          token: tokenInfo.Token,
-          payment_method: 'cardcom',
-          current_period_ends_at: calculatePeriodEnd(30), // Default to 30 days
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+        
+      if (subscription) {
+        await supabase
+          .from('subscriptions')
+          .update({
+            token: tokenInfo.Token,
+            status: responseCode === 0 ? 'active' : subscription.status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', subscription.id);
+      } else {
+        // Create new subscription if none exists
+        const defaultPeriodEnd = calculatePeriodEnd(30); // Default to 30 days
+        
+        await supabase
+          .from('subscriptions')
+          .insert({
+            user_id: userId,
+            plan_type: 'monthly', // Default plan type
+            status: responseCode === 0 ? 'active' : 'pending',
+            token: tokenInfo.Token,
+            payment_method: 'cardcom',
+            current_period_ends_at: defaultPeriodEnd,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+      }
+    } catch (subscriptionError) {
+      console.error('Error updating subscription:', subscriptionError);
     }
   }
   
@@ -386,14 +473,54 @@ async function syncSubscriptionData(supabase: any, userId: string, email?: strin
   console.log(`Syncing subscription data for user ${userId}`);
   
   // Get subscription
-  const { data: subscription } = await supabase
+  const { data: subscription, error: subError } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
     
+  if (subError) {
+    console.error('Error fetching subscription:', subError);
+    return;
+  }
+    
   if (!subscription) {
-    console.log(`No subscription found for user ${userId}`);
+    console.log(`No subscription found for user ${userId}, trying to create one`);
+    
+    // Try to find a valid token for this user
+    const { data: recurringPayments } = await supabase
+      .from('recurring_payments')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_valid', true)
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (recurringPayments && recurringPayments.length > 0) {
+      // Create a subscription using the available token
+      const token = recurringPayments[0].token;
+      const periodEnd = calculatePeriodEnd(30); // Default to 30 days
+      
+      const { error: createError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          plan_type: 'monthly', // Default plan type
+          status: 'active',
+          token: token,
+          payment_method: 'cardcom',
+          current_period_ends_at: periodEnd,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (createError) {
+        console.error('Error creating new subscription:', createError);
+      } else {
+        console.log('Created new subscription for user based on existing token');
+      }
+    }
+    
     return;
   }
   
@@ -407,6 +534,46 @@ async function syncSubscriptionData(supabase: any, userId: string, email?: strin
     
   if (!recurringPayments || recurringPayments.length === 0) {
     console.log(`No valid recurring payment tokens found for user ${userId}`);
+    
+    // Check user_payment_logs for any recent successful payments
+    const { data: recentPayments } = await supabase
+      .from('user_payment_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'payment_success')
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (recentPayments && recentPayments.length > 0 && recentPayments[0].payment_data?.token_info?.token) {
+      console.log('Found token in recent payment logs, creating missing recurring payment record');
+      
+      const tokenData = recentPayments[0].payment_data.token_info;
+      const expiryDate = tokenData.expiry ? parseCardcomDateString(tokenData.expiry) : calculatePeriodEnd(365);
+      
+      // Create a recurring_payments record from payment log data
+      await supabase
+        .from('recurring_payments')
+        .insert({
+          user_id: userId,
+          token: tokenData.token,
+          token_expiry: expiryDate,
+          token_approval_number: '',
+          status: 'active',
+          is_valid: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      // Update subscription with this token
+      await supabase
+        .from('subscriptions')
+        .update({
+          token: tokenData.token,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+    }
+    
     return;
   }
   

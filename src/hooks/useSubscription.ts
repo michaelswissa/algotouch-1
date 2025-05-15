@@ -45,18 +45,44 @@ export const useSubscription = (): UseSubscriptionReturn => {
     try {
       setIsCheckingPayments(true);
       
-      // Check for unprocessed webhooks with this user's email - use a correct JSON query
-      // Fixed: Using ->>, which extracts JSON values as text, then applying ILIKE
+      // Check for unprocessed webhooks with this user's email - using CORRECT JSON query syntax
+      // First attempt: Use JSON extraction with proper casting and ILIKE
       const { data: webhooks, error: webhookError } = await supabase
         .from('payment_webhooks')
         .select('*')
         .eq('processed', false)
-        .or(`(payload->'TranzactionInfo'->>'CardOwnerEmail')::text ILIKE '%${user.email}%',(payload->'UIValues'->>'CardOwnerEmail')::text ILIKE '%${user.email}%'`)
+        .or(`payload->'TranzactionInfo'->>'CardOwnerEmail' ILIKE '%${user.email}%',payload->'UIValues'->>'CardOwnerEmail' ILIKE '%${user.email}%'`)
         .order('created_at', { ascending: false })
         .limit(5);
-        
+      
       if (webhookError) {
         console.error('Error checking for unprocessed webhooks:', webhookError);
+        
+        // Fallback approach with simpler query if the complex one fails
+        const { data: basicWebhooks } = await supabase
+          .from('payment_webhooks')
+          .select('*')
+          .eq('processed', false)
+          .order('created_at', { ascending: false })
+          .limit(10);
+          
+        // Manually filter webhooks that might be related to this user
+        if (basicWebhooks && basicWebhooks.length > 0) {
+          const userRelatedWebhooks = basicWebhooks.filter(webhook => {
+            const payload = webhook.payload || {};
+            const email1 = payload.TranzactionInfo?.CardOwnerEmail || '';
+            const email2 = payload.UIValues?.CardOwnerEmail || '';
+            
+            return email1.toLowerCase().includes(user.email.toLowerCase()) || 
+                   email2.toLowerCase().includes(user.email.toLowerCase());
+          });
+          
+          if (userRelatedWebhooks.length > 0) {
+            console.log('Found unprocessed webhook(s) with manual filtering:', userRelatedWebhooks.length);
+            return true;
+          }
+        }
+        
         return false;
       }
       
@@ -83,7 +109,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
             .from('payment_webhooks')
             .select('*')
             .eq('processed', false)
-            .filter('payload->LowProfileId', 'eq', payment.token)
+            .eq('payload->>LowProfileId', payment.token)
             .limit(1);
             
           if (tokenWebhooks && tokenWebhooks.length > 0) {
@@ -94,7 +120,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
       }
       
       // Also check recurring_payments table for this user
-      const { data: recurringPayments } = await supabase
+      const { data: recurringPayments, error: recurringError } = await supabase
         .from('recurring_payments')
         .select('token, is_valid, token_expiry')
         .eq('user_id', user.id)
@@ -102,20 +128,24 @@ export const useSubscription = (): UseSubscriptionReturn => {
         .gte('token_expiry', new Date().toISOString().split('T')[0])
         .limit(1);
         
-      if (recurringPayments && recurringPayments.length === 0 && subscription) {
-        console.log('User has subscription but no valid recurring payment token');
-        // This indicates a potential inconsistency that might need fixing
-        return true;
-      }
-      
-      // Check if there's a mismatch between subscription and recurring_payments
-      if (recurringPayments?.length > 0 && subscription) {
-        const recurringToken = recurringPayments[0].token;
-        
-        if (subscription.token !== recurringToken) {
-          console.log('Token mismatch between subscription and recurring_payments');
-          // There's an inconsistency that needs to be fixed
+      if (recurringError) {
+        console.error('Error checking recurring payments:', recurringError);
+      } else {
+        if (recurringPayments && recurringPayments.length === 0 && subscription) {
+          console.log('User has subscription but no valid recurring payment token');
+          // This indicates a potential inconsistency that might need fixing
           return true;
+        }
+        
+        // Check if there's a mismatch between subscription and recurring_payments
+        if (recurringPayments?.length > 0 && subscription) {
+          const recurringToken = recurringPayments[0].token;
+          
+          if (subscription.token !== recurringToken) {
+            console.log('Token mismatch between subscription and recurring_payments');
+            // There's an inconsistency that needs to be fixed
+            return true;
+          }
         }
       }
       
