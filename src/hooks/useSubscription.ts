@@ -45,13 +45,13 @@ export const useSubscription = (): UseSubscriptionReturn => {
     try {
       setIsCheckingPayments(true);
       
-      // Check for unprocessed webhooks with this user's email - using CORRECT JSON query syntax
-      // First attempt: Use JSON extraction with proper casting and ILIKE
+      // Check for unprocessed webhooks with this user's email
+      // Use proper filter function instead of raw SQL to ensure type safety
       const { data: webhooks, error: webhookError } = await supabase
         .from('payment_webhooks')
         .select('*')
         .eq('processed', false)
-        .or(`payload->'TranzactionInfo'->>'CardOwnerEmail' ILIKE '%${user.email}%',payload->'UIValues'->>'CardOwnerEmail' ILIKE '%${user.email}%'`)
+        .filter('payload->TranzactionInfo->CardOwnerEmail', 'ilike', `%${user.email}%`)
         .order('created_at', { ascending: false })
         .limit(5);
       
@@ -109,7 +109,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
             .from('payment_webhooks')
             .select('*')
             .eq('processed', false)
-            .eq('payload->>LowProfileId', payment.token)
+            .filter('payload->LowProfileId', 'eq', payment.token)
             .limit(1);
             
           if (tokenWebhooks && tokenWebhooks.length > 0) {
