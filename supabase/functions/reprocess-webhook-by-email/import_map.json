@@ -1,6 +1,8 @@
 
 {
   "imports": {
-    "supabase-js": "https://esm.sh/@supabase/supabase-js@2.7.1"
+    "https://deno.land/std@0.168.0/http/server.ts": "https://deno.land/std@0.168.0/http/server.ts",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.7.1",
+    "cors": "https://deno.land/x/cors@v1.2.2/mod.ts"
   }
 }

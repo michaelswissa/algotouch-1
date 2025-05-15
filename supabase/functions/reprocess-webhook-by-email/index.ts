@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -50,6 +51,40 @@ serve(async (req) => {
       forceRefresh
     });
 
+    // Verify the payment_webhooks table exists before querying
+    try {
+      const { error: tableCheckError } = await supabaseAdmin
+        .from('payment_webhooks')
+        .select('id')
+        .limit(1);
+        
+      if (tableCheckError) {
+        console.error('Error checking payment_webhooks table:', tableCheckError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: 'Error checking payment_webhooks table: ' + tableCheckError.message
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    } catch (tableError) {
+      console.error('Exception when checking payment_webhooks table:', tableError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Exception checking payment_webhooks table: ' + tableError.message
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Find unprocessed webhooks
     let webhookQuery = supabaseAdmin.from('payment_webhooks')
       .select('*')
@@ -58,11 +93,11 @@ serve(async (req) => {
     
     // Filter by specific lowProfileId if provided
     if (lowProfileId) {
-      webhookQuery = webhookQuery.contains('payload', { LowProfileId: lowProfileId });
+      webhookQuery = webhookQuery.filter('payload->LowProfileId', 'eq', lowProfileId);
     } 
     // Otherwise filter by email
     else if (email) {
-      webhookQuery = webhookQuery.or(`payload->TranzactionInfo->CardOwnerEmail.ilike.%${email}%,payload->UIValues->CardOwnerEmail.ilike.%${email}%`);
+      webhookQuery = webhookQuery.or(`(payload->'TranzactionInfo'->>'CardOwnerEmail')::text ILIKE '%${email}%',(payload->'UIValues'->>'CardOwnerEmail')::text ILIKE '%${email}%'`);
     }
     
     const { data: webhooks, error: webhookError } = await webhookQuery.limit(5);

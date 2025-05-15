@@ -45,12 +45,13 @@ export const useSubscription = (): UseSubscriptionReturn => {
     try {
       setIsCheckingPayments(true);
       
-      // Check for unprocessed webhooks with this user's email - use a more detailed query
+      // Check for unprocessed webhooks with this user's email - use a correct JSON query
+      // Fixed: Using ->>, which extracts JSON values as text, then applying ILIKE
       const { data: webhooks, error: webhookError } = await supabase
         .from('payment_webhooks')
         .select('*')
         .eq('processed', false)
-        .or(`payload->TranzactionInfo->CardOwnerEmail.ilike.%${user.email}%,payload->UIValues->CardOwnerEmail.ilike.%${user.email}%`)
+        .or(`(payload->'TranzactionInfo'->>'CardOwnerEmail')::text ILIKE '%${user.email}%',(payload->'UIValues'->>'CardOwnerEmail')::text ILIKE '%${user.email}%'`)
         .order('created_at', { ascending: false })
         .limit(5);
         
@@ -82,7 +83,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
             .from('payment_webhooks')
             .select('*')
             .eq('processed', false)
-            .contains('payload', { LowProfileId: payment.token })
+            .filter('payload->LowProfileId', 'eq', payment.token)
             .limit(1);
             
           if (tokenWebhooks && tokenWebhooks.length > 0) {

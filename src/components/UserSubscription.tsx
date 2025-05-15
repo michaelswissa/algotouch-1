@@ -34,6 +34,7 @@ const UserSubscription = () => {
     subscription, 
     loading, 
     details, 
+    error,
     refreshSubscription, 
     checkForUnprocessedPayments 
   } = useSubscription();
@@ -41,6 +42,8 @@ const UserSubscription = () => {
   const [hasUnprocessedPayment, setHasUnprocessedPayment] = useState(false);
   const [specificLowProfileId, setSpecificLowProfileId] = useState('');
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Clear registration data on component mount if subscription exists
   useEffect(() => {
@@ -53,15 +56,20 @@ const UserSubscription = () => {
   // Check for unprocessed payments when the component mounts or when the user changes
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      if (!user?.id || !user?.email || loading || subscription) return;
+      if (!user?.id || !user?.email || loading) return;
       
       try {
+        setCheckError(null);
+        
+        // If we already have a subscription or we've retried too many times, skip the check
+        if (subscription && retryCount > 0) return;
+        
         // Check for unprocessed payments
         const hasUnprocessed = await checkForUnprocessedPayments();
         setHasUnprocessedPayment(hasUnprocessed);
         
-        // If there are unprocessed payments, try to auto-process them
-        if (hasUnprocessed) {
+        // If there are unprocessed payments and we don't have a subscription yet, try to auto-process them
+        if (hasUnprocessed && !subscription) {
           setIsAutoProcessing(true);
           
           try {
@@ -80,10 +88,12 @@ const UserSubscription = () => {
               await refreshSubscription();
             } else {
               console.log('Auto-processing failed:', data?.message);
+              setRetryCount(prev => prev + 1);
               // Don't show error message yet, we'll just fallback to manual processing
             }
           } catch (err) {
             console.error('Auto-processing failed:', err);
+            setRetryCount(prev => prev + 1);
             // Don't show error message, we'll just fallback to manual processing
           } finally {
             setIsAutoProcessing(false);
@@ -91,6 +101,8 @@ const UserSubscription = () => {
         }
       } catch (err) {
         console.error('Error checking payment status:', err);
+        setCheckError('שגיאה בבדיקת סטטוס התשלום');
+        setRetryCount(prev => prev + 1);
       }
     };
     
@@ -99,24 +111,64 @@ const UserSubscription = () => {
       sessionStorage.removeItem('registration_data');
     }
     
-    checkPaymentStatus();
+    // Only check payment status if we haven't retried too many times
+    if (retryCount < 3) {
+      checkPaymentStatus();
+    }
     
     // Set up periodic refresh of subscription data
     const refreshInterval = setInterval(() => {
-      if (user?.id && refreshSubscription) {
+      if (user?.id && refreshSubscription && retryCount < 3) {
         refreshSubscription().catch(console.error);
       }
     }, 60000); // Check every minute
     
     return () => clearInterval(refreshInterval);
-  }, [user, loading, subscription, checkForUnprocessedPayments, refreshSubscription]);
+  }, [user, loading, subscription, checkForUnprocessedPayments, refreshSubscription, retryCount]);
 
   // Function to manually refresh subscription data
   const handleManualRefresh = async () => {
     if (refreshSubscription) {
-      await refreshSubscription();
+      setRetryCount(0); // Reset retry count on manual refresh
+      try {
+        await refreshSubscription();
+        toast.success('הנתונים עודכנו בהצלחה');
+        setCheckError(null);
+      } catch (err) {
+        console.error('Error refreshing subscription:', err);
+        toast.error('שגיאה בעדכון הנתונים');
+        setCheckError('שגיאה בעדכון הנתונים');
+      }
     }
   };
+
+  // If we have an error and retried too many times, show an error state to avoid infinite loading
+  if (checkError && retryCount >= 3) {
+    return (
+      <SubscriptionCard 
+        title="שגיאה בטעינת פרטי המנוי" 
+        description="אירעה שגיאה בטעינת פרטי המנוי"
+      >
+        <div className="p-6">
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              {checkError}
+            </AlertDescription>
+          </Alert>
+          <Button 
+            onClick={handleManualRefresh}
+            className="w-full"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            נסה שוב
+          </Button>
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            <p>אם הבעיה נמשכת, אנא נסה להתחבר מחדש או צור קשר עם התמיכה</p>
+          </div>
+        </div>
+      </SubscriptionCard>
+    );
+  }
 
   if (loading || isAutoProcessing) {
     return <LoadingSkeleton />;
