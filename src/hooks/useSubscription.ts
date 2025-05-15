@@ -46,49 +46,39 @@ export const useSubscription = (): UseSubscriptionReturn => {
       setIsCheckingPayments(true);
       
       // Check for unprocessed webhooks with this user's email
-      // Use proper query structure to avoid TypeScript errors
+      // Fix: Use a different approach to query JSON fields to avoid TypeScript errors
       const { data: webhooks, error: webhookError } = await supabase
         .from('payment_webhooks')
         .select('*')
         .eq('processed', false)
-        .or(`payload->>'TranzactionInfo.CardOwnerEmail'.ilike.%${user.email}%,payload->>'UIValues.CardOwnerEmail'.ilike.%${user.email}%`)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
       
       if (webhookError) {
         console.error('Error checking for unprocessed webhooks:', webhookError);
-        
-        // Fallback approach with simpler query if the complex one fails
-        const { data: basicWebhooks } = await supabase
-          .from('payment_webhooks')
-          .select('*')
-          .eq('processed', false)
-          .order('created_at', { ascending: false })
-          .limit(10);
-          
-        // Manually filter webhooks that might be related to this user
-        if (basicWebhooks && basicWebhooks.length > 0) {
-          const userRelatedWebhooks = basicWebhooks.filter(webhook => {
-            const payload = webhook.payload || {};
-            const email1 = payload.TranzactionInfo?.CardOwnerEmail || '';
-            const email2 = payload.UIValues?.CardOwnerEmail || '';
-            
-            return email1.toLowerCase().includes(user.email.toLowerCase()) || 
-                   email2.toLowerCase().includes(user.email.toLowerCase());
-          });
-          
-          if (userRelatedWebhooks.length > 0) {
-            console.log('Found unprocessed webhook(s) with manual filtering:', userRelatedWebhooks.length);
-            return true;
-          }
-        }
-        
         return false;
       }
       
+      // Manually filter webhooks that contain the user's email in the payload
       if (webhooks && webhooks.length > 0) {
-        console.log('Found unprocessed webhook(s) for user email:', user.email, webhooks.length);
-        return true;
+        const userRelatedWebhooks = webhooks.filter(webhook => {
+          const payload = webhook.payload || {};
+          
+          // Check if the email exists in TranzactionInfo.CardOwnerEmail
+          const tranzactionEmail = payload.TranzactionInfo?.CardOwnerEmail || '';
+          
+          // Check if the email exists in UIValues.CardOwnerEmail
+          const uiValuesEmail = payload.UIValues?.CardOwnerEmail || '';
+          
+          // Return true if the email is found in either location
+          return tranzactionEmail.toLowerCase().includes(user.email.toLowerCase()) || 
+                 uiValuesEmail.toLowerCase().includes(user.email.toLowerCase());
+        });
+        
+        if (userRelatedWebhooks.length > 0) {
+          console.log('Found unprocessed webhook(s) for user email:', user.email, userRelatedWebhooks.length);
+          return true;
+        }
       }
       
       // If no webhook found by email, check by specific LowProfileId from known tokens
@@ -109,12 +99,19 @@ export const useSubscription = (): UseSubscriptionReturn => {
             .from('payment_webhooks')
             .select('*')
             .eq('processed', false)
-            .or(`payload->>'LowProfileId'.eq.${payment.token}`)
-            .limit(1);
+            .limit(10);
             
           if (tokenWebhooks && tokenWebhooks.length > 0) {
-            console.log('Found unprocessed webhook by token:', payment.token);
-            return true;
+            // Manually filter to find webhooks matching this token
+            const matchingWebhooks = tokenWebhooks.filter(webhook => {
+              const payload = webhook.payload || {};
+              return payload.LowProfileId === payment.token;
+            });
+            
+            if (matchingWebhooks.length > 0) {
+              console.log('Found unprocessed webhook by token:', payment.token);
+              return true;
+            }
           }
         }
       }
