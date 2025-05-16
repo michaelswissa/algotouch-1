@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { useAuthValidation } from '@/hooks/auth/useAuthValidation';
 
 const Auth = () => {
   const { isAuthenticated, loading, initialized, error } = useAuth();
@@ -17,16 +18,15 @@ const Auth = () => {
   const navigate = useNavigate();
   const state = location.state as { from?: Location, redirectToSubscription?: boolean };
 
+  // Use our new hook for auth-related validation logic
+  useAuthValidation({ error, navigate });
+
   // Get initial tab from URL if present
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(location.search);
-      const tab = params.get('tab');
-      if (tab === 'signup') {
-        setActiveTab('signup');
-      }
-    } catch (error) {
-      console.error("Error parsing URL params:", error);
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'signup') {
+      setActiveTab('signup');
     }
   }, [location]);
 
@@ -64,25 +64,9 @@ const Auth = () => {
     }
   }, [navigate, location.state]);
 
-  // Store any auth error in localStorage for the error page
-  useEffect(() => {
-    if (error) {
-      try {
-        localStorage.setItem('auth_error', error.message || 'Unknown auth error');
-        navigate('/auth-error', { replace: true });
-      } catch (e) {
-        console.error('Failed to store auth error:', e);
-      }
-    }
-  }, [error, navigate]);
-
   // Show loading state while auth is initializing
   if (!initialized || loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <AuthLoadingState />;
   }
 
   // If user is already authenticated, redirect to dashboard or subscription
@@ -95,20 +79,7 @@ const Auth = () => {
   }
 
   return (
-    <ErrorBoundary fallback={
-      <div className="flex min-h-screen items-center justify-center bg-red-50 dark:bg-red-900/20 p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">שגיאה בטעינת עמוד ההתחברות</h2>
-          <p className="mb-4">אירעה שגיאה בטעינת העמוד. אנא נסה שוב מאוחר יותר.</p>
-          <button 
-            onClick={() => navigate('/auth-error')} 
-            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
-          >
-            פרטי שגיאה
-          </button>
-        </div>
-      </div>
-    }>
+    <ErrorBoundary fallback={<AuthErrorState navigate={navigate} />}>
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-background to-background/90 p-4 dark:bg-background dark:text-foreground" dir="rtl">
         <div className="w-full max-w-md space-y-6">
           <AuthHeader />
@@ -132,5 +103,28 @@ const Auth = () => {
     </ErrorBoundary>
   );
 };
+
+// Extracted loading state component
+const AuthLoadingState = () => (
+  <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background/90 p-4">
+    <Spinner size="lg" />
+  </div>
+);
+
+// Extracted error state component
+const AuthErrorState = ({ navigate }: { navigate: ReturnType<typeof useNavigate> }) => (
+  <div className="flex min-h-screen items-center justify-center bg-red-50 dark:bg-red-900/20 p-4">
+    <div className="text-center">
+      <h2 className="text-2xl font-bold mb-4">שגיאה בטעינת עמוד ההתחברות</h2>
+      <p className="mb-4">אירעה שגיאה בטעינת העמוד. אנא נסה שוב מאוחר יותר.</p>
+      <button 
+        onClick={() => navigate('/auth-error')} 
+        className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+      >
+        פרטי שגיאה
+      </button>
+    </div>
+  </div>
+);
 
 export default Auth;

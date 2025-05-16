@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Route, Navigate } from 'react-router-dom';
+import { Route } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 // Import pages
@@ -9,6 +9,7 @@ import Dashboard from '@/pages/Dashboard';
 import NotFound from '@/pages/NotFound';
 import CourseDetail from '@/pages/CourseDetail';
 import Index from '@/pages/Index';
+import AuthLoadError from '@/pages/AuthLoadError';
 
 // Define route configurations
 export const routes = [
@@ -22,6 +23,11 @@ export const routes = [
   {
     path: '/auth',
     element: <ProtectedRoute requireAuth={false}><Auth /></ProtectedRoute>,
+    isPublic: true
+  },
+  {
+    path: '/auth-error',
+    element: <AuthLoadError />,
     isPublic: true
   },
   
@@ -57,8 +63,9 @@ export const generateRouteComponents = () => {
     // Fallback to basic routes if there's an error
     return [
       <Route key="index" path="/" element={<Index />} />,
-      <Route key="dashboard" path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />,
       <Route key="auth" path="/auth" element={<ProtectedRoute requireAuth={false}><Auth /></ProtectedRoute>} />,
+      <Route key="auth-error" path="/auth-error" element={<AuthLoadError />} />,
+      <Route key="dashboard" path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />,
       <Route key="not-found" path="*" element={<NotFound />} />
     ];
   }
