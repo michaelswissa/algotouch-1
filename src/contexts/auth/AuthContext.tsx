@@ -1,8 +1,9 @@
 
-import React, { createContext, useContext } from 'react';
+import { createContext } from 'react';
 import { AuthContextType } from './types';
 
-// Create context with a default value
+// Create context with a default value that doesn't cause errors
+// This prevents issues when accessing context before provider is mounted
 const defaultValue: AuthContextType = {
   user: null,
   session: null,
@@ -18,14 +19,3 @@ const defaultValue: AuthContextType = {
 };
 
 export const AuthContext = createContext<AuthContextType>(defaultValue);
-
-// Export a custom hook to use the auth context
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  
-  return context;
-};

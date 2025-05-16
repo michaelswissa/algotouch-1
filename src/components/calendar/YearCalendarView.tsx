@@ -4,20 +4,12 @@ import { useTradingDataStore } from '@/stores/trading-data-store';
 import { YearHeader } from './YearHeader';
 import { MonthCard } from './MonthCard';
 
-interface TradeDay {
-  date: string;
-  trades: number;
-  profit: number;
-  status: "Open" | "Active";
-}
-
-export interface YearCalendarViewProps {
+interface YearCalendarViewProps {
   year: number;
   onMonthSelect: (month: string) => void;
-  tradeDays?: TradeDay[];
 }
 
-export const YearCalendarView = ({ year, onMonthSelect, tradeDays = [] }: YearCalendarViewProps) => {
+export const YearCalendarView = ({ year, onMonthSelect }: YearCalendarViewProps) => {
   // Hebrew month names
   const hebrewMonths = [
     'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -79,4 +71,3 @@ export const YearCalendarView = ({ year, onMonthSelect, tradeDays = [] }: YearCa
     </div>
   );
 };
-

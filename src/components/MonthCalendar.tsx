@@ -13,7 +13,6 @@ interface MonthCalendarProps {
   onDayClick?: (day: number) => void;
   onBackToYear?: () => void;
   tradesData?: Record<string, TradeRecord[]>;
-  selectedDay?: string | null;
 }
 
 const MonthCalendar = ({ 
@@ -22,22 +21,14 @@ const MonthCalendar = ({
   status = 'Open', 
   onDayClick,
   onBackToYear,
-  tradesData = {},
-  selectedDay = null
+  tradesData = {}
 }: MonthCalendarProps) => {
-  const [internalSelectedDay, setInternalSelectedDay] = useState<string | null>(selectedDay);
-  
-  // Update internal state when prop changes
-  useEffect(() => {
-    setInternalSelectedDay(selectedDay);
-  }, [selectedDay]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   
   // Reset selected day when month changes
   useEffect(() => {
-    if (!selectedDay) {
-      setInternalSelectedDay(null);
-    }
-  }, [month, year, selectedDay]);
+    setSelectedDay(null);
+  }, [month, year]);
   
   // Hebrew month names
   const hebrewMonths = [
@@ -90,7 +81,7 @@ const MonthCalendar = ({
       const dayKey = `${day}-${monthIndex}-${year}`;
       console.log("Day clicked:", dayKey, "Has trades:", tradesData[dayKey]?.length || 0);
       
-      setInternalSelectedDay(dayKey);
+      setSelectedDay(dayKey);
       if (onDayClick) onDayClick(day);
     }
   };
@@ -111,7 +102,7 @@ const MonthCalendar = ({
           daysOfWeek={daysOfWeek}
           calendarDays={calendarDays}
           onDayClick={handleDayClick}
-          selectedDay={internalSelectedDay}
+          selectedDay={selectedDay}
           tradesData={tradesData}
           currentMonthIndex={monthIndex}
           currentYear={year}
@@ -135,4 +126,3 @@ const MonthCalendar = ({
 };
 
 export default MonthCalendar;
-

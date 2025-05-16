@@ -49,7 +49,6 @@ export function CalendarPageContent({
           <YearCalendarView 
             year={currentYear} 
             onMonthSelect={handleMonthSelect} 
-            tradeDays={tradeDays}
           />
         </div>
       ) : (
@@ -67,13 +66,9 @@ export function CalendarPageContent({
       )}
       
       {/* Pass tradeDays prop to RecentActivitySection */}
-      <div className="lg:col-span-1">
-        <RecentActivitySection tradeDays={tradeDays} />
-        
-        <div className="mt-6">
-          <EconomicCalendarSection />
-        </div>
-      </div>
+      <RecentActivitySection tradeDays={tradeDays} />
+      
+      <EconomicCalendarSection />
     </div>
   );
 }

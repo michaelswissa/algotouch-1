@@ -1,103 +1,67 @@
 
-import React from 'react';
-import { Upload, File, X, Check } from 'lucide-react';
+import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-
+import { Upload, FileUp, FileText } from 'lucide-react';
+import { useFileUpload } from '@/hooks/use-file-upload';
 interface FileUploadAreaProps {
   selectedFile: File | null;
   isUploading: boolean;
-  error?: string | null;
   onFileChange: (file: File) => void;
 }
-
-const FileUploadArea: React.FC<FileUploadAreaProps> = ({ 
-  selectedFile, 
-  isUploading, 
-  error,
-  onFileChange 
+const FileUploadArea: React.FC<FileUploadAreaProps> = ({
+  selectedFile,
+  isUploading,
+  onFileChange
 }) => {
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  
-  const handleBrowseFiles = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    handleFileChange,
+    handleDragOver,
+    handleDrop
+  } = useFileUpload({
+    onFileAccepted: onFileChange
+  });
+  const handleFileClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onFileChange(file);
-    }
-  };
-  
-  return (
-    <div 
-      className={`w-full p-8 border-2 border-dashed rounded-lg flex flex-col items-center justify-center mb-4 transition-colors
-        ${error ? 'bg-red-50 border-red-300' : selectedFile ? 'bg-green-50 border-green-300' : 'bg-slate-50/50 border-slate-300 hover:bg-slate-50'}`}
-    >
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept=".csv,.xls,.xlsx"
-        className="hidden"
-      />
+  return <div className="mb-6">
+      <p className="mb-4 text-slate-400 text-right w-full">העלה קובץ CSV או Excel המכיל את נתוני המסחר שלך. אפשר לייצא את הקובץ מאפליקציית 
+&quot;AlgoTouchAnalyzer&quot; ב-Tradestation.</p>
       
-      {selectedFile ? (
-        <div className="flex flex-col items-center space-y-2">
-          <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-1">
-            {isUploading ? (
-              <span className="animate-spin">
-                <Upload className="h-6 w-6 text-green-600" />
-              </span>
-            ) : (
-              <File className="h-6 w-6 text-green-600" />
-            )}
-          </div>
-          <p className="text-base font-medium">{selectedFile.name}</p>
-          <p className="text-sm text-gray-500">
-            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-          </p>
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              disabled={isUploading} 
-              onClick={handleBrowseFiles}
-            >
-              החלף קובץ
-            </Button>
-          </div>
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center transition-colors duration-200 hover:border-primary/50 cursor-pointer" onDragOver={handleDragOver} onDrop={handleDrop} onClick={handleFileClick}>
+        <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
+        
+        <div className="mb-4 flex justify-center">
+          <Upload className="h-10 w-10 mx-auto text-gray-400" />
         </div>
-      ) : (
-        <>
-          <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-            <Upload className="h-6 w-6 text-slate-600" />
-          </div>
-          <h3 className="text-lg font-medium mb-1">גרור לכאן או בחר קובץ</h3>
-          <p className="text-sm text-gray-500 text-center mb-4">
-            העלה קובץ CSV או Excel עם נתוני המסחר שלך
-          </p>
-          
-          {error && (
-            <div className="text-red-500 text-sm bg-red-50 p-2 rounded-md mb-4 w-full text-center border border-red-200">
-              <div className="font-semibold mb-1">שגיאה בהעלאת הקובץ</div>
-              <div>{error}</div>
-            </div>
-          )}
-          
-          <Button 
-            variant="outline" 
-            className="bg-white" 
-            onClick={handleBrowseFiles}
-          >
+        <p className="text-lg font-medium mb-2 text-center w-full">גרור ושחרר קובץ CSV או Excel</p>
+        <p className="text-sm text-gray-500 mb-4 text-center w-full">או</p>
+        
+        <div className="flex justify-center w-full">
+          <Button variant="outline" className="gap-2" onClick={e => {
+          e.stopPropagation();
+          handleFileClick();
+        }}>
+            <FileUp size={16} />
             בחר קובץ
           </Button>
-        </>
-      )}
-    </div>
-  );
+        </div>
+        
+        {selectedFile && <div className="mt-4 w-full">
+            <div className="flex items-center gap-2 bg-blue-50 p-3 rounded-md dark:bg-blue-950/30">
+              <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex-1 text-start">
+                <p className="font-medium">{selectedFile.name}</p>
+                <p className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(2)} KB</p>
+              </div>
+              <Button disabled={isUploading} variant="secondary">
+                {isUploading ? 'מעלה...' : 'הועלה בהצלחה'}
+              </Button>
+            </div>
+          </div>}
+      </div>
+    </div>;
 };
-
 export default FileUploadArea;

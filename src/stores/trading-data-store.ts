@@ -10,9 +10,8 @@ interface TradingDataState {
   tradesByDay: Record<string, TradeRecord[]>;
   updateTradesByDay: () => void;
   
-  // For debugging and display
+  // For debugging
   lastUpdateTimestamp: number;
-  getGlobalTradesCount: () => number;
   clearAllData: () => void;
 }
 
@@ -123,10 +122,6 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
     });
   },
   
-  getGlobalTradesCount: () => {
-    return get().globalTrades.length;
-  },
-  
   lastUpdateTimestamp: 0,
   
   clearAllData: () => {
@@ -138,4 +133,3 @@ export const useTradingDataStore = create<TradingDataState>((set, get) => ({
     });
   }
 }));
-

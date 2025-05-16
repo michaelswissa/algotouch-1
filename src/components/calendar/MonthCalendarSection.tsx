@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import MonthCalendar from '@/components/MonthCalendar';
 import { TradeRecord } from '@/lib/trade-analysis';
-import SelectedDayTradesDetailed from '@/components/calendar/SelectedDayTradesDetailed';
+import SelectedDayTrades from '@/components/calendar/SelectedDayTrades';
 import { MonthHeader } from '@/components/calendar/MonthHeader';
 
 interface MonthCalendarSectionProps {
@@ -79,13 +79,8 @@ export const MonthCalendarSection = ({
     const dayKey = `${day}-${monthIndex}-${currentYear}`;
     console.log("Day clicked:", dayKey, "Has trades:", tradesData[dayKey]?.length || 0);
     
-    // If clicking the same day, toggle selection
-    if (selectedDay === dayKey) {
-      setSelectedDay(null);
-    } else {
-      // Set the selected day
-      setSelectedDay(dayKey);
-    }
+    // Set the selected day
+    setSelectedDay(dayKey);
   };
   
   // Get selected day trades
@@ -93,13 +88,7 @@ export const MonthCalendarSection = ({
   
   return (
     <div className="col-span-2">
-      <MonthHeader 
-        currentMonth={currentMonth}
-        currentYear={currentYear} 
-        prevMonth={prevMonth} 
-        nextMonth={nextMonth} 
-        onBackToYear={onBackToYear}
-      />
+      <MonthHeader prevMonth={prevMonth} nextMonth={nextMonth} />
       
       <MonthCalendar 
         month={currentMonth} 
@@ -108,14 +97,13 @@ export const MonthCalendarSection = ({
         onBackToYear={onBackToYear}
         tradesData={tradesData}
         onDayClick={handleDayClick}
-        selectedDay={selectedDay}
       />
       
-      {/* Display selected day trades with our new detailed component */}
-      <SelectedDayTradesDetailed 
+      {/* Display selected day trades */}
+      <SelectedDayTrades 
         selectedDay={selectedDay} 
-        trades={selectedDayTrades} 
-        month={currentMonth}
+        selectedDayTrades={selectedDayTrades} 
+        month={currentMonth} 
       />
     </div>
   );

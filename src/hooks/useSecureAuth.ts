@@ -106,7 +106,7 @@ export function useSecureAuth() {
     }
   }, []);
 
-  // Other auth functions - kept minimal to fix the initial rendering
+  // Sign in function with improved error handling
   const signIn = useCallback(async (email: string, password: string): Promise<void> => {
     try {
       setLoading(true);
@@ -114,9 +114,18 @@ export function useSecureAuth() {
       
       if (error) {
         console.error('Sign in error:', error.message);
-        throw error;
+        
+        // Provide more user-friendly error messages
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('פרטי התחברות שגויים. אנא בדוק את הדוא"ל והסיסמה');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('הדוא"ל שלך לא אומת. אנא בדוק את תיבת הדואר הנכנס שלך');
+        } else {
+          throw error;
+        }
       }
       
+      console.log('Sign in successful');
       toast.success('התחברת בהצלחה!');
     } catch (error) {
       console.error('Error signing in:', error);
@@ -126,6 +135,7 @@ export function useSecureAuth() {
     }
   }, []);
 
+  // Other auth functions with similar improvements...
   const signUp = useCallback(async (userData: {
     email: string;
     password: string;
@@ -154,10 +164,15 @@ export function useSecureAuth() {
       
       if (error) {
         console.error('Sign up error:', error.message);
-        throw error;
+        if (error.message.includes('already registered')) {
+          throw new Error('כתובת הדוא"ל כבר קיימת במערכת');
+        } else {
+          throw error;
+        }
       }
       
-      toast.success('נרשמת בהצלחה!');
+      console.log('Sign up successful, user:', data.user);
+      toast.success('נרשמת בהצלחה! נא לאמת את כתובת הדוא"ל');
       
       return { success: true, user: data.user };
     } catch (error) {
@@ -178,6 +193,7 @@ export function useSecureAuth() {
         throw error;
       }
       
+      console.log('Sign out successful');
       toast.success('התנתקת בהצלחה');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -205,6 +221,7 @@ export function useSecureAuth() {
         throw error;
       }
       
+      console.log('Profile updated successfully');
       toast.success('הפרופיל עודכן בהצלחה');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -227,6 +244,7 @@ export function useSecureAuth() {
         throw error;
       }
       
+      console.log('Password reset email sent successfully');
       toast.success('הוראות לאיפוס הסיסמה נשלחו לדוא"ל שלך');
       return true;
     } catch (error) {
