@@ -3,7 +3,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
-  fallback: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -11,26 +11,34 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null
+  };
 
-  static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI.
+  public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // You can also log the error to an error reporting service
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Uncaught error:', error, errorInfo);
   }
 
-  render(): ReactNode {
+  public render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
-      return this.props.fallback;
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+      
+      return (
+        <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Something went wrong</h2>
+          <p className="text-red-700">
+            {this.state.error?.message || 'An unknown error occurred'}
+          </p>
+        </div>
+      );
     }
 
     return this.props.children;
