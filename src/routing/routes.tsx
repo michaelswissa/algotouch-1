@@ -1,16 +1,23 @@
 
 import React from 'react';
-import { Route } from 'react-router-dom';
+import { Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-// Import Auth and Dashboard pages directly to prevent dynamic imports
+// Import pages
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
 import NotFound from '@/pages/NotFound';
 import CourseDetail from '@/pages/CourseDetail';
+import Index from '@/pages/Index';
 
 // Define route configurations
 export const routes = [
+  // Root redirect to Index page
+  {
+    path: '/',
+    element: <Navigate to="/auth" replace />
+  },
+  
   // Public routes
   {
     path: '/auth',
@@ -49,8 +56,9 @@ export const generateRouteComponents = () => {
     console.error("Failed to generate route components:", error);
     // Fallback to basic routes if there's an error
     return [
-      <Route key="dashboard" path="/dashboard" element={<Dashboard />} />,
-      <Route key="auth" path="/auth" element={<Auth />} />,
+      <Route key="index" path="/" element={<Navigate to="/auth" replace />} />,
+      <Route key="dashboard" path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />,
+      <Route key="auth" path="/auth" element={<ProtectedRoute requireAuth={false}><Auth /></ProtectedRoute>} />,
       <Route key="not-found" path="*" element={<NotFound />} />
     ];
   }
