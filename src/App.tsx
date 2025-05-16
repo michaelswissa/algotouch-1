@@ -6,6 +6,7 @@ import { StockDataProvider } from '@/contexts/stock/StockDataContext';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/contexts/theme';
 import { generateRouteComponents } from '@/routing/routes';
+import RoutePrefetcher from '@/components/RoutePrefetcher';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <AuthProvider>
         <StockDataProvider>
           <Router>
+            <RoutePrefetcher />
             <Routes>
               {generateRouteComponents()}
             </Routes>

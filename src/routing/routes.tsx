@@ -15,7 +15,7 @@ export const routes = [
   // Root redirect to Index page
   {
     path: '/',
-    element: <Navigate to="/auth" replace />
+    element: <Index />
   },
   
   // Public routes
@@ -56,7 +56,7 @@ export const generateRouteComponents = () => {
     console.error("Failed to generate route components:", error);
     // Fallback to basic routes if there's an error
     return [
-      <Route key="index" path="/" element={<Navigate to="/auth" replace />} />,
+      <Route key="index" path="/" element={<Index />} />,
       <Route key="dashboard" path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />,
       <Route key="auth" path="/auth" element={<ProtectedRoute requireAuth={false}><Auth /></ProtectedRoute>} />,
       <Route key="not-found" path="*" element={<NotFound />} />
