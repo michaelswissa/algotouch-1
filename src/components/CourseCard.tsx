@@ -13,16 +13,16 @@ export interface ModuleProps {
 }
 
 export interface CourseProps {
+  id?: string;
   title: string;
   description: string;
   icon: "graduation" | "book" | "play";
-  id?: string;
   modules: ModuleProps[];
   isSelected?: boolean;
   onClick?: () => void;
 }
 
-const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: CourseProps) => {
+const CourseCard = ({ id, title, description, icon, modules, isSelected, onClick }: CourseProps) => {
   // Render the appropriate icon based on the icon prop
   const renderIcon = () => {
     switch (icon) {
