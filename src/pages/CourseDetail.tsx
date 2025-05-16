@@ -4,13 +4,14 @@ import { useParams } from 'react-router-dom';
 import CourseHeader from '@/components/courses/CourseHeader';
 import CourseContentTabs from '@/components/courses/CourseContentTabs';
 import Layout from '@/components/Layout';
-import { coursesData } from '@/components/Courses';
+import Courses from '@/components/Courses';
 
+// Fix the circular import issue by implementing directly
 const CourseDetail = () => {
   const { courseId } = useParams<{ courseId: string }>();
   
   // Find the course data based on the ID from URL params
-  const course = coursesData.find(course => course.id === courseId);
+  const course = Courses.coursesData.find(course => course.id === courseId);
   
   if (!course) {
     return (

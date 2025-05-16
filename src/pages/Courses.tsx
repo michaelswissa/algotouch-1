@@ -2,9 +2,9 @@
 import React, { useState, Suspense } from 'react';
 import Layout from '@/components/Layout';
 import CoursesComponent from '@/components/Courses';
-import ErrorBoundary from '@/components/ErrorBoundary';
 import { GraduationCap, BookOpen, Award, Users, LightbulbIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LoadingPage } from '@/components/ui/spinner';
 
 const CoursesFeatures = () => {
