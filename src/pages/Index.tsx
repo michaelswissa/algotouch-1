@@ -34,23 +34,9 @@ const Index = () => {
     if (registrationData) {
       sessionStorage.removeItem('registration_data');
     }
-    
-    // Also clear any session data that might be causing problems
-    try {
-      // Extract project ref from the Supabase URL
-      const supabaseUrl = "https://ndhakvhrrkczgylcmyoc.supabase.co"; // Using the direct URL instead of getUrl()
-      const projectRef = supabaseUrl.split('//')[1].split('.')[0];
-      const sessionKey = `sb-${projectRef}-auth-token`;
-      
-      if (localStorage.getItem(sessionKey)) {
-        console.log('Found existing Supabase session in localStorage');
-      }
-    } catch (err) {
-      console.error('Error checking Supabase session:', err);
-    }
   }, []);
   
-  // Make sure the redirection works properly
+  // Redirect to the auth page
   return <Navigate to="/auth" replace />;
 };
 
