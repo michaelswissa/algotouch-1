@@ -1,5 +1,8 @@
-import React, { createContext } from 'react';
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface AuthContextProps {
   session: Session | null;
@@ -35,7 +38,7 @@ const initialContext: AuthContextProps = {
   resetPassword: async () => false,
 };
 
-export const AuthContext = createContext<AuthContextProps>(initialContext);
+const AuthContext = createContext<AuthContextProps>(initialContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
