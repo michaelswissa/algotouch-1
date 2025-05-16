@@ -21,7 +21,7 @@ const MonthlyReport = () => {
   // Get the trading store functions to update global trades
   const { setGlobalTrades, clearAllData, getGlobalTradesCount } = useTradingDataStore();
 
-  const tradeCount = getGlobalTradesCount ? getGlobalTradesCount() : 0;
+  const tradeCount = getGlobalTradesCount();
 
   const {
     selectedFile,
@@ -36,10 +36,8 @@ const MonthlyReport = () => {
       } catch (error: any) {
         console.error("Error processing file:", error);
         setUploadError(error.message || "אירעה שגיאה בעיבוד הקובץ");
-        toast({
-          title: "שגיאה בטעינת הקובץ",
-          description: "אנא ודא שהקובץ בפורמט הנכון.",
-          variant: "destructive"
+        toast.error("שגיאה בטעינת הקובץ", {
+          description: "אנא ודא שהקובץ בפורמט הנכון."
         });
         resetFile();
       }
@@ -55,10 +53,8 @@ const MonthlyReport = () => {
       if (tradeData.length === 0) {
         const error = new Error("הקובץ ריק או שפורמט הנתונים אינו תואם למבנה הנדרש");
         setUploadError(error.message);
-        toast({
-          title: "אין נתונים בקובץ",
-          description: error.message,
-          variant: "destructive"
+        toast.error("אין נתונים בקובץ", {
+          description: error.message
         });
         throw error;
       }
@@ -75,8 +71,7 @@ const MonthlyReport = () => {
       console.log("Updating global trades store with", tradeData.length, "trades");
       setGlobalTrades(tradeData);
       
-      toast({
-        title: "הקובץ הועלה בהצלחה",
+      toast.success("הקובץ הועלה בהצלחה", {
         description: `'${file.name}' נוסף לדוח העסקאות שלך והנתונים זמינים גם בלוח השנה`,
       });
     } catch (error: any) {
@@ -88,16 +83,13 @@ const MonthlyReport = () => {
   const handleAddManualTrade = (formData: any) => {
     // Add validation
     if (!formData?.price || !formData?.date) {
-      toast({
-        title: "נתונים חסרים",
-        description: "יש למלא את כל שדות החובה",
-        variant: "destructive"
+      toast.error("נתונים חסרים", {
+        description: "יש למלא את כל שדות החובה"
       });
       return;
     }
     
-    toast({
-      title: "העסקה נשמרה בהצלחה",
+    toast.success("העסקה נשמרה בהצלחה", {
       description: "העסקה החדשה נוספה לרשימת העסקאות שלך"
     });
     

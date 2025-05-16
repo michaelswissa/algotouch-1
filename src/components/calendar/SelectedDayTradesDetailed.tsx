@@ -70,10 +70,10 @@ const SelectedDayTradesDetailed = ({
             <tbody>
               {trades.map((trade, index) => (
                 <tr key={index} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
-                  <td className="px-3 py-2 font-medium">{trade.Symbol || '-'}</td>
+                  <td className="px-3 py-2 font-medium">{trade.Contract || '-'}</td>
                   <td className="px-3 py-2">{trade.Side || '-'}</td>
-                  <td className="px-3 py-2">{trade.Qty || '-'}</td>
-                  <td className="px-3 py-2">{trade.Price ? `$${trade.Price}` : '-'}</td>
+                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2">{trade.EntryPrice ? `$${trade.EntryPrice}` : '-'}</td>
                   <td className="px-3 py-2">{trade.ExitPrice ? `$${trade.ExitPrice}` : '-'}</td>
                   <td className={`px-3 py-2 font-medium ${(trade.Net || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {trade.Net ? `$${trade.Net.toFixed(2)}` : '-'}
@@ -89,3 +89,4 @@ const SelectedDayTradesDetailed = ({
 };
 
 export default SelectedDayTradesDetailed;
+
