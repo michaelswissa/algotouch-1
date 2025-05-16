@@ -9,6 +9,7 @@ interface CalendarDayProps {
   month: 'current' | 'prev' | 'next';
   onClick?: () => void;
   tradeCount?: number;
+  isSelected?: boolean;
 }
 
 const CalendarDay = ({ 
@@ -17,7 +18,8 @@ const CalendarDay = ({
   status = 'neutral', 
   month = 'current', 
   onClick,
-  tradeCount = 0
+  tradeCount = 0,
+  isSelected = false
 }: CalendarDayProps) => {
   const getStatusClass = () => {
     if (month !== 'current') return 'text-gray-300';
@@ -34,13 +36,19 @@ const CalendarDay = ({
         month !== 'current' && 'text-gray-400/50',
         getStatusClass(),
         isToday && 'ring-2 ring-primary',
+        isSelected && 'bg-primary/20 font-bold',
         month === 'current' && 'hover:bg-primary/10 cursor-pointer transition-colors',
       )}
     >
       {day}
       
       {tradeCount > 0 && (
-        <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+        <span className={cn(
+          "absolute -top-1 -right-1 text-xs rounded-full w-4 h-4 flex items-center justify-center",
+          status === 'positive' ? 'bg-green-500 text-white' : 
+          status === 'negative' ? 'bg-red-500 text-white' : 
+          'bg-primary text-white'
+        )}>
           {tradeCount}
         </span>
       )}

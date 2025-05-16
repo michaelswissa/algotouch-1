@@ -10,6 +10,7 @@ import NotFound from '@/pages/NotFound';
 import CourseDetail from '@/pages/CourseDetail';
 import Index from '@/pages/Index';
 import AuthLoadError from '@/pages/AuthLoadError';
+import MonthlyReport from '@/pages/MonthlyReport';
 
 // Define route configurations
 export const routes = [
@@ -40,6 +41,10 @@ export const routes = [
     path: '/courses/:courseId',
     element: <ProtectedRoute><CourseDetail /></ProtectedRoute>
   },
+  {
+    path: '/monthly-report',
+    element: <ProtectedRoute><MonthlyReport /></ProtectedRoute>
+  },
   
   // Catch-all route
   {
@@ -66,6 +71,7 @@ export const generateRouteComponents = () => {
       <Route key="auth" path="/auth" element={<ProtectedRoute requireAuth={false}><Auth /></ProtectedRoute>} />,
       <Route key="auth-error" path="/auth-error" element={<AuthLoadError />} />,
       <Route key="dashboard" path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />,
+      <Route key="monthly-report" path="/monthly-report" element={<ProtectedRoute><MonthlyReport /></ProtectedRoute>} />,
       <Route key="not-found" path="*" element={<NotFound />} />
     ];
   }
