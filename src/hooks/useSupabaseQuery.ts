@@ -1,5 +1,5 @@
 
-import { useQuery, useMutation, QueryKey, UseQueryOptions, UseMutationOptions } from 'react-query';
+import { useQuery, useMutation, QueryKey, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { PostgrestError } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
@@ -16,9 +16,9 @@ export function useSupabaseQuery<T>(
 ) {
   const { showErrorToast = true, errorMessage = 'שגיאה בטעינת נתונים', ...queryOptions } = options || {};
   
-  return useQuery<T, PostgrestError>(
+  return useQuery<T, PostgrestError>({
     queryKey,
-    async () => {
+    queryFn: async () => {
       try {
         return await queryFn();
       } catch (error: any) {
@@ -29,8 +29,8 @@ export function useSupabaseQuery<T>(
         throw error;
       }
     },
-    queryOptions
-  );
+    ...queryOptions
+  });
 }
 
 export function useSupabaseMutation<T, V = unknown>(
@@ -50,8 +50,8 @@ export function useSupabaseMutation<T, V = unknown>(
     ...mutationOptions 
   } = options || {};
   
-  return useMutation<T, PostgrestError, V>(
-    async (variables) => {
+  return useMutation<T, PostgrestError, V>({
+    mutationFn: async (variables) => {
       try {
         return await mutationFn(variables);
       } catch (error: any) {
@@ -62,16 +62,14 @@ export function useSupabaseMutation<T, V = unknown>(
         throw error;
       }
     },
-    {
-      ...mutationOptions,
-      onSuccess: (data, variables, context) => {
-        if (showSuccessToast) {
-          toast.success(successMessage);
-        }
-        if (mutationOptions.onSuccess) {
-          mutationOptions.onSuccess(data, variables, context);
-        }
+    onSuccess: (data, variables, context) => {
+      if (showSuccessToast) {
+        toast.success(successMessage);
       }
-    }
-  );
+      if (mutationOptions.onSuccess) {
+        mutationOptions.onSuccess(data, variables, context);
+      }
+    },
+    ...mutationOptions
+  });
 }

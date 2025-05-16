@@ -1,13 +1,12 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from '@/contexts/auth/AuthContext';
+import { AuthProvider } from '@/contexts/auth';
 import { StockDataProvider } from '@/contexts/stock/StockDataContext';
 import { Toaster } from '@/components/ui/toaster';
-import { ThemeProvider } from '@/components/ThemeProvider';
-
+import { ThemeProvider } from '@/contexts/theme';
 // Pages
-import Home from '@/pages/Home';
+import Index from '@/pages/Index';
 import Dashboard from '@/pages/Dashboard';
 import CourseDetail from '@/pages/CourseDetail';
 import Auth from '@/pages/Auth';
@@ -20,7 +19,7 @@ function App() {
         <StockDataProvider>
           <Router>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/courses/:courseId" element={<CourseDetail />} />
