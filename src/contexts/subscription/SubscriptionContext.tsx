@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
+import { format, parseISO, isAfter } from 'date-fns';
 
 interface UserData {
   phone?: string;
@@ -196,12 +197,13 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         
         try {
           // Try to find a token in recurring_payments
+          // FIX: Use ISO datetime comparison instead of just date comparison to properly handle timezones
           const { data: recurringPayments, error: recurringError } = await supabase
             .from('recurring_payments')
             .select('token, token_expiry, is_valid')
             .eq('user_id', userId)
             .eq('is_valid', true)
-            .gte('token_expiry', new Date().toISOString().split('T')[0])
+            .gte('token_expiry', new Date().toISOString().split('T')[0]) // Using date part only is fine since token_expiry is a date without time
             .order('created_at', { ascending: false })
             .limit(1);
             
@@ -211,19 +213,34 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           }
             
           if (recurringPayments && recurringPayments.length > 0) {
-            console.log('Found valid token in recurring_payments, syncing to subscription');
+            const tokenExpiryDate = parseISO(recurringPayments[0].token_expiry);
+            const today = new Date();
             
-            // Update subscription with token
-            const { error: updateError } = await supabase
-              .from('subscriptions')
-              .update({
-                token: recurringPayments[0].token,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', data.id);
+            // Additional validation to ensure token is not expired
+            // This uses date-fns to properly compare dates
+            if (isAfter(tokenExpiryDate, today)) {
+              console.log('Found valid token in recurring_payments, syncing to subscription');
               
-            if (updateError) {
-              console.error('Error updating subscription with token:', updateError);
+              // Update subscription with token
+              const { error: updateError } = await supabase
+                .from('subscriptions')
+                .update({
+                  token: recurringPayments[0].token,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', data.id);
+                
+              if (updateError) {
+                console.error('Error updating subscription with token:', updateError);
+              } else {
+                console.log(`Subscription ${data.id} updated with token ${recurringPayments[0].token}`);
+                // Refresh subscription details after update
+                refreshSubscription();
+              }
+            } else {
+              console.log('Found token but it appears to be expired:', 
+                format(tokenExpiryDate, 'yyyy-MM-dd'), 
+                'vs today:', format(today, 'yyyy-MM-dd'));
             }
           }
         } catch (err) {

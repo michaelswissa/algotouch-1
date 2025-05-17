@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase-client';
@@ -111,7 +110,7 @@ export const useSubscriptionFlow = () => {
       setRegistrationData({ 
         ...registrationData, 
         contractSigned: true 
-        // Remove the contractSignedAt property as it's not in the RegistrationData type
+        // Fixed: removed contractSignedAt property which was causing the error
       });
     }
     
