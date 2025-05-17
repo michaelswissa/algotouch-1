@@ -56,7 +56,6 @@ const ContractSection: React.FC<ContractSectionProps> = ({
         onSign={handleSignContract}
         planId={selectedPlan} 
         fullName={fullName}
-        isSigningInProgress={isProcessing}
       />
       
       <div className="mt-6 flex justify-between">
