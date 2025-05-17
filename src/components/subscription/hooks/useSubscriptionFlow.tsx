@@ -1,17 +1,17 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase-client';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
-
-type SubscriptionStep = 'plan-selection' | 'contract' | 'payment' | 'complete';
+import { Steps } from '@/types/subscription';
 
 export const useSubscriptionFlow = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated, registrationData, setRegistrationData } = useAuth();
   
-  const [currentStep, setCurrentStep] = useState<SubscriptionStep>('plan-selection');
+  const [currentStep, setCurrentStep] = useState<Steps>('plan-selection');
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(planId);
   const [contractId, setContractId] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
@@ -110,8 +110,8 @@ export const useSubscriptionFlow = () => {
     if (registrationData) {
       setRegistrationData({ 
         ...registrationData, 
-        contractSigned: true,
-        contractSignedAt: new Date().toISOString()
+        contractSigned: true 
+        // Remove the contractSignedAt property as it's not in the RegistrationData type
       });
     }
     
@@ -120,11 +120,11 @@ export const useSubscriptionFlow = () => {
 
   // Handle payment completion
   const handlePaymentComplete = () => {
-    setCurrentStep('complete');
+    setCurrentStep('completion');
   };
 
   // Handle back navigation
-  const handleBackToStep = (step: SubscriptionStep) => {
+  const handleBackToStep = (step: Steps) => {
     setCurrentStep(step);
   };
 
