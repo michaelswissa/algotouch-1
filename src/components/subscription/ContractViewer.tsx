@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { getContractById, verifyContractSignature } from '@/lib/contracts/contract-service';
@@ -12,6 +13,18 @@ interface ContractViewerProps {
   onBack?: () => void;
   className?: string;
 }
+
+// HTML Sanitization function to prevent XSS attacks
+const escapeHtml = (unsafe: string | null | undefined): string => {
+  if (!unsafe) return '';
+  return unsafe
+    .toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
 
 const ContractViewer: React.FC<ContractViewerProps> = ({ 
   userId: externalUserId, 
@@ -111,14 +124,14 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
     
     const element = document.createElement('a');
     
-    // Enhance the HTML with additional metadata
+    // Enhance the HTML with additional metadata - with sanitization of all user inputs
     const enhancedHtml = `
       <!DOCTYPE html>
       <html dir="rtl" lang="he">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>הסכם חתום - ${contractData.full_name || 'לקוח'}</title>
+        <title>הסכם חתום - ${escapeHtml(contractData.full_name || 'לקוח')}</title>
         <style>
           body { font-family: Arial, sans-serif; direction: rtl; padding: 20px; }
           h2 { color: #333; }
@@ -128,7 +141,7 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
       </head>
       <body>
         <h2>הסכם חתום</h2>
-        <p>תאריך חתימה: ${new Date(contractData.created_at).toLocaleDateString('he-IL')}</p>
+        <p>תאריך חתימה: ${escapeHtml(new Date(contractData.created_at).toLocaleDateString('he-IL'))}</p>
         
         <div class="contract-content">
           ${contractHtml}
@@ -136,18 +149,18 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
         
         <div class="signature-block">
           <h3>פרטי החותם:</h3>
-          <p><strong>שם מלא:</strong> ${contractData.full_name || 'לא צוין'}</p>
-          <p><strong>אימייל:</strong> ${contractData.email || 'לא צוין'}</p>
-          <p><strong>כתובת:</strong> ${contractData.address || 'לא צוין'}</p>
-          <p><strong>טלפון:</strong> ${contractData.phone || 'לא צוין'}</p>
-          ${contractData.signature ? `<p><strong>חתימה:</strong><br><img src="${contractData.signature}" alt="חתימה דיגיטלית" style="max-width: 300px; border: 1px solid #eee;" /></p>` : ''}
-          <p><strong>תאריך חתימה:</strong> ${new Date(contractData.created_at).toLocaleString('he-IL')}</p>
+          <p><strong>שם מלא:</strong> ${escapeHtml(contractData.full_name || 'לא צוין')}</p>
+          <p><strong>אימייל:</strong> ${escapeHtml(contractData.email || 'לא צוין')}</p>
+          <p><strong>כתובת:</strong> ${escapeHtml(contractData.address || 'לא צוין')}</p>
+          <p><strong>טלפון:</strong> ${escapeHtml(contractData.phone || 'לא צוין')}</p>
+          ${contractData.signature ? `<p><strong>חתימה:</strong><br><img src="${escapeHtml(contractData.signature)}" alt="חתימה דיגיטלית" style="max-width: 300px; border: 1px solid #eee;" /></p>` : ''}
+          <p><strong>תאריך חתימה:</strong> ${escapeHtml(new Date(contractData.created_at).toLocaleString('he-IL'))}</p>
         </div>
         
         <div class="metadata">
           <h4>מידע נוסף:</h4>
-          <p>מזהה הסכם: ${contractData.id}</p>
-          <p>גרסת הסכם: ${contractData.contract_version || '1.0'}</p>
+          <p>מזהה הסכם: ${escapeHtml(contractData.id)}</p>
+          <p>גרסת הסכם: ${escapeHtml(contractData.contract_version || '1.0')}</p>
           <p>הוסכם לתנאי שימוש: ${contractData.agreed_to_terms ? 'כן' : 'לא'}</p>
           <p>הוסכם למדיניות פרטיות: ${contractData.agreed_to_privacy ? 'כן' : 'לא'}</p>
         </div>
@@ -157,7 +170,7 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
     
     const file = new Blob([enhancedHtml], {type: 'text/html'});
     element.href = URL.createObjectURL(file);
-    element.download = `contract-${contractData.full_name || 'user'}-${new Date().toISOString().slice(0,10)}.html`;
+    element.download = `contract-${escapeHtml(contractData.full_name || 'user')}-${new Date().toISOString().slice(0,10)}.html`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
