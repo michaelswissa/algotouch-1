@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { RegistrationData } from '@/types/payment';
 
@@ -25,7 +25,7 @@ export const useRegistrationData = () => {
     }
   }, [contextRegistrationData]);
 
-  const loadRegistrationData = () => {
+  const loadRegistrationData = useCallback(() => {
     if (contextRegistrationData) {
       setRegistrationData(contextRegistrationData as RegistrationData);
       console.log("Loaded registration data from context:", {
@@ -39,9 +39,9 @@ export const useRegistrationData = () => {
       console.log("No registration data found but that's okay - user can pay first and register later");
       return true;
     }
-  };
+  }, [contextRegistrationData]);
 
-  const updateRegistrationData = (newData: Partial<RegistrationData>) => {
+  const updateRegistrationData = useCallback((newData: Partial<RegistrationData>) => {
     if (!registrationData && !contextRegistrationData) return;
     
     const updatedData = {
@@ -51,12 +51,12 @@ export const useRegistrationData = () => {
     
     setRegistrationData(updatedData as RegistrationData);
     updateContextRegistrationData(updatedData);
-  };
+  }, [registrationData, contextRegistrationData, updateContextRegistrationData]);
 
-  const clearRegistrationData = () => {
+  const clearRegistrationData = useCallback(() => {
     clearContextRegistrationData();
     setRegistrationData(null);
-  };
+  }, [clearContextRegistrationData]);
 
   return {
     registrationData,

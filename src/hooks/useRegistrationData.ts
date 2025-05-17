@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface RegistrationData {
   planId?: string;
@@ -46,7 +46,7 @@ export function useRegistrationData() {
   }, []);
 
   // Update registration data and save to session storage
-  const updateRegistrationData = (newData: Partial<RegistrationData>) => {
+  const updateRegistrationData = useCallback((newData: Partial<RegistrationData>) => {
     setRegistrationData(prevData => {
       const updatedData = { ...prevData, ...newData } as RegistrationData;
       
@@ -55,15 +55,15 @@ export function useRegistrationData() {
       
       return updatedData;
     });
-  };
+  }, []);
 
   // Clear registration data
-  const clearRegistrationData = () => {
+  const clearRegistrationData = useCallback(() => {
     sessionStorage.removeItem('registration_data');
     setRegistrationData(null);
     setCurrentStep(1);
     setSelectedPlan(undefined);
-  };
+  }, []);
 
   return {
     registrationData,

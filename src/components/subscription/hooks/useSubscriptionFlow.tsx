@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase-client';
 import { useAuth } from '@/contexts/auth';
@@ -42,7 +42,6 @@ export const useSubscriptionFlow = () => {
           // If contract is signed, move to payment step
           if (registrationData.contractSigned) {
             setCurrentStep('payment');
-            // You'd also need to get the contractId here
           } else {
             setCurrentStep('contract');
           }
@@ -89,7 +88,7 @@ export const useSubscriptionFlow = () => {
   }, [planId, isAuthenticated, user, registrationData, setRegistrationData]);
 
   // Handle plan selection
-  const handlePlanSelect = (plan: string) => {
+  const handlePlanSelect = useCallback((plan: string) => {
     setSelectedPlan(plan);
     
     // Update registration data
@@ -99,33 +98,32 @@ export const useSubscriptionFlow = () => {
     
     setCurrentStep('contract');
     navigate(`/subscription`, { replace: true });
-  };
+  }, [registrationData, setRegistrationData, navigate]);
 
   // Handle contract signing
-  const handleContractSign = (contractId: string) => {
+  const handleContractSign = useCallback((contractId: string) => {
     setContractId(contractId);
     
     // Update registration data
     if (registrationData) {
       setRegistrationData({ 
         ...registrationData, 
-        contractSigned: true 
-        // Fixed: removed contractSignedAt property which was causing the error
+        contractSigned: true
       });
     }
     
     setCurrentStep('payment');
-  };
+  }, [registrationData, setRegistrationData]);
 
   // Handle payment completion
-  const handlePaymentComplete = () => {
+  const handlePaymentComplete = useCallback(() => {
     setCurrentStep('completion');
-  };
+  }, []);
 
   // Handle back navigation
-  const handleBackToStep = (step: Steps) => {
+  const handleBackToStep = useCallback((step: Steps) => {
     setCurrentStep(step);
-  };
+  }, []);
 
   return {
     currentStep,
