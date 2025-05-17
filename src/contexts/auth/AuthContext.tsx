@@ -11,11 +11,17 @@ const defaultValue: AuthContextType = {
   isAuthenticated: false,
   initialized: false,
   error: null,
+  registrationData: null,
+  isRegistering: false,
+  pendingSubscription: false,
   signIn: async () => { throw new Error('AuthContext not initialized') },
   signUp: async () => { throw new Error('AuthContext not initialized') },
   signOut: async () => { throw new Error('AuthContext not initialized') },
   updateProfile: async () => { throw new Error('AuthContext not initialized') },
-  resetPassword: async () => { throw new Error('AuthContext not initialized') }
+  resetPassword: async () => { throw new Error('AuthContext not initialized') },
+  setRegistrationData: () => { throw new Error('AuthContext not initialized') },
+  clearRegistrationData: () => { throw new Error('AuthContext not initialized') },
+  setPendingSubscription: () => { throw new Error('AuthContext not initialized') }
 };
 
 export const AuthContext = createContext<AuthContextType>(defaultValue);

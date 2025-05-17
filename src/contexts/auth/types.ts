@@ -1,16 +1,31 @@
 
-import { Session, User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 
-export type AuthState = {
-  session: Session | null;
-  user: User | null;
-  loading: boolean;
-  initialized: boolean;
-  isAuthenticated: boolean;
-  error: Error | null;
+export type RegistrationData = {
+  email?: string;
+  userData?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  };
+  contractSigned?: boolean;
+  planId?: string;
+  registrationTime?: string;
+  isValid?: boolean;
 };
 
-export type AuthContextType = AuthState & {
+export interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  isAuthenticated: boolean;
+  initialized: boolean;
+  error: Error | null;
+  // Registration state
+  registrationData: RegistrationData | null;
+  isRegistering: boolean;
+  pendingSubscription: boolean;
+  // Auth methods
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (userData: {
     email: string;
@@ -18,8 +33,12 @@ export type AuthContextType = AuthState & {
     firstName?: string;
     lastName?: string;
     phone?: string;
-  }) => Promise<{ success: boolean; user: User | null }>;
+  }) => Promise<any>;
   signOut: () => Promise<void>;
-  updateProfile: (userData: any) => Promise<void>;
+  updateProfile: (data: any) => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
-};
+  // Registration methods
+  setRegistrationData: (data: Partial<RegistrationData>) => void;
+  clearRegistrationData: () => void;
+  setPendingSubscription: (pending: boolean) => void;
+}

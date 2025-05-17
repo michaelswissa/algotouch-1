@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,11 @@ interface SignupFormProps {
 
 const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { 
+    signUp,
+    setRegistrationData,
+    setPendingSubscription
+  } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -80,22 +83,20 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
         phone
       });
       
-      // Store registration data in session storage for the subscription flow
-      const registrationData = {
+      // Store registration data in auth context
+      setRegistrationData({
         email,
         userData: {
           firstName,
           lastName,
           phone
-        },
-        registrationTime: new Date().toISOString()
-      };
+        }
+      });
       
-      // Clear any existing registration data to start fresh
-      sessionStorage.removeItem('registration_data');
-      sessionStorage.setItem('registration_data', JSON.stringify(registrationData));
+      // Set pending subscription flag
+      setPendingSubscription(true);
       
-      console.log('Registration data saved to session storage');
+      console.log('Registration data saved to context');
       toast.success('הפרטים נשמרו בהצלחה');
       
       // Navigate directly to subscription page

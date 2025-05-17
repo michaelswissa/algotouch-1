@@ -3,13 +3,67 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
-import { Spinner } from '@/components/ui/spinner';
+import { RegistrationData } from './types';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useSecureAuth();
   const navigate = useNavigate();
   const [hasError, setHasError] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  
+  // Registration state management
+  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [pendingSubscription, setPendingSubscription] = useState(false);
+  
+  // Load registration data from session storage on mount
+  useEffect(() => {
+    try {
+      const storedData = sessionStorage.getItem('registration_data');
+      if (storedData) {
+        const data = JSON.parse(storedData);
+        
+        // Check if data is still valid (within 30 minutes)
+        const registrationTime = data.registrationTime ? new Date(data.registrationTime) : null;
+        const now = new Date();
+        const isValid = registrationTime && 
+          ((now.getTime() - registrationTime.getTime()) < 30 * 60 * 1000);
+        
+        if (isValid) {
+          setRegistrationData({ ...data, isValid });
+          setIsRegistering(true);
+          setPendingSubscription(true);
+        } else {
+          // Clear stale registration data
+          sessionStorage.removeItem('registration_data');
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing registration data:", error);
+      sessionStorage.removeItem('registration_data');
+    }
+  }, []);
+  
+  // Update registration data in session storage when state changes
+  const updateRegistrationData = (data: Partial<RegistrationData>) => {
+    const updatedData = {
+      ...(registrationData || {}),
+      ...data,
+      registrationTime: data.registrationTime || new Date().toISOString()
+    };
+    
+    setRegistrationData(updatedData as RegistrationData);
+    sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
+    setIsRegistering(true);
+  };
+  
+  // Clear registration data
+  const clearRegistrationData = () => {
+    sessionStorage.removeItem('registration_data');
+    setRegistrationData(null);
+    setIsRegistering(false);
+    setPendingSubscription(false);
+  };
   
   // Add error handling for auth initialization
   useEffect(() => {
@@ -54,7 +108,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <AuthContext.Provider value={auth}>
+    <AuthContext.Provider value={{
+      ...auth,
+      registrationData,
+      isRegistering,
+      pendingSubscription,
+      setRegistrationData: updateRegistrationData,
+      clearRegistrationData,
+      setPendingSubscription
+    }}>
       {children}
     </AuthContext.Provider>
   );

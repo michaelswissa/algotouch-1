@@ -11,7 +11,14 @@ import { useAuth } from '@/contexts/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Auth = () => {
-  const { isAuthenticated, loading, initialized, error } = useAuth();
+  const { 
+    isAuthenticated, 
+    loading, 
+    initialized, 
+    error,
+    pendingSubscription
+  } = useAuth();
+  
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,33 +44,6 @@ const Auth = () => {
     }
   }, [state]);
 
-  // Check if there's valid registration data in session storage
-  useEffect(() => {
-    try {
-      const storedData = sessionStorage.getItem('registration_data');
-      if (storedData) {
-        const data = JSON.parse(storedData);
-        const registrationTime = new Date(data.registrationTime);
-        const now = new Date();
-        const timeDiffInMinutes = (now.getTime() - registrationTime.getTime()) / (1000 * 60);
-        
-        // If registration is fresh (less than 30 minutes old) and explicitly coming from signup
-        if (timeDiffInMinutes < 30 && location.state?.isRegistering) {
-          console.log("Auth: Valid registration data found, redirecting to subscription");
-          navigate('/subscription', { replace: true, state: { isRegistering: true } });
-        } else if (timeDiffInMinutes >= 30) {
-          // Clear stale registration data older than 30 minutes
-          console.log("Auth: Clearing stale registration data");
-          sessionStorage.removeItem('registration_data');
-          toast.info('מידע הרשמה קודם פג תוקף, אנא הירשם שנית');
-        }
-      }
-    } catch (error) {
-      console.error("Error parsing registration data:", error);
-      sessionStorage.removeItem('registration_data');
-    }
-  }, [navigate, location.state]);
-
   // Store any auth error in localStorage for the error page
   useEffect(() => {
     if (error) {
@@ -88,10 +68,15 @@ const Auth = () => {
   // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
     console.log("Auth page: User is authenticated, redirecting to appropriate page");
-    if (state?.redirectToSubscription) {
+    if (state?.redirectToSubscription || pendingSubscription) {
       return <Navigate to="/subscription" replace />;
     }
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // If pending subscription, also redirect to subscription page
+  if (pendingSubscription) {
+    return <Navigate to="/subscription" replace />;
   }
 
   return (

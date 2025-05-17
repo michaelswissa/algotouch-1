@@ -1,31 +1,40 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/auth';
 import { RegistrationData } from '@/types/payment';
 
 export const useRegistrationData = () => {
-  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
+  const { 
+    registrationData: contextRegistrationData, 
+    setRegistrationData: updateContextRegistrationData,
+    clearRegistrationData: clearContextRegistrationData,
+    isRegistering,
+    pendingSubscription,
+    setPendingSubscription
+  } = useAuth();
+  
+  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(
+    contextRegistrationData as RegistrationData | null
+  );
   const [registrationError, setRegistrationError] = useState<string | null>(null);
 
+  // Sync local state with context when context changes
+  useEffect(() => {
+    if (contextRegistrationData) {
+      setRegistrationData(contextRegistrationData as RegistrationData);
+    }
+  }, [contextRegistrationData]);
+
   const loadRegistrationData = () => {
-    const storedData = sessionStorage.getItem('registration_data');
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setRegistrationData(parsedData);
-        console.log("Loaded registration data:", {
-          email: parsedData.email,
-          hasPassword: !!parsedData.password,
-          hasUserData: !!parsedData.userData,
-          planId: parsedData.planId,
-          hasPaymentToken: !!parsedData.paymentToken
-        });
-        
-        return true;
-      } catch (e) {
-        console.error("Error parsing registration data:", e);
-        setRegistrationError('שגיאה בטעינת פרטי הרשמה. אנא נסה מחדש.');
-        return false;
-      }
+    if (contextRegistrationData) {
+      setRegistrationData(contextRegistrationData as RegistrationData);
+      console.log("Loaded registration data from context:", {
+        email: contextRegistrationData.email,
+        hasUserData: !!contextRegistrationData.userData,
+        planId: contextRegistrationData.planId
+      });
+      
+      return true;
     } else {
       console.log("No registration data found but that's okay - user can pay first and register later");
       return true;
@@ -33,28 +42,31 @@ export const useRegistrationData = () => {
   };
 
   const updateRegistrationData = (newData: Partial<RegistrationData>) => {
-    if (!registrationData) return;
+    if (!registrationData && !contextRegistrationData) return;
     
     const updatedData = {
-      ...registrationData,
+      ...(registrationData || {}),
       ...newData
     };
     
-    sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
-    setRegistrationData(updatedData);
+    setRegistrationData(updatedData as RegistrationData);
+    updateContextRegistrationData(updatedData);
   };
 
   const clearRegistrationData = () => {
-    sessionStorage.removeItem('registration_data');
+    clearContextRegistrationData();
     setRegistrationData(null);
   };
 
   return {
     registrationData,
     registrationError,
+    isRegistering,
+    pendingSubscription,
     loadRegistrationData,
     updateRegistrationData,
     clearRegistrationData,
-    setRegistrationError
+    setRegistrationError,
+    setPendingSubscription
   };
 };
