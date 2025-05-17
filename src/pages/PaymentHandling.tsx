@@ -95,7 +95,8 @@ const PaymentHandling: React.FC = () => {
     return <PaymentSuccess redirectPath="/dashboard" />;
   }
 
-  return <PaymentError message={errorMessage || 'אירעה שגיאה בתהליך התשלום'} />;
+  // Using the updated PaymentError component with explicit redirectPath
+  return <PaymentError message={errorMessage || 'אירעה שגיאה בתהליך התשלום'} redirectPath="/subscription" />;
 };
 
 export default PaymentHandling;

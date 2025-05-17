@@ -8,7 +8,7 @@ import PaymentSectionHeader from './PaymentSectionHeader';
 import PaymentIframe from './PaymentIframe';
 import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
-import PaymentError from './PaymentError';
+import SubscriptionPaymentError from './PaymentError';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -68,7 +68,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   // Show error screen if payment URL couldn't be generated
   if (!paymentUrl) {
     return (
-      <PaymentError 
+      <SubscriptionPaymentError 
         onRetry={initiateCardcomPayment} 
         onBack={onBack} 
       />

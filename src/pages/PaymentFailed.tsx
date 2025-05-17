@@ -12,8 +12,9 @@ const PaymentFailed = () => {
   const errorCode = searchParams.get('errorCode');
   const errorMessage = searchParams.get('errorMessage');
 
+  // Use explicit navigation instead of relative history navigation
   const handleRetry = () => {
-    navigate(-2); // Go back to the payment initiation page
+    navigate('/subscription');
   };
 
   const handleBackToDashboard = () => {
