@@ -110,7 +110,7 @@ const ContractView: React.FC<ContractViewProps> = ({
     <ContractSection
       selectedPlan={selectedPlan}
       fullName={fullName}
-      onSign={handleSignContract}
+      onSign={handleContractSign}
       onBack={onBack}
     />
   );
