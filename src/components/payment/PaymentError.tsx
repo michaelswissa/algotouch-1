@@ -1,26 +1,32 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 
 interface PaymentErrorProps {
   message?: string;
+  errorCode?: string;
   onRetry?: () => void;
   onBack?: () => void;
+  redirectPath?: string;
 }
 
-const PaymentError: React.FC<PaymentErrorProps> = ({ 
+const PaymentError: React.FC<PaymentErrorProps> = ({
   message = 'אירעה שגיאה בתהליך התשלום',
+  errorCode,
   onRetry,
-  onBack
+  onBack,
+  redirectPath = '/subscription'
 }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
     if (onBack) {
       onBack();
+    } else if (redirectPath) {
+      navigate(redirectPath);
     } else {
       navigate(-1);
     }
@@ -33,30 +39,41 @@ const PaymentError: React.FC<PaymentErrorProps> = ({
           <AlertCircle className="h-16 w-16 text-red-500" />
         </div>
         <CardTitle className="text-2xl text-center">שגיאה בתהליך התשלום</CardTitle>
+        <CardDescription className="text-center">
+          לא הצלחנו להשלים את התהליך
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="pt-6 space-y-4">
-        <p className="text-center">
-          {message}
-        </p>
+        {message && (
+          <p className="text-center">
+            {message}
+          </p>
+        )}
+        
+        {errorCode && (
+          <p className="text-muted-foreground text-sm text-center">
+            קוד שגיאה: {errorCode}
+          </p>
+        )}
         
         <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-900/30">
           <p className="text-center text-red-700 dark:text-red-300">
             ניתן לנסות שנית או לחזור לבחירת תוכנית אחרת
           </p>
         </div>
-        
-        <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-          {onRetry && (
-            <Button onClick={onRetry} variant="default">
-              נסה שנית
-            </Button>
-          )}
-          <Button onClick={handleBack} variant={onRetry ? "outline" : "default"}>
-            חזרה
-          </Button>
-        </div>
       </CardContent>
+      
+      <CardFooter className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
+        {onRetry && (
+          <Button onClick={onRetry} variant="default">
+            נסה שנית
+          </Button>
+        )}
+        <Button onClick={handleBack} variant={onRetry ? "outline" : "default"}>
+          חזרה
+        </Button>
+      </CardFooter>
     </Card>
   );
 };
