@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth';
-import { ContractSignatureData } from '@/services/subscription/types/contract';
 
 interface ContractSectionProps {
   selectedPlan: string;
   fullName: string;
-  onSign: (contractData: ContractSignatureData) => void;
+  onSign: (contractData: any) => void;
   onBack: () => void;
 }
 
@@ -24,7 +23,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
   const { user } = useAuth();
   
   // Function to handle contract signing
-  const handleSignContract = async (contractData: ContractSignatureData) => {
+  const handleSignContract = async (contractData: any) => {
     try {
       setIsProcessing(true);
       console.log('Contract signed, forwarding data to parent component');

@@ -2,7 +2,6 @@
 import { toast } from 'sonner';
 import { saveContractToDatabase, updateSubscriptionStatus, callIzidocSignFunction } from './storage-service';
 import { supabase } from '@/integrations/supabase/client';
-import { ContractSignatureData, ContractDocument } from '@/services/subscription/types/contract';
 
 /**
  * Processes a signed contract, saving it to the database and sending confirmation
@@ -12,7 +11,7 @@ export async function processSignedContract(
   planId: string,
   fullName: string,
   email: string,
-  contractData: ContractSignatureData
+  contractData: any
 ): Promise<string | boolean> {
   try {
     console.log('Processing signed contract for user:', { userId, planId, email });

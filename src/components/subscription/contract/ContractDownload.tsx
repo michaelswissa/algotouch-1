@@ -2,7 +2,6 @@
 import React from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ContractDisplayProps } from '@/services/subscription/types/contract';
 
 // HTML Sanitization function to prevent XSS attacks
 const escapeHtml = (unsafe: string | null | undefined): string => {
@@ -16,7 +15,12 @@ const escapeHtml = (unsafe: string | null | undefined): string => {
     .replace(/'/g, '&#039;');
 };
 
-const ContractDownload: React.FC<ContractDisplayProps> = ({ contractData, contractHtml }) => {
+interface ContractDownloadProps {
+  contractData: any;
+  contractHtml: string;
+}
+
+const ContractDownload: React.FC<ContractDownloadProps> = ({ contractData, contractHtml }) => {
   const downloadContract = () => {
     if (!contractHtml || !contractData) return;
     

@@ -1,7 +1,26 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ContractSignatureData } from '@/services/subscription/types/contract';
+
+/**
+ * Interface for contract data used in signing process
+ */
+export interface ContractData {
+  signature: string;
+  contractHtml?: string;
+  agreedToTerms: boolean;
+  agreedToPrivacy: boolean;
+  contractVersion?: string;
+  browserInfo?: {
+    userAgent: string;
+    language: string;
+    platform: string;
+    screenSize: string;
+    timeZone: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
 
 /**
  * Directly calls the izidoc-sign function to process a contract
@@ -11,7 +30,7 @@ export async function callIzidocSignFunction(
   planId: string,
   fullName: string,
   email: string,
-  contractData: ContractSignatureData
+  contractData: ContractData
 ): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
     console.log('Calling izidoc-sign function directly:', {

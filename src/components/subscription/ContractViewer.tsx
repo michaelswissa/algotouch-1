@@ -8,7 +8,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import ContractLoading from './contract/ContractLoading';
 import ContractError from './contract/ContractError';
 import ContractContent from './contract/ContractContent';
-import { ContractDocument } from '@/services/subscription/types/contract';
 
 interface ContractViewerProps {
   userId?: string;
@@ -37,7 +36,7 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
 }) => {
   const { user } = useAuth();
   const [contractHtml, setContractHtml] = useState<string | null>(null);
-  const [contractData, setContractData] = useState<ContractDocument | null>(null);
+  const [contractData, setContractData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -74,7 +73,7 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
           }
           
           console.log('Contract found:', { id: contract.id, hasHtml: !!contract.contract_html });
-          setContractData(contract as ContractDocument);
+          setContractData(contract);
           setContractHtml(contract.contract_html);
           setLoading(false);
           return;
@@ -108,7 +107,7 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
         }
         
         console.log('Contract loaded successfully');
-        setContractData(contract as ContractDocument);
+        setContractData(contract);
         setContractHtml(contract.contract_html);
       } catch (err) {
         console.error('Error fetching contract:', err);
