@@ -23,11 +23,15 @@ export function useChatbot() {
       content: DEFAULT_ASSISTANT_GREETING
     }
   ]);
+  const messagesRef = useRef<Message[]>(messages);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingToolCalls, setPendingToolCalls] = useState<ToolCall[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Update messagesRef whenever messages change
+  messagesRef.current = messages;
 
   // Handle function calls from the assistant
   const handleFunctionCall = useCallback(async (toolCall: ToolCall) => {
@@ -111,7 +115,7 @@ export function useChatbot() {
       
       // Update messages from the response
       if (data.messages && data.messages.length > 0) {
-        // Remove the "performing calculations" message
+        // Remove the "performing calculations" message and add the latest assistant message
         setMessages(prev => {
           const filteredMessages = prev.filter(msg => msg.content !== 'מבצע חישובים... אנא המתן.');
           
@@ -153,70 +157,80 @@ export function useChatbot() {
 
     // Add user message to local state
     const userMessage: Message = { role: 'user', content };
+    
+    // Update messages with functional form
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
     try {
-      // Call the edge function
-      const { data, error } = await supabase.functions.invoke('ai-chatbot', {
-        body: {
-          messages: [...messages, userMessage],
-          threadId,
-          action: 'chat'
-        }
-      });
+      // Wait a tick to ensure messagesRef is updated
+      setTimeout(async () => {
+        try {
+          // Call the edge function with the current messages from the ref
+          const { data, error } = await supabase.functions.invoke('ai-chatbot', {
+            body: {
+              messages: [...messagesRef.current],
+              threadId,
+              action: 'chat'
+            }
+          });
 
-      if (error) throw new Error(error.message);
+          if (error) throw new Error(error.message);
 
-      // Update thread ID for future messages
-      if (data.threadId) {
-        setThreadId(data.threadId);
-      }
-      
-      // Update run ID
-      if (data.runId) {
-        setRunId(data.runId);
-      }
-
-      // Check if we need to handle tool calls
-      if (data.status === 'requires_action' && data.toolCalls && data.toolCalls.length > 0) {
-        setPendingToolCalls(data.toolCalls);
-        await processToolCalls(data.toolCalls);
-        return;
-      }
-
-      // Update messages from the response
-      if (data.messages && data.messages.length > 0) {
-        // Sort messages by created_at and filter to only show the latest assistant message
-        const sortedMessages = [...data.messages].sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-        
-        const latestAssistantMessage = sortedMessages
-          .filter(msg => msg.role === 'assistant')
-          .pop();
+          // Update thread ID for future messages
+          if (data.threadId) {
+            setThreadId(data.threadId);
+          }
           
-        if (latestAssistantMessage) {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: latestAssistantMessage.content
-          }]);
+          // Update run ID
+          if (data.runId) {
+            setRunId(data.runId);
+          }
+
+          // Check if we need to handle tool calls
+          if (data.status === 'requires_action' && data.toolCalls && data.toolCalls.length > 0) {
+            setPendingToolCalls(data.toolCalls);
+            await processToolCalls(data.toolCalls);
+            return;
+          }
+
+          // Update messages from the response
+          if (data.messages && data.messages.length > 0) {
+            // Sort messages by created_at and filter to only show the latest assistant message
+            const sortedMessages = [...data.messages].sort((a, b) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            
+            const latestAssistantMessage = sortedMessages
+              .filter(msg => msg.role === 'assistant')
+              .pop();
+              
+            if (latestAssistantMessage) {
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: latestAssistantMessage.content
+              }]);
+            }
+          }
+        } catch (err) {
+          logger.error('Error sending message:', err);
+          // Add error message
+          setMessages(prev => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: 'התרחשה שגיאה בתקשורת. אנא נסה שוב מאוחר יותר.'
+            }
+          ]);
+        } finally {
+          setIsLoading(false);
         }
-      }
+      }, 0);
     } catch (err) {
-      logger.error('Error sending message:', err);
-      // Add error message
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'התרחשה שגיאה בתקשורת. אנא נסה שוב מאוחר יותר.'
-        }
-      ]);
-    } finally {
+      logger.error('Error in sendMessage:', err);
       setIsLoading(false);
     }
-  }, [messages, threadId, processToolCalls]);
+  }, [threadId, processToolCalls]);
 
   const speakText = useCallback(async (text: string, config?: TTSConfig): Promise<{audioUrl: string}> => {
     try {
@@ -242,16 +256,19 @@ export function useChatbot() {
   }, []);
 
   const clearMessages = useCallback(() => {
-    setMessages([
+    const initialMessages = [
       {
-        role: 'system',
+        role: 'system' as const,
         content: DEFAULT_SYSTEM_PROMPT
       },
       {
-        role: 'assistant',
+        role: 'assistant' as const,
         content: DEFAULT_ASSISTANT_GREETING
       }
-    ]);
+    ];
+    
+    setMessages(initialMessages);
+    messagesRef.current = initialMessages;
     setThreadId(null);
     setRunId(null);
     setPendingToolCalls([]);
