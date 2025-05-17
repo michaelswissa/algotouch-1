@@ -1,11 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { getContractById, verifyContractSignature } from '@/lib/contracts/contract-service';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import ContractLoading from './contract/ContractLoading';
+import ContractError from './contract/ContractError';
+import ContractContent from './contract/ContractContent';
 
 interface ContractViewerProps {
   userId?: string;
@@ -186,29 +188,14 @@ const ContractViewer: React.FC<ContractViewerProps> = ({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex justify-center p-8">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-          </div>
+          <ContractLoading />
         ) : error ? (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : contractHtml ? (
-          <div className="space-y-4">
-            <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
-              <p className="text-sm text-center mb-2">ההסכם נחתם ונשמר בהצלחה</p>
-              <div className="flex justify-center">
-                <Button onClick={downloadContract} variant="outline" className="flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  הורד עותק של ההסכם
-                </Button>
-              </div>
-            </div>
-            <div className="w-full h-[400px] border rounded-md overflow-auto">
-              <div className="p-4" dangerouslySetInnerHTML={{ __html: contractHtml }} />
-            </div>
-          </div>
+          <ContractError error={error} />
+        ) : contractHtml && contractData ? (
+          <ContractContent 
+            contractData={contractData}
+            contractHtml={contractHtml}
+          />
         ) : (
           <Alert>
             <AlertCircle className="h-4 w-4" />
