@@ -3,6 +3,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
+import { logger } from '@/lib/logger';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -44,25 +45,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // 2. User is in registration process (pendingSubscription flag is true)
   if (isSubscriptionPath(location.pathname)) {
     if (isAuthenticated || pendingSubscription || isRegistering) {
-      console.log("ProtectedRoute: Allowing access to subscription path", {
+      logger.debug("Allowing access to subscription path", {
         isAuthenticated,
         pendingSubscription,
         isRegistering
       });
       return <>{children}</>;
     }
-    console.log("ProtectedRoute: User is not authenticated for subscription, redirecting to auth");
+    logger.debug("User is not authenticated for subscription, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location, redirectToSubscription: true }} replace />;
   }
 
   // Standard auth checks
   if (requireAuth && !isAuthenticated) {
-    console.log("ProtectedRoute: User is not authenticated, redirecting to auth");
+    logger.debug("User is not authenticated, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && isAuthenticated) {
-    console.log("ProtectedRoute: User is already authenticated, redirecting to dashboard");
+    logger.debug("User is already authenticated, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 

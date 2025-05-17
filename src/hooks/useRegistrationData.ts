@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/lib/logger';
 
 interface RegistrationData {
   planId?: string;
@@ -40,7 +41,7 @@ export function useRegistrationData() {
           setCurrentStep(2); // Contract step
         }
       } catch (e) {
-        console.error('Error parsing registration data:', e);
+        logger.error('Error parsing registration data:', e);
       }
     }
   }, []);

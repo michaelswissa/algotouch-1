@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { logger } from '@/lib/logger';
 
 const Auth = () => {
   const { 
@@ -33,7 +34,7 @@ const Auth = () => {
         setActiveTab('signup');
       }
     } catch (error) {
-      console.error("Error parsing URL params:", error);
+      logger.error("Error parsing URL params:", error);
     }
   }, [location]);
 
@@ -51,7 +52,7 @@ const Auth = () => {
         localStorage.setItem('auth_error', error.message || 'Unknown auth error');
         navigate('/auth-error', { replace: true });
       } catch (e) {
-        console.error('Failed to store auth error:', e);
+        logger.error('Failed to store auth error:', e);
       }
     }
   }, [error, navigate]);
@@ -67,7 +68,7 @@ const Auth = () => {
 
   // If user is already authenticated, redirect to dashboard or subscription
   if (isAuthenticated) {
-    console.log("Auth page: User is authenticated, redirecting to appropriate page");
+    logger.debug("Auth page: User is authenticated, redirecting to appropriate page");
     if (state?.redirectToSubscription || pendingSubscription) {
       return <Navigate to="/subscription" replace />;
     }

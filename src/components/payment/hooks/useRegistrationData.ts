@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { RegistrationData } from '@/types/payment';
+import { logger } from '@/lib/logger';
 
 export const useRegistrationData = () => {
   const { 
@@ -28,7 +29,7 @@ export const useRegistrationData = () => {
   const loadRegistrationData = useCallback(() => {
     if (contextRegistrationData) {
       setRegistrationData(contextRegistrationData as RegistrationData);
-      console.log("Loaded registration data from context:", {
+      logger.debug("Loaded registration data from context:", {
         email: contextRegistrationData.email,
         hasUserData: !!contextRegistrationData.userData,
         planId: contextRegistrationData.planId
@@ -36,7 +37,7 @@ export const useRegistrationData = () => {
       
       return true;
     } else {
-      console.log("No registration data found but that's okay - user can pay first and register later");
+      logger.debug("No registration data found but that's okay - user can pay first and register later");
       return true;
     }
   }, [contextRegistrationData]);

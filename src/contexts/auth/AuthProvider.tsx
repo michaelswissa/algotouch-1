@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { RegistrationData } from './types';
+import { logger } from '@/lib/logger';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useSecureAuth();
@@ -39,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error) {
-      console.error("Error parsing registration data:", error);
+      logger.error("Error parsing registration data:", error);
       sessionStorage.removeItem('registration_data');
     }
   }, []); // This is correct as an initialization effect
@@ -70,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Only create the timeout when still initializing
     if (!auth.initialized && isInitializing) {
       const timeoutId = setTimeout(() => {
-        console.error('Auth initialization took too long, showing error page');
+        logger.error('Auth initialization took too long, showing error page');
         setHasError(true);
       }, 10000); // 10 seconds timeout
       
