@@ -1,10 +1,10 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { useSubscriptionActions } from '@/services/subscription/hooks/useSubscriptionActions';
 import { SubscriptionDetails } from '@/services/subscription/types';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 
 export interface UseSubscriptionReturn {
   subscription: any;
@@ -19,6 +19,7 @@ export interface UseSubscriptionReturn {
 
 export const useSubscription = (): UseSubscriptionReturn => {
   const { user } = useAuth();
+  const { subscription: contextSubscription, refreshSubscription: contextRefresh } = useSubscriptionContext();
   const [error, setError] = useState<string | null>(null);
   const [isCheckingPayments, setIsCheckingPayments] = useState<boolean>(false);
   
@@ -28,10 +29,10 @@ export const useSubscription = (): UseSubscriptionReturn => {
     status: { loading },
     cancelSubscription,
     reactivateSubscription,
-    refreshSubscription
+    refreshSubscription: actionsRefresh
   } = useSubscriptionActions({
     userId: user?.id,
-    subscriptionId: undefined, // Initialize with undefined instead of subscription.id
+    subscriptionId: contextSubscription?.id, // Now using the single subscription source from context
     onError: (error) => {
       setError(error.message || 'שגיאה בטעינת נתוני המנוי');
       toast.error(error.message || 'שגיאה בטעינת נתוני המנוי');
@@ -165,6 +166,23 @@ export const useSubscription = (): UseSubscriptionReturn => {
     }
   }, [user, subscription]);
 
+  // Combine the refreshSubscription methods from context and actions
+  const refreshSubscription = useCallback(async (): Promise<boolean> => {
+    try {
+      // First refresh from subscription actions
+      await actionsRefresh();
+      
+      // Then refresh from context
+      await contextRefresh();
+      
+      return true;
+    } catch (err) {
+      console.error('Error refreshing subscription:', err);
+      setError('שגיאה בטעינת נתוני המנוי');
+      return false;
+    }
+  }, [actionsRefresh, contextRefresh]);
+
   // Enhanced function to load subscription data when user changes
   useEffect(() => {
     if (user?.id) {
@@ -187,7 +205,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
   }, [user, subscription, checkForUnprocessedPayments]);
 
   return { 
-    subscription, 
+    subscription: subscription || contextSubscription, // Prioritize subscription from actions, fallback to context
     loading: loading || isCheckingPayments, 
     details, 
     error,

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { format, parseISO, isAfter } from 'date-fns';
+import { SubscriptionStatus } from '@/types/subscription';
 
 interface UserData {
   phone?: string;
@@ -13,18 +14,34 @@ interface UserData {
   email?: string;
 }
 
+interface SubscriptionRecord {
+  id: string;
+  status: SubscriptionStatus;
+  plan_type: string;
+  trial_ends_at: string | null;
+  current_period_ends_at: string | null;
+  cancelled_at: string | null;
+  token: string | null;
+  payment_method?: any;
+  // Add other fields as needed
+}
+
 interface SubscriptionContextType {
-  hasActiveSubscription: boolean;
   isCheckingSubscription: boolean;
   checkUserSubscription: (userId: string) => Promise<void>;
   refreshSubscription: () => Promise<void>;
   fullName: string | null;
   email: string | null;
-  subscriptionDetails: any | null;
-  planType: string | null;
   userData: UserData | null;
   lastRefreshed: Date | null;
   error: string | null;
+  
+  // Instead of separate subscription state variables
+  subscription: SubscriptionRecord | null;
+  
+  // Computed properties
+  hasActiveSubscription: boolean;
+  planType: string | null;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -43,16 +60,33 @@ interface SubscriptionProviderProps {
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
   const { user } = useAuth();
-  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean>(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState<boolean>(true);
   const [fullName, setFullName] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [subscriptionDetails, setSubscriptionDetails] = useState<any | null>(null);
-  const [planType, setPlanType] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState<number>(0);
+
+  // Computed property: hasActiveSubscription
+  const hasActiveSubscription = React.useMemo(() => {
+    if (!subscription) return false;
+    
+    const now = new Date();
+    const trialEndsAt = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+    const currentPeriodEndsAt = subscription.current_period_ends_at ? new Date(subscription.current_period_ends_at) : null;
+    
+    const isActive = subscription.status === 'active';
+    const isTrial = subscription.status === 'trial' && trialEndsAt && trialEndsAt > now;
+    const isValidPeriod = currentPeriodEndsAt && currentPeriodEndsAt > now;
+    const isCancelled = subscription.cancelled_at !== null && subscription.cancelled_at !== undefined;
+    
+    return (isActive || isTrial || isValidPeriod) && !isCancelled;
+  }, [subscription]);
+
+  // Computed property: planType
+  const planType = subscription?.plan_type || null;
 
   // Check subscription on user change
   useEffect(() => {
@@ -110,11 +144,9 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         }
       } else {
         // Reset states when user is not logged in
-        setHasActiveSubscription(false);
+        setSubscription(null);
         setFullName(null);
         setEmail(null);
-        setSubscriptionDetails(null);
-        setPlanType(null);
         setUserData(null);
         setIsCheckingSubscription(false);
         setLastRefreshed(null);
@@ -167,32 +199,17 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       
       if (!data) {
         // No subscription found
-        setHasActiveSubscription(false);
-        setSubscriptionDetails(null);
-        setPlanType(null);
+        setSubscription(null);
         setLastRefreshed(new Date());
         return;
       }
       
-      // Determine if subscription is active
-      const now = new Date();
-      const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
-      const currentPeriodEndsAt = data.current_period_ends_at ? new Date(data.current_period_ends_at) : null;
-      
-      const isActive = data.status === 'active';
-      const isTrial = data.status === 'trial' && trialEndsAt && trialEndsAt > now;
-      const isValidPeriod = currentPeriodEndsAt && currentPeriodEndsAt > now;
-      const isCancelled = data.cancelled_at !== null && data.cancelled_at !== undefined;
-      
-      const activeStatus = (isActive || isTrial || isValidPeriod) && !isCancelled;
-      
-      setHasActiveSubscription(activeStatus);
-      setSubscriptionDetails(data);
-      setPlanType(data.plan_type);
+      // Store the subscription record directly
+      setSubscription(data as SubscriptionRecord);
       setLastRefreshed(new Date());
       
       // Check if we have a valid recurring payment token
-      if (isActive && !data.token) {
+      if (data.status === 'active' && !data.token) {
         console.log('Active subscription without token, checking recurring_payments');
         
         try {
@@ -261,17 +278,21 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   };
 
   const value = {
-    hasActiveSubscription,
     isCheckingSubscription,
     checkUserSubscription,
     refreshSubscription,
     fullName,
     email,
-    subscriptionDetails,
-    planType,
     userData,
     lastRefreshed,
-    error
+    error,
+    
+    // Single source of truth for subscription
+    subscription,
+    
+    // Computed properties
+    hasActiveSubscription,
+    planType
   };
 
   return (

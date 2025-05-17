@@ -5,14 +5,15 @@ import SubscriptionSteps from '@/components/subscription/SubscriptionSteps';
 import { useSubscriptionFlow } from './hooks/useSubscriptionFlow';
 import SubscriptionView from './views/SubscriptionView';
 import { toast } from 'sonner';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 
 const SubscriptionContent = () => {
+  const { hasActiveSubscription } = useSubscriptionContext();
   const {
     currentStep,
     selectedPlan,
     fullName,
     isLoading,
-    hasActiveSubscription,
     handlePlanSelect,
     handleContractSign,
     handlePaymentComplete,

@@ -19,6 +19,7 @@ import DocumentsList from './subscription/DocumentsList';
 import SubscriptionManager from './payment/SubscriptionManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 
 // Types for webhook checking functions
 interface WebhookCheckResult {
@@ -29,6 +30,7 @@ interface WebhookCheckResult {
 const UserSubscription = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { hasActiveSubscription } = useSubscriptionContext(); // Use the computed property
   const { 
     subscription, 
     loading, 
@@ -47,11 +49,11 @@ const UserSubscription = () => {
   
   // Clear registration data on component mount if subscription exists
   useEffect(() => {
-    if (!loading && subscription) {
+    if (!loading && (subscription || hasActiveSubscription)) {
       sessionStorage.removeItem('registration_data');
       console.log('Registration data cleared due to existing subscription');
     }
-  }, [loading, subscription]);
+  }, [loading, subscription, hasActiveSubscription]);
   
   // Check for unprocessed payments when the component mounts or when the user changes
   useEffect(() => {
