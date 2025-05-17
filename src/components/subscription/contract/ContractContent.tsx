@@ -1,13 +1,9 @@
 
 import React from 'react';
 import ContractDownload from './ContractDownload';
+import { ContractDisplayProps } from '@/services/subscription/types/contract';
 
-interface ContractContentProps {
-  contractData: any;
-  contractHtml: string;
-}
-
-const ContractContent: React.FC<ContractContentProps> = ({ contractData, contractHtml }) => {
+const ContractContent: React.FC<ContractDisplayProps> = ({ contractData, contractHtml }) => {
   return (
     <div className="space-y-4">
       <ContractDownload contractData={contractData} contractHtml={contractHtml} />

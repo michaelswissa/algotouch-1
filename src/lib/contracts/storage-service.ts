@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ContractSignatureData, ContractDocument } from '@/services/subscription/types/contract';
 
 /**
  * Calls the izidoc-sign edge function
@@ -10,7 +10,7 @@ export async function callIzidocSignFunction(
   planId: string,
   fullName: string,
   email: string,
-  contractData: any
+  contractData: ContractSignatureData
 ): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
     console.log('Calling izidoc-sign edge function:', {
@@ -62,7 +62,7 @@ export async function saveContractToDatabase(
   planId: string,
   fullName: string,
   email: string,
-  contractData: any
+  contractData: ContractSignatureData
 ): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
     console.log('Saving contract for user:', userId, 'plan:', planId);
@@ -374,7 +374,7 @@ export async function verifyContractSignature(userId: string): Promise<{ signed:
 /**
  * Gets a specific contract by ID
  */
-export async function getContractById(contractId: string): Promise<{ success: boolean; contract?: any; error?: any }> {
+export async function getContractById(contractId: string): Promise<{ success: boolean; contract?: ContractDocument; error?: any }> {
   try {
     console.log('Fetching contract with ID:', contractId);
     const { data, error } = await supabase
@@ -389,7 +389,7 @@ export async function getContractById(contractId: string): Promise<{ success: bo
     }
     
     console.log('Contract retrieved successfully');
-    return { success: true, contract: data };
+    return { success: true, contract: data as ContractDocument };
   } catch (error) {
     console.error('Exception retrieving contract:', error);
     return { success: false, error };

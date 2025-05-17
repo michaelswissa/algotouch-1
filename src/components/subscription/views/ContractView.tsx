@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import ContractSection from '@/components/subscription/ContractSection';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
+import { ContractSignatureData } from '@/services/subscription/types/contract';
 
 interface ContractViewProps {
   selectedPlan: string;
@@ -20,7 +21,7 @@ const ContractView: React.FC<ContractViewProps> = ({
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleContractSign = async (contractData: any) => {
+  const handleContractSign = async (contractData: ContractSignatureData) => {
     if (isSubmitting) return; // Prevent double submission
     
     setIsSubmitting(true);
@@ -52,7 +53,7 @@ const ContractView: React.FC<ContractViewProps> = ({
       });
       
       // Add the plan ID to the contract data
-      const enhancedContractData = {
+      const enhancedContractData: ContractSignatureData = {
         ...contractData,
         planId: selectedPlan,
         // Add browser info for audit purposes
