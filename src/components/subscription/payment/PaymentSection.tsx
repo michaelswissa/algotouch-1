@@ -5,10 +5,11 @@ import { usePaymentInitialization } from './hooks/usePaymentInitialization';
 import { usePaymentUrlParams } from './hooks/usePaymentUrlParams';
 import { getPlanDetails } from './PlanUtilities';
 import PaymentSectionHeader from './PaymentSectionHeader';
-import PaymentIframe from './PaymentIframe';
 import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
 import SubscriptionPaymentError from './PaymentError';
+import CardcomPaymentFrame from '@/features/payment/components/CardcomPaymentFrame';
+import { usePaymentConfig } from '@/features/payment/hooks/usePaymentConfig';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -22,9 +23,10 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   onBack
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { paymentConfig } = usePaymentConfig();
   
   // Handle payment initialization
-  const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
+  const { paymentUrl, initiateCardcomPayment, paymentSessionId } = usePaymentInitialization(
     selectedPlan,
     onPaymentComplete, 
     onBack, 
@@ -65,8 +67,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
     return <PaymentLoading />;
   }
 
-  // Show error screen if payment URL couldn't be generated
-  if (!paymentUrl) {
+  // Show error screen if payment URL couldn't be generated or no config is available
+  if (!paymentUrl || !paymentConfig) {
     return (
       <SubscriptionPaymentError 
         onRetry={initiateCardcomPayment} 
@@ -74,6 +76,11 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
       />
     );
   }
+
+  // Generate URLs for success/failure redirects
+  const origin = window.location.origin;
+  const successUrl = `${origin}/payment/success?plan=${selectedPlan}`;
+  const errorUrl = `${origin}/payment/error?plan=${selectedPlan}`;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -86,10 +93,18 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
           getPlanDetails={() => getPlanDetails(selectedPlan)} 
         />
         
-        <PaymentIframe 
-          paymentUrl={paymentUrl} 
+        <CardcomPaymentFrame
+          amount={isMonthlyPlan ? 1 : getPlanDetails(selectedPlan).price}
+          planId={selectedPlan}
+          successUrl={successUrl}
+          errorUrl={errorUrl}
+          webhookUrl={`${origin}/api/payment-webhook`}
+          terminalNumber={paymentConfig.terminalNumber}
+          apiName={paymentConfig.apiName}
+          operation={isMonthlyPlan ? 'ChargeAndCreateToken' : 'ChargeAndCreateToken'}
           onSuccess={handlePaymentSuccess}
           onError={handlePaymentError}
+          onBack={onBack}
         />
         
         <PaymentSectionFooter 

@@ -1,12 +1,12 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LoadingPage } from '@/components/ui/spinner';
-import { usePaymentVerification } from '@/hooks/usePaymentVerification';
-import { PaymentRedirectError } from '@/components/payment/PaymentRedirectError';
-import { PaymentRedirectSuccess } from '@/components/payment/PaymentRedirectSuccess';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PaymentRedirectError } from '@/components/payment/PaymentRedirectError';
+import { PaymentRedirectSuccess } from '@/components/payment/PaymentRedirectSuccess';
+import { usePaymentVerification } from '@/features/payment/hooks/usePaymentVerification';
 
 export default function CardcomRedirectPage() {
   const location = useLocation();
@@ -45,8 +45,8 @@ export default function CardcomRedirectPage() {
   // Use our custom hook to handle payment verification - only if we have a lowProfileId
   const { isLoading, error, paymentDetails } = usePaymentVerification({ 
     lowProfileId,
-    // Skip verification if no ID found
-    skipVerification: !lowProfileId
+    skipVerification: !lowProfileId,
+    redirectOnSuccess: false // We'll handle redirection here
   });
 
   // Render appropriate UI based on state

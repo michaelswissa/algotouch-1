@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase-client';
+import { CheckCircle, XCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logPaymentError } from '@/features/payment/utils/errorHandling';
 
 interface ManualFixesProps {
   userId: string;
@@ -45,6 +46,13 @@ const ManualFixes: React.FC<ManualFixesProps> = ({ userId }) => {
       }
     } catch (error: any) {
       console.error('Error fixing payment:', error);
+      
+      // Use our error handling service
+      logPaymentError(error, userId, 'manual_fix', {
+        lowProfileId,
+        operation: 'manual_fix'
+      });
+      
       toast.error(error.message || 'שגיאה בתהליך התיקון');
       setResult({ success: false, message: error.message });
     } finally {
