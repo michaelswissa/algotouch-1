@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Clock, Volume2 } from "lucide-react";
+import { Clock, Volume2, Download, Share } from "lucide-react";
 
 interface CourseVideoPlayerProps {
   videoUrl: string;
@@ -111,10 +111,10 @@ const CourseVideoPlayer = ({
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="text-xs">
-            הורד
+            <Download className="h-3.5 w-3.5 mr-1" /> הורד
           </Button>
           <Button size="sm" className="text-xs">
-            שתף
+            <Share className="h-3.5 w-3.5 mr-1" /> שתף
           </Button>
         </div>
       </div>
