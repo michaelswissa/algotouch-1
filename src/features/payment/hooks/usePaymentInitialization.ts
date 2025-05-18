@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useSubscriptionContext } from '@/features/subscription/contexts/SubscriptionContext';
-import { useAuth } from '@/features/auth';
+import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
+import { useAuth } from '@/contexts/auth';
 
 export const usePaymentInitialization = (
   selectedPlan: string,
