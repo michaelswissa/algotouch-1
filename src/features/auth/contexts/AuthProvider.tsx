@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
-import { RegistrationData } from './types';
+import { RegistrationData } from '../types';
 import { logger } from '@/lib/logger';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -106,9 +107,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null; // Will be redirected to error page via the useEffect
   }
 
+  // Create an adapter for signIn that matches the AuthContextType signature
+  const signInAdapter = (credentials: { email: string; password: string }) => {
+    return auth.signIn(credentials.email, credentials.password);
+  };
+
   return (
     <AuthContext.Provider value={{
       ...auth,
+      signIn: signInAdapter, // Use the adapter here
       registrationData,
       isRegistering,
       pendingSubscription,
