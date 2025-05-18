@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
-import { processWebhookByEmail } from '@/features/payment/services/cardcomService';
 
 interface SubscriptionManagerProps {
   userId: string;
@@ -26,10 +26,19 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     try {
       setLoading(true);
       
-      // Process webhook for this user using our encapsulated service
-      const result = await processWebhookByEmail(email, lowProfileId, userId);
+      // Process webhook for this user
+      const { data, error } = await supabase.functions.invoke('reprocess-webhook-by-email', {
+        body: { 
+          email,
+          lowProfileId,
+          userId,
+          forceRefresh: retryCount > 0 // Force a deeper refresh if this is a retry
+        }
+      });
       
-      if (result.success) {
+      if (error) throw error;
+      
+      if (data?.success) {
         toast.success('המנוי עודכן בהצלחה');
         if (onComplete) onComplete(true);
         
@@ -43,9 +52,9 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         
         if (retryCount >= 2) {
           // On multiple retries, offer more detailed error
-          toast.error(`שגיאה בעדכון המנוי: ${result.message || 'בעיה בתקשורת עם שרת התשלומים'}`);
+          toast.error(`שגיאה בעדכון המנוי: ${data?.message || 'בעיה בתקשורת עם שרת התשלומים'}`);
         } else {
-          toast.error(result.message || 'שגיאה בעדכון המנוי');
+          toast.error(data?.message || 'שגיאה בעדכון המנוי');
         }
         
         if (onComplete) onComplete(false);

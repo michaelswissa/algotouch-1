@@ -20,7 +20,7 @@ export interface UseSubscriptionReturn {
 
 export const useSubscription = (): UseSubscriptionReturn => {
   const { user } = useAuth();
-  const { subscription: contextSubscription, refreshSubscription: contextRefresh, hasActiveSubscription } = useSubscriptionContext();
+  const { subscription: contextSubscription, refreshSubscription: contextRefresh } = useSubscriptionContext();
   const [error, setError] = useState<string | null>(null);
   const [isCheckingPayments, setIsCheckingPayments] = useState<boolean>(false);
   

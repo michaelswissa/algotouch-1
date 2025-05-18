@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
@@ -7,7 +6,6 @@ import { AuthProvider } from '@/contexts/auth';
 import { DirectionProvider } from '@/contexts/direction/DirectionProvider';
 import { StockDataProvider } from '@/contexts/stock/StockDataContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { SubscriptionProvider } from '@/contexts/subscription/SubscriptionContext';
 
 // Eagerly loaded routes for critical paths
 import Auth from '@/pages/Auth';
@@ -105,9 +103,7 @@ function App() {
               element={
                 <AuthProvider>
                   <StockDataProvider refreshInterval={30000}>
-                    <SubscriptionProvider>
-                      <Outlet />
-                    </SubscriptionProvider>
+                    <Outlet />
                   </StockDataProvider>
                 </AuthProvider>
               }
