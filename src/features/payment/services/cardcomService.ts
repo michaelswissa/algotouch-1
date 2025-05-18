@@ -115,6 +115,8 @@ export async function verifyPayment(lowProfileId: string): Promise<{
   message: string;
   paymentDetails?: any;
   tokenInfo?: any;
+  source?: string;
+  error?: any;
 }> {
   try {
     const { data, error } = await supabase.functions.invoke('verify-cardcom-payment', {
@@ -125,16 +127,134 @@ export async function verifyPayment(lowProfileId: string): Promise<{
       console.error('Error verifying payment:', error);
       return {
         success: false,
-        message: 'שגיאה באימות התשלום'
+        message: 'שגיאה באימות התשלום',
+        error
       };
     }
     
-    return data;
+    return {
+      ...data,
+      source: data?.source || 'api_verification'
+    };
   } catch (err) {
     console.error('Error invoking verify-payment function:', err);
     return {
       success: false,
-      message: 'שגיאה בהתקשרות עם שרת התשלומים'
+      message: 'שגיאה בהתקשרות עם שרת התשלומים',
+      error: err
     };
   }
 }
+
+// Add the missing createTokenizationUrl function
+export async function createTokenizationUrl({
+  terminalNumber,
+  apiName,
+  amount,
+  successUrl,
+  errorUrl,
+  webhookUrl,
+  productName = 'AlgoTouch Subscription',
+  returnValue,
+  language = 'he',
+  operation = 'ChargeAndCreateToken',
+  fullName,
+  email
+}: {
+  terminalNumber: number;
+  apiName: string;
+  amount: number;
+  successUrl: string;
+  errorUrl: string;
+  webhookUrl: string;
+  productName?: string;
+  returnValue: string;
+  language?: string;
+  operation?: string;
+  fullName?: string;
+  email?: string;
+}) {
+  try {
+    // Call iframe-redirect edge function
+    const { data, error } = await supabase.functions.invoke('iframe-redirect', {
+      body: {
+        terminalNumber,
+        apiName,
+        amount,
+        successUrl,
+        failedUrl: errorUrl,
+        webhookUrl,
+        returnValue,
+        operation,
+        productName,
+        language,
+        customerName: fullName,
+        customerEmail: email
+      }
+    });
+    
+    if (error) {
+      console.error('Error creating tokenization URL:', error);
+      return {
+        success: false,
+        error: 'שגיאה ביצירת דף תשלום'
+      };
+    }
+    
+    if (!data || data.ResponseCode !== 0) {
+      console.error('Error in iframe-redirect response:', data);
+      return {
+        success: false,
+        error: data?.Description || 'שגיאה ביצירת דף תשלום'
+      };
+    }
+    
+    return {
+      success: true,
+      url: data.LowProfileUrl,
+      lowProfileId: data.LowProfileId
+    };
+  } catch (err) {
+    console.error('Error in createTokenizationUrl:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'שגיאה ביצירת דף תשלום'
+    };
+  }
+}
+
+// Add the missing logPaymentError function
+export const logPaymentError = async (
+  error: any, 
+  userId?: string, 
+  context: string = 'payment_general',
+  additionalData?: any
+) => {
+  try {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Log to console
+    console.error(`[${context}] Payment error:`, errorMessage, {
+      userId,
+      ...(additionalData || {})
+    });
+    
+    // Log to the database
+    await supabase.from('system_logs').insert({
+      function_name: context,
+      level: 'error',
+      message: errorMessage,
+      details: {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        userId: userId || 'anonymous',
+        context,
+        timestamp: new Date().toISOString(),
+        ...(additionalData || {})
+      }
+    });
+  } catch (logError) {
+    // Just log to console if logging to the database fails
+    console.error('Failed to log payment error:', logError);
+  }
+};
