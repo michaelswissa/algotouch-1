@@ -8,7 +8,7 @@ interface PaymentMethodInfoProps {
 }
 
 const PaymentMethodInfo: React.FC<PaymentMethodInfoProps> = ({ paymentMethod }) => {
-  if (!paymentMethod || !paymentMethod.lastFourDigits) {
+  if (!paymentMethod) {
     return (
       <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
         <CreditCard className="h-5 w-5 text-muted-foreground flex-shrink-0" />
