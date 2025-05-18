@@ -33,7 +33,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
     refreshSubscription: actionsRefresh
   } = useSubscriptionActions({
     userId: user?.id,
-    subscriptionId: contextSubscription?.id,
+    subscriptionId: contextSubscription?.id, // Now using the single subscription source from context
     onError: (error) => {
       setError(error.message || 'שגיאה בטעינת נתוני המנוי');
       toast.error(error.message || 'שגיאה בטעינת נתוני המנוי');
@@ -44,8 +44,9 @@ export const useSubscription = (): UseSubscriptionReturn => {
   const checkForUnprocessedPayments = useCallback(async (): Promise<boolean> => {
     if (!user?.email) return false;
     
-    setIsCheckingPayments(true);
     try {
+      setIsCheckingPayments(true);
+      
       // Check for unprocessed webhooks with this user's email
       const { data: webhooks, error: webhookError } = await supabase
         .from('payment_webhooks')
@@ -161,15 +162,13 @@ export const useSubscription = (): UseSubscriptionReturn => {
       console.error('Error in checkForUnprocessedPayments:', err);
       return false;
     } finally {
-      // IMPORTANT: Always clear the loading state in finally block
+      // Ensure loading state is cleared even in error cases
       setIsCheckingPayments(false);
     }
   }, [user, subscription]);
 
   // Combine the refreshSubscription methods from context and actions
   const refreshSubscription = useCallback(async (): Promise<boolean> => {
-    let success = false;
-    setError(null);
     try {
       // First refresh from subscription actions
       await actionsRefresh();
@@ -177,48 +176,33 @@ export const useSubscription = (): UseSubscriptionReturn => {
       // Then refresh from context
       await contextRefresh();
       
-      success = true;
+      return true;
     } catch (err) {
       console.error('Error refreshing subscription:', err);
       setError('שגיאה בטעינת נתוני המנוי');
-      success = false;
+      return false;
     }
-    return success;
   }, [actionsRefresh, contextRefresh]);
 
   // Enhanced function to load subscription data when user changes
   useEffect(() => {
-    let isMounted = true;
-    
     if (user?.id) {
       refreshSubscription().catch((err) => {
-        if (isMounted) {
-          console.error('Error refreshing subscription:', err);
-          setError('שגיאה בטעינת נתוני המנוי');
-        }
+        console.error('Error refreshing subscription:', err);
+        setError('שגיאה בטעינת נתוני המנוי');
       });
     }
-    
-    return () => {
-      isMounted = false;
-    };
   }, [user, refreshSubscription]);
   
   // Automatically check for unprocessed payments when the component mounts
   useEffect(() => {
-    let isMounted = true;
-    
     if (user?.id && user?.email) {
       checkForUnprocessedPayments().catch(err => {
-        if (isMounted) {
-          console.error('Error checking for unprocessed payments:', err);
-        }
+        console.error('Error checking for unprocessed payments:', err);
+        // Ensure loading state is cleared even when top-level catch handles error
+        setIsCheckingPayments(false);
       });
     }
-    
-    return () => {
-      isMounted = false;
-    };
   }, [user, checkForUnprocessedPayments]);
 
   return { 
