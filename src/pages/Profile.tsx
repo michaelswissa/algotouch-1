@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -13,6 +14,7 @@ import { UserCircle, Lock, MapPin, Wrench } from 'lucide-react';
 import UserSubscription from '@/components/UserSubscription';
 import RecoveryTool from '@/components/payment/RecoveryTool';
 import { supabase } from '@/integrations/supabase/client';
+import { SubscriptionProvider } from '@/contexts/subscription/SubscriptionContext';
 
 interface ProfileData {
   first_name: string;
@@ -365,7 +367,9 @@ const Profile = () => {
           </div>
           
           <div>
-            <UserSubscription />
+            <SubscriptionProvider>
+              <UserSubscription />
+            </SubscriptionProvider>
           </div>
         </div>
       </div>
