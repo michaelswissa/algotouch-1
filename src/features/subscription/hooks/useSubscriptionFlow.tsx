@@ -1,16 +1,17 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase-client';
 import { useAuth } from '@/features/auth';
 import { toast } from 'sonner';
-import { Steps } from '@/features/subscription/types';
+import { StepKey } from '@/features/subscription/types';
 
 export const useSubscriptionFlow = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated, registrationData, setRegistrationData } = useAuth();
   
-  const [currentStep, setCurrentStep] = useState<Steps>('plan-selection');
+  const [currentStep, setCurrentStep] = useState<StepKey>('plan-selection');
   const [selectedPlan, setSelectedPlan] = useState<string | undefined>(planId);
   const [contractId, setContractId] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
@@ -121,7 +122,7 @@ export const useSubscriptionFlow = () => {
   }, []);
 
   // Handle back navigation
-  const handleBackToStep = useCallback((step: Steps) => {
+  const handleBackToStep = useCallback((step: StepKey) => {
     setCurrentStep(step);
   }, []);
 
