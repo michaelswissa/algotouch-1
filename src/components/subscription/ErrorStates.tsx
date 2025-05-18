@@ -14,6 +14,7 @@ interface ErrorStateProps {
   onRefresh: () => Promise<void>;
   userId?: string;
   email?: string;
+  children?: React.ReactNode;
 }
 
 export const CriticalErrorState: React.FC<ErrorStateProps> = ({ 
