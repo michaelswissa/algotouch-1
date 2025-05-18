@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SubscriptionCard from '../SubscriptionCard';
-import SubscriptionManager from '../payment/SubscriptionManager';
+import SubscriptionManager from '../../payment/SubscriptionManager';
 
 export interface ErrorStateProps {
   title: string;

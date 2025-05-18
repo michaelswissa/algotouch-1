@@ -1,7 +1,7 @@
 
 import React from 'react';
 import SubscriptionCard from '../SubscriptionCard';
-import SubscriptionManager from '../payment/SubscriptionManager';
+import SubscriptionManager from '../../payment/SubscriptionManager';
 
 export interface UnprocessedPaymentStateProps {
   userId: string;

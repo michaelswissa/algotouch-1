@@ -6,7 +6,8 @@ export {
   TimeoutWarningState,
   MaxRetriesState,
   NoSubscriptionState,
-  UnprocessedPaymentState,
-  ErrorStateProps,
-  UnprocessedPaymentStateProps
+  UnprocessedPaymentState
 } from './error-states';
+
+export type { ErrorStateProps } from './error-states';
+export type { UnprocessedPaymentStateProps } from './error-states';

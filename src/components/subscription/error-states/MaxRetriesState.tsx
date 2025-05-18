@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SubscriptionCard from '../SubscriptionCard';
-import SubscriptionManager from '../payment/SubscriptionManager';
+import SubscriptionManager from '../../payment/SubscriptionManager';
 import { ErrorStateProps } from './CriticalErrorState';
 
 export const MaxRetriesState: React.FC<ErrorStateProps> = ({ 
