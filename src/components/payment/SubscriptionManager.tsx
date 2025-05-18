@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { processWebhookByEmail } from '@/features/payment/services/cardcomService';
+import { PaymentLogger } from '@/services/logging/paymentLogger';
 
 interface SubscriptionManagerProps {
   userId: string;
@@ -26,11 +27,28 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     try {
       setLoading(true);
       
+      // Log the repair attempt for audit purposes
+      await PaymentLogger.info(
+        'Subscription repair attempt initiated',
+        'subscription_repair',
+        { email, lowProfileId, userId },
+        userId
+      );
+      
       // Process webhook for this user using our encapsulated service
       const result = await processWebhookByEmail(email, lowProfileId, userId);
       
       if (result.success) {
         toast.success('המנוי עודכן בהצלחה');
+        
+        // Log successful repair
+        await PaymentLogger.success(
+          'Subscription repair completed successfully',
+          'subscription_repair',
+          { email, result },
+          userId
+        );
+        
         if (onComplete) onComplete(true);
         
         // Reload page after short delay to show the updated subscription
@@ -40,6 +58,14 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       } else {
         // If failed, increment retry count
         setRetryCount(prev => prev + 1);
+        
+        // Log failed repair attempt
+        await PaymentLogger.error(
+          `Subscription repair failed: ${result.message || 'Unknown error'}`,
+          'subscription_repair',
+          { email, lowProfileId, error: result.message, retryCount: retryCount + 1 },
+          userId
+        );
         
         if (retryCount >= 2) {
           // On multiple retries, offer more detailed error
@@ -53,6 +79,15 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     } catch (err: any) {
       console.error('Error processing webhook:', err);
       setRetryCount(prev => prev + 1);
+      
+      // Log error in repair attempt
+      await PaymentLogger.error(
+        'Exception during subscription repair',
+        'subscription_repair',
+        { email, lowProfileId, error: err.message, stack: err.stack },
+        userId
+      );
+      
       toast.error('שגיאה בעדכון המנוי');
       if (onComplete) onComplete(false);
     } finally {
@@ -85,7 +120,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
           className="flex items-center gap-2"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {loading ? 'מעבד...' : 'עדכן פרטי מנוי'}
+          {loading ? 'מעבד...' : 'תקן נתוני מנוי'}
         </Button>
       </CardFooter>
     </Card>

@@ -11,6 +11,7 @@ import {
 import LoadingSkeleton from '../LoadingSkeleton';
 import { SubscriptionStatusState } from '@/hooks/subscription/types';
 import { User } from '@/types/auth';
+import SubscriptionManager from '../../payment/SubscriptionManager';
 
 interface SubscriptionErrorViewProps {
   statusState: SubscriptionStatusState;
@@ -76,7 +77,22 @@ const SubscriptionErrorView: React.FC<SubscriptionErrorViewProps> = ({
   }
 
   if (isLoading) {
-    return <LoadingSkeleton />;
+    const canRepair = user?.id && user?.email;
+    
+    return (
+      <>
+        <LoadingSkeleton />
+        {canRepair && (
+          <div className="mt-4">
+            <SubscriptionManager
+              userId={user.id}
+              email={user.email}
+              onComplete={handleRefresh}
+            />
+          </div>
+        )}
+      </>
+    );
   }
 
   // If there's unprocessed payment but no subscription
@@ -94,7 +110,18 @@ const SubscriptionErrorView: React.FC<SubscriptionErrorViewProps> = ({
   // If no subscription data was found
   if (!subscription) {
     return (
-      <NoSubscriptionState onSubscribe={() => navigate('/subscription')} />
+      <>
+        <NoSubscriptionState onSubscribe={() => navigate('/subscription')} />
+        {user?.id && user?.email && (
+          <div className="mt-4">
+            <SubscriptionManager
+              userId={user.id}
+              email={user.email}
+              onComplete={handleRefresh}
+            />
+          </div>
+        )}
+      </>
     );
   }
 
