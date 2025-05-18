@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * Record a lesson as watched by the user
  */
-export async function recordLessonWatched(courseId: string, lessonId: string): Promise<void> {
+export async function recordLessonWatched(userId: string, courseId: string): Promise<boolean> {
   try {
     const { data: user } = await supabase.auth.getUser();
     if (!user?.user?.id) {
@@ -22,8 +22,8 @@ export async function recordLessonWatched(courseId: string, lessonId: string): P
     if (existingProgress) {
       // Update existing progress
       const lessonsWatched = existingProgress.lessons_watched || [];
-      if (!lessonsWatched.includes(lessonId)) {
-        lessonsWatched.push(lessonId);
+      if (!lessonsWatched.includes(userId)) {
+        lessonsWatched.push(userId);
         
         await supabase
           .from('course_progress')
@@ -41,7 +41,7 @@ export async function recordLessonWatched(courseId: string, lessonId: string): P
         .insert({
           user_id: user.user.id,
           course_id: courseId,
-          lessons_watched: [lessonId],
+          lessons_watched: [userId],
           modules_completed: [],
           is_completed: false,
           last_watched: new Date().toISOString(),
@@ -50,9 +50,10 @@ export async function recordLessonWatched(courseId: string, lessonId: string): P
         });
     }
     
-    console.log(`Lesson ${lessonId} recorded as watched for course ${courseId}`);
+    console.log(`Lesson ${userId} recorded as watched for course ${courseId}`);
+    return true;
   } catch (error) {
     console.error('Error recording lesson watched:', error);
-    throw error;
+    return false;
   }
 }

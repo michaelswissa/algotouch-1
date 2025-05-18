@@ -4,11 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * Mark a module as completed by the user
  */
-export async function completeModule(courseId: string, moduleId: string): Promise<void> {
+export async function completeModule(userId: string, courseId: string): Promise<boolean> {
   try {
     const { data: user } = await supabase.auth.getUser();
     if (!user?.user?.id) {
       throw new Error('User not authenticated');
+      return false;
     }
     
     // Check if course progress exists
@@ -22,8 +23,8 @@ export async function completeModule(courseId: string, moduleId: string): Promis
     if (existingProgress) {
       // Update existing progress
       const modulesCompleted = existingProgress.modules_completed || [];
-      if (!modulesCompleted.includes(moduleId)) {
-        modulesCompleted.push(moduleId);
+      if (!modulesCompleted.includes(userId)) {
+        modulesCompleted.push(userId);
         
         await supabase
           .from('course_progress')
@@ -41,16 +42,17 @@ export async function completeModule(courseId: string, moduleId: string): Promis
           user_id: user.user.id,
           course_id: courseId,
           lessons_watched: [],
-          modules_completed: [moduleId],
+          modules_completed: [userId],
           is_completed: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
     }
     
-    console.log(`Module ${moduleId} marked as completed for course ${courseId}`);
+    console.log(`Module ${userId} marked as completed for course ${courseId}`);
+    return true;
   } catch (error) {
     console.error('Error completing module:', error);
-    throw error;
+    return false;
   }
 }

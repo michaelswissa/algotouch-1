@@ -1,4 +1,3 @@
-
 // Types related to the community system
 
 // Activity types
@@ -94,14 +93,15 @@ export interface Tag {
 
 // Interface for course progress data
 export interface CourseProgress {
+  id?: string;
   courseId: string;
   userId: string;
   lessonsWatched: string[]; // Array of lesson IDs
   modulesCompleted: string[]; // Array of module IDs
   isCompleted: boolean;
-  lastWatched: string;
-  created_at: string;
-  updated_at: string;
+  lastWatched?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Interface for user streak data

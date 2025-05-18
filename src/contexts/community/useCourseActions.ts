@@ -13,7 +13,7 @@ export function useCourseActions(userId: string | undefined, refreshDataCallback
     try {
       // Import dynamically to avoid circular imports
       const { recordLessonWatched } = await import('@/lib/community/course-service');
-      const result = await recordLessonWatched(userId, courseId, lessonId);
+      const result = await recordLessonWatched(lessonId, courseId);
       
       if (result) {
         toast.success('קיבלת 5 נקודות על צפייה בשיעור!', {
@@ -38,7 +38,7 @@ export function useCourseActions(userId: string | undefined, refreshDataCallback
     try {
       // Import dynamically to avoid circular imports
       const { completeModule } = await import('@/lib/community/course-service');
-      const result = await completeModule(userId, courseId, moduleId);
+      const result = await completeModule(moduleId, courseId);
       
       if (result) {
         toast.success('מודול הושלם! קיבלת 20 נקודות!', {
@@ -63,7 +63,7 @@ export function useCourseActions(userId: string | undefined, refreshDataCallback
     try {
       // Import dynamically to avoid circular imports
       const { completeCourse } = await import('@/lib/community/course-service');
-      const result = await completeCourse(userId, courseId);
+      const result = await completeCourse(courseId);
       
       if (result) {
         toast.success('קורס הושלם! קיבלת 50 נקודות ותעודה חדשה!', {

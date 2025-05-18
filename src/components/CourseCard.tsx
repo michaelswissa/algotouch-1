@@ -15,11 +15,17 @@ export interface ModuleProps {
 export interface CourseProps {
   title: string;
   description: string;
-  icon: "graduation" | "book" | "play";
+  icon?: "graduation" | "book" | "play";
   id?: string;
   modules: ModuleProps[];
   isSelected?: boolean;
   onClick?: () => void;
+  instructor?: string;
+  duration?: string;
+  level?: string;
+  students?: number;
+  rating?: number;
+  imagePath?: string;
 }
 
 const CourseCard = ({ title, description, icon, modules, isSelected, onClick }: CourseProps) => {

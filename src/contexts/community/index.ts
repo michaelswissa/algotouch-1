@@ -4,9 +4,14 @@ import { useContext, createContext } from 'react';
 // Define types for community context
 interface CourseProgress {
   courseId: string;
+  userId: string;
   lessonsWatched: string[];
   modulesCompleted: string[];
-  completionDate?: Date | null;
+  isCompleted: boolean;
+  lastWatched?: string;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface UserBadge {
@@ -24,9 +29,9 @@ interface UserBadge {
 export interface CommunityContextType {
   courseProgress?: CourseProgress[];
   userBadges?: UserBadge[];
-  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<void>;
-  completeModule?: (courseId: string, moduleId: string) => Promise<void>;
-  completeCourse?: (courseId: string) => Promise<void>;
+  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<boolean>;
+  completeModule?: (courseId: string, moduleId: string) => Promise<boolean>;
+  completeCourse?: (courseId: string) => Promise<boolean>;
 }
 
 // Create context with default values

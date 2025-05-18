@@ -56,14 +56,26 @@ export const CourseProgressProvider: React.FC<{ children: React.ReactNode }> = (
   const fetchUserCourseProgress = async (userId: string) => {
     try {
       const progress = await getUserCourseProgress(userId);
-      setCourseProgress(progress || []);
+      // Transform the data to match CourseProgress interface
+      const mappedProgress: CourseProgress[] = progress.map(item => ({
+        id: item.id,
+        courseId: item.course_id,
+        userId: item.user_id,
+        lessonsWatched: item.lessons_watched || [],
+        modulesCompleted: item.modules_completed || [],
+        isCompleted: item.is_completed || false,
+        lastWatched: item.last_watched,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
+      setCourseProgress(mappedProgress);
     } catch (error) {
       console.error('Error fetching user course progress:', error);
     }
   };
   
   // Wrapper functions that include toast notifications
-  const handleRecordLessonWatched = async (courseId: string, lessonId: string) => {
+  const handleRecordLessonWatched = async (courseId: string, lessonId: string): Promise<boolean> => {
     if (!isAuthenticated || !user) return false;
     
     const success = await recordLesson(courseId, lessonId);
@@ -74,7 +86,7 @@ export const CourseProgressProvider: React.FC<{ children: React.ReactNode }> = (
     return success;
   };
   
-  const handleCompleteModule = async (courseId: string, moduleId: string) => {
+  const handleCompleteModule = async (courseId: string, moduleId: string): Promise<boolean> => {
     if (!isAuthenticated || !user) return false;
     
     const success = await completeModuleAction(courseId, moduleId);
@@ -85,7 +97,7 @@ export const CourseProgressProvider: React.FC<{ children: React.ReactNode }> = (
     return success;
   };
   
-  const handleCompleteCourse = async (courseId: string) => {
+  const handleCompleteCourse = async (courseId: string): Promise<boolean> => {
     if (!isAuthenticated || !user) return false;
     
     const success = await completeCourseAction(courseId);

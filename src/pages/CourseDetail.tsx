@@ -48,8 +48,8 @@ const CourseDetail = () => {
       <div className="tradervue-container py-6">
         <CourseHeader 
           title={course.title} 
-          description={course.description || ''} 
-          instructor="מדריך מקצועי"
+          description={course.description} 
+          instructor={course.instructor || "מדריך מקצועי"}
           progress={30}
           isAuthenticated={true}
           hasCourseCompletionBadge={false}

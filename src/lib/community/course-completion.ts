@@ -4,11 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * Mark a course as completed by the user
  */
-export async function completeCourse(courseId: string): Promise<void> {
+export async function completeCourse(courseId: string): Promise<boolean> {
   try {
     const { data: user } = await supabase.auth.getUser();
     if (!user?.user?.id) {
       throw new Error('User not authenticated');
+      return false;
     }
     
     // Check if course progress exists
@@ -40,8 +41,9 @@ export async function completeCourse(courseId: string): Promise<void> {
     }
     
     console.log(`Course ${courseId} marked as completed`);
+    return true;
   } catch (error) {
     console.error('Error completing course:', error);
-    throw error;
+    return false;
   }
 }
