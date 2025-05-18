@@ -1,26 +1,19 @@
 
 import React from 'react';
 import { CreditCard } from 'lucide-react';
-import { PaymentMethod } from '@/services/subscription/types';
+
+interface PaymentMethod {
+  lastFourDigits: string;
+  expiryMonth: string;
+  expiryYear: string;
+}
 
 interface PaymentMethodInfoProps {
   paymentMethod: PaymentMethod | null;
 }
 
 const PaymentMethodInfo: React.FC<PaymentMethodInfoProps> = ({ paymentMethod }) => {
-  if (!paymentMethod) {
-    return (
-      <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
-        <CreditCard className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-        <div>
-          <h4 className="text-sm font-medium">אמצעי תשלום</h4>
-          <p className="text-sm text-muted-foreground">אין נתונים זמינים</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { lastFourDigits, expiryMonth, expiryYear } = paymentMethod;
+  if (!paymentMethod) return null;
   
   return (
     <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
@@ -28,8 +21,7 @@ const PaymentMethodInfo: React.FC<PaymentMethodInfoProps> = ({ paymentMethod }) 
       <div>
         <h4 className="text-sm font-medium">אמצעי תשלום</h4>
         <p className="text-sm text-muted-foreground">
-          כרטיס אשראי המסתיים ב-{lastFourDigits || '****'} 
-          {expiryMonth && expiryYear ? ` (בתוקף עד ${expiryMonth}/${expiryYear})` : ''}
+          כרטיס אשראי המסתיים ב-{paymentMethod.lastFourDigits} (תוקף: {paymentMethod.expiryMonth}/{paymentMethod.expiryYear.slice(-2)})
         </p>
       </div>
     </div>

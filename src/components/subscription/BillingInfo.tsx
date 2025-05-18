@@ -13,17 +13,13 @@ const BillingInfo: React.FC<BillingInfoProps> = ({
   planPrice,
   currency = '$'
 }) => {
-  // Format display values with fallbacks for missing data
-  const displayDate = nextBillingDate || 'לא זמין';
-  const displayPrice = planPrice || '--';
-  
   return (
     <>
       <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-md">
         <Calendar className="h-5 w-5 text-primary flex-shrink-0" />
         <div>
           <h4 className="text-sm font-medium">החיוב הבא</h4>
-          <p className="text-sm text-muted-foreground">{displayDate}</p>
+          <p className="text-sm text-muted-foreground">{nextBillingDate}</p>
         </div>
       </div>
       
@@ -31,9 +27,7 @@ const BillingInfo: React.FC<BillingInfoProps> = ({
         <Settings className="h-5 w-5 text-primary flex-shrink-0" />
         <div>
           <h4 className="text-sm font-medium">סכום החיוב</h4>
-          <p className="text-sm text-muted-foreground">
-            {displayPrice !== '--' ? `${currency}${displayPrice} בתאריך ${displayDate}` : 'לא זמין'}
-          </p>
+          <p className="text-sm text-muted-foreground">{currency}{planPrice} בתאריך {nextBillingDate}</p>
         </div>
       </div>
     </>

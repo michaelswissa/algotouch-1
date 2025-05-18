@@ -8,20 +8,13 @@ import { PaymentMethod, Subscription, SubscriptionDetails } from '../types';
  * Format a date string to the Israeli format
  */
 export const formatDate = (dateString: string): string => {
-  if (!dateString) return 'לא זמין';
-  try {
-    return format(parseISO(dateString), 'dd/MM/yyyy', { locale: he });
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'לא זמין';
-  }
+  return format(parseISO(dateString), 'dd/MM/yyyy', { locale: he });
 };
 
 /**
  * Calculate days left until a given date
  */
 export const calculateDaysLeft = (endDate: Date): number => {
-  if (!endDate) return 0;
   return Math.max(0, differenceInDays(endDate, new Date()));
 };
 
@@ -29,7 +22,6 @@ export const calculateDaysLeft = (endDate: Date): number => {
  * Calculate progress value based on start date, end date, and days left
  */
 export const calculateProgress = (startDate: Date, endDate: Date, daysLeft: number): number => {
-  if (!startDate || !endDate) return 0;
   const totalDays = differenceInDays(endDate, startDate);
   return Math.max(0, Math.min(100, (totalDays - daysLeft) / totalDays * 100));
 };
@@ -105,12 +97,6 @@ export const getStatusInfo = (subscription: Subscription) => {
     
     statusText = 'פעיל';
     nextBillingDate = formatDate(subscription.current_period_ends_at);
-  } else {
-    // Fallback for missing date information
-    statusText = subscription.status || 'לא ידוע';
-    nextBillingDate = 'לא זמין';
-    progressValue = 0;
-    daysLeft = 0;
   }
   
   return { statusText, nextBillingDate, progressValue, daysLeft };
@@ -126,7 +112,7 @@ export const getSubscriptionDetails = (
   if (!subscription) return null;
   
   // Get plan name and price based on plan_type
-  const planInfo = getPlanInfo(subscription.plan_type || 'monthly');
+  const planInfo = getPlanInfo(subscription.plan_type);
   
   // Get status details based on subscription status
   const statusInfo = getStatusInfo(subscription);

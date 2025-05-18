@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -325,19 +326,6 @@ const SubscriptionDetails = ({
   const hasContract = subscription.contract_signed;
   const isCancelled = subscription.status === 'cancelled';
   
-  // Create fallback details if details object is missing
-  const fallbackDetails = details || {
-    planName: subscription.plan_type === 'annual' ? 'שנתי' : 
-              subscription.plan_type === 'vip' ? 'VIP' : 'חודשי',
-    statusText: subscription.status || 'לא ידוע',
-    nextBillingDate: 'לא זמין',
-    planPrice: subscription.plan_type === 'annual' ? '899' : 
-               subscription.plan_type === 'vip' ? '1499' : '99',
-    daysLeft: 0,
-    progressValue: 0,
-    paymentMethod: null
-  };
-  
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -352,8 +340,8 @@ const SubscriptionDetails = ({
 
   return (
     <SubscriptionCard
-      title={`מנוי ${fallbackDetails.planName}${isCancelled ? ' (מבוטל)' : ''}`}
-      description={`סטטוס: ${fallbackDetails.statusText}`}
+      title={`מנוי ${details?.planName}${isCancelled ? ' (מבוטל)' : ''}`}
+      description={`סטטוס: ${details?.statusText}`}
     >
       <>
         <div className="flex justify-end mb-2">
@@ -381,30 +369,34 @@ const SubscriptionDetails = ({
             {isCancelled && (
               <Alert variant="warning" className="mb-4">
                 <AlertDescription>
-                  המנוי שלך בוטל ויישאר פעיל עד {fallbackDetails.nextBillingDate}.
+                  המנוי שלך בוטל ויישאר פעיל עד {details?.nextBillingDate}.
                   לאחר מכן, לא תחויב יותר והגישה למערכת תיחסם.
                 </AlertDescription>
               </Alert>
             )}
             
-            {subscription.status === 'trial' && fallbackDetails && (
+            {subscription.status === 'trial' && details && (
               <SubscriptionStatus 
                 status={subscription.status} 
-                daysLeft={fallbackDetails.daysLeft} 
-                progressValue={fallbackDetails.progressValue} 
+                daysLeft={details.daysLeft} 
+                progressValue={details.progressValue} 
               />
             )}
             
             <div className="grid grid-cols-1 gap-4 mt-4">
-              <BillingInfo 
-                nextBillingDate={fallbackDetails.nextBillingDate} 
-                planPrice={fallbackDetails.planPrice}
-                currency="$"
-              />
-              
-              <PaymentMethodInfo 
-                paymentMethod={fallbackDetails.paymentMethod} 
-              />
+              {details && (
+                <>
+                  <BillingInfo 
+                    nextBillingDate={details.nextBillingDate} 
+                    planPrice={details.planPrice}
+                    currency="$"
+                  />
+                  
+                  <PaymentMethodInfo 
+                    paymentMethod={details.paymentMethod} 
+                  />
+                </>
+              )}
             </div>
           </TabsContent>
           
