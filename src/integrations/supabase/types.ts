@@ -733,6 +733,9 @@ export type Database = {
       subscriptions: {
         Row: {
           cancelled_at: string | null
+          contract_signed: boolean | null
+          contract_signed_at: string | null
+          contract_signed_location: string | null
           created_at: string | null
           current_period_ends_at: string | null
           fail_count: number | null
@@ -749,6 +752,9 @@ export type Database = {
         }
         Insert: {
           cancelled_at?: string | null
+          contract_signed?: boolean | null
+          contract_signed_at?: string | null
+          contract_signed_location?: string | null
           created_at?: string | null
           current_period_ends_at?: string | null
           fail_count?: number | null
@@ -765,6 +771,9 @@ export type Database = {
         }
         Update: {
           cancelled_at?: string | null
+          contract_signed?: boolean | null
+          contract_signed_at?: string | null
+          contract_signed_location?: string | null
           created_at?: string | null
           current_period_ends_at?: string | null
           fail_count?: number | null

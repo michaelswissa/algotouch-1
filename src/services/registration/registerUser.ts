@@ -12,6 +12,7 @@ interface RegisterResult {
   success: boolean;
   userId?: string;
   error?: any;
+  registrationId?: string;
 }
 
 /**
@@ -37,8 +38,30 @@ export const registerUser = async ({
     console.log('Starting user registration:', {
       email: registrationData.email,
       firstName: registrationData.userData.firstName,
-      planId: registrationData.planId
+      planId: registrationData.planId,
+      hasToken: !!tokenData?.token
     });
+
+    // First, create temporary registration record in database to track this registration attempt
+    const { data: tempRegistration, error: tempRegError } = await supabase
+      .from('temp_registration_data')
+      .insert({
+        registration_data: {
+          ...registrationData,
+          tokenData: tokenData
+        },
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h expiry
+        used: false
+      })
+      .select('id')
+      .single();
+      
+    if (tempRegError) {
+      console.error('Error creating temporary registration record:', tempRegError);
+      // Continue with registration attempt even if temp storage fails
+    } else {
+      console.log('Created temporary registration record:', tempRegistration.id);
+    }
 
     // Create the user account
     const { data: userData, error: userError } = await supabase.auth.signUp({
@@ -66,7 +89,7 @@ export const registerUser = async ({
 
     console.log('User created successfully:', userData.user.id);
 
-    // Add a delay to ensure the user is created before proceeding
+    // Add a delay to ensure the user record is propagated
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const trialEndsAt = new Date();
@@ -91,6 +114,37 @@ export const registerUser = async ({
     }
     
     console.log('Subscription created successfully');
+    
+    // Create payment token record for future use
+    if (tokenData && tokenData.token) {
+      try {
+        const expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + 5); // 5 years validity for card token
+        
+        const { error: tokenError } = await supabase
+          .from('recurring_payments')
+          .insert({
+            user_id: userData.user.id,
+            token: tokenData.token,
+            token_expiry: expiryDate.toISOString(),
+            last_4_digits: tokenData.lastFourDigits,
+            card_type: tokenData.cardType || 'unknown',
+            status: 'active',
+            token_approval_number: tokenData.approvalNumber,
+            is_valid: true
+          });
+          
+        if (tokenError) {
+          console.error('Error storing payment token:', tokenError);
+          // Non-critical error, continue with registration
+        } else {
+          console.log('Payment token stored successfully');
+        }
+      } catch (tokenStoreError) {
+        console.error('Exception storing token:', tokenStoreError);
+        // Continue with registration even if token storage fails
+      }
+    }
     
     // Create payment history record
     await supabase.from('payment_history').insert({
@@ -165,8 +219,20 @@ export const registerUser = async ({
         // Continue with registration even if there's an error storing the contract
       }
     }
+
+    // Mark temp registration as used if it exists
+    if (tempRegistration?.id) {
+      await supabase
+        .from('temp_registration_data')
+        .update({ used: true })
+        .eq('id', tempRegistration.id);
+    }
     
-    return { success: true, userId: userData.user.id };
+    return { 
+      success: true, 
+      userId: userData.user.id,
+      registrationId: tempRegistration?.id
+    };
   } catch (error: any) {
     console.error('Registration error:', error);
     return { success: false, error };

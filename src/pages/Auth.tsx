@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AuthHeader from '@/components/auth/AuthHeader';
@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { useUnifiedRegistrationData } from '@/hooks/useUnifiedRegistrationData';
 
 const Auth = () => {
   const { 
@@ -16,10 +17,15 @@ const Auth = () => {
     loading, 
     initialized, 
     error,
-    pendingSubscription
   } = useAuth();
   
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+  const {
+    pendingSubscription,
+    registrationData,
+    clearRegistrationData
+  } = useUnifiedRegistrationData();
+  
+  const [activeTab, setActiveTab] = React.useState<'login' | 'signup'>('login');
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { from?: Location, redirectToSubscription?: boolean };
@@ -55,6 +61,23 @@ const Auth = () => {
       }
     }
   }, [error, navigate]);
+  
+  // Detect and clear stale registration data
+  useEffect(() => {
+    if (registrationData) {
+      // Check if the registration data is old (> 1 hour)
+      const registrationTime = registrationData.registrationTime ? 
+        new Date(registrationData.registrationTime).getTime() : 0;
+      const now = new Date().getTime();
+      const oneHourMs = 60 * 60 * 1000;
+      
+      if (now - registrationTime > oneHourMs) {
+        console.log('Auth: Registration data is stale (>1 hour), clearing');
+        clearRegistrationData();
+        toast.info('מידע ההרשמה הישן נמחק. אנא התחל מחדש');
+      }
+    }
+  }, [registrationData, clearRegistrationData]);
 
   // Show loading state while auth is initializing
   if (!initialized || loading) {

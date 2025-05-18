@@ -1,18 +1,6 @@
 
-import { User, Session } from '@supabase/supabase-js';
-
-export type RegistrationData = {
-  email?: string;
-  userData?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-  };
-  contractSigned?: boolean;
-  planId?: string;
-  registrationTime?: string;
-  isValid?: boolean;
-};
+import { AuthError, Session, User } from "@supabase/supabase-js";
+import { RegistrationData } from "@/types/payment";
 
 export interface AuthContextType {
   user: User | null;
@@ -20,25 +8,45 @@ export interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   initialized: boolean;
-  error: Error | null;
-  // Registration state
+  error: AuthError | null;
   registrationData: RegistrationData | null;
   isRegistering: boolean;
   pendingSubscription: boolean;
-  // Auth methods
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (userData: {
-    email: string;
-    password: string;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
+  signUp: (email: string, password: string, userData?: any) => Promise<{ success: boolean; error?: any }>;
+  signOut: () => Promise<void>;
+  updateProfile: (data: any) => Promise<any>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: any }>;
+  setRegistrationData: (data: Partial<RegistrationData>) => void;
+  clearRegistrationData: () => void;
+  setPendingSubscription: (value: boolean) => void;
+  validateSession: () => Promise<boolean>;
+}
+
+export interface RegistrationData {
+  email?: string;
+  contractSigned?: boolean;
+  planId?: string;
+  userData?: {
     firstName?: string;
     lastName?: string;
     phone?: string;
-  }) => Promise<any>;
-  signOut: () => Promise<void>;
-  updateProfile: (data: any) => Promise<void>;
-  resetPassword: (email: string) => Promise<boolean>;
-  // Registration methods
-  setRegistrationData: (data: Partial<RegistrationData>) => void;
-  clearRegistrationData: () => void;
-  setPendingSubscription: (pending: boolean) => void;
+  };
+  password?: string;
+  contractDetails?: {
+    contractHtml?: string;
+    signature?: string;
+    agreedToTerms?: boolean;
+    agreedToPrivacy?: boolean;
+    contractVersion?: string;
+    browserInfo?: any;
+  };
+  contractSignedAt?: string;
+  registrationTime?: string;
+  paymentToken?: {
+    token?: string;
+    expiry?: string;
+    last4Digits?: string;
+    cardholderName?: string;
+  };
 }

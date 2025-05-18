@@ -60,9 +60,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clear registration data
   const clearRegistrationData = () => {
     sessionStorage.removeItem('registration_data');
+    localStorage.removeItem('temp_registration_id');
     setRegistrationData(null);
     setIsRegistering(false);
     setPendingSubscription(false);
+  };
+  
+  // Validate session with the server
+  const validateSession = async () => {
+    if (!auth.session) return false;
+    
+    try {
+      const { data, error } = await auth.supabase.auth.getUser();
+      if (error) {
+        console.error('Session validation error:', error);
+        return false;
+      }
+      
+      return !!data.user;
+    } catch (error) {
+      console.error('Session validation exception:', error);
+      return false;
+    }
   };
   
   // Add error handling for auth initialization
@@ -115,7 +134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       pendingSubscription,
       setRegistrationData: updateRegistrationData,
       clearRegistrationData,
-      setPendingSubscription
+      setPendingSubscription,
+      validateSession
     }}>
       {children}
     </AuthContext.Provider>

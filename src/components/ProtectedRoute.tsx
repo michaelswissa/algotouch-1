@@ -3,6 +3,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { Spinner } from '@/components/ui/spinner';
+import { useUnifiedRegistrationData } from '@/hooks/useUnifiedRegistrationData';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,10 +19,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { 
     isAuthenticated, 
     loading, 
-    initialized,
-    pendingSubscription,
-    isRegistering 
+    initialized
   } = useAuth();
+  
+  const {
+    pendingSubscription,
+    isRegistering
+  } = useUnifiedRegistrationData();
   
   const location = useLocation();
   
