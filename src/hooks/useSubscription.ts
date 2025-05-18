@@ -4,4 +4,3 @@
  */
 export { useSubscription } from './subscription';
 export type { UseSubscriptionReturn } from './subscription';
-
