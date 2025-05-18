@@ -162,10 +162,9 @@ export const useSubscription = (): UseSubscriptionReturn => {
       console.error('Error in checkForUnprocessedPayments:', err);
       return false;
     } finally {
-      // Ensure loading state is cleared even in error cases
       setIsCheckingPayments(false);
     }
-  }, [user, subscription]);
+  }, [user]);
 
   // Combine the refreshSubscription methods from context and actions
   const refreshSubscription = useCallback(async (): Promise<boolean> => {
@@ -197,11 +196,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
   // Automatically check for unprocessed payments when the component mounts
   useEffect(() => {
     if (user?.id && user?.email) {
-      checkForUnprocessedPayments().catch(err => {
-        console.error('Error checking for unprocessed payments:', err);
-        // Ensure loading state is cleared even when top-level catch handles error
-        setIsCheckingPayments(false);
-      });
+      checkForUnprocessedPayments().catch(console.error);
     }
   }, [user, checkForUnprocessedPayments]);
 

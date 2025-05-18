@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -47,23 +46,6 @@ const UserSubscription = () => {
   const [checkError, setCheckError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [maxRetriesReached, setMaxRetriesReached] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  
-  // Add timeout safety to prevent infinite loading
-  useEffect(() => {
-    let timer: number;
-    
-    if (loading) {
-      // If loading takes more than 10 seconds, show a timeout warning
-      timer = window.setTimeout(() => {
-        setLoadingTimeout(true);
-      }, 10000);
-    }
-    
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [loading]);
   
   // Clear registration data on component mount if subscription exists
   useEffect(() => {
@@ -167,7 +149,6 @@ const UserSubscription = () => {
     if (refreshSubscription) {
       setRetryCount(0); // Reset retry count on manual refresh
       setMaxRetriesReached(false); // Reset max retries flag
-      setLoadingTimeout(false); // Reset timeout flag
       try {
         await refreshSubscription();
         toast.success('הנתונים עודכנו בהצלחה');
@@ -185,34 +166,6 @@ const UserSubscription = () => {
       }
     }
   };
-
-  // Show timeout warning if loading is taking too long
-  if (loadingTimeout && loading) {
-    return (
-      <SubscriptionCard 
-        title="טעינת פרטי המנוי מתעכבת" 
-        description="הטעינה נמשכת זמן רב מהצפוי"
-      >
-        <div className="p-6">
-          <Alert className="mb-4">
-            <AlertDescription>
-              טעינת פרטי המנוי נמשכת זמן רב מהצפוי. ייתכן שישנה בעיה בתקשורת עם השרת.
-            </AlertDescription>
-          </Alert>
-          
-          <div className="flex gap-4 justify-center">
-            <Button 
-              onClick={handleManualRefresh}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              רענן נתונים
-            </Button>
-          </div>
-        </div>
-      </SubscriptionCard>
-    );
-  }
 
   // Special state for when we've tried a few times and still can't load data
   if (maxRetriesReached || (checkError && retryCount >= 3)) {

@@ -1,8 +1,6 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
 import UserSubscription from '@/components/UserSubscription';
-import SubscriptionDiagnostic from '@/components/subscription/SubscriptionDiagnostic';
 
 const Profile: React.FC = () => {
   return (
@@ -17,8 +15,6 @@ const Profile: React.FC = () => {
           </div>
           
           <div>
-            {/* Add diagnostic component before subscription component */}
-            <SubscriptionDiagnostic />
             <UserSubscription />
           </div>
         </div>

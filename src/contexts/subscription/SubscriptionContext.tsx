@@ -68,7 +68,6 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState<number>(0);
-  const [initialLoadCompleted, setInitialLoadCompleted] = useState<boolean>(false);
 
   // Computed property: hasActiveSubscription
   const hasActiveSubscription = React.useMemo(() => {
@@ -102,7 +101,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           // Get user profile data
           const { data, error: profileError } = await supabase
             .from('profiles')
-            .select('first_name, last_name, phone')
+            .select('first_name, last_name, phone, id_number')
             .eq('id', user.id)
             .single();
           
@@ -117,6 +116,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
               first_name?: string | null;
               last_name?: string | null;
               phone?: string | null;
+              id_number?: string | null;
             };
             
             if (profileData.first_name || profileData.last_name) {
@@ -126,6 +126,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
             // Set user data with available fields
             setUserData({
               phone: profileData.phone || '',
+              idNumber: profileData.id_number || '',
               firstName: profileData.first_name || '',
               lastName: profileData.last_name || '',
               email: user.email || ''
@@ -133,22 +134,13 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
             console.log('Profile data loaded:', profileData);
           }
-
-          // Mark initial load as completed
-          setInitialLoadCompleted(true);
-          
         } catch (err) {
           console.error('Error loading user data:', err);
           if (retryCount < 3) {
             setRetryCount(prev => prev + 1);
           } else {
             setError('שגיאה בטעינת נתוני המשתמש');
-            // Make sure we still mark initial load as completed
-            setInitialLoadCompleted(true);
           }
-        } finally {
-          // Ensure loading state is cleared regardless of outcome
-          setIsCheckingSubscription(false);
         }
       } else {
         // Reset states when user is not logged in
@@ -160,7 +152,6 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         setLastRefreshed(null);
         setError(null);
         setRetryCount(0);
-        setInitialLoadCompleted(true);
       }
     };
     
@@ -182,18 +173,11 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     };
   }, [user, retryCount]);
 
-  // Expose refresh function for manual refreshes
   const refreshSubscription = async () => {
     if (user?.id) {
       setRetryCount(0); // Reset retry count on manual refresh
       setError(null);
-      setIsCheckingSubscription(true); // Start loading
-      
-      try {
-        await checkUserSubscription(user.id);
-      } finally {
-        setIsCheckingSubscription(false); // Always clear loading state
-      }
+      await checkUserSubscription(user.id);
     }
   };
 
@@ -214,17 +198,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       }
       
       if (!data) {
-        // No subscription found - explicitly set to null
+        // No subscription found
         setSubscription(null);
         setLastRefreshed(new Date());
-        console.log('No subscription found for user:', userId);
         return;
       }
       
       // Store the subscription record directly
       setSubscription(data as SubscriptionRecord);
       setLastRefreshed(new Date());
-      console.log('Subscription found:', data);
       
       // Check if we have a valid recurring payment token
       if (data.status === 'active' && !data.token) {
