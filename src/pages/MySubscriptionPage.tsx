@@ -2,6 +2,7 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import UserSubscription from '@/components/UserSubscription';
+import { SubscriptionProvider } from '@/contexts/subscription/SubscriptionContext';
 
 const MySubscriptionPage = () => {
   return (
@@ -12,7 +13,9 @@ const MySubscriptionPage = () => {
           <p className="text-muted-foreground">פרטי המנוי והחיובים שלך</p>
         </div>
         
-        <UserSubscription />
+        <SubscriptionProvider>
+          <UserSubscription />
+        </SubscriptionProvider>
       </div>
     </Layout>
   );
