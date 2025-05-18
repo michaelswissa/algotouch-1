@@ -19,7 +19,7 @@ interface SubscriptionErrorViewProps {
     handleRefresh: () => Promise<void>;
     isLoading: boolean;
   };
-  user: { id: string; email: string } | null;
+  user: { id: string; email?: string } | null;
 }
 
 const SubscriptionErrorView: React.FC<SubscriptionErrorViewProps> = ({ 
