@@ -1,6 +1,5 @@
 
 import { AuthError, Session, User } from "@supabase/supabase-js";
-import { RegistrationData } from "@/types/payment";
 
 export interface AuthContextType {
   user: User | null;
@@ -25,6 +24,7 @@ export interface AuthContextType {
 
 export interface RegistrationData {
   email?: string;
+  password?: string;
   contractSigned?: boolean;
   planId?: string;
   userData?: {
@@ -32,7 +32,6 @@ export interface RegistrationData {
     lastName?: string;
     phone?: string;
   };
-  password?: string;
   contractDetails?: {
     contractHtml?: string;
     signature?: string;
@@ -49,4 +48,5 @@ export interface RegistrationData {
     last4Digits?: string;
     cardholderName?: string;
   };
+  isValid?: boolean;
 }

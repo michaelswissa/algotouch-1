@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,10 +80,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onPaymentComplete }) 
       
       const tokenData = createTokenData(cardNumber, expiryDate, cardholderName);
       
-      // Update registration data with token information
+      // Update registration data with token information - Cast to string to fix type error
       updateRegistrationData({
         paymentToken: {
-          token: tokenData.token,
+          token: tokenData.token?.toString(),
           last4Digits: tokenData.lastFourDigits,
           expiry: `${tokenData.expiryMonth}/${tokenData.expiryYear}`,
           cardholderName: tokenData.cardholderName

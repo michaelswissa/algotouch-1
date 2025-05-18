@@ -42,25 +42,33 @@ export const registerUser = async ({
       hasToken: !!tokenData?.token
     });
 
-    // First, create temporary registration record in database to track this registration attempt
-    const { data: tempRegistration, error: tempRegError } = await supabase
-      .from('temp_registration_data')
-      .insert({
-        registration_data: {
-          ...registrationData,
-          tokenData: tokenData
-        },
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h expiry
-        used: false
-      })
-      .select('id')
-      .single();
+    // Create a temp registration ID to track this attempt
+    let tempRegistrationId = '';
+    
+    // First, store registration data in a simpler way with payment_logs instead
+    try {
+      const { data, error } = await supabase.from('payment_logs').insert({
+        user_id: 'temp', // Will be updated later with real user ID
+        transaction_id: 'registration_' + Date.now(),
+        amount: 0,
+        payment_status: 'registration_started',
+        currency: 'ILS',
+        plan_id: registrationData.planId || 'unknown',
+        payment_data: {
+          email: registrationData.email,
+          plan_id: registrationData.planId,
+          timestamp: new Date().toISOString(),
+          token_last4: tokenData.lastFourDigits
+        }
+      }).select('id').single();
       
-    if (tempRegError) {
-      console.error('Error creating temporary registration record:', tempRegError);
-      // Continue with registration attempt even if temp storage fails
-    } else {
-      console.log('Created temporary registration record:', tempRegistration.id);
+      if (!error && data) {
+        tempRegistrationId = data.id;
+        console.log('Created temporary registration record:', tempRegistrationId);
+      }
+    } catch (err) {
+      // Non-critical error, continue with registration
+      console.warn('Failed to create temp registration log:', err);
     }
 
     // Create the user account
@@ -95,7 +103,16 @@ export const registerUser = async ({
     const trialEndsAt = new Date();
     trialEndsAt.setMonth(trialEndsAt.getMonth() + 1); // 1 month trial
     
-    // Create the subscription record
+    // Create the subscription record - Convert TokenData to a regular object for storage
+    const paymentMethodData = {
+      token: tokenData.token,
+      lastFourDigits: tokenData.lastFourDigits,
+      expiryMonth: tokenData.expiryMonth,
+      expiryYear: tokenData.expiryYear,
+      cardholderName: tokenData.cardholderName,
+      cardType: tokenData.cardType || 'unknown'
+    };
+    
     const { error: subscriptionError } = await supabase
       .from('subscriptions')
       .insert({
@@ -103,7 +120,7 @@ export const registerUser = async ({
         plan_type: registrationData.planId,
         status: 'trial',
         trial_ends_at: trialEndsAt.toISOString(),
-        payment_method: tokenData,
+        payment_method: paymentMethodData, // Using the simplified object
         contract_signed: true,
         contract_signed_at: new Date().toISOString()
       });
@@ -121,25 +138,19 @@ export const registerUser = async ({
         const expiryDate = new Date();
         expiryDate.setFullYear(expiryDate.getFullYear() + 5); // 5 years validity for card token
         
-        const { error: tokenError } = await supabase
-          .from('recurring_payments')
-          .insert({
-            user_id: userData.user.id,
-            token: tokenData.token,
-            token_expiry: expiryDate.toISOString(),
-            last_4_digits: tokenData.lastFourDigits,
-            card_type: tokenData.cardType || 'unknown',
-            status: 'active',
-            token_approval_number: tokenData.approvalNumber,
-            is_valid: true
-          });
+        // Insert token data into recurring_payments table
+        await supabase.from('recurring_payments').insert({
+          user_id: userData.user.id,
+          token: tokenData.token.toString(), // Ensure it's a string
+          token_expiry: expiryDate.toISOString(),
+          last_4_digits: tokenData.lastFourDigits,
+          card_type: tokenData.cardType?.toString() || 'unknown',
+          status: 'active',
+          token_approval_number: tokenData.approvalNumber?.toString(),
+          is_valid: true
+        });
           
-        if (tokenError) {
-          console.error('Error storing payment token:', tokenError);
-          // Non-critical error, continue with registration
-        } else {
-          console.log('Payment token stored successfully');
-        }
+        console.log('Payment token stored successfully');
       } catch (tokenStoreError) {
         console.error('Exception storing token:', tokenStoreError);
         // Continue with registration even if token storage fails
@@ -152,7 +163,7 @@ export const registerUser = async ({
       subscription_id: userData.user.id,
       amount: 0,
       status: 'trial_started',
-      payment_method: tokenData
+      payment_method: paymentMethodData // Using the simplified object
     });
     
     // Update profile information
@@ -185,7 +196,15 @@ export const registerUser = async ({
           console.log('Could not get IP address, continuing without it');
         }
         
-        // Store the contract signature
+        // Store the contract signature with simplified browser_info
+        const browserInfo = {
+          language: contractDetails.browserInfo?.language || navigator.language,
+          platform: contractDetails.browserInfo?.platform || navigator.platform,
+          timeZone: contractDetails.browserInfo?.timeZone || 
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
+          userAgent: contractDetails.browserInfo?.userAgent || navigator.userAgent
+        };
+        
         const { error: signatureError } = await supabase
           .from('contract_signatures')
           .insert({
@@ -197,12 +216,8 @@ export const registerUser = async ({
             signature: contractDetails.signature,
             contract_html: contractDetails.contractHtml,
             ip_address: ipAddress,
-            user_agent: contractDetails.browserInfo?.userAgent || navigator.userAgent,
-            browser_info: contractDetails.browserInfo || {
-              language: navigator.language,
-              platform: navigator.platform,
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-            },
+            user_agent: browserInfo.userAgent,
+            browser_info: browserInfo,
             contract_version: contractDetails.contractVersion || "1.0",
             agreed_to_terms: contractDetails.agreedToTerms || false,
             agreed_to_privacy: contractDetails.agreedToPrivacy || false,
@@ -220,18 +235,24 @@ export const registerUser = async ({
       }
     }
 
-    // Mark temp registration as used if it exists
-    if (tempRegistration?.id) {
-      await supabase
-        .from('temp_registration_data')
-        .update({ used: true })
-        .eq('id', tempRegistration.id);
+    // Update our temporary payment log with the real user ID
+    if (tempRegistrationId) {
+      await supabase.from('payment_logs')
+        .update({ 
+          user_id: userData.user.id,
+          payment_data: {
+            status: 'completed',
+            user_created: true,
+            timestamp: new Date().toISOString()
+          }
+        })
+        .eq('id', tempRegistrationId);
     }
     
     return { 
       success: true, 
       userId: userData.user.id,
-      registrationId: tempRegistration?.id
+      registrationId: tempRegistrationId
     };
   } catch (error: any) {
     console.error('Registration error:', error);

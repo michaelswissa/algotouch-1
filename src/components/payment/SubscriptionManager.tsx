@@ -34,12 +34,17 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       setLoading(true);
       setErrorMessage(null);
       
-      // First we log this check attempt
-      await supabase.from('subscription_repair_logs').insert({
+      // First we log this check attempt to payment_logs instead of subscription_repair_logs
+      await supabase.from('payment_logs').insert({
         user_id: userId,
-        email: email,
-        repair_type: 'status_check',
-        details: {
+        transaction_id: 'status_check',
+        amount: 0,
+        payment_status: 'diagnostic',
+        currency: 'ILS',
+        plan_id: 'diagnostic',
+        payment_data: {
+          action: 'subscription_status_check',
+          email,
           checkTime: new Date().toISOString(),
           lowProfileId
         }
@@ -117,12 +122,17 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       setStatus('checking');
       setErrorMessage(null);
       
-      // Log this repair attempt
-      await supabase.from('subscription_repair_logs').insert({
+      // Log this repair attempt to payment_logs instead of subscription_repair_logs
+      await supabase.from('payment_logs').insert({
         user_id: userId,
-        email: email,
-        repair_type: 'repair_webhook',
-        details: {
+        transaction_id: 'repair_attempt',
+        amount: 0,
+        payment_status: 'repair_webhook',
+        currency: 'ILS',
+        plan_id: 'repair',
+        payment_data: {
+          action: 'subscription_repair',
+          email,
           repairTime: new Date().toISOString(),
           lowProfileId,
           retryCount

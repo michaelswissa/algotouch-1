@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
-import { RegistrationData } from './types';
+import { RegistrationData as AuthRegistrationData } from './types';
+import { supabase } from '@/lib/supabase-client';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useSecureAuth();
@@ -12,7 +13,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isInitializing, setIsInitializing] = useState(true);
   
   // Registration state management
-  const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null);
+  const [registrationData, setRegistrationData] = useState<AuthRegistrationData | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [pendingSubscription, setPendingSubscription] = useState(false);
   
@@ -45,14 +46,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
   
   // Update registration data in session storage when state changes
-  const updateRegistrationData = (data: Partial<RegistrationData>) => {
+  const updateRegistrationData = (data: Partial<AuthRegistrationData>) => {
     const updatedData = {
       ...(registrationData || {}),
       ...data,
       registrationTime: data.registrationTime || new Date().toISOString()
     };
     
-    setRegistrationData(updatedData as RegistrationData);
+    setRegistrationData(updatedData as AuthRegistrationData);
     sessionStorage.setItem('registration_data', JSON.stringify(updatedData));
     setIsRegistering(true);
   };
@@ -71,7 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!auth.session) return false;
     
     try {
-      const { data, error } = await auth.supabase.auth.getUser();
+      // Use the imported supabase client directly
+      const { data, error } = await supabase.auth.getUser();
       if (error) {
         console.error('Session validation error:', error);
         return false;

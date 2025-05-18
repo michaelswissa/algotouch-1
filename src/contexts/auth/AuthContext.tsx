@@ -21,7 +21,8 @@ const defaultValue: AuthContextType = {
   resetPassword: async () => { throw new Error('AuthContext not initialized') },
   setRegistrationData: () => { throw new Error('AuthContext not initialized') },
   clearRegistrationData: () => { throw new Error('AuthContext not initialized') },
-  setPendingSubscription: () => { throw new Error('AuthContext not initialized') }
+  setPendingSubscription: () => { throw new Error('AuthContext not initialized') },
+  validateSession: async () => { throw new Error('AuthContext not initialized') }
 };
 
 export const AuthContext = createContext<AuthContextType>(defaultValue);

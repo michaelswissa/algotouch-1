@@ -74,18 +74,21 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
       setSigningUp(true);
       console.log('Starting registration process for:', email);
       
-      // Use auth context to sign up
-      await signUp({
-        email,
-        password,
+      // Use auth context to sign up - Fix by providing email and password as string arguments
+      const { success, error } = await signUp(email, password, {
         firstName,
         lastName,
         phone
       });
       
+      if (!success) {
+        throw error || new Error('Registration failed');
+      }
+      
       // Store registration data in auth context
       setRegistrationData({
         email,
+        password,
         userData: {
           firstName,
           lastName,
@@ -147,6 +150,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
               {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
             </div>
           </div>
+          
           <div className="space-y-2">
             <Label htmlFor="signup-email">דוא"ל</Label>
             <Input 
@@ -160,6 +164,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
             />
             {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
           </div>
+          
           <div className="space-y-2">
             <Label htmlFor="phone">טלפון</Label>
             <Input 
@@ -172,6 +177,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
             />
             {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
           </div>
+          
           <div className="space-y-2">
             <Label htmlFor="signup-password">סיסמה</Label>
             <Input 
@@ -185,6 +191,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSignupSuccess }) => {
             />
             {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
           </div>
+          
           <div className="space-y-2">
             <Label htmlFor="password-confirm">אימות סיסמה</Label>
             <Input 
