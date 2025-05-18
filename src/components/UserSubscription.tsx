@@ -47,21 +47,34 @@ const UserSubscription = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [maxRetriesReached, setMaxRetriesReached] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [criticalError, setCriticalError] = useState(false);
   
   // Add timeout safety to prevent infinite loading
   useEffect(() => {
-    let timer: number;
+    let timer: number | undefined;
     
     if (loading) {
       // If loading takes more than 10 seconds, show a timeout warning
       timer = window.setTimeout(() => {
         setLoadingTimeout(true);
       }, 10000);
-    }
-    
-    return () => {
+
+      // Add a critical timeout - if loading continues for too long, trigger error state
+      const criticalTimer = window.setTimeout(() => {
+        setCriticalError(true);
+        console.error("Critical timeout reached for subscription loading");
+      }, 25000);
+      
+      return () => {
+        if (timer) window.clearTimeout(timer);
+        window.clearTimeout(criticalTimer);
+      };
+    } else {
+      // Clear timeouts and reset timeout states when loading is finished
+      setLoadingTimeout(false);
       if (timer) window.clearTimeout(timer);
-    };
+      return undefined;
+    }
   }, [loading]);
   
   // Clear registration data on component mount if subscription exists
@@ -167,6 +180,8 @@ const UserSubscription = () => {
       setRetryCount(0); // Reset retry count on manual refresh
       setMaxRetriesReached(false); // Reset max retries flag
       setLoadingTimeout(false); // Reset timeout flag
+      setCriticalError(false); // Reset critical error flag
+      
       try {
         await refreshSubscription();
         toast.success('הנתונים עודכנו בהצלחה');
@@ -184,6 +199,53 @@ const UserSubscription = () => {
       }
     }
   };
+  
+  // If critical error occurs, show an emergency fallback view
+  if (criticalError) {
+    return (
+      <SubscriptionCard 
+        title="בעיה קריטית בטעינת פרטי המנוי" 
+        description="לא ניתן לטעון את נתוני המנוי"
+      >
+        <div className="p-6">
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              קיימת בעיה בטעינת פרטי המנוי. ייתכן שהנתונים בבסיס הנתונים חסרים או שגויים.
+            </AlertDescription>
+          </Alert>
+          
+          <div className="flex gap-4 justify-center">
+            <Button 
+              onClick={handleManualRefresh}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              נסה שוב
+            </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/subscription')}
+            >
+              עבור לדף המנויים
+            </Button>
+          </div>
+          
+          {user?.email && (
+            <div className="mt-6 p-4 border border-yellow-500 bg-yellow-50 rounded-md">
+              <h3 className="font-medium mb-2">כלי תיקון:</h3>
+              <p className="mb-4 text-sm">לתיקון בעיות במנוי, ניתן להשתמש בכלי התיקון:</p>
+              <SubscriptionManager 
+                userId={user.id} 
+                email={user.email} 
+                onComplete={handleManualRefresh}
+              />
+            </div>
+          )}
+        </div>
+      </SubscriptionCard>
+    );
+  }
 
   // Show timeout warning if loading is taking too long
   if (loadingTimeout && loading) {
@@ -207,6 +269,10 @@ const UserSubscription = () => {
               <RefreshCw className="h-4 w-4" />
               רענן נתונים
             </Button>
+          </div>
+          
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            <p>אם הבעיה נמשכת, ייתכן שנת��ני המנוי חסרים במערכת.</p>
           </div>
         </div>
       </SubscriptionCard>
@@ -303,13 +369,15 @@ const UserSubscription = () => {
   }
 
   // Render subscription details
-  return <SubscriptionDetails 
-    subscription={subscription}
-    details={details}
-    activeTab={activeTab}
-    setActiveTab={setActiveTab}
-    onRefresh={handleManualRefresh}
-  />;
+  return (
+    <SubscriptionDetails 
+      subscription={subscription}
+      details={details}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      onRefresh={handleManualRefresh}
+    />
+  );
 };
 
 // Extract subscription details view to a separate component
