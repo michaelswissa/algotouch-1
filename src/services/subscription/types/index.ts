@@ -7,7 +7,8 @@ export type {
   Subscription, 
   SubscriptionDetails, 
   PaymentMethod,
-  CancellationData
+  CancellationData,
+  SubscriptionRecord
 } from '@/types/subscription';
 
 // Define result interface for subscription actions

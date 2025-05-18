@@ -35,6 +35,25 @@ export interface Subscription {
   updated_at?: string;
 }
 
+// Define subscription record interface (matching database format)
+export interface SubscriptionRecord {
+  id: string;
+  user_id?: string;
+  plan_id?: string;
+  plan_type?: string | null;
+  status?: string | null;
+  trial_ends_at?: string | null;
+  current_period_ends_at?: string | null;
+  next_charge_at?: string | null;
+  cancelled_at?: string | null;
+  payment_method?: any | null;
+  contract_signed?: boolean | null;
+  contract_signed_at?: string | null;
+  token?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 // Define subscription details interface
 export interface SubscriptionDetails {
   planName: string;

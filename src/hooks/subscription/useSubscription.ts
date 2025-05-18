@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
@@ -6,7 +7,30 @@ import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionCont
 import { useUnprocessedPayments } from './useUnprocessedPayments';
 import { useSubscriptionRefresh } from './useSubscriptionRefresh';
 import { UseSubscriptionReturn, UseSubscriptionOptions } from './types';
-import { Subscription } from '@/types/subscription';
+import { Subscription, SubscriptionRecord } from '@/types/subscription';
+
+// Helper function to ensure Subscription type compatibility
+const normalizeSubscription = (sub: Subscription | SubscriptionRecord | null): Subscription | null => {
+  if (!sub) return null;
+  
+  return {
+    id: sub.id,
+    user_id: sub.user_id,
+    plan_id: sub.plan_id,
+    plan_type: sub.plan_type || '',
+    status: (sub.status as any) || 'pending',
+    trial_ends_at: sub.trial_ends_at,
+    current_period_ends_at: sub.current_period_ends_at,
+    next_charge_at: sub.next_charge_at,
+    cancelled_at: sub.cancelled_at,
+    payment_method: sub.payment_method || null,
+    contract_signed: sub.contract_signed,
+    contract_signed_at: sub.contract_signed_at,
+    token: sub.token,
+    created_at: sub.created_at,
+    updated_at: sub.updated_at
+  };
+};
 
 export const useSubscription = (
   options: UseSubscriptionOptions = {}
@@ -88,8 +112,11 @@ export const useSubscription = (
     };
   }, [user, checkForUnprocessedPayments]);
 
+  // Normalize the subscription data to ensure type compatibility
+  const normalizedSubscription = normalizeSubscription(subscription || contextSubscription);
+
   return { 
-    subscription: subscription || contextSubscription, 
+    subscription: normalizedSubscription,
     loading: loading || isCheckingPayments, 
     details, 
     error,
