@@ -272,7 +272,7 @@ const UserSubscription = () => {
           </div>
           
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>אם הבעיה נמשכת, ייתכן שנתוני המנוי חסרים במערכת.</p>
+            <p>אם הבעיה נמשכת, ייתכן שנת��ני המנוי חסרים במערכת.</p>
           </div>
         </div>
       </SubscriptionCard>
@@ -392,7 +392,6 @@ const SubscriptionDetails = ({
   const hasTrial = subscription.status === 'trial' || subscription.plan_type === 'monthly';
   const hasContract = subscription.contract_signed;
   const isCancelled = subscription.status === 'cancelled';
-  const billingError = !details?.nextBillingDate && subscription.status === 'active';
   
   // Create fallback details if details object is missing
   const fallbackDetails = details || {
@@ -469,7 +468,6 @@ const SubscriptionDetails = ({
                 nextBillingDate={fallbackDetails.nextBillingDate} 
                 planPrice={fallbackDetails.planPrice}
                 currency="$"
-                hasError={billingError}
               />
               
               <PaymentMethodInfo 

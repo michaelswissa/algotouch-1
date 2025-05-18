@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
 
@@ -306,63 +307,34 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
   const transactionInfo = payload.TranzactionInfo;
   const operation = payload.Operation;
 
-  // Determine the subscription period and next billing date based on plan_type
-  // Default to monthly (30 days) if plan_type not specified
-  let planType = 'monthly'; // Default plan type
-  let periodDays = 30; // Default period in days
-  
-  // Try to extract plan_type from existing subscription
-  try {
-    const { data: existingSub, error: subError } = await supabase
-      .from('subscriptions')
-      .select('plan_type')
-      .eq('user_id', userId)
-      .maybeSingle();
-      
-    if (!subError && existingSub && existingSub.plan_type) {
-      planType = existingSub.plan_type;
-      
-      // Set period days based on plan type
-      if (planType === 'annual') {
-        periodDays = 365; // Annual subscription
-      } else if (planType === 'vip') {
-        periodDays = 365; // VIP subscription (also annual)
-      }
-      // else keep default 30 days for monthly
-      
-      console.log(`Found existing plan_type: ${planType}, setting period to ${periodDays} days`);
-    } else {
-      console.log(`No existing plan_type found, using default monthly (${periodDays} days)`);
-    }
-  } catch (planLookupError) {
-    console.error('Error looking up existing plan:', planLookupError);
-    // Continue with defaults
-  }
-  
-  // Calculate next billing date - ALWAYS set this
-  const now = new Date();
-  const nextBillingDate = new Date(now);
-  nextBillingDate.setDate(now.getDate() + periodDays);
-  const nextBillingISOString = nextBillingDate.toISOString();
-  
-  console.log(`Setting next billing date to: ${nextBillingISOString} (${periodDays} days from now)`);
-
   // Update user's subscription status
   const { error } = await supabase
     .from('subscriptions')
     .upsert({
       user_id: userId,
       status: (operation === "CreateTokenOnly") ? 'trial' : 'active',
-      payment_method: {
-        lastFourDigits: transactionInfo?.Last4CardDigits || '****',
-        expiryMonth: transactionInfo?.CardMonth?.toString() || '**',
-        expiryYear: transactionInfo?.CardYear?.toString() || '**',
-        cardholderName: transactionInfo?.CardOwnerName || 'Card Holder'
-      },
-      plan_type: planType,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      current_period_ends_at: nextBillingISOString // ALWAYS include this field
+      payment_method: 'cardcom',
+      last_payment_date: new Date().toISOString(),
+      // If we have token information and it's a ChargeAndCreateToken or CreateTokenOnly operation
+      // then store the token in the payment_method column
+      payment_details: {
+        transaction_id: payload.TranzactionId,
+        low_profile_id: payload.LowProfileId,
+        amount: transactionInfo?.Amount || payload.Amount || 0,
+        response_code: payload.ResponseCode,
+        operation: operation,
+        card_info: transactionInfo ? {
+          last4: transactionInfo.Last4CardDigits,
+          expiry: `${transactionInfo.CardMonth}/${transactionInfo.CardYear}`,
+          card_name: transactionInfo.CardName,
+          card_type: transactionInfo.CardInfo
+        } : null,
+        token_info: tokenInfo ? {
+          token: tokenInfo.Token,
+          expiry: tokenInfo.TokenExDate,
+          approval: tokenInfo.TokenApprovalNumber
+        } : null
+      }
     });
   
   if (error) {
@@ -423,7 +395,6 @@ async function processUserPayment(supabase: any, userId: string, payload: any) {
           operation: operation,
           response_code: payload.ResponseCode,
           low_profile_id: payload.LowProfileId,
-          next_billing_date: nextBillingISOString, // Include the calculated next billing date
           card_info: transactionInfo ? {
             last4: transactionInfo.Last4CardDigits,
             expiry: `${transactionInfo.CardMonth}/${transactionInfo.CardYear}`
