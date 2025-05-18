@@ -48,6 +48,7 @@ export const handlePaymentError = async (
   }
 };
 
+// Maintain this alias for backward compatibility
 export const logPaymentError = handlePaymentError;
 
 export const createPaymentError = (message: string, code: string, details: any): PaymentServiceError => {

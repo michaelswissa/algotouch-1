@@ -47,15 +47,12 @@ const ManualFixes: React.FC<ManualFixesProps> = ({ userId }) => {
     } catch (error: any) {
       console.error('Error fixing payment:', error);
       
-      // Use our error handling service - fix typing by passing error as string
+      // Use our error handling service with correct parameter types
       logPaymentError(
         error, 
         userId, 
         'manual_fix', 
-        { // Pass as additional data instead
-          lowProfileId,
-          operation: 'manual_fix'
-        }
+        lowProfileId  // Pass lowProfileId as a string parameter instead of an object
       );
       
       toast.error(error.message || 'שגיאה בתהליך התיקון');
