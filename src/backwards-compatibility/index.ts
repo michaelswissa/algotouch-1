@@ -8,7 +8,7 @@ export { AuthContext, AuthProvider } from '../features/auth/contexts';
 export { useAuth } from '../features/auth/hooks/useAuth';
 
 // Subscription backward compatibility
-export { useSubscriptionContext, SubscriptionProvider } from '../contexts/subscription/SubscriptionContext';
+export { useSubscriptionContext, SubscriptionProvider } from '../features/subscription/contexts/SubscriptionContext';
 
 // Add more re-exports as needed
 
