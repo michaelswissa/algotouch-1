@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -6,7 +7,7 @@ import {
   MaxRetriesState, 
   NoSubscriptionState, 
   UnprocessedPaymentState 
-} from '../ErrorStates';
+} from '../error-states';
 import LoadingSkeleton from '../LoadingSkeleton';
 import { SubscriptionStatusState } from '@/hooks/subscription/types';
 import { User } from '@/types/auth';
