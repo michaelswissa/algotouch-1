@@ -1,7 +1,11 @@
 
 // Export payment services
 export * from './services/cardcomService';
-export * from './utils/errorHandling';
+// Export error handling utilities without re-exporting logPaymentError
+export { 
+  handlePaymentError,
+  createPaymentError
+} from './utils/errorHandling';
 
 // Export payment hooks
 export { usePaymentVerification } from './hooks/usePaymentVerification';

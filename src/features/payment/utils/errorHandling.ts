@@ -23,16 +23,16 @@ export const handlePaymentError = async (
       ...(errorDetails || {})
     });
     
-    // Log to the database if possible
+    // Log to the database if possible - using system_logs instead of payment_logs
     const logPayload = {
-      user_id: userId || 'anonymous',
+      function_name: 'payment_error_handler',
       level: 'error',
       message: errorMessage,
-      context: errorContext || 'payment_service',
-      source: 'frontend',
       details: {
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
+        userId: userId || 'anonymous',
+        context: errorContext,
         email,
         transactionId,
         timestamp: new Date().toISOString(),
@@ -41,7 +41,7 @@ export const handlePaymentError = async (
       }
     };
     
-    await supabase.from('payment_logs').insert(logPayload);
+    await supabase.from('system_logs').insert(logPayload);
   } catch (logError) {
     // Just log to console if logging to the database fails
     console.error('Failed to log payment error:', logError);

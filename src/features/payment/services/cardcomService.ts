@@ -204,14 +204,16 @@ export const logPaymentError = async (
     
     // Log to the database if we have a userId
     if (userId) {
-      await supabase.from('payment_logs').insert({
-        user_id: userId,
+      // Fix: Use system_logs table instead of payment_logs which has incorrect schema
+      await supabase.from('system_logs').insert({
+        function_name: 'payment_service',
         level: 'error',
         message: errorMessage,
-        context: context,
         details: {
           error: errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
+          userId,
+          context,
           ...(additionalData || {}),
           ...(errorDetails || {})
         }

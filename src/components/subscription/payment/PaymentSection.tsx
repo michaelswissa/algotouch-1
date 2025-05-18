@@ -25,8 +25,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { paymentConfig } = usePaymentConfig();
   
-  // Handle payment initialization
-  const { paymentUrl, initiateCardcomPayment, paymentSessionId } = usePaymentInitialization(
+  // Handle payment initialization - remove paymentSessionId reference
+  const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
     selectedPlan,
     onPaymentComplete, 
     onBack, 
@@ -82,6 +82,9 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const successUrl = `${origin}/payment/success?plan=${selectedPlan}`;
   const errorUrl = `${origin}/payment/error?plan=${selectedPlan}`;
 
+  // Cast to number to fix type error - ensure we have valid numbers
+  const planAmount = isMonthlyPlan ? 1 : Number(getPlanDetails(selectedPlan).price);
+
   return (
     <div className="max-w-2xl mx-auto">
       <Card 
@@ -94,7 +97,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         />
         
         <CardcomPaymentFrame
-          amount={isMonthlyPlan ? 1 : getPlanDetails(selectedPlan).price}
+          amount={planAmount}
           planId={selectedPlan}
           successUrl={successUrl}
           errorUrl={errorUrl}
