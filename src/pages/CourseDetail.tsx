@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import CourseHeader from '@/components/courses/CourseHeader';
@@ -8,7 +7,7 @@ import Layout from '@/components/Layout';
 import Courses from '@/components/Courses';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { recordLessonWatched } from '@/lib/community/course-service';
-import { useAuth } from '@/contexts/auth';
+import { useAuth } from '@/features/auth'; // Updated import path
 
 const CourseDetail = () => {
   const { courseId } = useParams<{ courseId: string }>();
