@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { CardcomWebhookPayload } from '@/types/payment';
 
 interface DiagnosticResult {
   hasSubscription: boolean;
@@ -72,11 +73,24 @@ const SubscriptionDiagnostic: React.FC = () => {
           
           // Check if webhook payload contains user email
           const payload = webhook.payload;
-          const hasEmail = 
-            payload.UIValues?.CardOwnerEmail?.toLowerCase().includes(user.email.toLowerCase()) ||
-            payload.TranzactionInfo?.CardOwnerEmail?.toLowerCase().includes(user.email.toLowerCase());
-            
-          return hasEmail;
+          
+          // Type guard to ensure payload is an object before accessing properties
+          if (typeof payload !== 'object' || payload === null) return false;
+          
+          const payloadObj = payload as Record<string, any>;
+          
+          // Safely access the nested properties
+          const uiValues = payloadObj.UIValues as Record<string, any> | undefined;
+          const tranzactionInfo = payloadObj.TranzactionInfo as Record<string, any> | undefined;
+          
+          const uiValueEmail = uiValues?.CardOwnerEmail?.toLowerCase() || '';
+          const tranzactionEmail = tranzactionInfo?.CardOwnerEmail?.toLowerCase() || '';
+          
+          // Check if either email matches the user's email
+          return (
+            uiValueEmail.includes(user.email.toLowerCase()) ||
+            tranzactionEmail.includes(user.email.toLowerCase())
+          );
         });
       }
       
