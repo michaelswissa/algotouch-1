@@ -1,74 +1,58 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
-import { CourseProgress } from './types';
 
 /**
- * Record that a user has watched a lesson and award points
+ * Record a lesson as watched by the user
  */
-export async function recordLessonWatched(
-  userId: string, 
-  courseId: string, 
-  lessonId: string
-): Promise<boolean> {
+export async function recordLessonWatched(courseId: string, lessonId: string): Promise<void> {
   try {
-    if (!userId) return false;
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user?.id) {
+      throw new Error('User not authenticated');
+    }
     
-    // First, check if the user already has a course progress record
+    // Check if course progress exists
     const { data: existingProgress } = await supabase
       .from('course_progress')
-      .select('id, lessons_watched')
-      .eq('user_id', userId)
+      .select('*')
+      .eq('user_id', user.user.id)
       .eq('course_id', courseId)
       .maybeSingle();
     
-    let lessonsWatched: string[] = [];
-    
     if (existingProgress) {
-      // If progress exists, update it
-      lessonsWatched = existingProgress.lessons_watched || [];
-      
-      // Only award points if this is the first time watching this lesson
+      // Update existing progress
+      const lessonsWatched = existingProgress.lessons_watched || [];
       if (!lessonsWatched.includes(lessonId)) {
-        // Add the new lesson to the list
         lessonsWatched.push(lessonId);
         
-        // Update the progress record
         await supabase
           .from('course_progress')
-          .update({ 
+          .update({
             lessons_watched: lessonsWatched,
-            last_watched: new Date().toISOString()
+            last_watched: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
           .eq('id', existingProgress.id);
-        
-        // Award points for watching a lesson
-        await awardPoints(userId, ACTIVITY_TYPES.LESSON_WATCHED, lessonId);
-        return true;
       }
-      
-      return false;
     } else {
-      // If no progress record exists, create one
-      lessonsWatched = [lessonId];
-      
+      // Create new progress entry
       await supabase
         .from('course_progress')
         .insert({
-          user_id: userId,
+          user_id: user.user.id,
           course_id: courseId,
-          lessons_watched: lessonsWatched,
+          lessons_watched: [lessonId],
           modules_completed: [],
           is_completed: false,
-          last_watched: new Date().toISOString()
+          last_watched: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
-      
-      // Award points for watching a lesson
-      await awardPoints(userId, ACTIVITY_TYPES.LESSON_WATCHED, lessonId);
-      return true;
     }
+    
+    console.log(`Lesson ${lessonId} recorded as watched for course ${courseId}`);
   } catch (error) {
     console.error('Error recording lesson watched:', error);
-    return false;
+    throw error;
   }
 }

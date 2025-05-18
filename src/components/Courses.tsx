@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import CourseCard, { CourseProps } from './CourseCard';
-import { coursesData } from '../data/courses';
+import CourseCard from './CourseCard';
+import { coursesData } from '@/data/courses';
 
 interface CoursesComponentProps {
   onCourseClick?: (courseId: string) => void;
@@ -36,8 +36,5 @@ const Courses = ({ onCourseClick, selectedCourseId }: CoursesComponentProps) => 
     </div>
   );
 };
-
-// Export coursesData to maintain backward compatibility if needed
-Courses.coursesData = coursesData;
 
 export default Courses;

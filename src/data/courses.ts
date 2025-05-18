@@ -3,52 +3,54 @@ import { CourseProps } from '@/components/CourseCard';
 
 export const coursesData: CourseProps[] = [
   {
-    title: "קורס אלגוטאצ' למתחילים",
-    description: "לימוד שיטתי של מערכת אלגוטאצ' הכולל פתיחת חשבון, הגדרת המערכת, תפעול ומסחר, ועד ניהול כספים ומיסוי.",
-    icon: "graduation",
-    id: "algotouch-basics",
+    id: "algo-trading-basics",
+    title: "יסודות מסחר אלגוריתמי",
+    description: "קורס מקיף לבניית אסטרטגיות מסחר אלגוריתמיות",
+    instructor: "יוסי כהן",
+    duration: "12 שעות",
+    level: "מתחילים",
+    students: 423,
+    rating: 4.8,
+    imagePath: "/lovable-uploads/course-thumbnail.jpg",
     modules: [
-      { title: "פתיחת חשבון ב-TradeStation", details: "הרשמה ל-Tradestation, העברת כספים לחשבון המסחר, מילוי טפסים + התקנת הפלטפורמה של Tradestation" },
-      { title: "הגדרת מערכת אלגוטאצ'", details: "בקשת גישה למערכת + התקנה, חיבור אלגוטאצ' לחשבון המסחר שלך ב-Tradestation" },
-      { title: "תפעול ומסחר במערכת", isNew: true, details: "בחירת נכס למסחר, הגדרת פרקי זמן למסחר, הגדרת רמות תמיכה והתנגדות, כפתורי הפעלה והגדרות בסיסיות, ניהול יעדי רווח, ניהול סיכונים והגנה על עסקאות, שימוש חוזר ברמות תמיכה והתנגדות, שליחת פקודות מדויקות, אסטרטגיות מתקדמות לניהול עסקאות" },
-      { title: "ניהול ומעקב שוטף", details: "חוקים להצלחה במסחר - הדרך למסחר יציב ורווחי, איך להוציא דו\"ח עסקאות במערכת, שינויים ואופטימיזציה לפרמטרים - שיפור ביצועים בעזרת בינה מלאכותית" },
-      { title: "משיכת כספים", details: "תהליך משיכת כספים מ-Tradestation לחשבון הבנק שלך" },
-      { title: "מיסוי", details: "נקודות חשובות בהקשר למיסוי רווחים מהמסחר, חישוב מס ורווחים נטו" },
-      { title: "קבלת תמיכה", details: "איך ליצור קשר עם התמיכה של אלגוטאצ'" }
+      { title: "מבוא למסחר אלגוריתמי", duration: "2 שעות", details: "הכרת עקרונות בסיסיים" },
+      { title: "ניתוח נתונים היסטוריים", duration: "3 שעות", details: "עיבוד וניתוח דאטה לצורך פיתוח אלגוריתמים" },
+      { title: "בניית אסטרטגיה ראשונה", duration: "4 שעות", details: "פיתוח אלגוריתם מסחר בסיסי" },
+      { title: "אופטימיזציה ובדיקות", duration: "3 שעות", details: "שיפור ביצועים ומניעת אוברפיטינג", isNew: true }
     ]
   },
   {
-    title: "הדרכה מקיפה למערכת TradeStation",
-    description: "קורס עומק המכסה את כל היבטי מערכת TradeStation מסביבת העבודה ועד סורקי מניות, גרפים, ושליחת פקודות.",
-    icon: "book",
-    id: "algotouch-advanced",
+    id: "risk-management",
+    title: "ניהול סיכונים במסחר",
+    description: "שיטות מתקדמות לניהול סיכונים אפקטיבי בשוק ההון",
+    instructor: "רונית לוי",
+    duration: "8 שעות",
+    level: "מתקדם",
+    students: 285,
+    rating: 4.6,
+    imagePath: "/lovable-uploads/fab3481d-e54b-40ba-8173-ca15a5739a3a.png",
     modules: [
-      { title: "הדרכת מתחילים למערכת מסחר טריידסטיישן", duration: "1:25:56" },
-      { title: "תחילת העבודה עם חשבון החוזים העתידיים", duration: "9:35" },
-      { title: "סביבת עבודה", duration: "6:50" },
-      { title: "ניהול חשבון", duration: "11:56" },
-      { title: "ניתוחים וחדשות על מניות חמות", duration: "11:54" },
-      { title: "היכרות עם הגרפים", duration: "10:04" },
-      { title: "סורק המניות עטור הפרסים Radar Screen", duration: "6:54" },
-      { title: "סורקי מניות ורשימות חמות", duration: "7:40" },
-      { title: "אפשרויות שליחת פקודות", duration: "17:48" },
-      { title: "סטופ לוס וטייק פרופיט", duration: "17:32" },
-      { title: "הכרת המטריקס: ניתוח עומק השוק בזמן אמת", duration: "11:49" },
-      { title: "הדרכת מערכת TS למתקדמים", duration: "52:00" }
+      { title: "עקרונות ניהול סיכונים", duration: "2 שעות" },
+      { title: "גידור פוזיציות", duration: "2 שעות" },
+      { title: "אסטרטגיות הגנה", duration: "2 שעות" },
+      { title: "ניתוח תרחישי קיצון", duration: "2 שעות" }
     ]
   },
   {
-    title: "מסחר בחוזים עתידיים",
-    description: "קורס מקיף העוסק במסחר בחוזים עתידיים בבורסה האמריקאית, כולל סשנים, סימולים, פקיעות ובטחונות.",
-    icon: "play",
     id: "market-analysis",
+    title: "ניתוח שוק מתקדם",
+    description: "טכניקות מתקדמות לניתוח מגמות שוק וזיהוי הזדמנויות",
+    instructor: "אלכס ברגר",
+    duration: "10 שעות",
+    level: "מתקדם",
+    students: 347,
+    rating: 4.7,
+    imagePath: "/lovable-uploads/eaaedceb-e362-4bfa-b236-a73f5544c6f3.png",
     modules: [
-      { title: "פתיח", duration: "1:49" },
-      { title: "פעילות החוזים העתידיים הפופולרים", duration: "2:43" },
-      { title: "3 הסשנים העיקריים למסחר בבורסה האמריקאית", duration: "3:38" },
-      { title: "סימולים פקיעות ושווי נכסים", duration: "11:31" },
-      { title: "בטחונות", duration: "5:48" },
-      { title: "הזדמנות בחוזי המיקרו", duration: "4:09", isNew: true }
+      { title: "ניתוח טכני מתקדם", duration: "3 שעות" },
+      { title: "זיהוי מגמות מאקרו", duration: "3 שעות" },
+      { title: "ניתוח סנטימנט", duration: "2 שעות" },
+      { title: "אינטגרציה של מקורות מידע", duration: "2 שעות", isNew: true }
     ]
   }
 ];

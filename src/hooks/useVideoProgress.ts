@@ -1,91 +1,43 @@
 
-import { useState, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { useState, useCallback } from 'react';
 
 interface UseVideoProgressProps {
   courseId: string;
   lessonId: number | null;
-  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<boolean>;
-  videoTitle?: string;
+  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<void>;
+  videoTitle: string;
 }
 
 export function useVideoProgress({
-  courseId, 
-  lessonId, 
+  courseId,
+  lessonId,
   recordLessonWatched,
   videoTitle
 }: UseVideoProgressProps) {
-  const [watchedTime, setWatchedTime] = useState<number>(0);
-  const [videoDuration, setVideoDuration] = useState<number>(0);
-  const [videoCompleted, setVideoCompleted] = useState<boolean>(false);
+  const [videoCompleted, setVideoCompleted] = useState(false);
   
-  // Track if video has been marked as watched to avoid duplicate points
-  const videoMarkedAsWatched = useRef(false);
+  // Handle video progress tracking
+  const handleVideoProgress = useCallback((event: any) => {
+    console.log(`Video progress for lesson "${videoTitle}":`, event);
+  }, [videoTitle]);
   
-  // Threshold for considering video as watched (80%)
-  const lessonCompletionThreshold = 0.8;
-  
-  // Reset watched time and completion status when video changes
-  useEffect(() => {
-    setWatchedTime(0);
-    setVideoDuration(0);
-    setVideoCompleted(false);
-    videoMarkedAsWatched.current = false;
-  }, [lessonId]);
-  
-  // Track video progress
-  const handleVideoProgress = async (event: any) => {
-    if (!lessonId) return;
+  // Handle video completion
+  const handleVideoEnded = useCallback(async () => {
+    console.log(`Video completed: ${videoTitle}`);
     
-    const currentTime = event.target?.currentTime || 0;
-    const duration = event.target?.duration || 0;
-    
-    if (duration > 0) {
-      setWatchedTime(currentTime);
-      setVideoDuration(duration);
-      const percentWatched = currentTime / duration;
-      
-      // If watched more than threshold and not already marked as watched
-      if (percentWatched >= lessonCompletionThreshold && !videoMarkedAsWatched.current) {
-        videoMarkedAsWatched.current = true;
+    if (lessonId && recordLessonWatched) {
+      try {
+        await recordLessonWatched(courseId, lessonId.toString());
         setVideoCompleted(true);
-        
-        // Award points for watching the lesson
-        if (recordLessonWatched) {
-          const lessonIdStr = lessonId.toString();
-          await recordLessonWatched(courseId, lessonIdStr);
-        }
+        console.log(`Lesson ${lessonId} marked as watched for course ${courseId}`);
+      } catch (error) {
+        console.error('Failed to record lesson watched:', error);
       }
     }
-  };
-  
-  // Handle video ended event
-  const handleVideoEnded = async () => {
-    if (!lessonId) return;
-    
-    if (!videoMarkedAsWatched.current && recordLessonWatched) {
-      videoMarkedAsWatched.current = true;
-      
-      // Award points if not already awarded earlier by the progress handler
-      if (!videoCompleted) {
-        const lessonIdStr = lessonId.toString();
-        await recordLessonWatched(courseId, lessonIdStr);
-      }
-      
-      toast.success('השיעור הושלם!', {
-        description: 'המשך לשיעור הבא כדי להמשיך ללמוד',
-        duration: 3000,
-      });
-      
-      setVideoCompleted(true);
-    }
-  };
+  }, [courseId, lessonId, recordLessonWatched, videoTitle]);
   
   return {
-    watchedTime,
-    videoDuration,
     videoCompleted,
-    progressPercentage: videoDuration > 0 ? (watchedTime / videoDuration) * 100 : 0,
     handleVideoProgress,
     handleVideoEnded
   };

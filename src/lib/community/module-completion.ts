@@ -1,52 +1,56 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
 
 /**
- * Mark a module as completed and award points
+ * Mark a module as completed by the user
  */
-export async function completeModule(
-  userId: string, 
-  courseId: string, 
-  moduleId: string
-): Promise<boolean> {
+export async function completeModule(courseId: string, moduleId: string): Promise<void> {
   try {
-    if (!userId) return false;
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user?.id) {
+      throw new Error('User not authenticated');
+    }
     
-    // Get the course progress
-    const { data: progress } = await supabase
+    // Check if course progress exists
+    const { data: existingProgress } = await supabase
       .from('course_progress')
-      .select('id, modules_completed')
-      .eq('user_id', userId)
+      .select('*')
+      .eq('user_id', user.user.id)
       .eq('course_id', courseId)
       .maybeSingle();
     
-    if (!progress) {
-      console.error('No course progress found');
-      return false;
+    if (existingProgress) {
+      // Update existing progress
+      const modulesCompleted = existingProgress.modules_completed || [];
+      if (!modulesCompleted.includes(moduleId)) {
+        modulesCompleted.push(moduleId);
+        
+        await supabase
+          .from('course_progress')
+          .update({
+            modules_completed: modulesCompleted,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingProgress.id);
+      }
+    } else {
+      // Create new progress entry
+      await supabase
+        .from('course_progress')
+        .insert({
+          user_id: user.user.id,
+          course_id: courseId,
+          lessons_watched: [],
+          modules_completed: [moduleId],
+          is_completed: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
     }
     
-    // Check if the module is already completed
-    const modulesCompleted = progress.modules_completed || [];
-    if (modulesCompleted.includes(moduleId)) {
-      return false;
-    }
-    
-    // Add the module to completed modules
-    modulesCompleted.push(moduleId);
-    
-    // Update the progress
-    await supabase
-      .from('course_progress')
-      .update({ modules_completed: modulesCompleted })
-      .eq('id', progress.id);
-    
-    // Award points for completing a module
-    await awardPoints(userId, ACTIVITY_TYPES.MODULE_COMPLETED, moduleId);
-    
-    return true;
+    console.log(`Module ${moduleId} marked as completed for course ${courseId}`);
   } catch (error) {
     console.error('Error completing module:', error);
-    return false;
+    throw error;
   }
 }

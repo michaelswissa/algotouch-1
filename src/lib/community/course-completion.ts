@@ -1,47 +1,47 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { awardPoints, ACTIVITY_TYPES } from './reputation-service';
 
 /**
- * Mark a course as completed and award points & badge
+ * Mark a course as completed by the user
  */
-export async function completeCourse(
-  userId: string, 
-  courseId: string
-): Promise<boolean> {
+export async function completeCourse(courseId: string): Promise<void> {
   try {
-    if (!userId) return false;
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user?.id) {
+      throw new Error('User not authenticated');
+    }
     
-    // Get the course progress
-    const { data: progress } = await supabase
+    // Check if course progress exists
+    const { data: existingProgress } = await supabase
       .from('course_progress')
-      .select('id, is_completed')
-      .eq('user_id', userId)
+      .select('*')
+      .eq('user_id', user.user.id)
       .eq('course_id', courseId)
       .maybeSingle();
     
-    if (!progress) {
-      console.error('No course progress found');
-      return false;
+    if (existingProgress) {
+      // Update existing progress
+      await supabase
+        .from('course_progress')
+        .update({
+          is_completed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingProgress.id);
+      
+      // Add a badge for completing the course
+      await supabase
+        .from('user_badges')
+        .insert({
+          user_id: user.user.id,
+          badge_id: `course_completion_${courseId}`,
+          earned_at: new Date().toISOString()
+        });
     }
     
-    // Check if the course is already completed
-    if (progress.is_completed) {
-      return false;
-    }
-    
-    // Mark the course as completed
-    await supabase
-      .from('course_progress')
-      .update({ is_completed: true })
-      .eq('id', progress.id);
-    
-    // Award points for completing the course
-    await awardPoints(userId, ACTIVITY_TYPES.COURSE_COMPLETED, courseId);
-    
-    return true;
+    console.log(`Course ${courseId} marked as completed`);
   } catch (error) {
     console.error('Error completing course:', error);
-    return false;
+    throw error;
   }
 }
