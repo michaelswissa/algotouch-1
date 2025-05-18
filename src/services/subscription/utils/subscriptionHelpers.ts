@@ -124,7 +124,7 @@ export const getStatusInfo = (subscription: Subscription | null) => {
     else if (subscription.current_period_ends_at) {
       const periodEndDate = parseISO(subscription.current_period_ends_at);
       // Generate a start date if it's not available
-      const periodStartDate = subscription.created_at ? 
+      const periodStartDate = subscription.created_at && subscription.created_at !== null ? 
         parseISO(subscription.created_at) : 
         addMonths(periodEndDate, -1);
         
@@ -137,7 +137,7 @@ export const getStatusInfo = (subscription: Subscription | null) => {
     // Fallback if ends_at is missing - use current date + 30 days as estimate
     else if (subscription.status === 'active') {
       const estimatedEndDate = addMonths(new Date(), 1);
-      const startDate = subscription.created_at ? 
+      const startDate = subscription.created_at && subscription.created_at !== null ? 
         parseISO(subscription.created_at) : 
         addMonths(estimatedEndDate, -1);
         
