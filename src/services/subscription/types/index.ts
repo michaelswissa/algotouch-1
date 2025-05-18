@@ -1,43 +1,16 @@
 
 import { Json } from "@/integrations/supabase/types";
 
-export interface PaymentMethod {
-  lastFourDigits: string;
-  expiryMonth: string;
-  expiryYear: string;
-  cardholderName?: string;
-}
+// Re-export types from the main subscription types file
+export type { 
+  SubscriptionStatus, 
+  Subscription, 
+  SubscriptionDetails, 
+  PaymentMethod,
+  CancellationData
+} from '@/types/subscription';
 
-export interface Subscription {
-  id: string;
-  plan_type: string;
-  status: string;
-  trial_ends_at: string | null;
-  current_period_ends_at: string | null;
-  cancelled_at: string | null;
-  payment_method: PaymentMethod | Json | null;
-  contract_signed?: boolean | null;
-  token?: string | null;
-  created_at?: string | null;
-}
-
-export interface CancellationData {
-  reason: string;
-  feedback?: string;
-}
-
-export interface SubscriptionDetails {
-  planName: string;
-  planPrice: string;
-  statusText: string;
-  nextBillingDate: string;
-  progressValue: number;
-  daysLeft: number;
-  paymentMethod: PaymentMethod | null;
-  cancellationReason?: string;
-  cancellationFeedback?: string;
-}
-
+// Define result interface for subscription actions
 export interface ActionResult<T> {
   success: boolean;
   data?: T;
@@ -45,13 +18,21 @@ export interface ActionResult<T> {
   message?: string;
 }
 
+// Define status interface for tracking action states
 export interface ActionStatus {
   loading: boolean;
   error: Error | null;
   lastUpdated: Date | null;
 }
 
+// Define common parameters for subscription actions
 export interface SubscriptionActionParams {
   userId: string;
   subscriptionId: string;
+}
+
+// Define cancellation parameters
+export interface CancelSubscriptionParams extends SubscriptionActionParams {
+  reason: string;
+  feedback?: string;
 }

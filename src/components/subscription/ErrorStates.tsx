@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import SubscriptionCard from './SubscriptionCard';
 import SubscriptionManager from '../payment/SubscriptionManager';
 import { AlertTriangle } from 'lucide-react';
 
-interface ErrorStateProps {
+export interface ErrorStateProps {
   title: string;
   description: string;
   onRefresh: () => Promise<void>;
@@ -182,12 +181,19 @@ export const NoSubscriptionState: React.FC<{onSubscribe: () => void}> = ({ onSub
   );
 };
 
-export const UnprocessedPaymentState: React.FC<{
+export interface UnprocessedPaymentStateProps {
   userId: string;
   email: string;
   lowProfileId?: string;
   onComplete: () => Promise<void>;
-}> = ({ userId, email, lowProfileId, onComplete }) => {
+}
+
+export const UnprocessedPaymentState: React.FC<UnprocessedPaymentStateProps> = ({ 
+  userId, 
+  email, 
+  lowProfileId, 
+  onComplete 
+}) => {
   return (
     <SubscriptionCard 
       title="עדכון פרטי מנוי" 

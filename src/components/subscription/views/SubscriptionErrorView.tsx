@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -9,17 +8,12 @@ import {
   UnprocessedPaymentState 
 } from '../ErrorStates';
 import LoadingSkeleton from '../LoadingSkeleton';
-import { useSubscriptionStatus } from '@/hooks/subscription/useSubscriptionStatus';
-import { SubscriptionStatusState } from '@/hooks/subscription/useSubscriptionStatus';
+import { SubscriptionStatusState } from '@/hooks/subscription/types';
+import { User } from '@/types/auth';
 
 interface SubscriptionErrorViewProps {
-  statusState: SubscriptionStatusState & {
-    subscriptionLoading: boolean;
-    subscription: any;
-    handleRefresh: () => Promise<void>;
-    isLoading: boolean;
-  };
-  user: { id: string; email?: string } | null;
+  statusState: SubscriptionStatusState;
+  user: User | null;
 }
 
 const SubscriptionErrorView: React.FC<SubscriptionErrorViewProps> = ({ 
@@ -36,7 +30,9 @@ const SubscriptionErrorView: React.FC<SubscriptionErrorViewProps> = ({
     isLoading,
     hasUnprocessedPayment,
     subscription,
-    handleRefresh
+    handleRefresh,
+    subscriptionLoading,
+    specificLowProfileId
   } = statusState;
   
   // If critical error occurs, show an emergency fallback view

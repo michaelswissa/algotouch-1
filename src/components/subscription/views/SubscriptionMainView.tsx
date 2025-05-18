@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import SubscriptionDetails from '../SubscriptionDetails';
-import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
+import { Subscription, SubscriptionDetails as SubscriptionDetailsType } from '@/types/subscription';
 
 interface SubscriptionMainViewProps {
-  subscription: any;
-  details: any;
+  subscription: Subscription | null;
+  details: SubscriptionDetailsType | null;
   refreshSubscription: () => Promise<void>;
 }
 

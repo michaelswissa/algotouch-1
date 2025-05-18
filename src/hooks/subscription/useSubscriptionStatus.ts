@@ -1,23 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase-client';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
 import { useSubscription } from './useSubscription';
+import { SubscriptionStatusState } from './types';
+import { Subscription } from '@/types/subscription';
 
-export interface SubscriptionStatusState {
-  loading: boolean;
-  hasUnprocessedPayment: boolean;
-  specificLowProfileId: string;
-  isAutoProcessing: boolean;
-  checkError: string | null;
-  retryCount: number;
-  maxRetriesReached: boolean;
-  loadingTimeout: boolean;
-  criticalError: boolean;
-}
-
-export const useSubscriptionStatus = () => {
+export const useSubscriptionStatus = (): SubscriptionStatusState => {
   const { user } = useAuth();
   const { 
     subscription, 
@@ -26,7 +15,7 @@ export const useSubscriptionStatus = () => {
     checkForUnprocessedPayments 
   } = useSubscription();
   
-  const [state, setState] = useState<SubscriptionStatusState>({
+  const [state, setState] = useState<Omit<SubscriptionStatusState, 'subscriptionLoading' | 'subscription' | 'handleRefresh' | 'isLoading'>>({
     loading: true,
     hasUnprocessedPayment: false,
     specificLowProfileId: '',

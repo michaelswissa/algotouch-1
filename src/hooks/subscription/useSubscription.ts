@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
@@ -7,12 +6,13 @@ import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionCont
 import { useUnprocessedPayments } from './useUnprocessedPayments';
 import { useSubscriptionRefresh } from './useSubscriptionRefresh';
 import { UseSubscriptionReturn, UseSubscriptionOptions } from './types';
+import { Subscription } from '@/types/subscription';
 
 export const useSubscription = (
   options: UseSubscriptionOptions = {}
 ): UseSubscriptionReturn => {
   const { user } = useAuth();
-  const { subscription: contextSubscription, refreshSubscription: contextRefresh, hasActiveSubscription } = useSubscriptionContext();
+  const { subscription: contextSubscription, refreshSubscription: contextRefresh } = useSubscriptionContext();
   const [error, setError] = useState<string | null>(null);
 
   // Initialize subscription actions
@@ -89,7 +89,7 @@ export const useSubscription = (
   }, [user, checkForUnprocessedPayments]);
 
   return { 
-    subscription: subscription || contextSubscription, // Prioritize subscription from actions, fallback to context
+    subscription: subscription || contextSubscription, 
     loading: loading || isCheckingPayments, 
     details, 
     error,
