@@ -5,7 +5,6 @@ import { AuthContext } from './AuthContext';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { RegistrationData as AuthRegistrationData } from './types';
 import { supabase } from '@/lib/supabase-client';
-import { AuthError } from '@supabase/supabase-js';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useSecureAuth();
@@ -129,28 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null; // Will be redirected to error page via the useEffect
   }
 
-  // Create a compatible error object if auth.error is not already an AuthError
-  let authError: AuthError | null = null;
-  if (auth.error) {
-    if ('code' in auth.error && 'status' in auth.error && '__isAuthError' in auth.error) {
-      // It's already an AuthError
-      authError = auth.error as AuthError;
-    } else {
-      // Create an AuthError-compatible object
-      authError = {
-        name: auth.error.name || 'AuthError',
-        message: auth.error.message || 'Authentication error',
-        code: 'unknown_error',
-        status: 500,
-        __isAuthError: true
-      } as AuthError;
-    }
-  }
-
   return (
     <AuthContext.Provider value={{
       ...auth,
-      error: authError,
       registrationData,
       isRegistering,
       pendingSubscription,

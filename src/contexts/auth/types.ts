@@ -1,5 +1,5 @@
 
-import { AuthError, Session, User } from "@supabase/supabase-js";
+import { Session, User } from "@supabase/supabase-js";
 
 export interface AuthContextType {
   user: User | null;
@@ -7,7 +7,7 @@ export interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   initialized: boolean;
-  error: AuthError | null;
+  error: Error | null;
   registrationData: RegistrationData | null;
   isRegistering: boolean;
   pendingSubscription: boolean;

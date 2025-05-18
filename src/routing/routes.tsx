@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Route } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -6,6 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 // Import Auth and Dashboard pages directly to prevent dynamic imports
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
+import AuthLoadError from '@/pages/AuthLoadError'; // Add import for the error page
 
 // Import all other pages statically
 import Index from '@/pages/Index';
@@ -39,6 +39,11 @@ export const routes = [
   {
     path: '/auth',
     element: <ProtectedRoute requireAuth={false}><Auth /></ProtectedRoute>,
+    isPublic: true
+  },
+  {
+    path: '/auth-error',
+    element: <AuthLoadError />,
     isPublic: true
   },
   {
@@ -155,6 +160,7 @@ export const generateRouteComponents = () => {
       <Route key="home" path="/" element={<Index />} />,
       <Route key="dashboard" path="/dashboard" element={<Dashboard />} />,
       <Route key="auth" path="/auth" element={<Auth />} />,
+      <Route key="auth-error" path="/auth-error" element={<AuthLoadError />} />,
       <Route key="not-found" path="*" element={<NotFound />} />
     ];
   }

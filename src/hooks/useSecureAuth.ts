@@ -8,7 +8,7 @@ export function useSecureAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  const [error, setError] = useState<AuthError | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const isAuthenticated = !!session && !!user;
 
   // Initialize auth state
@@ -47,15 +47,7 @@ export function useSecureAuth() {
       } catch (err) {
         if (mounted) {
           console.error('Auth initialization error:', err);
-          // Convert to AuthError format
-          const authError: AuthError = {
-            name: err instanceof Error ? err.name : 'AuthError',
-            message: err instanceof Error ? err.message : String(err),
-            code: 'unknown_error',
-            status: 500,
-            __isAuthError: true
-          };
-          setError(authError);
+          setError(err instanceof Error ? err : new Error(String(err)));
           setLoading(false);
           setInitialized(true);
         }
@@ -85,15 +77,9 @@ export function useSecureAuth() {
       return { success: true };
     } catch (err) {
       console.error('Sign in error:', err);
-      const authError: AuthError = {
-        name: err instanceof Error ? err.name : 'AuthError',
-        message: err instanceof Error ? err.message : String(err),
-        code: 'unknown_error',
-        status: 500,
-        __isAuthError: true
-      };
-      setError(authError);
-      return { success: false, error: authError };
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      return { success: false, error };
     }
   };
 
@@ -115,15 +101,9 @@ export function useSecureAuth() {
       return { success: true, user: data.user };
     } catch (err) {
       console.error('Sign up error:', err);
-      const authError: AuthError = {
-        name: err instanceof Error ? err.name : 'AuthError',
-        message: err instanceof Error ? err.message : String(err),
-        code: 'unknown_error',
-        status: 500,
-        __isAuthError: true
-      };
-      setError(authError);
-      return { success: false, error: authError };
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      return { success: false, error };
     }
   };
 
@@ -135,14 +115,8 @@ export function useSecureAuth() {
       }
     } catch (err) {
       console.error('Sign out error:', err);
-      const authError: AuthError = {
-        name: err instanceof Error ? err.name : 'AuthError',
-        message: err instanceof Error ? err.message : String(err),
-        code: 'unknown_error',
-        status: 500,
-        __isAuthError: true
-      };
-      setError(authError);
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
     }
   };
 
@@ -160,15 +134,9 @@ export function useSecureAuth() {
       return { success: true, user: data.user };
     } catch (err) {
       console.error('Update profile error:', err);
-      const authError: AuthError = {
-        name: err instanceof Error ? err.name : 'AuthError',
-        message: err instanceof Error ? err.message : String(err),
-        code: 'unknown_error',
-        status: 500,
-        __isAuthError: true
-      };
-      setError(authError);
-      return { success: false, error: authError };
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      return { success: false, error };
     }
   };
 
@@ -189,15 +157,9 @@ export function useSecureAuth() {
       return { success: true };
     } catch (err) {
       console.error('Reset password error:', err);
-      const authError: AuthError = {
-        name: err instanceof Error ? err.name : 'AuthError',
-        message: err instanceof Error ? err.message : String(err),
-        code: 'unknown_error',
-        status: 500,
-        __isAuthError: true
-      };
-      setError(authError);
-      return { success: false, error: authError };
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      return { success: false, error };
     }
   };
 
