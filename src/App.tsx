@@ -129,7 +129,6 @@ function App() {
                 <Route path="/courses/:courseId" element={<CourseDetail />} />
                 <Route path="/account" element={<Account />} />
                 
-                {/* Add missing routes here */}
                 <Route path="/monthly-report" element={<MonthlyReport />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/trade-journal" element={<TradeJournal />} />
