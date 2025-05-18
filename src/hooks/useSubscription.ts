@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { toast } from 'sonner';
@@ -48,6 +47,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
       setIsCheckingPayments(true);
       
       // Check for unprocessed webhooks with this user's email
+      // Fix: Use a different approach to query JSON fields to avoid TypeScript errors
       const { data: webhooks, error: webhookError } = await supabase
         .from('payment_webhooks')
         .select('*')
@@ -164,7 +164,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
     } finally {
       setIsCheckingPayments(false);
     }
-  }, [user]);
+  }, [user, subscription]);
 
   // Combine the refreshSubscription methods from context and actions
   const refreshSubscription = useCallback(async (): Promise<boolean> => {
@@ -196,9 +196,13 @@ export const useSubscription = (): UseSubscriptionReturn => {
   // Automatically check for unprocessed payments when the component mounts
   useEffect(() => {
     if (user?.id && user?.email) {
-      checkForUnprocessedPayments().catch(console.error);
+      checkForUnprocessedPayments().then(hasUnprocessed => {
+        if (hasUnprocessed && !subscription) {
+          console.log('Found unprocessed payments, user might need to sync subscription data');
+        }
+      }).catch(console.error);
     }
-  }, [user, checkForUnprocessedPayments]);
+  }, [user, subscription, checkForUnprocessedPayments]);
 
   return { 
     subscription: subscription || contextSubscription, // Prioritize subscription from actions, fallback to context

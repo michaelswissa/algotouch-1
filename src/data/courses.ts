@@ -3,7 +3,7 @@ import { CourseProps } from '@/components/CourseCard';
 
 export const coursesData: CourseProps[] = [
   {
-    title: "הדרכה מקיפה למערכת AlgoTouch",
+    title: "קורס אלגוטאצ' למתחילים",
     description: "לימוד שיטתי של מערכת אלגוטאצ' הכולל פתיחת חשבון, הגדרת המערכת, תפעול ומסחר, ועד ניהול כספים ומיסוי.",
     icon: "graduation",
     id: "algotouch-basics",

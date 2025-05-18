@@ -32,7 +32,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Pass the contract data directly to the parent along with user information
-      await onSign({
+      onSign({
         ...contractData,
         userId: user?.id // This will be undefined if the user isn't authenticated
       });
@@ -55,7 +55,7 @@ const ContractSection: React.FC<ContractSectionProps> = ({
       <DigitalContractForm 
         onSign={handleSignContract}
         planId={selectedPlan} 
-        fullName={fullName}
+        fullName={fullName} 
       />
       
       <div className="mt-6 flex justify-between">

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './AuthContext';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { RegistrationData } from './types';
-import { logger } from '@/lib/logger';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useSecureAuth();
@@ -40,10 +39,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error) {
-      logger.error("Error parsing registration data:", error);
+      console.error("Error parsing registration data:", error);
       sessionStorage.removeItem('registration_data');
     }
-  }, []); // This is correct as an initialization effect
+  }, []);
   
   // Update registration data in session storage when state changes
   const updateRegistrationData = (data: Partial<RegistrationData>) => {
@@ -68,22 +67,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   // Add error handling for auth initialization
   useEffect(() => {
-    // Only create the timeout when still initializing
-    if (!auth.initialized && isInitializing) {
-      const timeoutId = setTimeout(() => {
-        logger.error('Auth initialization took too long, showing error page');
+    // Set a timeout to detect if auth initialization takes too long
+    const timeoutId = setTimeout(() => {
+      if (!auth.initialized && isInitializing) {
+        console.error('Auth initialization took too long, showing error page');
         setHasError(true);
-      }, 10000); // 10 seconds timeout
-      
-      return () => {
-        clearTimeout(timeoutId);
-      };
-    }
+      }
+    }, 10000); // 10 seconds timeout
     
-    // When auth is initialized, update the initialization state
+    // Clear timeout when auth is initialized
     if (auth.initialized) {
+      clearTimeout(timeoutId);
       setIsInitializing(false);
     }
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [auth.initialized, isInitializing]);
   
   // If there's an auth error, redirect to the error page

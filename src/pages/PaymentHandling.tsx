@@ -25,34 +25,32 @@ const PaymentHandling: React.FC = () => {
     // Clear any existing payment temp data
     localStorage.removeItem('temp_payment_session');
 
-    // Process payment based on query parameters
+    // Check authentication state
+    if (!isAuthenticated && !regId) {
+      console.log('User not authenticated, redirecting to login');
+      navigate('/auth', { state: { from: location } });
+      return;
+    }
+
     const processPayment = async () => {
       try {
         setIsLoading(true);
         
-        // Case 1: Registration with success parameter
-        if (regId && isSuccessParam) {
-          console.log('Processing registration payment verification with regId:', regId);
-          const { data, error } = await supabase.functions.invoke('verify-payment-registration', {
-            body: { registrationId: regId }
-          });
-          
-          if (error) throw new Error(error.message);
-          if (!data.success) throw new Error(data.message || 'Payment verification failed');
-          
-          setIsSuccess(true);
-          return;
-        }
-        
-        // Case 2: Regular payment success (requires authentication)
-        else if (isSuccessParam) {
-          // Check if user is authenticated for regular success flow
-          if (!isAuthenticated) {
-            console.log('User not authenticated for success flow, redirecting to login');
-            navigate('/auth', { state: { from: location } });
+        if (isSuccessParam) {
+          // If we have a registration ID, verify the payment with the backend
+          if (regId) {
+            const { data, error } = await supabase.functions.invoke('verify-payment-registration', {
+              body: { registrationId: regId }
+            });
+            
+            if (error) throw new Error(error.message);
+            if (!data.success) throw new Error(data.message || 'Payment verification failed');
+            
+            setIsSuccess(true);
             return;
           }
           
+          // Regular payment success flow
           setIsSuccess(true);
           
           // Update user subscription status if needed
@@ -64,29 +62,13 @@ const PaymentHandling: React.FC = () => {
               updated_at: new Date().toISOString()
             });
           }
-        }
-        
-        // Case 3: Payment error
-        else if (errorParam) {
-          const errorMsg = params.get('message');
+        } else if (errorParam) {
+          // Handle payment error
           setIsSuccess(false);
-          setErrorMessage(errorMsg || 'התשלום נכשל או בוטל. אנא נסה שנית.');
-        }
-        
-        // Case 4: No valid parameters, redirect based on auth status
-        else {
-          console.log('No valid payment parameters found');
-          if (regId) {
-            // If we have regId but no success/error, treat as error
-            setIsSuccess(false);
-            setErrorMessage('לא התקבל סטטוס תשלום תקין. אנא נסה שנית.');
-          } else {
-            // No regId and no success/error, redirect to appropriate page
-            const redirectPath = isAuthenticated ? '/subscription' : '/auth';
-            console.log(`No payment parameters, redirecting to ${redirectPath}`);
-            navigate(redirectPath, { replace: true });
-            return; // Skip setting isLoading to false since we're navigating away
-          }
+          setErrorMessage('התשלום נכשל או בוטל. אנא נסה שנית.');
+        } else {
+          // No status parameters, redirect to subscription page
+          navigate('/subscription');
         }
       } catch (error: any) {
         console.error('Error processing payment result:', error);

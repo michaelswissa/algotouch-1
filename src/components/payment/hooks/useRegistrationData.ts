@@ -1,8 +1,7 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { RegistrationData } from '@/types/payment';
-import { logger } from '@/lib/logger';
 
 export const useRegistrationData = () => {
   const { 
@@ -26,10 +25,10 @@ export const useRegistrationData = () => {
     }
   }, [contextRegistrationData]);
 
-  const loadRegistrationData = useCallback(() => {
+  const loadRegistrationData = () => {
     if (contextRegistrationData) {
       setRegistrationData(contextRegistrationData as RegistrationData);
-      logger.debug("Loaded registration data from context:", {
+      console.log("Loaded registration data from context:", {
         email: contextRegistrationData.email,
         hasUserData: !!contextRegistrationData.userData,
         planId: contextRegistrationData.planId
@@ -37,12 +36,12 @@ export const useRegistrationData = () => {
       
       return true;
     } else {
-      logger.debug("No registration data found but that's okay - user can pay first and register later");
+      console.log("No registration data found but that's okay - user can pay first and register later");
       return true;
     }
-  }, [contextRegistrationData]);
+  };
 
-  const updateRegistrationData = useCallback((newData: Partial<RegistrationData>) => {
+  const updateRegistrationData = (newData: Partial<RegistrationData>) => {
     if (!registrationData && !contextRegistrationData) return;
     
     const updatedData = {
@@ -52,12 +51,12 @@ export const useRegistrationData = () => {
     
     setRegistrationData(updatedData as RegistrationData);
     updateContextRegistrationData(updatedData);
-  }, [registrationData, contextRegistrationData, updateContextRegistrationData]);
+  };
 
-  const clearRegistrationData = useCallback(() => {
+  const clearRegistrationData = () => {
     clearContextRegistrationData();
     setRegistrationData(null);
-  }, [clearContextRegistrationData]);
+  };
 
   return {
     registrationData,
