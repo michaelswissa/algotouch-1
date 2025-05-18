@@ -34,6 +34,14 @@ export function useCourseData(courseId?: string) {
   // Get user progress for this course
   const userProgress = courseProgress.find(progress => progress.courseId === courseId);
   
+  // Define a wrapper for recordLessonWatched that matches the expected signature
+  const handleRecordLessonWatched = async (courseId: string, lessonId: string): Promise<boolean> => {
+    if (recordLessonWatched) {
+      return await recordLessonWatched(courseId, lessonId);
+    }
+    return false;
+  };
+  
   // Handle video progress tracking
   const { 
     videoCompleted,
@@ -42,7 +50,7 @@ export function useCourseData(courseId?: string) {
   } = useVideoProgress({
     courseId: courseId || 'unknown',
     lessonId: activeVideoId,
-    recordLessonWatched,
+    recordLessonWatched: handleRecordLessonWatched,
     videoTitle
   });
   

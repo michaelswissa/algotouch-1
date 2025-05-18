@@ -2,7 +2,7 @@
 import { useContext, createContext } from 'react';
 
 // Define types for community context
-interface CourseProgress {
+export interface CourseProgress {
   courseId: string;
   userId: string;
   lessonsWatched: string[];
@@ -14,7 +14,7 @@ interface CourseProgress {
   updated_at?: string;
 }
 
-interface UserBadge {
+export interface UserBadge {
   id: string;
   userId: string;
   badgeId: string;

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 interface UseVideoProgressProps {
   courseId: string;
   lessonId: number | null;
-  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<void>;
+  recordLessonWatched?: (courseId: string, lessonId: string) => Promise<boolean>;
   videoTitle: string;
 }
 
@@ -27,9 +27,11 @@ export function useVideoProgress({
     
     if (lessonId && recordLessonWatched) {
       try {
-        await recordLessonWatched(courseId, lessonId.toString());
-        setVideoCompleted(true);
-        console.log(`Lesson ${lessonId} marked as watched for course ${courseId}`);
+        const result = await recordLessonWatched(courseId, lessonId.toString());
+        if (result) {
+          setVideoCompleted(true);
+          console.log(`Lesson ${lessonId} marked as watched for course ${courseId}`);
+        }
       } catch (error) {
         console.error('Failed to record lesson watched:', error);
       }
