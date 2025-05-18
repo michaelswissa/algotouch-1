@@ -41,41 +41,61 @@ export const useSubscriptionActions = ({
     
     setStatus({ ...status, loading: true, error: null });
     
-    const result = await cancelSubscription({
-      userId,
-      subscriptionId,
-      reason,
-      feedback
-    });
-    
-    if (result.success) {
-      toast.success(result.message || 'המנוי בוטל בהצלחה');
-      setStatus({
-        loading: false,
-        error: null,
-        lastUpdated: new Date()
+    try {
+      const result = await cancelSubscription({
+        userId,
+        subscriptionId,
+        reason,
+        feedback
       });
       
-      // Refresh subscription data
-      await refreshSubscription();
-      
-      if (onSuccess) {
-        onSuccess('cancel');
+      if (result.success) {
+        toast.success(result.message || 'המנוי בוטל בהצלחה');
+        setStatus({
+          loading: false,
+          error: null,
+          lastUpdated: new Date()
+        });
+        
+        // Refresh subscription data
+        await refreshSubscription();
+        
+        if (onSuccess) {
+          onSuccess('cancel');
+        }
+        
+        return true;
+      } else {
+        setStatus({
+          loading: false,
+          error: result.error || new Error(result.message || 'שגיאה לא ידועה'),
+          lastUpdated: new Date()
+        });
+        
+        if (onError && result.error) {
+          onError(result.error, 'cancel');
+        }
+        
+        return false;
       }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('שגיאה לא ידועה בביטול המנוי');
+      console.error('Error canceling subscription:', err);
       
-      return true;
-    } else {
       setStatus({
         loading: false,
-        error: result.error || new Error(result.message || 'שגיאה לא ידועה'),
+        error,
         lastUpdated: new Date()
       });
       
-      if (onError && result.error) {
-        onError(result.error, 'cancel');
+      if (onError) {
+        onError(error, 'cancel');
       }
       
       return false;
+    } finally {
+      // Ensure loading state is always cleared
+      setStatus(current => ({ ...current, loading: false }));
     }
   };
   
@@ -90,39 +110,59 @@ export const useSubscriptionActions = ({
     
     setStatus({ ...status, loading: true, error: null });
     
-    const result = await reactivateSubscription({
-      userId,
-      subscriptionId
-    });
-    
-    if (result.success) {
-      toast.success(result.message || 'המנוי הופעל מחדש בהצלחה');
-      setStatus({
-        loading: false,
-        error: null,
-        lastUpdated: new Date()
+    try {
+      const result = await reactivateSubscription({
+        userId,
+        subscriptionId
       });
       
-      // Refresh subscription data
-      await refreshSubscription();
-      
-      if (onSuccess) {
-        onSuccess('reactivate');
+      if (result.success) {
+        toast.success(result.message || 'המנוי הופעל מחדש בהצלחה');
+        setStatus({
+          loading: false,
+          error: null,
+          lastUpdated: new Date()
+        });
+        
+        // Refresh subscription data
+        await refreshSubscription();
+        
+        if (onSuccess) {
+          onSuccess('reactivate');
+        }
+        
+        return true;
+      } else {
+        setStatus({
+          loading: false,
+          error: result.error || new Error(result.message || 'שגיאה לא ידועה'),
+          lastUpdated: new Date()
+        });
+        
+        if (onError && result.error) {
+          onError(result.error, 'reactivate');
+        }
+        
+        return false;
       }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('שגיאה לא ידועה בהפעלת המנוי מחדש');
+      console.error('Error reactivating subscription:', err);
       
-      return true;
-    } else {
       setStatus({
         loading: false,
-        error: result.error || new Error(result.message || 'שגיאה לא ידועה'),
+        error,
         lastUpdated: new Date()
       });
       
-      if (onError && result.error) {
-        onError(result.error, 'reactivate');
+      if (onError) {
+        onError(error, 'reactivate');
       }
       
       return false;
+    } finally {
+      // Ensure loading state is always cleared
+      setStatus(current => ({ ...current, loading: false }));
     }
   };
   
@@ -134,44 +174,69 @@ export const useSubscriptionActions = ({
     
     setStatus({ ...status, loading: true, error: null });
     
-    const result = await checkSubscriptionStatus({ userId });
-    
-    if (result.success && result.data) {
-      setSubscription(result.data);
+    try {
+      const result = await checkSubscriptionStatus({ userId });
       
-      // Fetch cancellation data if available
-      if (result.data.id) {
-        const cancellationResult = await fetchCancellationData({
-          subscriptionId: result.data.id
+      if (result.success && result.data) {
+        setSubscription(result.data);
+        
+        // Fetch cancellation data if available
+        if (result.data.id) {
+          try {
+            const cancellationResult = await fetchCancellationData({
+              subscriptionId: result.data.id
+            });
+            
+            if (cancellationResult.success) {
+              const subscriptionDetails = getSubscriptionDetails(result.data, cancellationResult.data);
+              setDetails(subscriptionDetails);
+            } else {
+              const subscriptionDetails = getSubscriptionDetails(result.data);
+              setDetails(subscriptionDetails);
+            }
+          } catch (err) {
+            console.error('Error fetching cancellation data:', err);
+            // Still set details without cancellation data
+            const subscriptionDetails = getSubscriptionDetails(result.data);
+            setDetails(subscriptionDetails);
+          }
+        }
+        
+        setStatus({
+          loading: false,
+          error: null,
+          lastUpdated: new Date()
         });
         
-        if (cancellationResult.success) {
-          const subscriptionDetails = getSubscriptionDetails(result.data, cancellationResult.data);
-          setDetails(subscriptionDetails);
-        } else {
-          const subscriptionDetails = getSubscriptionDetails(result.data);
-          setDetails(subscriptionDetails);
-        }
+        return true;
+      } else {
+        setSubscription(null);
+        setDetails(null);
+        
+        setStatus({
+          loading: false,
+          error: result.error || null,
+          lastUpdated: new Date()
+        });
+        
+        return false;
       }
+    } catch (err) {
+      console.error('Error refreshing subscription:', err);
       
-      setStatus({
-        loading: false,
-        error: null,
-        lastUpdated: new Date()
-      });
-      
-      return true;
-    } else {
       setSubscription(null);
       setDetails(null);
       
       setStatus({
         loading: false,
-        error: result.error || null,
+        error: err instanceof Error ? err : new Error('שגיאה לא ידועה'),
         lastUpdated: new Date()
       });
       
       return false;
+    } finally {
+      // Ensure loading state is always cleared
+      setStatus(current => ({ ...current, loading: false }));
     }
   };
   
