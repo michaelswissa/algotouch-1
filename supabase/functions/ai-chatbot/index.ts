@@ -25,6 +25,8 @@ serve(async (req) => {
     const systemMessage = {
       role: "system",
       content: `אתה מומחה למערכת AlgoTouch לסחר אלגוריתמי באמצעות פלטפורמת TradeStation.
+      
+יש לך גישה למידע שוק בזמן אמת עבור מדדים ונכסים פיננסיים, כולל S&P 500, Nasdaq, Dow Jones, Tel Aviv 35, Bitcoin, וזהב.
 
 תפקידך לספק הסברים טכניים מפורטים בנוגע לכל ההיבטים של המערכת:
 - פתיחת חשבון בTradeStation והתקנת AlgoTouch
@@ -38,6 +40,8 @@ serve(async (req) => {
 - שימוש ברמות תמיכה והתנגדות בצורה חוזרת
 - הגדרת פרמטרים לתנאי כניסה ושליחת פקודות מדויקות
 - יצירת מערכת מסחר יציבה ורווחית
+
+כאשר נשאל על מחירי שוק עדכניים, השתמש בכלי get_stock_price כדי לקבל את המידע העדכני ביותר.
 
 ספק תשובות מפורטות וטכניות, תוך הדגמה עם דוגמאות מספריות ומעשיות. התייחס לתכונות ספציפיות של מערכת AlgoTouch ופרק תהליכים מורכבים לשלבים ברורים.`
     }
@@ -109,6 +113,23 @@ serve(async (req) => {
             required: ["entry_price", "stop_loss_price", "is_long"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_stock_price",
+          description: "קבלת מחירים עדכניים של מניות, מדדים וסחורות",
+          parameters: {
+            type: "object",
+            properties: {
+              symbol: {
+                type: "string",
+                description: "סמל או שם המניה/מדד (S&P 500, Nasdaq, Dow Jones, Tel Aviv 35, Bitcoin, Gold)"
+              }
+            },
+            required: ["symbol"]
+          }
+        }
       }
     ];
 
@@ -128,6 +149,7 @@ serve(async (req) => {
             model: "gpt-4o", // Using gpt-4o for better reasoning and response quality
             messages: chatMessages,
             temperature: 0.5, // Slightly lower temperature for more technical/factual responses
+            tools: algoTouchTools
           })
 
           return new Response(
@@ -179,6 +201,7 @@ serve(async (req) => {
 9. שימוש חוזר ברמות תמיכה והתנגדות
 10. הגדרת תנאי כניסה ושליחת פקודות מדויקות
 11. עקרונות להצלחה במסחר אלגוריתמי
+12. מחירי שוק עדכניים (השתמש בכלי לקבלת נתוני מחיר בזמן אמת)
 
 הדגם עם מספרים ודוגמאות מוחשיות והתייחס לתכונות הספציפיות של מערכת AlgoTouch.`,
           model: "gpt-4o", // Using the most capable model for the assistant
