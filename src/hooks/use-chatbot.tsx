@@ -40,13 +40,12 @@ export function useChatbot() {
 7. אסטרטגיות מתקדמות כמו DCA ו-Martingale
 8. הגדרת פרמטרים לכניסה מחדש לרמות, תנאי כניסה, וסינון נרות
 9. חוקים להצלחה במסחר ועקרונות חשובים
-10. נתוני מחירי מדדים ומניות בזמן אמת
 
 יש לתת תשובות מפורטות ומקצועיות המבוססות על הידע הטכני של המערכת.`
     },
     {
       role: 'assistant',
-      content: 'שלום, אני העוזר החכם של AlgoTouch. כיצד אוכל לעזור לך היום בנושאי מסחר אלגוריתמי, הגדרות המערכת, אסטרטגיות מסחר, או מידע על מחירי שוק עדכניים?'
+      content: 'שלום, אני העוזר החכם של AlgoTouch. כיצד אוכל לעזור לך היום בנושאי מסחר אלגוריתמי, הגדרות המערכת, או אסטרטגיות מסחר?'
     }
   ]);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -68,9 +67,6 @@ export function useChatbot() {
         break;
       case 'calculate_profit_targets':
         result = calculateProfitTargets(args);
-        break;
-      case 'get_stock_price':
-        result = await getStockPrice(args);
         break;
       default:
         result = JSON.stringify({ error: `Function ${name} not implemented` });
@@ -119,52 +115,6 @@ export function useChatbot() {
       - יעד רווח שני (RR ${risk_reward_ratio_2}): $${target2.toFixed(2)}
       - יעד רווח שלישי (RR ${risk_reward_ratio_3}): $${target3.toFixed(2)}`
     });
-  };
-  
-  // New function to fetch stock prices from our edge function
-  const getStockPrice = async (args: any): Promise<string> => {
-    try {
-      const { symbol } = args;
-      
-      // Call our stock-data edge function
-      const { data, error } = await supabase.functions.invoke('stock-data');
-      
-      if (error) {
-        console.error('Error fetching stock data:', error);
-        return JSON.stringify({
-          error: `שגיאה בעת קבלת נתוני מחיר: ${error.message}`
-        });
-      }
-      
-      // Find the requested symbol - case insensitive and partial match
-      const stockInfo = data.find((stock: any) => 
-        stock.symbol.toLowerCase() === symbol.toLowerCase() ||
-        stock.symbol.toLowerCase().includes(symbol.toLowerCase())
-      );
-      
-      if (!stockInfo) {
-        return JSON.stringify({
-          error: `לא נמצאו נתונים עבור "${symbol}"`,
-          available_symbols: data.map((s: any) => s.symbol).join(", ")
-        });
-      }
-      
-      // Return formatted response
-      return JSON.stringify({
-        symbol: stockInfo.symbol,
-        price: stockInfo.price,
-        change: stockInfo.change,
-        changePercent: stockInfo.changePercent,
-        direction: stockInfo.isPositive ? "עלייה" : "ירידה",
-        lastUpdated: new Date().toISOString(),
-        explanation: `המחיר העדכני של ${stockInfo.symbol} הוא $${stockInfo.price}, ${stockInfo.isPositive ? 'עלייה' : 'ירידה'} של ${stockInfo.changePercent} (${stockInfo.change}$) מהמחיר הקודם.`
-      });
-    } catch (error) {
-      console.error('Error processing stock price query:', error);
-      return JSON.stringify({
-        error: `שגיאה בעת עיבוד נתוני המחיר: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`
-      });
-    }
   };
 
   // Handle tool calls from the assistant

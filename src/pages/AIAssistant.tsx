@@ -2,9 +2,8 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import ChatBot from '@/components/ChatBot';
-import { Bot, Lightbulb, Sparkles, Zap, Brain, MessageSquare, TrendingUp } from 'lucide-react';
+import { Bot, Lightbulb, Sparkles, Zap, Brain, MessageSquare } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { StockDataProvider } from '@/contexts/stock/StockDataContext';
 
 const AIAssistant = () => {
   const aiFeatures = [
@@ -19,9 +18,9 @@ const AIAssistant = () => {
       icon: <Zap className="h-6 w-6 text-blue-400" />
     },
     {
-      title: "נתוני שוק בזמן אמת",
-      description: "שאל על מחירי מניות, מדדים, ביטקוין וזהב לקבלת מידע עדכני מהשוק",
-      icon: <TrendingUp className="h-6 w-6 text-green-400" />
+      title: "תובנות וטיפים",
+      description: "קבל עצות מעשיות מבוססות נתונים לשיפור ביצועי המסחר שלך",
+      icon: <Lightbulb className="h-6 w-6 text-yellow-400" />
     }
   ];
 
@@ -65,7 +64,7 @@ const AIAssistant = () => {
               
               <p className="text-lg">
                 ניתן לשאול על הגדרת פרמטרים כמו רמות תמיכה והתנגדות, Position Sizing, Stop Loss, BE Stop, 
-                Trailing Stop, DCA, Martingale, ועוד נושאים טכניים נוספים, וגם לקבל מידע עדכני על מחירי שוק בזמן אמת.
+                Trailing Stop, DCA, Martingale, ועוד נושאים טכניים נוספים.
               </p>
             </div>
           </div>
@@ -80,9 +79,7 @@ const AIAssistant = () => {
             <MessageSquare size={24} className="text-primary" />
           </div>
           
-          <StockDataProvider refreshInterval={60000}>
-            <ChatBot />
-          </StockDataProvider>
+          <ChatBot />
         </div>
       </div>
     </Layout>

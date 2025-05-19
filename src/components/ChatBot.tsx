@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpRight, Send, Volume2, VolumeX, RefreshCw, Bot, Upload, TrendingUp } from "lucide-react";
+import { ArrowUpRight, Send, Volume2, VolumeX, RefreshCw, Bot, Upload } from "lucide-react";
 import { useChatbot } from '@/hooks/use-chatbot';
 import { toast } from '@/hooks/use-toast';
-import { useStockData } from '@/contexts/stock/StockDataContext';
 
 const ChatBot = () => {
   const [input, setInput] = useState('');
@@ -17,8 +16,7 @@ const ChatBot = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { messages, isLoading, sendMessage, speakText, clearMessages } = useChatbot();
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const { stockData } = useStockData(); // Access stock data context
-  
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -134,31 +132,6 @@ const ChatBot = () => {
     }
   };
 
-  // Generate stock data questions based on available stock data
-  const generateStockQuestions = () => {
-    if (!stockData || stockData.length === 0) return [];
-    
-    // Select 2 random stocks to create questions about
-    const shuffled = [...stockData].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 2);
-    
-    return selected.map(stock => `מה המחיר הנוכחי של ${stock.symbol}?`);
-  };
-
-  const stockQuestions = generateStockQuestions();
-
-  const formatMessageContent = (content: string | null | undefined) => {
-    // Guard against null or undefined content
-    if (!content) return '';
-    
-    return content
-      .replace(/\n/g, '<br/>')
-      // Bold important terms
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Italic
-      .replace(/\*(.*?)\*/g, '<em>$1</em>');
-  };
-
   return (
     <div className="container mx-auto py-6 max-w-5xl" dir="rtl">
       <div>
@@ -173,7 +146,7 @@ const ChatBot = () => {
                   <CardTitle className="text-2xl">העוזר החכם של AlgoTouch</CardTitle>
                   <CardDescription>
                     העוזר מתמחה במערכת AlgoTouch ובמסחר אלגוריתמי. שאל כל שאלה הקשורה לרמות תמיכה והתנגדות, 
-                    Position Sizing, Stop Loss, BE Stop, Trailing Stop, DCA, Martingale, או מחירי מניות בזמן אמת.
+                    Position Sizing, Stop Loss, BE Stop, Trailing Stop, DCA, ו-Martingale.
                   </CardDescription>
                 </div>
               </div>
@@ -205,7 +178,12 @@ const ChatBot = () => {
                       className="whitespace-pre-wrap"
                       // Enable rendering of formatted text with line breaks
                       dangerouslySetInnerHTML={{
-                        __html: formatMessageContent(message.content)
+                        __html: message.content
+                          .replace(/\n/g, '<br/>')
+                          // Bold important terms
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          // Italic
+                          .replace(/\*(.*?)\*/g, '<em>$1</em>')
                       }}
                     />
                   </div>
@@ -228,7 +206,7 @@ const ChatBot = () => {
           <CardFooter className="border-t border-blue-50 dark:border-blue-900/20 pt-4">
             <div className="flex w-full gap-2">
               <Input
-                placeholder="שאל שאלה על מערכת AlgoTouch או מחירי מניות בזמן אמת..."
+                placeholder="שאל שאלה על מערכת AlgoTouch..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -322,48 +300,7 @@ const ChatBot = () => {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/95 dark:bg-gray-900/30 border border-white/80 dark:border-white/5 shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-500" />
-              <CardTitle className="text-base font-medium">שאלות על מחירי שוק</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {stockQuestions.map((question, index) => (
-              <Button 
-                key={index}
-                variant="outline" 
-                className="w-full justify-start text-right hover:bg-green-50/50 dark:hover:bg-green-900/10 bg-white/95 dark:bg-gray-800/30 border border-white/80 dark:border-white/5" 
-                onClick={() => handleQuickQuestion(question)}
-                disabled={isLoading}
-              >
-                <ArrowUpRight className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-                {question}
-              </Button>
-            ))}
-            <Button 
-              variant="outline" 
-              className="w-full justify-start text-right hover:bg-green-50/50 dark:hover:bg-green-900/10 bg-white/95 dark:bg-gray-800/30 border border-white/80 dark:border-white/5" 
-              onClick={() => handleQuickQuestion('מהם מדדי השוק המובילים כרגע?')}
-              disabled={isLoading}
-            >
-              <ArrowUpRight className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-              מהם מדדי השוק המובילים כרגע?
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start text-right hover:bg-green-50/50 dark:hover:bg-green-900/10 bg-white/95 dark:bg-gray-800/30 border border-white/80 dark:border-white/5" 
-              onClick={() => handleQuickQuestion('מה המחיר של ביטקוין כעת?')}
-              disabled={isLoading}
-            >
-              <ArrowUpRight className="h-4 w-4 ml-2 rtl:mr-2 rtl:ml-0" />
-              מה המחיר של ביטקוין כעת?
-            </Button>
-          </CardContent>
-        </Card>
-        
-        <Card className="md:col-span-1 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/5 dark:to-indigo-900/5 border border-blue-100/50 dark:border-blue-900/10 shadow-sm">
+        <Card className="md:col-span-2 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/5 dark:to-indigo-900/5 border border-blue-100/50 dark:border-blue-900/10 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-blue-600 dark:text-blue-300">טיפים מקצועיים למערכת AlgoTouch</CardTitle>
           </CardHeader>
