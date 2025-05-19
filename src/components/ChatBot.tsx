@@ -147,6 +147,18 @@ const ChatBot = () => {
 
   const stockQuestions = generateStockQuestions();
 
+  const formatMessageContent = (content: string | null | undefined) => {
+    // Guard against null or undefined content
+    if (!content) return '';
+    
+    return content
+      .replace(/\n/g, '<br/>')
+      // Bold important terms
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // Italic
+      .replace(/\*(.*?)\*/g, '<em>$1</em>');
+  };
+
   return (
     <div className="container mx-auto py-6 max-w-5xl" dir="rtl">
       <div>
@@ -193,12 +205,7 @@ const ChatBot = () => {
                       className="whitespace-pre-wrap"
                       // Enable rendering of formatted text with line breaks
                       dangerouslySetInnerHTML={{
-                        __html: message.content
-                          .replace(/\n/g, '<br/>')
-                          // Bold important terms
-                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                          // Italic
-                          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        __html: formatMessageContent(message.content)
                       }}
                     />
                   </div>
