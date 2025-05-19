@@ -21,7 +21,7 @@ const StockDataContext = createContext<StockDataContextType | undefined>(undefin
 
 export const StockDataProvider: React.FC<{ children: React.ReactNode; refreshInterval?: number }> = ({ 
   children, 
-  refreshInterval = 2000 // Changed from 30000 to 2000 (2 seconds)
+  refreshInterval = 30000 
 }) => {
   const stockDataState = useStockDataWithRefresh(refreshInterval);
   

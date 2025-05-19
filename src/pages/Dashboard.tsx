@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import BlogSection from '@/components/BlogSection';
-import { useStockData, StockDataProvider } from '@/contexts/stock/StockDataContext';
+import { useStockData } from '@/contexts/stock/StockDataContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const StockIndicesSection = () => {
@@ -109,10 +109,7 @@ const Dashboard = () => {
         
         {/* Stock Indices Section - First for greater prominence */}
         <ErrorBoundary fallback={<div>שגיאה בטעינת נתוני מדד. אנא נסה לרענן את הדף.</div>}>
-          {/* Wrap with StockDataProvider to ensure 2-second refresh */}
-          <StockDataProvider refreshInterval={2000}>
-            <StockIndicesSection />
-          </StockDataProvider>
+          <StockIndicesSection />
         </ErrorBoundary>
         
         {/* Blog Section */}
