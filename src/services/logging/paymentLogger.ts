@@ -17,24 +17,6 @@ interface LogEntry {
 
 export class PaymentLogger {
   private static readonly MAX_RETRIES = 3;
-  private static sessionId: string | null = null;
-
-  /**
-   * Get or create a session ID for the current payment flow
-   */
-  private static getSessionId(): string {
-    if (!this.sessionId) {
-      this.sessionId = generateSessionId();
-    }
-    return this.sessionId;
-  }
-
-  /**
-   * Reset the session ID (use when starting a new payment flow)
-   */
-  public static resetSessionId(): void {
-    this.sessionId = null;
-  }
 
   /**
    * Log payment-related events
@@ -51,11 +33,11 @@ export class PaymentLogger {
       level,
       message,
       context,
-      data: sanitizeData(data),
+      data,
       userId: userId || 'anonymous',
       timestamp: new Date().toISOString(),
       transactionId,
-      sessionId: this.getSessionId(),
+      sessionId: generateSessionId(),
       source: 'client'
     };
 
@@ -119,32 +101,6 @@ export class PaymentLogger {
   }
 
   /**
-   * Log payment debug events (only in development)
-   */
-  static debug(
-    message: string,
-    context: string,
-    data?: any,
-    userId?: string,
-    transactionId?: string
-  ): void {
-    // Only log to console, don't store in database
-    const logEntry: LogEntry = {
-      level: 'debug',
-      message,
-      context,
-      data: sanitizeData(data),
-      userId: userId || 'anonymous',
-      timestamp: new Date().toISOString(),
-      transactionId,
-      sessionId: this.getSessionId(),
-      source: 'client'
-    };
-    
-    this.logToConsole(logEntry);
-  }
-
-  /**
    * Store log entries in Supabase database
    */
   private static async storeLog(logEntry: LogEntry): Promise<void> {
@@ -186,8 +142,7 @@ export class PaymentLogger {
    */
   private static logToConsole(logEntry: LogEntry): void {
     const timestamp = new Date(logEntry.timestamp).toLocaleTimeString();
-    const sessionIdShort = logEntry.sessionId ? logEntry.sessionId.substring(0, 8) : 'no-session';
-    const prefix = `[PAYMENT ${logEntry.level.toUpperCase()}] [${timestamp}] [${logEntry.context}] [${sessionIdShort}]`;
+    const prefix = `[PAYMENT ${logEntry.level.toUpperCase()}] [${timestamp}] [${logEntry.context}]`;
     
     switch (logEntry.level) {
       case 'error':
@@ -214,39 +169,4 @@ export class PaymentLogger {
  */
 function generateSessionId(): string {
   return `pay_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-}
-
-/**
- * Sanitize sensitive data before logging
- */
-function sanitizeData(data: any): any {
-  if (!data) return {};
-  
-  const sanitized = { ...data };
-  
-  // Sanitize common sensitive fields
-  const sensitiveFields = [
-    'password', 'creditCard', 'cvv', 'cardNumber', 'cardCvv', 
-    'securityCode', 'token', 'key', 'secret', 'idNumber', 'ssn'
-  ];
-  
-  sensitiveFields.forEach(field => {
-    if (typeof sanitized === 'object' && sanitized !== null) {
-      // Check direct fields
-      if (field in sanitized) {
-        sanitized[field] = '[REDACTED]';
-      }
-      
-      // Check nested fields
-      for (const key in sanitized) {
-        if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-          if (field in sanitized[key]) {
-            sanitized[key][field] = '[REDACTED]';
-          }
-        }
-      }
-    }
-  });
-  
-  return sanitized;
 }

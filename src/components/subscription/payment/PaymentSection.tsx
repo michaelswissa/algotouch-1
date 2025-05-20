@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { usePaymentInitialization } from './hooks/usePaymentInitialization';
 import { usePaymentUrlParams } from './hooks/usePaymentUrlParams';
@@ -9,8 +9,6 @@ import PaymentIframe from './PaymentIframe';
 import PaymentSectionFooter from './PaymentSectionFooter';
 import PaymentLoading from './PaymentLoading';
 import SubscriptionPaymentError from './PaymentError';
-import { PaymentLogger } from '@/services/logging/paymentLogger';
-import { useAuth } from '@/contexts/auth';
 
 interface PaymentSectionProps {
   selectedPlan: string;
@@ -24,28 +22,9 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   onBack
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useAuth();
-  const [retryCount, setRetryCount] = useState(0);
-  
-  // Log component mount with plan selection
-  useEffect(() => {
-    PaymentLogger.info(
-      'Payment section mounted', 
-      'payment-section', 
-      { 
-        plan: selectedPlan,
-        isAuthenticated: !!user,
-        userId: user?.id || 'guest'
-      }
-    );
-    
-    return () => {
-      PaymentLogger.info('Payment section unmounted', 'payment-section');
-    };
-  }, [selectedPlan, user]);
   
   // Handle payment initialization
-  const { paymentUrl, initiateCardcomPayment, isLoading: isInitLoading, error: initError } = usePaymentInitialization(
+  const { paymentUrl, initiateCardcomPayment } = usePaymentInitialization(
     selectedPlan,
     onPaymentComplete, 
     onBack, 
@@ -61,17 +40,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   // Handle payment success
   const handlePaymentSuccess = (paymentData: any) => {
     console.log('Payment successful in parent component:', paymentData);
-    PaymentLogger.success(
-      'Payment completed successfully', 
-      'payment-process', 
-      { 
-        plan: selectedPlan, 
-        lowProfileId: paymentData?.lowProfileId || 'unknown',
-        paymentMethod: 'iframe',
-        transactionId: paymentData?.transactionId || 'unknown'
-      }
-    );
-    
     // We'll store the payment data in sessionStorage for later validation
     if (paymentData?.lowProfileId) {
       sessionStorage.setItem('payment_success_data', JSON.stringify({
@@ -89,31 +57,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   // Handle payment error
   const handlePaymentError = (error: Error) => {
     console.error('Payment error in parent component:', error);
-    PaymentLogger.error(
-      'Payment error in parent component', 
-      'payment-process', 
-      {
-        error: error.message,
-        plan: selectedPlan,
-        isAuthenticated: !!user,
-        userId: user?.id || 'guest'
-      }
-    );
     setIsLoading(false);
-  };
-
-  // Handle retry of payment initialization
-  const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
-    PaymentLogger.info(
-      'Retrying payment initialization', 
-      'payment-retry', 
-      { 
-        retryCount: retryCount + 1, 
-        plan: selectedPlan 
-      }
-    );
-    initiateCardcomPayment();
   };
 
   // Show loading screen when initializing payment
@@ -125,10 +69,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   if (!paymentUrl) {
     return (
       <SubscriptionPaymentError 
-        onRetry={handleRetry} 
+        onRetry={initiateCardcomPayment} 
         onBack={onBack} 
-        retryCount={retryCount}
-        errorMessage={initError || 'שגיאה ביצירת דף התשלום'}
       />
     );
   }
