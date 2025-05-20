@@ -33,8 +33,14 @@ interface CardcomResponse {
     CardYear: number;
     ApprovalNumber?: string;
     CardInfo?: string;
+    CardOwnerName?: string;
+    CardOwnerEmail?: string;
+    CardOwnerPhone?: string;
   };
 }
+
+// Maximum retries for database operations
+const MAX_DB_RETRIES = 3;
 
 // Logger function for edge function
 async function logPaymentEvent(
@@ -44,24 +50,52 @@ async function logPaymentEvent(
   context: string, 
   data: any,
   userId?: string,
-  transactionId?: string
+  transactionId?: string,
+  requestId: string = 'system'
 ) {
+  const logEntry = {
+    level,
+    message,
+    context,
+    payment_data: {
+      ...data,
+      timestamp: new Date().toISOString(),
+      requestId
+    },
+    user_id: userId || 'system',
+    transaction_id: transactionId || 'none',
+    amount: 0, // Using 0 for log entries that don't represent actual payments
+    plan_id: 'system_log', // Using 'system_log' for log entries that don't relate to a specific plan
+    currency: 'N/A'
+  };
+
   try {
-    await supabaseClient
-      .from('payment_logs')
-      .insert({
-        level,
-        message,
-        context,
-        payment_data: data || {},
-        user_id: userId || 'system',
-        transaction_id: transactionId || 'none',
-        source: 'edge-function'
-      });
+    // Try to log to the database with retries
+    for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
+      try {
+        const { error } = await supabaseClient
+          .from('payment_logs')
+          .insert(logEntry);
+          
+        if (!error) break; // Success, exit retry loop
+          
+        console.error(`[${requestId}] Error logging to database (attempt ${attempt}/${MAX_DB_RETRIES}):`, error);
+        
+        if (attempt < MAX_DB_RETRIES) {
+          // Wait with exponential backoff before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      } catch (e) {
+        console.error(`[${requestId}] Exception when logging to database (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
+        if (attempt < MAX_DB_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
   } catch (error) {
     // Fallback to console logging if database logging fails
-    console.error('Error logging to database:', error);
-    console.log(`[${level}] [${context}] ${message}`, data);
+    console.error(`[${requestId}] Error logging to database:`, error);
+    console.log(`[${requestId}] [${level}] [${context}] ${message}`, data);
   }
 }
 
@@ -76,6 +110,7 @@ serve(async (req) => {
   }
 
   const requestStartTime = Date.now();
+  const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
   let supabaseClient;
 
   try {
@@ -91,7 +126,8 @@ serve(async (req) => {
     );
 
     // Parse the request body
-    const { lowProfileId } = await req.json();
+    const requestBody = await req.json();
+    const { lowProfileId, sessionId } = requestBody;
     
     if (!lowProfileId) {
       throw new Error('Missing lowProfileId parameter');
@@ -102,7 +138,10 @@ serve(async (req) => {
       'info', 
       `Verifying payment for lowProfileId: ${lowProfileId}`,
       'verify-cardcom-payment',
-      { lowProfileId }
+      { lowProfileId, sessionId },
+      undefined,
+      undefined,
+      requestId
     );
 
     // Get CardCom API credentials from environment variables
@@ -119,7 +158,10 @@ serve(async (req) => {
       'info', 
       'Checking for existing webhook data',
       'verify-cardcom-payment',
-      { lowProfileId }
+      { lowProfileId, sessionId },
+      undefined,
+      undefined,
+      requestId
     );
 
     const { data: existingWebhook, error: webhookError } = await supabaseClient
@@ -143,10 +185,12 @@ serve(async (req) => {
           { 
             lowProfileId,
             webhookId: existingWebhook.id,
-            responseCode: webhookData.ResponseCode
+            responseCode: webhookData.ResponseCode,
+            sessionId
           },
           webhookData.ReturnValue,
-          webhookData.TranzactionId?.toString()
+          webhookData.TranzactionId?.toString(),
+          requestId
         );
         
         // Extract payment details
@@ -175,7 +219,8 @@ serve(async (req) => {
             message: 'Payment already verified via webhook',
             paymentDetails,
             tokenInfo,
-            source: 'webhook'
+            source: 'webhook',
+            requestId
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -193,26 +238,54 @@ serve(async (req) => {
       'info', 
       'No webhook data found, calling CardCom API',
       'verify-cardcom-payment',
-      { lowProfileId }
+      { lowProfileId, sessionId },
+      undefined,
+      undefined,
+      requestId
     );
 
-    const cardcomResponse = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        TerminalNumber: terminalNumber,
-        ApiName: apiName,
-        LowProfileId: lowProfileId
-      })
-    });
+    // Try CardCom API with retries
+    let cardcomResponse;
+    let cardcomData: CardcomResponse | null = null;
+    let apiError = null;
     
-    if (!cardcomResponse.ok) {
-      throw new Error(`CardCom API error: ${cardcomResponse.status} ${cardcomResponse.statusText}`);
+    for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
+      try {
+        cardcomResponse = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            TerminalNumber: terminalNumber,
+            ApiName: apiName,
+            LowProfileId: lowProfileId
+          })
+        });
+        
+        if (cardcomResponse.ok) {
+          cardcomData = await cardcomResponse.json() as CardcomResponse;
+          break; // Success, exit retry loop
+        } else {
+          apiError = `CardCom API error: ${cardcomResponse.status} ${cardcomResponse.statusText}`;
+          console.error(`[${requestId}] ${apiError} (attempt ${attempt}/${MAX_DB_RETRIES})`);
+          if (attempt < MAX_DB_RETRIES) {
+            // Wait with exponential backoff before retrying
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          }
+        }
+      } catch (e) {
+        apiError = e instanceof Error ? e.message : String(e);
+        console.error(`[${requestId}] Exception calling CardCom API (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
+        if (attempt < MAX_DB_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      }
     }
     
-    const cardcomData = await cardcomResponse.json() as CardcomResponse;
+    if (!cardcomData) {
+      throw new Error(apiError || 'Failed to get response from CardCom API');
+    }
     
     await logPaymentEvent(
       supabaseClient, 
@@ -222,10 +295,12 @@ serve(async (req) => {
       { 
         lowProfileId,
         responseCode: cardcomData.ResponseCode,
-        description: cardcomData.Description
+        description: cardcomData.Description,
+        sessionId
       },
       cardcomData.ReturnValue,
-      cardcomData.TranzactionId?.toString()
+      cardcomData.TranzactionId?.toString(),
+      requestId
     );
     
     if (cardcomData.ResponseCode !== 0) {
@@ -233,40 +308,50 @@ serve(async (req) => {
     }
 
     // Save the response to payment_webhooks table for future reference
-    const { data: savedWebhook, error: saveError } = await supabaseClient
-      .from('payment_webhooks')
-      .insert({
-        webhook_type: 'cardcom_verification',
-        payload: cardcomData,
-        processed: true,
-        processed_at: new Date().toISOString(),
-        processing_result: {
-          verification_source: 'api_call',
-          timestamp: new Date().toISOString()
-        }
-      })
-      .select()
-      .single();
-    
-    if (saveError) {
-      await logPaymentEvent(
-        supabaseClient,
-        'error',
-        'Error saving webhook data',
-        'verify-cardcom-payment',
-        { lowProfileId, error: saveError },
-        cardcomData.ReturnValue
-      );
+    try {
+      const { data: savedWebhook, error: saveError } = await supabaseClient
+        .from('payment_webhooks')
+        .insert({
+          webhook_type: 'cardcom_verification',
+          payload: cardcomData,
+          processed: true,
+          processed_at: new Date().toISOString(),
+          processing_result: {
+            verification_source: 'api_call',
+            timestamp: new Date().toISOString(),
+            requestId
+          }
+        })
+        .select()
+        .single();
+      
+      if (saveError) {
+        await logPaymentEvent(
+          supabaseClient,
+          'error',
+          'Error saving webhook data',
+          'verify-cardcom-payment',
+          { lowProfileId, error: saveError, sessionId },
+          cardcomData.ReturnValue,
+          undefined,
+          requestId
+        );
+        // Continue anyway as this is not critical
+      } else {
+        await logPaymentEvent(
+          supabaseClient,
+          'info',
+          `Saved verification data to webhooks table: ${savedWebhook.id}`,
+          'verify-cardcom-payment',
+          { lowProfileId, webhookId: savedWebhook.id, sessionId },
+          cardcomData.ReturnValue,
+          undefined,
+          requestId
+        );
+      }
+    } catch (saveError) {
+      console.error(`[${requestId}] Exception saving webhook data:`, saveError);
       // Continue anyway as this is not critical
-    } else {
-      await logPaymentEvent(
-        supabaseClient,
-        'info',
-        `Saved verification data to webhooks table: ${savedWebhook.id}`,
-        'verify-cardcom-payment',
-        { lowProfileId, webhookId: savedWebhook.id },
-        cardcomData.ReturnValue
-      );
     }
 
     // Process the payment data (save token, update subscription, etc.)
@@ -274,22 +359,28 @@ serve(async (req) => {
       const userId = cardcomData.ReturnValue;
       
       try {
-        await supabaseClient.functions.invoke('process-payment-data', {
+        const processingResult = await supabaseClient.functions.invoke('process-payment-data', {
           body: {
             paymentData: cardcomData,
             userId,
-            source: 'verify-cardcom-payment'
+            source: 'verify-cardcom-payment',
+            requestId
           }
         });
+        
+        if (processingResult.error) {
+          throw new Error(processingResult.error);
+        }
         
         await logPaymentEvent(
           supabaseClient,
           'info',
           `Payment data processed for user: ${userId}`,
           'verify-cardcom-payment',
-          { lowProfileId },
+          { lowProfileId, sessionId },
           userId,
-          cardcomData.TranzactionId?.toString()
+          cardcomData.TranzactionId?.toString(),
+          requestId
         );
       } catch (processError) {
         await logPaymentEvent(
@@ -299,9 +390,12 @@ serve(async (req) => {
           'verify-cardcom-payment',
           { 
             lowProfileId, 
-            error: processError instanceof Error ? processError.message : String(processError) 
+            error: processError instanceof Error ? processError.message : String(processError),
+            sessionId
           },
-          userId
+          userId,
+          undefined,
+          requestId
         );
         // Continue anyway, as we'll still return success to the client
       }
@@ -334,10 +428,12 @@ serve(async (req) => {
       { 
         lowProfileId, 
         executionTime,
-        transactionId: cardcomData.TranzactionId
+        transactionId: cardcomData.TranzactionId,
+        sessionId
       },
       cardcomData.ReturnValue,
-      cardcomData.TranzactionId?.toString()
+      cardcomData.TranzactionId?.toString(),
+      requestId
     );
 
     return new Response(
@@ -346,7 +442,9 @@ serve(async (req) => {
         message: 'Payment verified successfully',
         paymentDetails,
         tokenInfo,
-        source: 'api_verification'
+        source: 'api_verification',
+        requestId,
+        executionTime
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -356,23 +454,33 @@ serve(async (req) => {
 
   } catch (error: any) {
     // Log error with details
+    const executionTime = Date.now() - requestStartTime;
     if (supabaseClient) {
       await logPaymentEvent(
         supabaseClient,
         'error',
         `Error verifying payment: ${error.message || 'Unknown error'}`,
         'verify-cardcom-payment',
-        { error: error.message || String(error) }
+        { 
+          error: error.message || String(error),
+          executionTime,
+          stack: error.stack
+        },
+        undefined,
+        undefined,
+        requestId
       );
     } else {
-      console.error('Error verifying payment:', error);
+      console.error(`[${requestId}] Error verifying payment:`, error);
     }
     
     return new Response(
       JSON.stringify({
         success: false,
         message: error.message || 'Error verifying payment',
-        error: error.toString()
+        error: error.toString(),
+        requestId,
+        executionTime
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -381,3 +489,21 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to parse Cardcom date string format (YYYYMMDD) to ISO date
+function parseCardcomDateString(dateStr: string): string {
+  try {
+    if (!dateStr) return new Date().toISOString().split('T')[0];
+    
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    
+    // Return in YYYY-MM-DD format
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error('Error parsing date string:', error);
+    // Return current date as fallback
+    return new Date().toISOString().split('T')[0];
+  }
+}

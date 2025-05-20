@@ -26,6 +26,26 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const [retryCount, setRetryCount] = useState(0);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  
+  // Generate a session ID for this payment flow if we don't have one
+  useEffect(() => {
+    if (!sessionId) {
+      const newSessionId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      setSessionId(newSessionId);
+      
+      // Reset the PaymentLogger session to ensure clean logging
+      PaymentLogger.resetSessionId();
+      
+      // Store the session ID in localStorage for potential error recovery
+      localStorage.setItem('current_payment_session', newSessionId);
+    }
+    
+    return () => {
+      // Clean up on unmount
+      localStorage.removeItem('current_payment_session');
+    };
+  }, [sessionId]);
   
   // Log component mount with plan selection
   useEffect(() => {
@@ -35,17 +55,28 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
       { 
         plan: selectedPlan,
         isAuthenticated: !!user,
-        userId: user?.id || 'guest'
+        userId: user?.id || 'guest',
+        sessionId
       }
     );
     
     return () => {
-      PaymentLogger.info('Payment section unmounted', 'payment-section');
+      PaymentLogger.info('Payment section unmounted', 'payment-section', {
+        sessionId
+      });
     };
-  }, [selectedPlan, user]);
+  }, [selectedPlan, user, sessionId]);
   
   // Handle payment initialization
-  const { paymentUrl, initiateCardcomPayment, isLoading: isInitLoading, error: initError } = usePaymentInitialization(
+  const { 
+    paymentUrl, 
+    initiateCardcomPayment, 
+    isLoading: isInitLoading, 
+    error: initError,
+    errorCode,
+    errorDetails,
+    transactionId
+  } = usePaymentInitialization(
     selectedPlan,
     onPaymentComplete, 
     onBack, 
@@ -68,7 +99,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         plan: selectedPlan, 
         lowProfileId: paymentData?.lowProfileId || 'unknown',
         paymentMethod: 'iframe',
-        transactionId: paymentData?.transactionId || 'unknown'
+        transactionId: paymentData?.transactionId || 'unknown',
+        sessionId
       }
     );
     
@@ -78,7 +110,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         lowProfileId: paymentData.lowProfileId,
         transactionId: paymentData.transactionId,
         plan: selectedPlan,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sessionId
       }));
     }
     
@@ -96,7 +129,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         error: error.message,
         plan: selectedPlan,
         isAuthenticated: !!user,
-        userId: user?.id || 'guest'
+        userId: user?.id || 'guest',
+        sessionId
       }
     );
     setIsLoading(false);
@@ -110,7 +144,8 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
       'payment-retry', 
       { 
         retryCount: retryCount + 1, 
-        plan: selectedPlan 
+        plan: selectedPlan,
+        sessionId 
       }
     );
     initiateCardcomPayment();
@@ -129,6 +164,9 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         onBack={onBack} 
         retryCount={retryCount}
         errorMessage={initError || 'שגיאה ביצירת דף התשלום'}
+        errorDetails={errorDetails}
+        errorCode={errorCode}
+        transactionId={transactionId}
       />
     );
   }
