@@ -8,6 +8,8 @@ import { AlertCircle } from 'lucide-react';
 interface PaymentErrorProps {
   message?: string;
   errorCode?: string;
+  errorDetails?: string;
+  transactionId?: string;
   onRetry?: () => void;
   onBack?: () => void;
   redirectPath?: string;
@@ -16,6 +18,8 @@ interface PaymentErrorProps {
 const PaymentError: React.FC<PaymentErrorProps> = ({
   message = 'אירעה שגיאה בתהליך התשלום',
   errorCode,
+  errorDetails,
+  transactionId,
   onRetry,
   onBack,
   redirectPath = '/subscription'
@@ -57,11 +61,27 @@ const PaymentError: React.FC<PaymentErrorProps> = ({
           </p>
         )}
         
-        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-900/30">
-          <p className="text-center text-red-700 dark:text-red-300">
-            ניתן לנסות שנית או לחזור לבחירת תוכנית אחרת
+        {errorDetails && (
+          <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-900/30">
+            <p className="text-center text-red-700 dark:text-red-300">
+              {errorDetails}
+            </p>
+          </div>
+        )}
+        
+        {transactionId && (
+          <p className="text-muted-foreground text-xs text-center">
+            מזהה עסקה: {transactionId}
           </p>
-        </div>
+        )}
+        
+        {!errorDetails && (
+          <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md border border-red-200 dark:border-red-900/30">
+            <p className="text-center text-red-700 dark:text-red-300">
+              ניתן לנסות שנית או לחזור לבחירת תוכנית אחרת
+            </p>
+          </div>
+        )}
       </CardContent>
       
       <CardFooter className="flex flex-col sm:flex-row justify-center gap-3 pt-4">

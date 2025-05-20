@@ -174,7 +174,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   return (
     <div className="max-w-2xl mx-auto">
       <Card 
-        className="max-w-2xl mx-auto border-primary/30 shadow-[0_10px_24px_rgba(0,0,0,0.15)] overflow-hidden transition-all duration-300 hover:shadow-[0_12px_30px_-5px_rgba(0,102,255,0.2)] animate-fade-in" 
+        className="max-w-2xl mx-auto border-primary/30 shadow-[0_10px_24px_rgba(0,0,0,0.15)] overflow-hidden transition-all duration-300 hover:shadow-[0_12px_30px_-5px_rgba(0,0,0,0.2)] animate-fade-in" 
         dir="rtl"
       >
         <PaymentSectionHeader 

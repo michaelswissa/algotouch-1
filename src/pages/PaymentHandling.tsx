@@ -7,7 +7,11 @@ import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/contexts/auth';
 import { supabase } from '@/lib/supabase-client';
 
-const PaymentHandling: React.FC = () => {
+interface PaymentHandlingProps {
+  recoveryMode?: boolean;
+}
+
+const PaymentHandling: React.FC<PaymentHandlingProps> = ({ recoveryMode = false }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -66,6 +70,27 @@ const PaymentHandling: React.FC = () => {
           // Handle payment error
           setIsSuccess(false);
           setErrorMessage('התשלום נכשל או בוטל. אנא נסה שנית.');
+        } else if (recoveryMode) {
+          // Handle recovery mode
+          const sessionId = location.pathname.split('/').pop();
+          console.log('Recovery mode active for session:', sessionId);
+          
+          // Try to recover the payment session
+          if (sessionId) {
+            const { data, error } = await supabase.functions.invoke('recover-payment-session', {
+              body: { sessionId }
+            });
+            
+            if (error || !data?.success) {
+              setErrorMessage(data?.message || 'לא הצלחנו לשחזר את פעולת התשלום');
+            } else {
+              // Redirect to the appropriate page based on recovery data
+              navigate(data.redirectUrl || '/subscription');
+              return;
+            }
+          }
+          
+          setIsSuccess(false);
         } else {
           // No status parameters, redirect to subscription page
           navigate('/subscription');
@@ -80,7 +105,7 @@ const PaymentHandling: React.FC = () => {
     };
 
     processPayment();
-  }, [location, navigate, user, isAuthenticated]);
+  }, [location, navigate, user, isAuthenticated, recoveryMode]);
 
   if (isLoading) {
     return (
