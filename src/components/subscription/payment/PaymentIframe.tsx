@@ -35,25 +35,53 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
   // Listen for messages from the iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // For security, we should validate the origin, but for now we're using '*' in postMessage
+      // Log all messages for debugging
       console.log('Received message from iframe:', event.data);
       
-      if (event.data?.type === 'cardcom-paid') {
-        // Payment successful
-        console.log('Payment successful:', event.data.details);
-        toast.success('התשלום התקבל בהצלחה!');
-        
-        if (onSuccess) {
-          onSuccess(event.data.details);
+      try {
+        // For security, we should validate the origin, but for now we're using '*' in postMessage
+        if (event.data?.type === 'cardcom-paid') {
+          // Payment successful
+          console.log('Payment successful:', event.data.details);
+          toast.success('התשלום התקבל בהצלחה!');
+          
+          if (onSuccess) {
+            onSuccess(event.data.details);
+          }
+        } else if (event.data?.type === 'cardcom-error') {
+          // Payment failed
+          console.error('Payment error:', event.data);
+          toast.error('שגיאה בתהליך התשלום: ' + (event.data.message || 'אנא נסה שנית'));
+          
+          if (onError) {
+            onError(new Error(event.data.message || 'Payment failed'));
+          }
+        } else if (typeof event.data === 'string') {
+          // Try to parse string messages (some systems send stringified JSON)
+          try {
+            const parsedData = JSON.parse(event.data);
+            if (parsedData.success === true || parsedData.paid === true) {
+              console.log('Payment successful (parsed):', parsedData);
+              toast.success('התשלום התקבל בהצלחה!');
+              
+              if (onSuccess) {
+                onSuccess(parsedData);
+              }
+            } else if (parsedData.error) {
+              console.error('Payment error (parsed):', parsedData);
+              toast.error('שגיאה בתהליך התשלום: ' + (parsedData.message || 'אנא נסה שנית'));
+              
+              if (onError) {
+                onError(new Error(parsedData.message || 'Payment failed'));
+              }
+            }
+          } catch (e) {
+            // Not JSON, might be some other message
+            console.log('Received non-JSON string message:', event.data);
+          }
         }
-      } else if (event.data?.type === 'cardcom-error') {
-        // Payment failed
-        console.error('Payment error:', event.data.message);
-        toast.error('שגיאה בתהליך התשלום: ' + (event.data.message || 'אנא נסה שנית'));
-        
-        if (onError) {
-          onError(new Error(event.data.message || 'Payment failed'));
-        }
+      } catch (err) {
+        console.error('Error processing iframe message:', err);
       }
     };
 

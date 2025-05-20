@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { v4 as uuidv4 } from "https://deno.land/std@0.168.0/uuid/mod.ts";
 
 interface CreateLowProfileRequest {
   terminalNumber: number;
@@ -13,6 +14,7 @@ interface CreateLowProfileRequest {
   language?: string;
   returnValue?: string;
   operation?: string; // Add operation parameter
+  registrationData?: any; // Optional registration data
 }
 
 serve(async (req) => {
@@ -23,15 +25,16 @@ serve(async (req) => {
 
   try {
     // Parse the request body
-    const requestData: CreateLowProfileRequest = await req.json();
+    const requestData = await req.json();
     
     // Validate required fields
-    if (!requestData.terminalNumber || !requestData.apiName || !requestData.amount || 
-        !requestData.successUrl || !requestData.failedUrl || !requestData.webhookUrl) {
+    if (!requestData.amount || 
+        !requestData.origin || 
+        !requestData.webHookUrl) {
       return new Response(
         JSON.stringify({
           error: "Missing required fields",
-          details: "terminalNumber, apiName, amount, successUrl, failedUrl, and webhookUrl are required"
+          details: "amount, origin, and webHookUrl are required"
         }),
         {
           status: 400,
@@ -43,29 +46,82 @@ serve(async (req) => {
       );
     }
 
+    // Get terminal number and API name from environment variables
+    const terminalNumber = Deno.env.get("CARDCOM_TERMINAL_NUMBER") || "160138";
+    const apiName = Deno.env.get("CARDCOM_API_NAME") || "terminal160138";
+    
+    // Create a valid registration ID (must be a UUID)
+    const registrationId = uuidv4();
+
+    // Build URL for success/failure redirects
+    const baseUrl = requestData.origin || "https://your-app-url.com";
+    const successUrl = `${baseUrl}/payment/success?plan=${requestData.planId || "unknown"}`;
+    const failedUrl = `${baseUrl}/payment/error?plan=${requestData.planId || "unknown"}`;
+    
+    console.log('Creating CardCom payment session with terminal:', terminalNumber, 'operation:', requestData.operationType || "ChargeAndCreateToken", 'amount:', requestData.amount);
+
+    // Save registration data if provided
+    if (requestData.registrationData) {
+      try {
+        // Store the registration ID and data
+        const { data, error } = await fetch("https://ndhakvhrrkczgylcmyoc.supabase.co/functions/v1/cardcom-payment/save-registration-data", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders
+          },
+          body: JSON.stringify({
+            registrationId,
+            registrationData: requestData.registrationData
+          })
+        }).then(res => res.json());
+
+        if (error) {
+          console.error("Error saving registration data:", error);
+        } else {
+          console.log("Created CardCom payment session:", registrationId);
+        }
+      } catch (error) {
+        console.error("Error saving payment session:", error);
+      }
+    }
+
+    // Prepare user details for payment form
+    const userDetails = requestData.userDetails || {};
+    console.log('Sending payload with user details:', {
+      name: userDetails.fullName || "",
+      email: userDetails.email || "",
+      phone: userDetails.phone || "",
+      idNumber: userDetails.idNumber || "",
+      operation: requestData.operationType || "ChargeAndCreateToken",
+      amount: requestData.amount,
+      webhookUrl: requestData.webHookUrl
+    });
+
     // Build request body for Cardcom API
     const cardcomRequestBody = {
-      TerminalNumber: requestData.terminalNumber,
-      ApiName: requestData.apiName,
+      TerminalNumber: parseInt(terminalNumber),
+      ApiName: apiName,
       // Include the operation (e.g. ChargeAndCreateToken) for recurring payments
-      Operation: requestData.operation || "ChargeAndCreateToken",
+      Operation: requestData.operationType || "ChargeAndCreateToken",
       Amount: requestData.amount,
-      SuccessRedirectUrl: requestData.successUrl,
-      FailedRedirectUrl: requestData.failedUrl,
-      WebHookUrl: requestData.webhookUrl,
+      SuccessRedirectUrl: successUrl,
+      FailedRedirectUrl: failedUrl,
+      WebHookUrl: requestData.webHookUrl,
       ProductName: requestData.productName || "AlgoTouch Subscription",
       Language: requestData.language || "he",
-      ReturnValue: requestData.returnValue || "",
+      ReturnValue: registrationId || "",
       UIDefinition: {
-        IsHideCardOwnerName: false,
-        IsHideCardOwnerPhone: false,
+        IsHideCardOwnerName: !userDetails.fullName,
+        CardOwnerNameValue: userDetails.fullName || "",
+        IsHideCardOwnerPhone: !userDetails.phone,
+        CardOwnerPhoneValue: userDetails.phone || "",
         IsCardOwnerPhoneRequired: true,
-        IsHideCardOwnerEmail: false,
+        IsHideCardOwnerEmail: !userDetails.email,
+        CardOwnerEmailValue: userDetails.email || "",
         IsCardOwnerEmailRequired: true
       }
     };
-
-    console.log("Sending request to Cardcom:", JSON.stringify(cardcomRequestBody));
 
     // Call Cardcom API to create low profile page (updated to v11)
     const response = await fetch("https://secure.cardcom.solutions/api/v11/LowProfile/Create", {
@@ -80,6 +136,9 @@ serve(async (req) => {
     const data = await response.json();
     
     console.log("Received response from Cardcom:", JSON.stringify(data));
+    
+    // Add the registration ID to the response
+    data.registrationId = registrationId;
     
     // Return the response
     return new Response(
