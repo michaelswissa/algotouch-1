@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CardContent } from '@/components/ui/card';
 import { Shield, ShieldCheck, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
+import { PaymentLogger } from '@/services/logging/paymentLogger';
 
 interface PaymentIframeProps {
   paymentUrl: string | null;
@@ -34,6 +35,10 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
 
   // Listen for messages from the iframe
   useEffect(() => {
+    if (!paymentUrl) return;
+    
+    PaymentLogger.info('Payment iframe mounted', 'payment-iframe', { hasUrl: !!paymentUrl });
+    
     const handleMessage = (event: MessageEvent) => {
       // Log all messages for debugging
       console.log('Received message from iframe:', event.data);
@@ -43,6 +48,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         if (event.data?.type === 'cardcom-paid') {
           // Payment successful
           console.log('Payment successful:', event.data.details);
+          PaymentLogger.success('Payment successful', 'payment-iframe', event.data.details);
           toast.success('התשלום התקבל בהצלחה!');
           
           if (onSuccess) {
@@ -51,6 +57,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
         } else if (event.data?.type === 'cardcom-error') {
           // Payment failed
           console.error('Payment error:', event.data);
+          PaymentLogger.error('Payment failed', 'payment-iframe', event.data);
           toast.error('שגיאה בתהליך התשלום: ' + (event.data.message || 'אנא נסה שנית'));
           
           if (onError) {
@@ -60,8 +67,14 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
           // Try to parse string messages (some systems send stringified JSON)
           try {
             const parsedData = JSON.parse(event.data);
+            PaymentLogger.info('Received string message from iframe', 'payment-iframe', { 
+              isJSON: true,
+              data: parsedData 
+            });
+            
             if (parsedData.success === true || parsedData.paid === true) {
               console.log('Payment successful (parsed):', parsedData);
+              PaymentLogger.success('Payment successful (parsed JSON)', 'payment-iframe', parsedData);
               toast.success('התשלום התקבל בהצלחה!');
               
               if (onSuccess) {
@@ -69,6 +82,7 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
               }
             } else if (parsedData.error) {
               console.error('Payment error (parsed):', parsedData);
+              PaymentLogger.error('Payment failed (parsed JSON)', 'payment-iframe', parsedData);
               toast.error('שגיאה בתהליך התשלום: ' + (parsedData.message || 'אנא נסה שנית'));
               
               if (onError) {
@@ -77,17 +91,33 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
             }
           } catch (e) {
             // Not JSON, might be some other message
+            PaymentLogger.info('Received non-JSON string message from iframe', 'payment-iframe', { 
+              message: event.data.substring(0, 100) + (event.data.length > 100 ? '...' : '') 
+            });
             console.log('Received non-JSON string message:', event.data);
           }
+        } else if (event.data) {
+          // Log other types of messages
+          PaymentLogger.info('Received other message type from iframe', 'payment-iframe', {
+            messageType: typeof event.data,
+            hasData: !!event.data
+          });
         }
       } catch (err) {
         console.error('Error processing iframe message:', err);
+        PaymentLogger.error('Error processing iframe message', 'payment-iframe', { 
+          error: err instanceof Error ? err.message : 'Unknown error',
+          originalData: typeof event.data === 'object' ? JSON.stringify(event.data).substring(0, 200) : String(event.data).substring(0, 200)
+        });
       }
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onSuccess, onError]);
+    return () => {
+      PaymentLogger.info('Payment iframe unmounted', 'payment-iframe');
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [onSuccess, onError, paymentUrl]);
 
   if (!paymentUrl) return null;
 
@@ -129,6 +159,8 @@ const PaymentIframe: React.FC<PaymentIframeProps> = ({
               frameBorder="0"
               title="Cardcom Payment Form"
               className="w-full"
+              onLoad={() => PaymentLogger.info('Payment iframe loaded', 'payment-iframe')}
+              onError={() => PaymentLogger.error('Payment iframe failed to load', 'payment-iframe')}
             />
           </div>
         </div>

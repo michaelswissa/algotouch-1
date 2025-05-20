@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { useSubscriptionContext } from '@/contexts/subscription/SubscriptionContext';
 import { useAuth } from '@/contexts/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { PaymentLogger } from '@/services/logging/paymentLogger';
+import { handlePaymentError } from '@/components/payment/utils/errorHandling';
 
 // Helper function to get plan amount based on plan ID
 const getPlanAmount = (planId: string): number => {
@@ -46,6 +48,9 @@ export const usePaymentInitialization = (
     setInitError(null);
     
     try {
+      // Log payment initialization start
+      PaymentLogger.info('Starting payment initialization', 'payment-init', { plan: selectedPlan });
+      
       // Define operation types based on plan
       // 1: ChargeOnly - for one-time VIP payment
       // 2: ChargeAndCreateToken - for annual with immediate charge and future charges
@@ -57,6 +62,11 @@ export const usePaymentInitialization = (
       } else if (selectedPlan === 'vip') {
         operationType = 1; // Charge only
       }
+      
+      PaymentLogger.info('Determined operation type', 'payment-init', { 
+        plan: selectedPlan, 
+        operationType 
+      });
 
       // Get registration data if available (for guest checkout)
       const registrationData = sessionStorage.getItem('registration_data') 
@@ -64,8 +74,10 @@ export const usePaymentInitialization = (
         : null;
 
       if (!user && !registrationData) {
-        toast.error('נדרשים פרטי הרשמה כדי להמשיך');
-        setInitError('נדרשים פרטי הרשמה');
+        const errorMsg = 'נדרשים פרטי הרשמה כדי להמשיך';
+        PaymentLogger.error('Missing registration data', 'payment-init', { hasUser: !!user });
+        toast.error(errorMsg);
+        setInitError(errorMsg);
         setIsLoading(false);
         return;
       }
@@ -105,10 +117,17 @@ export const usePaymentInitialization = (
         }
       };
 
+      PaymentLogger.info('Prepared payload for payment initialization', 'payment-init', {
+        planId: selectedPlan,
+        hasUserId: !!user?.id,
+        hasEmail: !!userEmail,
+        operationType
+      });
       console.log('Initializing payment with payload:', payload);
       console.log('Using temporary registration ID:', tempRegistrationId);
 
       // Call the edge function to create a payment session
+      PaymentLogger.info('Calling cardcom-iframe-redirect function', 'payment-init');
       const { data, error } = await supabase.functions.invoke('cardcom-iframe-redirect', {
         body: {
           ...payload,
@@ -118,23 +137,41 @@ export const usePaymentInitialization = (
 
       if (error) {
         console.error('Error creating payment URL:', error);
+        PaymentLogger.error('Failed to create payment URL', 'payment-init', {
+          error: error.message,
+          details: error
+        });
         throw new Error(error.message);
       }
 
       if (!data?.url) {
-        throw new Error('לא ניתן ליצור קישור לתשלום');
+        const errorMsg = 'לא ניתן ליצור קישור לתשלום';
+        PaymentLogger.error('No URL returned from payment function', 'payment-init');
+        throw new Error(errorMsg);
       }
 
       // Store registration ID for post-payment processing
       if (tempRegistrationId && !user?.id) {
         localStorage.setItem('temp_registration_id', tempRegistrationId);
+        PaymentLogger.info('Stored temporary registration ID', 'payment-init', { tempRegistrationId });
       }
 
       setPaymentUrl(data.url);
       setInitError(null);
+      PaymentLogger.success('Payment URL generated successfully', 'payment-init', {
+        hasUrl: !!data.url,
+        plan: selectedPlan
+      });
       
     } catch (err: any) {
       console.error('Payment initialization error:', err);
+      
+      // Use structured error handling approach
+      handlePaymentError(err, user?.id, email, undefined, {
+        paymentDetails: { plan: selectedPlan },
+        shouldRetry: false
+      });
+      
       setInitError(err.message || 'שגיאה בהגדרת תהליך התשלום');
       toast.error('שגיאה ביצירת עמוד התשלום');
     } finally {
