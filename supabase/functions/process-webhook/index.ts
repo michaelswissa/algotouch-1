@@ -9,9 +9,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
-// Maximum retries for database operations
-const MAX_DB_RETRIES = 3;
-
 // Main server function
 serve(async (req) => {
   // Handle OPTIONS (preflight) request
@@ -22,9 +19,6 @@ serve(async (req) => {
     });
   }
 
-  const requestStartTime = Date.now();
-  const requestId = `process_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-  
   try {
     // Create a Supabase client
     const supabaseClient = createClient(
@@ -38,14 +32,13 @@ serve(async (req) => {
     );
 
     // Parse the request body
-    const { webhookId, userId, lowProfileId, email, sessionId } = await req.json();
+    const { webhookId, userId, lowProfileId, email } = await req.json();
 
     if (!webhookId && !lowProfileId && !email) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Missing required parameters: either webhookId, lowProfileId, or email',
-          requestId
+          message: 'Missing required parameters: either webhookId, lowProfileId, or email'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,96 +48,43 @@ serve(async (req) => {
     }
 
     // For debugging
-    console.log(`[${requestId}] Process webhook request: webhookId=${webhookId}, userId=${userId}, lowProfileId=${lowProfileId}, email=${email}, sessionId=${sessionId}`);
-    
-    await logSystemEvent(
-      supabaseClient,
-      'info',
-      'process-webhook',
-      'Processing webhook',
-      {
-        webhookId,
-        userId,
-        lowProfileId,
-        email,
-        sessionId,
-        requestId
-      }
-    );
+    console.log(`Process webhook request: webhookId=${webhookId}, userId=${userId}, lowProfileId=${lowProfileId}, email=${email}`);
 
     // If email is provided but no userId, try to find userId
     let effectiveUserId = userId;
     if (email && !effectiveUserId) {
       try {
         // Try with auth API first
-        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-          try {
-            const { data: authUser } = await supabaseClient.auth.admin.listUsers({
-              filter: { email }
-            });
-            
-            if (authUser?.users && authUser.users.length > 0) {
-              effectiveUserId = authUser.users[0].id;
-              console.log(`[${requestId}] Found userId ${effectiveUserId} for email ${email}`);
-              break;
-            } else if (attempt < MAX_DB_RETRIES) {
-              console.log(`[${requestId}] No user found for email ${email}, retry ${attempt}/${MAX_DB_RETRIES}`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          } catch (e) {
-            console.error(`[${requestId}] Error finding user by email (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          }
+        const { data: authUser } = await supabaseClient.auth.admin.listUsers({
+          filter: { email }
+        });
+        
+        if (authUser?.users && authUser.users.length > 0) {
+          effectiveUserId = authUser.users[0].id;
+          console.log(`Found userId ${effectiveUserId} for email ${email}`);
         }
       } catch (e) {
-        console.error(`[${requestId}] Error finding user by email:`, e);
+        console.error("Error finding user by email:", e);
       }
     }
 
     // Scenario 1: Process a specific webhook by ID
     if (webhookId) {
-      console.log(`[${requestId}] Processing webhook by ID: ${webhookId}`);
+      console.log(`Processing webhook by ID: ${webhookId}`);
       
-      // Get the webhook data with retries
-      let webhookData;
-      let webhookError;
-      
-      for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-        try {
-          const result = await supabaseClient
-            .from('payment_webhooks')
-            .select('*')
-            .eq('id', webhookId)
-            .single();
-            
-          webhookData = result.data;
-          webhookError = result.error;
-          
-          if (!webhookError) break; // Success, exit retry loop
-          
-          console.error(`[${requestId}] Error getting webhook data (attempt ${attempt}/${MAX_DB_RETRIES}):`, webhookError);
-          if (attempt < MAX_DB_RETRIES) {
-            // Wait with exponential backoff before retrying
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        } catch (e) {
-          console.error(`[${requestId}] Exception when getting webhook data (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-          webhookError = e;
-          if (attempt < MAX_DB_RETRIES) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        }
-      }
+      // Get the webhook data
+      const { data: webhookData, error: webhookError } = await supabaseClient
+        .from('payment_webhooks')
+        .select('*')
+        .eq('id', webhookId)
+        .single();
 
       if (webhookError || !webhookData) {
         return new Response(
           JSON.stringify({
             success: false,
             message: 'Webhook not found',
-            error: webhookError?.message || 'No data found',
-            requestId
+            error: webhookError?.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -158,84 +98,46 @@ serve(async (req) => {
       
       // If userId is provided, update ReturnValue in payload
       if (effectiveUserId && payload) {
-        console.log(`[${requestId}] Updating ReturnValue to ${effectiveUserId} in webhook payload`);
+        console.log(`Updating ReturnValue to ${effectiveUserId} in webhook payload`);
         payload.ReturnValue = effectiveUserId;
       }
       
       // Simulate a webhook call by invoking the cardcom-webhook function
-      let webhookResult;
-      let webhookResponse;
-      
-      try {
-        webhookResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify(payload)
-          }
-        );
+      const webhookResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
 
-        webhookResult = await webhookResponse.json();
-      } catch (error) {
-        console.error(`[${requestId}] Error calling cardcom-webhook:`, error);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Error processing webhook',
-            error: error instanceof Error ? error.message : String(error),
-            requestId
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          }
-        );
-      }
+      const webhookResult = await webhookResponse.json();
 
       // Mark webhook as processed if successful
       if (webhookResult.success) {
-        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-          try {
-            const { error } = await supabaseClient
-              .from('payment_webhooks')
-              .update({
-                processed: true,
-                processed_at: new Date().toISOString(),
-                processing_result: {
-                  success: true,
-                  message: 'Manually processed via API',
-                  timestamp: new Date().toISOString(),
-                  requestId
-                }
-              })
-              .eq('id', webhookId);
-              
-            if (!error) break; // Success, exit retry loop
-            
-            console.error(`[${requestId}] Error updating webhook status (attempt ${attempt}/${MAX_DB_RETRIES}):`, error);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        await supabaseClient
+          .from('payment_webhooks')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+            processing_result: {
+              success: true,
+              message: 'Manually processed via API',
+              timestamp: new Date().toISOString()
             }
-          } catch (e) {
-            console.error(`[${requestId}] Exception when updating webhook status (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          }
-        }
+          })
+          .eq('id', webhookId);
       }
 
       return new Response(
         JSON.stringify({
           success: true,
           message: 'Webhook processed',
-          result: webhookResult,
-          requestId,
-          executionTime: Date.now() - requestStartTime
+          result: webhookResult
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -246,39 +148,16 @@ serve(async (req) => {
     
     // Scenario 2: Process by lowProfileId
     if (lowProfileId) {
-      console.log(`[${requestId}] Processing by lowProfileId: ${lowProfileId}`);
+      console.log(`Processing by lowProfileId: ${lowProfileId}`);
       
       // Look up the webhook by LowProfileId
-      let webhookData;
-      let webhookError;
-      
-      for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-        try {
-          const result = await supabaseClient
-            .from('payment_webhooks')
-            .select('*')
-            .filter('payload->LowProfileId', 'eq', lowProfileId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-            
-          webhookData = result.data;
-          webhookError = result.error;
-          
-          if (!webhookError && webhookData) break; // Success, exit retry loop
-          
-          if (attempt < MAX_DB_RETRIES) {
-            console.log(`[${requestId}] No webhook found for lowProfileId ${lowProfileId}, retry ${attempt}/${MAX_DB_RETRIES}`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        } catch (e) {
-          console.error(`[${requestId}] Exception when looking up webhook by LowProfileId (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-          webhookError = e;
-          if (attempt < MAX_DB_RETRIES) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        }
-      }
+      const { data: webhookData, error: webhookError } = await supabaseClient
+        .from('payment_webhooks')
+        .select('*')
+        .filter('payload->LowProfileId', 'eq', lowProfileId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
       if (webhookError || !webhookData) {
         // If no webhook found, try to get data directly from CardCom
@@ -289,8 +168,7 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({
               success: false,
-              message: 'CardCom credentials not found and no webhook data available',
-              requestId
+              message: 'CardCom credentials not found and no webhook data available'
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -299,53 +177,27 @@ serve(async (req) => {
           );
         }
         
-        console.log(`[${requestId}] Calling CardCom API for lowProfileId ${lowProfileId}`);
+        console.log(`Calling CardCom API for lowProfileId ${lowProfileId}`);
         
-        // Call CardCom API directly with retries
-        let cardcomData;
-        let cardcomError;
+        // Call CardCom API directly
+        const cardcomResponse = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            TerminalNumber: terminalNumber,
+            ApiName: apiName,
+            LowProfileId: lowProfileId
+          })
+        });
         
-        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-          try {
-            const cardcomResponse = await fetch('https://secure.cardcom.solutions/api/v1/LowProfile/GetLpResult', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                TerminalNumber: terminalNumber,
-                ApiName: apiName,
-                LowProfileId: lowProfileId
-              })
-            });
-            
-            if (cardcomResponse.ok) {
-              cardcomData = await cardcomResponse.json();
-              console.log(`[${requestId}] CardCom API response:`, cardcomData);
-              break; // Success, exit retry loop
-            } else {
-              cardcomError = `${cardcomResponse.status} ${cardcomResponse.statusText}`;
-              console.error(`[${requestId}] CardCom API error (attempt ${attempt}/${MAX_DB_RETRIES}): ${cardcomError}`);
-              if (attempt < MAX_DB_RETRIES) {
-                await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-              }
-            }
-          } catch (e) {
-            console.error(`[${requestId}] Exception calling CardCom API (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-            cardcomError = e;
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-            }
-          }
-        }
-        
-        if (!cardcomData) {
+        if (!cardcomResponse.ok) {
           return new Response(
             JSON.stringify({
               success: false,
               message: 'Failed to get payment data from CardCom',
-              error: cardcomError instanceof Error ? cardcomError.message : String(cardcomError),
-              requestId
+              error: `${cardcomResponse.status} ${cardcomResponse.statusText}`
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -354,13 +206,15 @@ serve(async (req) => {
           );
         }
         
+        const cardcomData = await cardcomResponse.json();
+        console.log(`CardCom API response:`, cardcomData);
+        
         if (cardcomData.ResponseCode !== 0) {
           return new Response(
             JSON.stringify({
               success: false,
               message: 'Payment was not successful',
-              data: cardcomData,
-              requestId
+              data: cardcomData
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -375,36 +229,19 @@ serve(async (req) => {
         }
         
         // Save CardCom response as a webhook for future reference
-        let savedWebhook;
-        
-        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-          try {
-            const result = await supabaseClient
-              .from('payment_webhooks')
-              .insert({
-                webhook_type: 'cardcom_manual_recovery',
-                payload: cardcomData,
-                processed: false,
-                created_at: new Date().toISOString()
-              })
-              .select()
-              .single();
-              
-            if (!result.error) {
-              savedWebhook = result.data;
-              break; // Success, exit retry loop
-            }
-            
-            console.error(`[${requestId}] Error saving CardCom data as webhook (attempt ${attempt}/${MAX_DB_RETRIES}):`, result.error);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          } catch (e) {
-            console.error(`[${requestId}] Exception saving CardCom data as webhook (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          }
+        const { data: savedWebhook, error: saveError } = await supabaseClient
+          .from('payment_webhooks')
+          .insert({
+            webhook_type: 'cardcom_manual_recovery',
+            payload: cardcomData,
+            processed: false,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+          
+        if (saveError) {
+          console.error('Error saving CardCom data as webhook:', saveError);
         }
         
         // If userId is provided, manually process the payment for this user
@@ -414,157 +251,92 @@ serve(async (req) => {
           const transactionInfo = cardcomData.TranzactionInfo;
           
           if (tokenInfo && tokenInfo.Token) {
-            // Create/update subscription with retry logic
-            let subError;
-            for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-              try {
-                const result = await supabaseClient
-                  .from('subscriptions')
-                  .upsert({
-                    user_id: effectiveUserId,
-                    status: 'active',
-                    payment_method: {
-                      lastFourDigits: transactionInfo?.Last4CardDigits || '****',
-                      expiryMonth: transactionInfo?.CardMonth || '**',
-                      expiryYear: transactionInfo?.CardYear || '****',
-                      cardholderName: transactionInfo?.CardOwnerName || email || 'Card Holder'
-                    },
-                    plan_type: 'monthly', // Default to monthly plan, can be updated later
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    current_period_ends_at: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString()
-                  });
-                  
-                subError = result.error;
-                
-                if (!subError) break; // Success, exit retry loop
-                
-                console.error(`[${requestId}] Error creating subscription (attempt ${attempt}/${MAX_DB_RETRIES}):`, subError);
-                if (attempt < MAX_DB_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-              } catch (e) {
-                console.error(`[${requestId}] Exception creating subscription (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-                subError = e;
-                if (attempt < MAX_DB_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-              }
+            // Create/update subscription
+            const { error: subError } = await supabaseClient
+              .from('subscriptions')
+              .upsert({
+                user_id: effectiveUserId,
+                status: 'active',
+                payment_method: {
+                  lastFourDigits: transactionInfo?.Last4CardDigits || '****',
+                  expiryMonth: transactionInfo?.CardMonth || '**',
+                  expiryYear: transactionInfo?.CardYear || '****',
+                  cardholderName: transactionInfo?.CardOwnerName || email || 'Card Holder'
+                },
+                plan_type: 'monthly', // Default to monthly plan, can be updated later
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                current_period_ends_at: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString()
+              });
+              
+            if (subError) {
+              console.error('Error creating subscription:', subError);
             }
             
-            // Save token with retry logic
-            let tokenError;
-            for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-              try {
-                const result = await supabaseClient
-                  .from('recurring_payments')
-                  .upsert({
-                    user_id: effectiveUserId,
+            // Save token
+            const { error: tokenError } = await supabaseClient
+              .from('recurring_payments')
+              .upsert({
+                user_id: effectiveUserId,
+                token: tokenInfo.Token,
+                token_expiry: parseCardcomDateString(tokenInfo.TokenExDate),
+                token_approval_number: tokenInfo.TokenApprovalNumber,
+                last_4_digits: transactionInfo?.Last4CardDigits || null,
+                card_type: transactionInfo?.CardInfo || null,
+                status: 'active',
+                is_valid: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+              
+            if (tokenError) {
+              console.error('Error saving token:', tokenError);
+            }
+            
+            // Log the payment
+            const { error: logError } = await supabaseClient
+              .from('user_payment_logs')
+              .insert({
+                user_id: effectiveUserId,
+                subscription_id: effectiveUserId,
+                token: cardcomData.LowProfileId,
+                amount: transactionInfo?.Amount || cardcomData.Amount || 0,
+                status: 'payment_success',
+                transaction_id: cardcomData.TranzactionId?.toString() || null,
+                payment_data: {
+                  operation: cardcomData.Operation,
+                  response_code: cardcomData.ResponseCode,
+                  low_profile_id: cardcomData.LowProfileId,
+                  source: 'manual_recovery',
+                  card_info: transactionInfo ? {
+                    last4: transactionInfo.Last4CardDigits,
+                    expiry: `${transactionInfo.CardMonth}/${transactionInfo.CardYear}`
+                  } : null,
+                  token_info: tokenInfo ? {
                     token: tokenInfo.Token,
-                    token_expiry: parseCardcomDateString(tokenInfo.TokenExDate),
-                    token_approval_number: tokenInfo.TokenApprovalNumber,
-                    last_4_digits: transactionInfo?.Last4CardDigits || null,
-                    card_type: transactionInfo?.CardInfo || null,
-                    status: 'active',
-                    is_valid: true,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  });
-                  
-                tokenError = result.error;
-                
-                if (!tokenError) break; // Success, exit retry loop
-                
-                console.error(`[${requestId}] Error saving token (attempt ${attempt}/${MAX_DB_RETRIES}):`, tokenError);
-                if (attempt < MAX_DB_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    expiry: tokenInfo.TokenExDate
+                  } : null
                 }
-              } catch (e) {
-                console.error(`[${requestId}] Exception saving token (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-                tokenError = e;
-                if (attempt < MAX_DB_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-              }
-            }
-            
-            // Log the payment with retry logic
-            let logError;
-            for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-              try {
-                const result = await supabaseClient
-                  .from('user_payment_logs')
-                  .insert({
-                    user_id: effectiveUserId,
-                    subscription_id: effectiveUserId,
-                    token: cardcomData.LowProfileId,
-                    amount: transactionInfo?.Amount || cardcomData.Amount || 0,
-                    status: 'payment_success',
-                    transaction_id: cardcomData.TranzactionId?.toString() || null,
-                    payment_data: {
-                      operation: cardcomData.Operation,
-                      response_code: cardcomData.ResponseCode,
-                      low_profile_id: cardcomData.LowProfileId,
-                      source: 'manual_recovery',
-                      card_info: transactionInfo ? {
-                        last4: transactionInfo.Last4CardDigits,
-                        expiry: `${transactionInfo.CardMonth}/${transactionInfo.CardYear}`
-                      } : null,
-                      token_info: tokenInfo ? {
-                        token: tokenInfo.Token,
-                        expiry: tokenInfo.TokenExDate
-                      } : null
-                    }
-                  });
-                  
-                logError = result.error;
-                
-                if (!logError) break; // Success, exit retry loop
-                
-                console.error(`[${requestId}] Error logging payment (attempt ${attempt}/${MAX_DB_RETRIES}):`, logError);
-                if (attempt < MAX_DB_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-              } catch (e) {
-                console.error(`[${requestId}] Exception logging payment (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-                logError = e;
-                if (attempt < MAX_DB_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-              }
+              });
+              
+            if (logError) {
+              console.error('Error logging payment:', logError);
             }
             
             // Mark webhook as processed if we created one
             if (savedWebhook) {
-              for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-                try {
-                  const { error } = await supabaseClient
-                    .from('payment_webhooks')
-                    .update({
-                      processed: true,
-                      processed_at: new Date().toISOString(),
-                      processing_result: {
-                        success: true,
-                        message: 'Manually processed',
-                        timestamp: new Date().toISOString(),
-                        requestId
-                      }
-                    })
-                    .eq('id', savedWebhook.id);
-                    
-                  if (!error) break; // Success, exit retry loop
-                  
-                  console.error(`[${requestId}] Error marking webhook as processed (attempt ${attempt}/${MAX_DB_RETRIES}):`, error);
-                  if (attempt < MAX_DB_RETRIES) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+              await supabaseClient
+                .from('payment_webhooks')
+                .update({
+                  processed: true,
+                  processed_at: new Date().toISOString(),
+                  processing_result: {
+                    success: true,
+                    message: 'Manually processed',
+                    timestamp: new Date().toISOString()
                   }
-                } catch (e) {
-                  console.error(`[${requestId}] Exception marking webhook as processed (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-                  if (attempt < MAX_DB_RETRIES) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                  }
-                }
-              }
+                })
+                .eq('id', savedWebhook.id);
             }
             
             return new Response(
@@ -574,9 +346,7 @@ serve(async (req) => {
                 cardcomData,
                 subscriptionUpdated: !subError,
                 tokenSaved: !tokenError,
-                paymentLogged: !logError,
-                requestId,
-                executionTime: Date.now() - requestStartTime
+                paymentLogged: !logError
               }),
               {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -592,9 +362,7 @@ serve(async (req) => {
             success: true,
             message: 'Retrieved payment data from CardCom',
             data: cardcomData,
-            webhookId: savedWebhook?.id,
-            requestId,
-            executionTime: Date.now() - requestStartTime
+            webhookId: savedWebhook?.id
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -608,82 +376,46 @@ serve(async (req) => {
       
       // If userId is provided and different from ReturnValue, update the payload
       if (effectiveUserId && payload && effectiveUserId !== payload.ReturnValue) {
-        console.log(`[${requestId}] Updating ReturnValue from ${payload.ReturnValue} to ${effectiveUserId}`);
+        console.log(`Updating ReturnValue from ${payload.ReturnValue} to ${effectiveUserId}`);
         payload.ReturnValue = effectiveUserId;
       }
       
       // Simulate a webhook call
-      let webhookResult;
-      try {
-        const webhookResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify(payload)
-          }
-        );
+      const webhookResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
 
-        webhookResult = await webhookResponse.json();
-      } catch (error) {
-        console.error(`[${requestId}] Error calling cardcom-webhook:`, error);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Error processing webhook',
-            error: error instanceof Error ? error.message : String(error),
-            requestId
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          }
-        );
-      }
+      const webhookResult = await webhookResponse.json();
 
       // Mark webhook as processed if successful
       if (webhookResult.success) {
-        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-          try {
-            const { error } = await supabaseClient
-              .from('payment_webhooks')
-              .update({
-                processed: true,
-                processed_at: new Date().toISOString(),
-                processing_result: {
-                  success: true,
-                  message: 'Manually processed via API',
-                  timestamp: new Date().toISOString(),
-                  requestId
-                }
-              })
-              .eq('id', webhookData.id);
-              
-            if (!error) break; // Success, exit retry loop
-            
-            console.error(`[${requestId}] Error marking webhook as processed (attempt ${attempt}/${MAX_DB_RETRIES}):`, error);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        await supabaseClient
+          .from('payment_webhooks')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+            processing_result: {
+              success: true,
+              message: 'Manually processed via API',
+              timestamp: new Date().toISOString()
             }
-          } catch (e) {
-            console.error(`[${requestId}] Exception marking webhook as processed (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          }
-        }
+          })
+          .eq('id', webhookData.id);
       }
 
       return new Response(
         JSON.stringify({
           success: true,
           message: 'Existing webhook processed',
-          result: webhookResult,
-          requestId,
-          executionTime: Date.now() - requestStartTime
+          result: webhookResult
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -694,47 +426,23 @@ serve(async (req) => {
 
     // Scenario 3: Process by email
     if (email) {
-      console.log(`[${requestId}] Processing by email: ${email}`);
+      console.log(`Processing by email: ${email}`);
       
       // First try to find a webhook with this email
-      let webhooks;
-      let webhookError;
-      
-      for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-        try {
-          const result = await supabaseClient
-            .from('payment_webhooks')
-            .select('*')
-            .or(`payload->TranzactionInfo->CardOwnerEmail.eq."${email}",payload->UIValues->CardOwnerEmail.eq."${email}"`)
-            .order('created_at', { ascending: false })
-            .limit(5);
-            
-          webhooks = result.data;
-          webhookError = result.error;
-          
-          if (!webhookError && webhooks && webhooks.length > 0) break; // Success, exit retry loop
-          
-          if (attempt < MAX_DB_RETRIES) {
-            console.log(`[${requestId}] No webhooks found for email ${email}, retry ${attempt}/${MAX_DB_RETRIES}`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        } catch (e) {
-          console.error(`[${requestId}] Exception when querying webhooks by email (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-          webhookError = e;
-          if (attempt < MAX_DB_RETRIES) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          }
-        }
-      }
-      
+      const { data: webhooks, error: webhookError } = await supabaseClient
+        .from('payment_webhooks')
+        .select('*')
+        .or(`payload->TranzactionInfo->CardOwnerEmail.eq."${email}",payload->UIValues->CardOwnerEmail.eq."${email}"`)
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
       if (webhookError) {
-        console.error(`[${requestId}] Error querying webhooks by email:`, webhookError);
+        console.error("Error querying webhooks by email:", webhookError);
         return new Response(
           JSON.stringify({
             success: false,
             message: 'Error querying webhooks by email',
-            error: webhookError instanceof Error ? webhookError.message : String(webhookError),
-            requestId
+            error: webhookError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -747,8 +455,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: false,
-            message: `No webhooks found for email: ${email}`,
-            requestId
+            message: `No webhooks found for email: ${email}`
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -759,88 +466,52 @@ serve(async (req) => {
       
       // Process the first webhook
       const webhook = webhooks[0];
-      console.log(`[${requestId}] Processing webhook ${webhook.id} for email ${email}`);
+      console.log(`Processing webhook ${webhook.id} for email ${email}`);
       
       const payload = webhook.payload;
       
       // Update ReturnValue with our userId if we have one
       if (effectiveUserId && payload) {
-        console.log(`[${requestId}] Setting ReturnValue to ${effectiveUserId}`);
+        console.log(`Setting ReturnValue to ${effectiveUserId}`);
         payload.ReturnValue = effectiveUserId;
       }
       
       // Simulate a webhook call
-      let webhookResult;
-      try {
-        const webhookResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify(payload)
-          }
-        );
+      const webhookResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/cardcom-webhook`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
 
-        webhookResult = await webhookResponse.json();
-      } catch (error) {
-        console.error(`[${requestId}] Error calling cardcom-webhook:`, error);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Error processing webhook',
-            error: error instanceof Error ? error.message : String(error),
-            requestId
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          }
-        );
-      }
+      const webhookResult = await webhookResponse.json();
 
       // Mark webhook as processed if successful
       if (webhookResult.success) {
-        for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
-          try {
-            const { error } = await supabaseClient
-              .from('payment_webhooks')
-              .update({
-                processed: true,
-                processed_at: new Date().toISOString(),
-                processing_result: {
-                  success: true,
-                  message: 'Manually processed via API',
-                  timestamp: new Date().toISOString(),
-                  requestId
-                }
-              })
-              .eq('id', webhook.id);
-              
-            if (!error) break; // Success, exit retry loop
-            
-            console.error(`[${requestId}] Error marking webhook as processed (attempt ${attempt}/${MAX_DB_RETRIES}):`, error);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        await supabaseClient
+          .from('payment_webhooks')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+            processing_result: {
+              success: true,
+              message: 'Manually processed via API',
+              timestamp: new Date().toISOString()
             }
-          } catch (e) {
-            console.error(`[${requestId}] Exception marking webhook as processed (attempt ${attempt}/${MAX_DB_RETRIES}):`, e);
-            if (attempt < MAX_DB_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-          }
-        }
+          })
+          .eq('id', webhook.id);
       }
 
       return new Response(
         JSON.stringify({
           success: true,
           message: 'Webhook processed by email',
-          result: webhookResult,
-          requestId,
-          executionTime: Date.now() - requestStartTime
+          result: webhookResult
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -852,8 +523,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: 'No valid processing method found',
-        requestId
+        message: 'No valid processing method found'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -862,15 +532,13 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error(`[${requestId}] Error processing webhook:`, error);
+    console.error('Error processing webhook:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
         message: error.message || 'Error processing webhook',
-        error: error.toString(),
-        requestId,
-        executionTime: Date.now() - requestStartTime
+        error: error.toString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -895,28 +563,5 @@ function parseCardcomDateString(dateStr: string): string {
     console.error('Error parsing date string:', error);
     // Return current date as fallback
     return new Date().toISOString().split('T')[0];
-  }
-}
-
-// Helper function to log system events
-async function logSystemEvent(
-  supabaseClient: any,
-  level: string,
-  functionName: string,
-  message: string,
-  details: any = {}
-) {
-  try {
-    await supabaseClient
-      .from('system_logs')
-      .insert({
-        level,
-        function_name: functionName,
-        message,
-        details,
-        created_at: new Date().toISOString()
-      });
-  } catch (error) {
-    console.error('Error logging to system_logs:', error);
   }
 }

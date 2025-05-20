@@ -26,26 +26,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const [retryCount, setRetryCount] = useState(0);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  
-  // Generate a session ID for this payment flow if we don't have one
-  useEffect(() => {
-    if (!sessionId) {
-      const newSessionId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-      setSessionId(newSessionId);
-      
-      // Reset the PaymentLogger session to ensure clean logging
-      PaymentLogger.resetSessionId();
-      
-      // Store the session ID in localStorage for potential error recovery
-      localStorage.setItem('current_payment_session', newSessionId);
-    }
-    
-    return () => {
-      // Clean up on unmount
-      localStorage.removeItem('current_payment_session');
-    };
-  }, [sessionId]);
   
   // Log component mount with plan selection
   useEffect(() => {
@@ -55,28 +35,17 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
       { 
         plan: selectedPlan,
         isAuthenticated: !!user,
-        userId: user?.id || 'guest',
-        sessionId
+        userId: user?.id || 'guest'
       }
     );
     
     return () => {
-      PaymentLogger.info('Payment section unmounted', 'payment-section', {
-        sessionId
-      });
+      PaymentLogger.info('Payment section unmounted', 'payment-section');
     };
-  }, [selectedPlan, user, sessionId]);
+  }, [selectedPlan, user]);
   
   // Handle payment initialization
-  const { 
-    paymentUrl, 
-    initiateCardcomPayment, 
-    isLoading: isInitLoading, 
-    error: initError,
-    errorCode,
-    errorDetails,
-    transactionId
-  } = usePaymentInitialization(
+  const { paymentUrl, initiateCardcomPayment, isLoading: isInitLoading, error: initError } = usePaymentInitialization(
     selectedPlan,
     onPaymentComplete, 
     onBack, 
@@ -99,8 +68,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         plan: selectedPlan, 
         lowProfileId: paymentData?.lowProfileId || 'unknown',
         paymentMethod: 'iframe',
-        transactionId: paymentData?.transactionId || 'unknown',
-        sessionId
+        transactionId: paymentData?.transactionId || 'unknown'
       }
     );
     
@@ -110,8 +78,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         lowProfileId: paymentData.lowProfileId,
         transactionId: paymentData.transactionId,
         plan: selectedPlan,
-        timestamp: new Date().toISOString(),
-        sessionId
+        timestamp: new Date().toISOString()
       }));
     }
     
@@ -129,8 +96,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         error: error.message,
         plan: selectedPlan,
         isAuthenticated: !!user,
-        userId: user?.id || 'guest',
-        sessionId
+        userId: user?.id || 'guest'
       }
     );
     setIsLoading(false);
@@ -144,8 +110,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
       'payment-retry', 
       { 
         retryCount: retryCount + 1, 
-        plan: selectedPlan,
-        sessionId 
+        plan: selectedPlan 
       }
     );
     initiateCardcomPayment();
@@ -164,9 +129,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
         onBack={onBack} 
         retryCount={retryCount}
         errorMessage={initError || 'שגיאה ביצירת דף התשלום'}
-        errorDetails={errorDetails}
-        errorCode={errorCode}
-        transactionId={transactionId}
       />
     );
   }
@@ -174,7 +136,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   return (
     <div className="max-w-2xl mx-auto">
       <Card 
-        className="max-w-2xl mx-auto border-primary/30 shadow-[0_10px_24px_rgba(0,0,0,0.15)] overflow-hidden transition-all duration-300 hover:shadow-[0_12px_30px_-5px_rgba(0,0,0,0.2)] animate-fade-in" 
+        className="max-w-2xl mx-auto border-primary/30 shadow-[0_10px_24px_rgba(0,0,0,0.15)] overflow-hidden transition-all duration-300 hover:shadow-[0_12px_30px_-5px_rgba(0,102,255,0.2)] animate-fade-in" 
         dir="rtl"
       >
         <PaymentSectionHeader 
